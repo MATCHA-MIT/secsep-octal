@@ -20,8 +20,6 @@ type operand =
   | MemOpr of immediate option * register option * register option * scale option (* disp, base, index, scale *)
   | LabelOpr of label
 
-type jmp_type = JMP | JNE | JE (* TODO *)
-
 (* destination (if any) is the first operand *)
 type instruction =
   | Mov of operand * operand
@@ -36,7 +34,8 @@ type instruction =
   | Not of operand
   | And of operand * operand
   | Cmp of operand * operand
-  | Jmp of jmp_type * operand
+  | Jmp of operand
+  | Jne of operand
   | Ret
   | Nop
 
@@ -50,6 +49,7 @@ type program = basic_block list
 exception LexicalError of string
 
 exception ParseError of string
+
 let parse_error msg = raise (ParseError ("[Parse Error] " ^ msg))
 
 let lexical_error msg = raise (LexicalError ("[Lexical Error] " ^ msg))
@@ -275,13 +275,13 @@ let parse_tokens (ts: token list) : instruction =
   | ("andq", [opr1; opr2]) -> And (opr2, opr1)
   | ("cmp", [opr1; opr2]) -> Cmp (opr1, opr2)
   | ("cmpq", [opr1; opr2]) -> Cmp (opr1, opr2)
-  | ("jmp", [opr1]) -> Jmp (JMP, opr1)
-  | ("jne", [opr1]) -> Jmp (JNE, opr1)
+  | ("jmp", [opr1]) -> Jmp (opr1)
+  | ("jne", [opr1]) -> Jne (opr1)
   | ("ret", []) -> Ret
   | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
 
 let parse_instr (line: string) : instruction =
-  print_endline ("Parsing " ^ line);
+  (* print_endline ("Parsing " ^ line); *)
   let tokens = tokenize_line line in
   (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
   parse_tokens tokens
@@ -360,7 +360,7 @@ addq $1, %rax
 cmpq $96, %rax
 jne .L79
 # To L79:
-# rax: k6+1\{96}, rcx: any/data, rdx: k7, rsi: k8, rdi: k9
+# rax: k6+1{96}, rcx: any/data, rdx: k7, rsi: k8, rdi: k9
 # To next:
 # rax: {96}, rcx: any/data, rdx: k7, rsi: k8, rdi: k9
 addq $1, %rdi
@@ -369,7 +369,7 @@ addq $96, %rsi
 cmpq $9, %rdi
 jne .L80
 # To L80:
-# rax: any/data, rcx: any/data, rdi: k9+1\{9}, rsi: k8+96,
+# rax: any/data, rcx: any/data, rdi: k9+1{9}, rsi: k8+96,
 # To next:
 # rax: any/data, rcx: any/data, rdi: {9}, rsi: k8+96,
 # ...
