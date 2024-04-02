@@ -30,3 +30,5 @@ add rax, rbx
   rbx = kb
   (+, kb, 1)
 
+1. obtain operands' type
+2. 

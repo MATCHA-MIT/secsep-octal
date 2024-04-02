@@ -20,6 +20,9 @@ type operand =
   | MemOpr of immediate option * register option * register option * scale option (* disp, base, index, scale *)
   | LabelOpr of label
 
+(* FIX (maybe later): distinguish store memopr, access memopr, pure memopr *)
+
+(* FIX: add destination *)
 (* destination (if any) is the first operand *)
 type instruction =
   | Mov of operand * operand
@@ -50,9 +53,13 @@ exception LexicalError of string
 
 exception ParseError of string
 
-let parse_error msg = raise (ParseError ("[Parse Error] " ^ msg))
+exception TypeAlgoError of string
 
 let lexical_error msg = raise (LexicalError ("[Lexical Error] " ^ msg))
+
+let parse_error msg = raise (ParseError ("[Parse Error] " ^ msg))
+
+let type_algo_error msg = raise (TypeAlgoError ("[Type Algorithm Error] " ^ msg))
 
 let parse_label (line: string) : label =
   let label_name = String.sub line 0 ((String.length line) - 1) in
@@ -208,7 +215,7 @@ let parse_memory_operand (ts: token list) : operand * token list =
   match ts with
   | LParen :: RegTok base :: RParen :: ts -> (* (base) *)
     (MemOpr (None, Some base, None, None), ts)
-  | LParen :: RegTok base :: Comma :: RegTok index :: RParen :: ts -> (* (base) *)
+  | LParen :: RegTok base :: Comma :: RegTok index :: RParen :: ts -> (* (base + index) *)
     (MemOpr (None, Some base, Some index, None), ts)
   | ImmTok disp :: LParen :: RegTok base :: RParen :: ts -> (* disp(base) *)
     (MemOpr (Some disp, Some base, None, None), ts)
@@ -319,6 +326,217 @@ let parse_program (source: string) : program =
   in
   let bbs = bb_spliter lines [] [] in
   List.map parse_basic_block bbs
+
+let int_of_immediate (imm: immediate) : int =
+  match imm with
+  | ImmNum n -> n
+  | ImmLabel l -> type_algo_error "int_of_immediate: label lookup not supported yet"
+
+type singleton_type =
+| SingletonValue of int
+| SingletonSymbol of int (* FIXME *)
+(* memory: {symbol + offset: type; ...}*)
+
+type arith_op =
+| AddOp (* includes sub *)
+| MulOp
+
+type reg_type =
+| SingletonT of singleton_type
+| RangeT of int * int * int (* beg, end, step *) (* TODO: inclusive? *)
+| VariableT of int (* variable id *)
+| ArithT of arith_op * reg_type * int
+| TypeArithT of arith_op * reg_type * reg_type
+| SetSubT of reg_type * reg_type (* TODO: think of the second one *)
+| TopT
+| BottomT
+
+type gpr_types = {
+  rax: reg_type; rcx: reg_type; rdx: reg_type; rbx: reg_type;
+  rsp: reg_type; rbp: reg_type; rsi: reg_type; rdi: reg_type;
+  r8:  reg_type; r9:  reg_type; r10: reg_type; r11: reg_type;
+  r12: reg_type; r13: reg_type; r14: reg_type; r15: reg_type;
+}
+
+type type_state = gpr_types * ((int * reg_type) list) (* reg types, (offset from initial rsp of func & type) *)
+
+module VarMap = Map.Make (struct
+  type t = int
+  let compare = compare
+end)
+
+type subtype_relation = reg_type * reg_type
+
+let is_function_entry (l: label) = String.length l >= 2 && l.[0] <> '.'
+
+let get_reg_type (types: type_state) (reg: register) =
+  let (gpr_types, _) = types in
+  match reg with
+  | RAX | EAX | AX | AH | AL -> gpr_types.rax
+  | RCX | ECX | CX | CH | CL -> gpr_types.rcx
+  | RDX | EDX | DX | DH | DL -> gpr_types.rdx
+  | RBX | EBX | BX | BH | BL -> gpr_types.rbx
+  | RSP | ESP | SP | SPL -> gpr_types.rsp
+  | RBP | EBP | BP | BPL -> gpr_types.rbp
+  | RSI | ESI | SI | SIL -> gpr_types.rsi
+  | RDI | EDI | DI | DIL -> gpr_types.rdi
+  | R8 | R8D | R8W | R8B -> gpr_types.r8
+  | R9 | R9D | R9W | R9B -> gpr_types.r9
+  | R10 | R10D | R10W | R10B -> gpr_types.r10
+  | R11 | R11D | R11W | R11B -> gpr_types.r11
+  | R12 | R12D | R12W | R12B -> gpr_types.r12
+  | R13 | R13D | R13W | R13B -> gpr_types.r13
+  | R14 | R14D | R14W | R14B -> gpr_types.r14
+  | R15 | R15D | R15W | R15B -> gpr_types.r15
+
+let set_reg_type (types: type_state) (reg: register) (t: reg_type)=
+  let (gpr_types, stack_types) = types in
+  match reg with
+  | RAX | EAX | AX | AH | AL -> ({gpr_types with rax = t}, stack_types)
+  | RCX | ECX | CX | CH | CL -> ({gpr_types with rcx = t}, stack_types)
+  | RDX | EDX | DX | DH | DL -> ({gpr_types with rdx = t}, stack_types)
+  | RBX | EBX | BX | BH | BL -> ({gpr_types with rbx = t}, stack_types)
+  | RSP | ESP | SP | SPL -> ({gpr_types with rsp = t}, stack_types)
+  | RBP | EBP | BP | BPL -> ({gpr_types with rbp = t}, stack_types)
+  | RSI | ESI | SI | SIL -> ({gpr_types with rsi = t}, stack_types)
+  | RDI | EDI | DI | DIL -> ({gpr_types with rdi = t}, stack_types)
+  | R8 | R8D | R8W | R8B -> ({gpr_types with r8 = t}, stack_types)
+  | R9 | R9D | R9W | R9B -> ({gpr_types with r9 = t}, stack_types)
+  | R10 | R10D | R10W | R10B -> ({gpr_types with r10 = t}, stack_types)
+  | R11 | R11D | R11W | R11B -> ({gpr_types with r11 = t}, stack_types)
+  | R12 | R12D | R12W | R12B -> ({gpr_types with r12 = t}, stack_types)
+  | R13 | R13D | R13W | R13B -> ({gpr_types with r13 = t}, stack_types)
+  | R14 | R14D | R14W | R14B -> ({gpr_types with r14 = t}, stack_types)
+  | R15 | R15D | R15W | R15B -> ({gpr_types with r15 = t}, stack_types)
+
+let offset_of_mem_operand () :  =
+  
+
+let set_mem_type (types: type_state) (opr: operand) (t: reg_type) : type_state =
+  let (gpr_types, stack_types) = types in
+  match opr with
+  | MemOpr (disp, base, index, scale) -> begin
+      match disp, base, index, scale with begin
+      | None, Some base, None, None ->
+          let base_type = get_reg_type types base in
+          (gpr_types, stack_types')
+      (* TODO: match all patterns of memory addressing that refers to stack slot *)
+      end
+    end
+  | _ -> type_algo_error "set_mem_type: expecting memory addressing operand"
+
+let type_add (t1: reg_type) (t2: reg_type) : reg_type =
+  match t1, t2 with
+  | TopT, _ | _, TopT -> TopT
+  | SingletonT (SingletonValue v1), SingletonT (SingletonValue v2) -> SingletonT (SingletonValue (v1 + v2))
+  | SingletonT (SingletonBase), SingletonT (SingletonValue v)
+  | SingletonT (SingletonValue v), SingletonT (SingletonBase) -> ArithT (AddOp, SingletonT (SingletonBase), v)
+  | ArithT (AddOp, t, i), SingletonT (SingletonValue v)
+  | SingletonT (SingletonValue v), ArithT (AddOp, t, i) -> ArithT (AddOp, t, i + v)
+  | RangeT (bg, ed, st), SingletonT (SingletonValue v)
+  | SingletonT (SingletonValue v) , RangeT (bg, ed, st) -> RangeT (bg + v, ed + v, st)
+  (* TODO *)
+  | _ -> TypeArithT (AddOp, t1, t2)
+
+let stack_base_id = 1
+
+(* TODO: Add size; warn when loads / stores' size does not match *)
+let (types: type_state) (mem_opr: reg_type) : reg_type =
+  let (_, stack_types) = types in
+  match mem_opr with
+  | ArithT (AddOp, SingletonSymbol s', SingletonValue offset) ->
+      if s' = stack_base_id
+      then begin
+        List.find (fun (off, _) -> off = offset) stack_types |> snd
+      end
+
+let get_mem_type (types: type_state) (mem_opr: operand) : reg_type =
+  let (_, stack_types) = types in
+  let load_stack_type_by_offset (offset: int) : reg_type =
+    try
+      List.find (fun (off, _) -> off = offset) stack_types |> snd
+    with
+    | Not_found -> type_algo_error ("get_mem_type: stack offset " ^ (string_of_int offset) ^ " not in record")
+  in
+  let load_stack_type_by_type (offset_type: reg_type) (extra: int) : reg_type =
+    match offset_type with
+    | SingletonT (SingletonBase) -> load_stack_type_by_offset extra
+    | ArithT (AddOp, SingletonT SingletonBase, off) -> load_stack_type_by_offset (off + extra)
+    (* TODO: stack base + a range ? *)
+    | _ -> type_algo_error "get_mem_type: unsupporting stack loading"
+  in
+  let helper disp base index scale =
+    match disp, base, index, scale with
+    | None, Some base, None, None ->
+        load_stack_type_by_type (get_reg_type types base) 0 (* (base) *)
+    | Some disp, Some base, None, None ->
+        load_stack_type_by_type (get_reg_type types base) (int_of_immediate disp) (* disp(base) *)
+    | None, Some base, Some index, None ->
+        let base_type = get_reg_type types base in
+        let index_type = get_reg_type types index in
+        load_stack_type_by_type (TypeArithT (AddOp, base_type, index_type)) 0 (* (base + index) *)
+    | _ -> type_algo_error "get_operand_type: unsupported memory operand"
+  in 
+  match mem_opr with
+  | MemOpr (disp, base, index, scale) -> helper disp base index scale
+  | _ -> type_algo_error "get_mem_type: expecting memory operand"
+
+let get_operand_type (types: type_state) (opr: operand) : reg_type =
+  match opr with
+  | ImmOpr imm -> SingletonT (SingletonValue (int_of_immediate imm))
+  | RegOpr r -> get_reg_type types r
+  | MemOpr (_, _, _, _)-> get_mem_type types opr
+  | LabelOpr _ -> type_algo_error "get_operand_type: label type not supported yet"
+
+(* operand (memory operand) --> offset 
+     --> use offset as value (LEA)
+     --> use offset to load / store
+
+
+*)
+
+(* FIXME: only the part in "type_add" is different for different opcodes. reformat *)
+
+let prop_add (types: type_state) (opr1: operand) (opr2: operand) : type_state =
+  let new_type = type_add (get_operand_type types opr1) (get_operand_type types opr2) in
+  match opr1, opr2 with
+  | RegOpr r, _ ->
+      set_reg_type types r new_type
+  | MemOpr _, _ ->
+      set_mem_type types opr1 new_type
+  | _ -> type_algo_error "prop_add: unsupported"
+
+let propagate_fwd (bb: basic_block) (init_types: type_state) : type_state =
+  let rec helper (instrs: instruction list) (types: type_state) : type_state =
+    match instrs with
+    | [] -> types
+    | instr :: instrs -> begin
+        let types' = match instr with
+        | Add(opr1, opr2) -> prop_add types opr1 opr2
+        | _ -> type_algo_error "propagate_fwd: unsupported instruction"
+        in
+        helper instrs types'
+      end
+
+  in
+  helper bb.instrs init_types
+
+let foo (target: int) (r1: reg_type * reg_type) (r2: reg_type * reg_type) : reg_type option =
+  match r1, r2 with
+  | (SingletonValue base, VariableT var1), (SetSubT (ArithT (op, VariableT var2, step), SingletonValue bound))
+  | (SetSubT (ArithT (op, VariableT var2, step), SingletonValue bound)), (SingletonValue base, VariableT var1) ->
+      if var1 = var2 && var1 = target then begin
+        match op with
+        | AddOp ->
+            if base < bound && step > 0 then
+              Some RangeT (base, bound, step) (* FIXME: range inclusiveness *)
+            else if base > bound && step < 0 then
+              Some RangeT (bound, base, -step)
+            else
+              None
+      end
+      else None
+  | _ -> None
 
 let _ = parse_program "
 table_select:
