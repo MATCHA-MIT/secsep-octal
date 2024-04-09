@@ -1,0 +1,541 @@
+(* Type and type derivation *)
+open Isa
+
+module CodeType = struct
+  exception CodeTypeError of string
+  let code_type_error msg = raise (CodeTypeError ("[Code Type Error] " ^ msg))
+
+  type single_var = int
+  let stack_base_id = 1
+
+  type single_bop =
+    | SingleAdd
+    | SingleSub
+    | SingleMul
+    | SingleSal
+    | SingleSar
+    | SingleXor
+    | SingleAnd
+    | SingleOr
+
+  type single_uop =
+    | SingleNot
+    (* TODO: Should we add SingleNeg? *)
+
+  type single_exp =
+    | SingleConst of int
+    | SingleVar of single_var
+    | SingleBExp of single_bop * single_exp * single_exp
+    | SingleUExp of single_uop * single_exp
+
+  let rec eval_single_exp (e: single_exp) : single_exp =
+    match e with
+    | SingleBExp (op, e1, e2) -> 
+      let ee1 = eval_single_exp e1 in 
+      let ee2 = eval_single_exp e2 in
+      let default_single = SingleBExp (op, ee1, ee2) in
+      begin match ee1, ee2 with
+      | (SingleConst v1), (SingleConst v2) -> 
+        begin match op with
+        | SingleAdd -> SingleConst (v1 + v2)
+        | SingleSub -> SingleConst (v1 - v2)
+        | SingleMul -> SingleConst (v1 * v2)
+        | SingleSal -> SingleConst (Int.shift_left v1 v2)
+        | SingleSar -> SingleConst (Int.shift_right v1 v2)
+        | SingleXor -> SingleConst (Int.logxor v1 v2)
+        | SingleAnd -> SingleConst (Int.logand v1 v2)
+        | SingleOr -> SingleConst (Int.logor v1 v2)
+        end
+      | _ -> default_single
+      end
+    | SingleUExp (op, e) -> 
+      let ee = eval_single_exp e in
+      let default_single = SingleUExp (op, ee) in
+      begin match ee with
+      | SingleConst v -> begin
+          match op with
+          | SingleNot -> SingleConst (Int.lognot v)
+        end
+      | _ -> default_single
+      end
+    | _ -> e
+
+  type type_var = int
+
+  type type_bop =
+    | TypeAdd
+    | TypeSub
+    | TypeMul
+    | TypeSal
+    | TypeSar
+    | TypeXor
+    | TypeAnd
+    | TypeOr
+    | TypeInter
+    | TypeUnion
+    | TypeDiff
+
+  type type_uop =
+    | TypeNot
+    | TypeComp
+
+  type type_exp =
+    | TypeSingle of single_exp
+    | TypeRange of single_exp * bool * single_exp * bool * int (* begin, inc, end, inc, step *)
+    | TypeVar of type_var
+    | TypeTop
+    | TypeBot
+    | TypeBExp of type_bop * type_exp * type_exp
+    | TypeUExp of type_uop * type_exp
+
+  let rec eval_type_exp (e: type_exp) : type_exp =
+    match e with
+    | TypeBExp (tbop, e1, e2) -> 
+      let ee1 = eval_type_exp e1 in
+      let ee2 = eval_type_exp e2 in
+      let default_type = TypeBExp (tbop, ee1, ee2) in
+      begin match ee1, ee2 with
+      | TypeSingle s1, TypeSingle s2 -> 
+        begin match tbop with
+        | TypeAdd -> TypeSingle (eval_single_exp (SingleBExp (SingleAdd, s1, s2)))
+        | TypeSub -> TypeSingle (eval_single_exp (SingleBExp (SingleSub, s1, s2)))
+        | TypeMul -> TypeSingle (eval_single_exp (SingleBExp (SingleMul, s1, s2)))
+        | TypeSal -> TypeSingle (eval_single_exp (SingleBExp (SingleSal, s1, s2)))
+        | TypeSar -> TypeSingle (eval_single_exp (SingleBExp (SingleSal, s1, s2)))
+        | TypeXor -> TypeSingle (eval_single_exp (SingleBExp (SingleXor, s1, s2)))
+        | TypeAnd -> TypeSingle (eval_single_exp (SingleBExp (SingleAnd, s1, s2)))
+        | TypeOr -> TypeSingle (eval_single_exp (SingleBExp (SingleOr, s1, s2)))
+        | TypeInter -> 
+          begin match s1, s2 with
+          | SingleConst v1, SingleConst v2 -> if v1 = v2 then TypeSingle (SingleConst v1) else TypeBot
+          | SingleVar v1, SingleConst v2 -> if v1 = v2 then TypeSingle (SingleVar v1) else e (* TODO Double check this!*)
+          | _ -> default_type
+          end
+        | TypeDiff -> 
+          begin match s1, s2 with
+          | SingleConst v1, SingleConst v2 -> if v1 = v2 then TypeBot else TypeSingle (SingleConst v1)
+          | SingleVar v1, SingleVar v2 -> if v1 = v2 then TypeBot else TypeSingle (SingleVar v1)
+          | _ -> default_type
+          end
+        | _ -> default_type
+        end
+      | TypeSingle s0, TypeRange (s1, b1, s2, b2, step) ->
+        begin match tbop with
+        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s1, s0))), b1,
+                                (eval_single_exp (SingleBExp (SingleAdd, s2, s0))), b2, step)
+        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s0, s1))), b2,
+                                (eval_single_exp (SingleBExp (SingleSub, s0, s1))), b1, step)
+        | TypeMul -> 
+          begin match s0 with
+          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
+                                         (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step * i0)
+          | _ -> default_type
+            (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
+                            (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
+          end
+        (* TODO: TypeXor TypeAnd TypeOr *)
+        | _ -> default_type
+        end
+      | TypeRange (s1, b1, s2, b2, step), TypeSingle s0 -> 
+        begin match tbop with
+        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s1, s0))), b1,
+                                (eval_single_exp (SingleBExp (SingleAdd, s2, s0))), b2, step)
+        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s1, s0))), b1,
+                                (eval_single_exp (SingleBExp (SingleSub, s2, s0))), b2, step)
+        | TypeMul -> 
+          begin match s0 with
+          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
+                                         (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step * i0)
+          | _ -> default_type
+            (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
+                            (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
+          end
+        | TypeSal ->
+          begin match s0 with
+          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleSal, s1, s0))), b1,
+                                         (eval_single_exp (SingleBExp (SingleSal, s2, s0))), b2, Int.shift_left step i0)
+          | _ -> default_type
+          end
+        | TypeSar ->
+          begin match s0 with
+          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleSar, s1, s0))), b1,
+                                          (eval_single_exp (SingleBExp (SingleSar, s2, s0))), b2, Int.shift_right step i0)
+          | _ -> default_type
+          end
+        (* TODO: TypeXor TypeAnd TypeOr *)
+        | _ -> default_type
+        end
+      | _ -> default_type
+      end
+    | TypeUExp (tuop, e) ->
+      let ee = eval_type_exp e in
+      let default_type = TypeUExp (tuop, ee) in
+      begin match ee with
+      | TypeSingle s ->
+        begin match tuop with
+        | TypeNot -> TypeSingle (eval_single_exp (SingleUExp (SingleNot, s)))
+        | _ -> default_type
+        end
+      | _ -> default_type
+      end
+    | _ -> e
+
+
+  module Ints = Set.Make(Int)
+
+  type type_full_exp = type_exp * Ints.t
+  (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=2 *)
+
+  type reg_type = type_full_exp list
+  (* type reg_type = {
+    rax: type_full_exp; rcx: type_full_exp; rdx: type_full_exp; rbx: type_full_exp;
+    rsp: type_full_exp; rbp: type_full_exp; rsi: type_full_exp; rdi: type_full_exp;
+    r8:  type_full_exp; r9:  type_full_exp; r10: type_full_exp; r11: type_full_exp;
+    r12: type_full_exp; r13: type_full_exp; r14: type_full_exp; r15: type_full_exp;
+  } *)
+
+  type mem_type = (int * type_full_exp) list
+
+  type cond_type =
+    | CondNe of (type_full_exp * type_full_exp)
+    | CondEq of (type_full_exp * type_full_exp)
+    | CondLq of (type_full_exp * type_full_exp)
+    | CondLe of (type_full_exp * type_full_exp)
+
+  let not_cond_type (cond: cond_type) : cond_type = 
+    match cond with
+    | CondNe (l, r) -> CondEq (l, r)
+    | CondEq (l, r) -> CondNe (l, r)
+    | CondLq (l, r) -> CondLq (r, l)
+    | CondLe (l, r) -> CondLe (r, l)
+  
+  let get_cond_type (cond_list: cond_type list) (cond_idx: int) : cond_type =
+    let idx = cond_idx / 2 in
+    let cond = List.nth cond_list ((List.length cond_list) - idx) in
+    let taken = Int.rem cond_idx 2 in
+    if taken = 1 then cond
+    else not_cond_type cond
+
+  let add_cond_type (cond_list: cond_type list) (cond: cond_type) (taken: bool) : (cond_type list) * int =
+    let cond_suffix = if taken then 1 else 0 in
+    (cond::cond_list, ((List.length cond_list) + 1) * 2 + cond_suffix)
+
+  type state_type = {
+    reg_type: reg_type;
+    mem_type: mem_type;
+    cond_type: (type_full_exp * type_full_exp)  (* Cmp and test and etc. will set this; Cond branch will use this *)
+  }
+
+  let get_imm_type (i: Isa.immediate) : type_full_exp =
+    match i with
+    | ImmNum v -> (TypeSingle (SingleConst v), Ints.empty)
+    | ImmLabel v -> (TypeSingle (SingleVar v), Ints.empty)
+
+  let get_reg_type (curr_state: state_type) (r: Isa.register) : type_full_exp =
+    let reg_type_list = curr_state.reg_type in
+    let reg_idx = Isa.get_reg_idx r in
+    List.nth reg_type_list reg_idx
+    (* match r with
+    | RAX | EAX | AX | AH | AL -> reg_dict.rax
+    | RCX | ECX | CX | CH | CL -> reg_dict.rcx
+    | RDX | EDX | DX | DH | DL -> reg_dict.rdx
+    | RBX | EBX | BX | BH | BL -> reg_dict.rbx
+    | RSP | ESP | SP | SPL -> reg_dict.rsp
+    | RBP | EBP | BP | BPL -> reg_dict.rbp
+    | RSI | ESI | SI | SIL -> reg_dict.rsi
+    | RDI | EDI | DI | DIL -> reg_dict.rdi
+    | R8 | R8D | R8W | R8B -> reg_dict.r8
+    | R9 | R9D | R9W | R9B -> reg_dict.r9
+    | R10 | R10D | R10W | R10B -> reg_dict.r10
+    | R11 | R11D | R11W | R11B -> reg_dict.r11
+    | R12 | R12D | R12W | R12B -> reg_dict.r12
+    | R13 | R13D | R13W | R13B -> reg_dict.r13
+    | R14 | R14D | R14W | R14B -> reg_dict.r14
+    | R15 | R15D | R15W | R15B -> reg_dict.r15
+    | R0 -> (TypeSingle (SingleConst 0), Ints.empty) *)
+
+  let set_reg_type (curr_state: state_type) (r: Isa.register) (t: type_full_exp) : state_type =
+    let reg_list = curr_state.reg_type in
+    let reg_idx = Isa.get_reg_idx r in
+    let new_reg_list = List.mapi (fun idx reg_type -> if idx = reg_idx then t else reg_type) reg_list in
+    {curr_state with reg_type = new_reg_list}
+    (* match r with
+    | RAX | EAX | AX | AH | AL -> {curr_state with reg_type = {reg_dict with rax = t}}
+    | RCX | ECX | CX | CH | CL -> {curr_state with reg_type = {reg_dict with rcx = t}}
+    | RDX | EDX | DX | DH | DL -> {curr_state with reg_type = {reg_dict with rdx = t}}
+    | RBX | EBX | BX | BH | BL -> {curr_state with reg_type = {reg_dict with rbx = t}}
+    | RSP | ESP | SP | SPL -> {curr_state with reg_type = {reg_dict with rsp = t}}
+    | RBP | EBP | BP | BPL -> {curr_state with reg_type = {reg_dict with rbp = t}}
+    | RSI | ESI | SI | SIL -> {curr_state with reg_type = {reg_dict with rsi = t}}
+    | RDI | EDI | DI | DIL -> {curr_state with reg_type = {reg_dict with rdi = t}}
+    | R8 | R8D | R8W | R8B -> {curr_state with reg_type = {reg_dict with r8 = t}}
+    | R9 | R9D | R9W | R9B -> {curr_state with reg_type = {reg_dict with r9 = t}}
+    | R10 | R10D | R10W | R10B -> {curr_state with reg_type = {reg_dict with r10 = t}}
+    | R11 | R11D | R11W | R11B -> {curr_state with reg_type = {reg_dict with r11 = t}}
+    | R12 | R12D | R12W | R12B -> {curr_state with reg_type = {reg_dict with r12 = t}}
+    | R13 | R13D | R13W | R13B -> {curr_state with reg_type = {reg_dict with r13 = t}}
+    | R14 | R14D | R14W | R14B -> {curr_state with reg_type = {reg_dict with r14 = t}}
+    | R15 | R15D | R15W | R15B -> {curr_state with reg_type = {reg_dict with r15 = t}}
+    | R0 -> curr_state *)
+
+  let get_mem_op_type (curr_state: state_type)
+      (disp: Isa.immediate) (base: Isa.register)
+      (index: Isa.register) (scale: Isa.scale) : type_full_exp =
+    let disp_type, _ = get_imm_type disp in
+    let base_type, base_cond = get_reg_type curr_state base in
+    let index_type, index_cond = get_reg_type curr_state index in
+    let scale_val = Isa.scale_val scale in
+    let new_type = eval_type_exp (TypeBExp (TypeAdd, TypeBExp (TypeAdd, disp_type, base_type), TypeBExp (TypeMul, index_type, TypeSingle (SingleConst scale_val)))) in
+    let new_cond = Ints.union base_cond index_cond in
+    (new_type, new_cond)
+
+  let get_mem_idx (addr_type: type_exp) : int option =
+    match addr_type with
+    | TypeSingle s -> 
+      begin match s with
+      | SingleVar v -> if v = stack_base_id then Some 0 else None
+      | SingleBExp (op, v1, v2) -> 
+        begin match op, v1, v2 with
+        | SingleAdd, SingleVar v, SingleConst c
+        | SingleAdd, SingleConst c, SingleVar v -> if v = stack_base_id then Some c else None
+        | SingleSub, SingleVar v, SingleConst c -> if v = stack_base_id then Some (-c) else None (* NOTE: this maybe not needed*)
+        | _ -> None
+        end
+      | _ -> None
+      end
+    | _ -> None
+
+  let get_mem_idx_type (curr_state: state_type) (offset: int) : type_full_exp =
+    let mem_type = curr_state.mem_type in
+    let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
+    match idx_find with
+    | Some (_, t) -> t
+    | None -> code_type_error ("get_mem_idx_type: stack offset " ^ (string_of_int offset) ^ " not in record")
+
+  let set_mem_idx_type (curr_state: state_type) (offset: int) (new_type: type_full_exp) : state_type =
+    let mem_type = curr_state.mem_type in
+    let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
+    match idx_find with
+    | Some _ -> 
+      {curr_state with mem_type = 
+        List.map (fun (off, x) -> if off = offset then (off, new_type) else (off, x)) mem_type}
+    | None -> {curr_state with mem_type = (offset, new_type) :: mem_type}
+
+  let get_ld_op_type (curr_state: state_type)
+      (disp: Isa.immediate) (base: Isa.register)
+      (index: Isa.register) (scale: Isa.scale) : type_full_exp =
+    let addr_type, _ = get_mem_op_type curr_state disp base index scale in
+    let mem_idx = get_mem_idx addr_type in
+    match mem_idx with
+    | Some v -> get_mem_idx_type curr_state v
+    | None -> (TypeTop, Ints.empty)
+
+  let set_st_op_type (curr_state: state_type) 
+      (disp: Isa.immediate) (base: Isa.register)
+      (index: Isa.register) (scale: Isa.scale)
+      (new_type: type_full_exp) : state_type =
+    let addr_type, _ = get_mem_op_type curr_state disp base index scale in
+    let mem_idx = get_mem_idx addr_type in
+    match mem_idx with
+    | Some v -> set_mem_idx_type curr_state v new_type (* TODO!!!*)
+    | None -> curr_state
+
+  let get_src_op_type (curr_state: state_type) (src: Isa.operand) : type_full_exp =
+    match src with
+    | ImmOp imm -> get_imm_type imm
+    | RegOp r -> get_reg_type curr_state r
+    | MemOp (disp, base, index, scale) -> get_mem_op_type curr_state disp base index scale
+    | LdOp (disp, base, index, scale) -> get_ld_op_type curr_state disp base index scale
+    | StOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a st op")
+    | LabelOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a label op")
+
+  let set_dest_op_type (curr_state: state_type) (dest: Isa.operand) (new_type: type_full_exp) : state_type =
+    match dest with
+    | RegOp r -> set_reg_type curr_state r new_type
+    | StOp (disp, base, index, scale) -> set_st_op_type curr_state disp base index scale new_type
+    | _ -> code_type_error ("set_dest_op_type: dest is not reg or st op")
+
+  let add_type_cond (tf: type_full_exp) (cond_idx: int) : type_full_exp =
+    let t, cond = tf in (t, Ints.add cond_idx cond)
+  
+  let add_type_cond_set (tf: type_full_exp) (cond_set: Ints.t) : type_full_exp =
+    let t, cond = tf in (t, Ints.union cond_set cond)
+
+  let add_reg_type_cond (reg_list: reg_type) (cond_idx: int) : reg_type =
+    List.map (fun reg_type -> add_type_cond reg_type cond_idx) reg_list
+    (* {
+      rax = add_type_cond reg_dict.rax cond_idx;
+      rcx = add_type_cond reg_dict.rcx cond_idx;
+      rdx = add_type_cond reg_dict.rdx cond_idx;
+      rbx = add_type_cond reg_dict.rbx cond_idx;
+      rsp = add_type_cond reg_dict.rsp cond_idx;
+      rbp = add_type_cond reg_dict.rbp cond_idx;
+      rsi = add_type_cond reg_dict.rsi cond_idx;
+      rdi = add_type_cond reg_dict.rdi cond_idx;
+      r8 = add_type_cond reg_dict.r8 cond_idx;
+      r9 = add_type_cond reg_dict.r9 cond_idx;
+      r10 = add_type_cond reg_dict.r10 cond_idx;
+      r11 = add_type_cond reg_dict.r11 cond_idx;
+      r12 = add_type_cond reg_dict.r12 cond_idx;
+      r13 = add_type_cond reg_dict.r13 cond_idx;
+      r14 = add_type_cond reg_dict.r14 cond_idx;
+      r15 = add_type_cond reg_dict.r15 cond_idx;
+    } *)
+
+  let add_mem_type_cond (mem_list: mem_type) (cond_idx: int) : mem_type =
+    List.map (fun (off, tf) -> (off, add_type_cond tf cond_idx)) mem_list
+    
+  let add_state_type_cond (curr_state: state_type) (cond_idx: int) : state_type =
+    {
+      reg_type = add_reg_type_cond curr_state.reg_type cond_idx;
+      mem_type = add_mem_type_cond curr_state.mem_type cond_idx;
+      cond_type = curr_state.cond_type
+    }
+
+  let type_prop_inst (curr_state: state_type) (cond_list: cond_type list) (inst: Isa.instruction) : state_type * (cond_type list) =
+    match inst with
+    | Mov (dest, src)
+    | MovS (dest, src)
+    | MovZ (dest, src)
+    | Lea (dest, src) ->
+      let src_type = get_src_op_type curr_state src in
+      (set_dest_op_type curr_state dest src_type, cond_list)
+    | Add (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Sub (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeSub, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Sal (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeSal, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Sar (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeSar, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Xor (dest, src1, src2) ->
+      (* TODO: Add special case for xor %rax %rax *)
+      begin match src1, src2 with
+      | RegOp r1, RegOp r2 ->
+        if r1 = r2 then (set_dest_op_type curr_state dest (TypeSingle (SingleConst 0), Ints.empty), cond_list)
+        else begin
+          let src1_type, src1_cond = get_src_op_type curr_state src1 in
+          let src2_type, src2_cond = get_src_op_type curr_state src2 in
+          let dest_type = (eval_type_exp (TypeBExp (TypeXor, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+          (set_dest_op_type curr_state dest dest_type, cond_list)
+        end
+      | _ ->
+        let src1_type, src1_cond = get_src_op_type curr_state src1 in
+        let src2_type, src2_cond = get_src_op_type curr_state src2 in
+        let dest_type = (eval_type_exp (TypeBExp (TypeXor, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+        (set_dest_op_type curr_state dest dest_type, cond_list)
+      end
+    | Not (dest, src) ->
+      let src_type, src_cond = get_src_op_type curr_state src in
+      let dest_type = (eval_type_exp (TypeUExp (TypeNot, src_type)), src_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | And (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeAnd, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Or (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeOr, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Cmp (src1, src2) ->
+      let src1_full_type = get_src_op_type curr_state src1 in
+      let src2_full_type = get_src_op_type curr_state src2 in
+      ({curr_state with cond_type = (src1_full_type, src2_full_type)}, cond_list)
+      (* TODO: Handle the case where some other instructions set flags and some other instructions use flags!!! *)
+    | Jcond (_, branch_cond) ->
+      let cond_left, cond_right = curr_state.cond_type in
+      let new_cond = 
+        begin match branch_cond with
+        | JNe -> CondNe (cond_left, cond_right)
+        | JE -> CondEq (cond_left, cond_right)
+        | JL -> CondLq (cond_left, cond_right)
+        | JLe -> CondLe (cond_left, cond_right)
+        | JG -> CondLq (cond_right, cond_left)
+        | JGe -> CondLe (cond_right, cond_left)
+        end in
+      let new_cond_list, new_cond_idx = add_cond_type cond_list new_cond false in
+      (add_state_type_cond curr_state new_cond_idx, new_cond_list)
+    | _ -> (curr_state, cond_list) (* TODO *)
+
+
+
+  type block_type = {
+    label: Isa.label;
+    block_code_type: state_type;
+  }
+
+  type t = block_type list
+
+  let init_reg_type (start_type_var_idx: int) : int * reg_type =
+    (start_type_var_idx + Isa.total_reg_num,
+    List.init Isa.total_reg_num (fun idx -> (TypeSingle (SingleVar (start_type_var_idx + idx)), Ints.empty)))
+    (* (start_type_var_idx + 16, {
+      rax = (TypeSingle (SingleVar start_type_var_idx), Ints.empty);
+      rcx = (TypeSingle (SingleVar (start_type_var_idx + 1)), Ints.empty);
+      rdx = (TypeSingle (SingleVar (start_type_var_idx + 2)), Ints.empty);
+      rbx = (TypeSingle (SingleVar (start_type_var_idx + 3)), Ints.empty);
+      rsp = (TypeSingle (SingleVar (start_type_var_idx + 4)), Ints.empty);
+      rbp = (TypeSingle (SingleVar (start_type_var_idx + 5)), Ints.empty);
+      rsi = (TypeSingle (SingleVar (start_type_var_idx + 6)), Ints.empty);
+      rdi = (TypeSingle (SingleVar (start_type_var_idx + 7)), Ints.empty);
+      r8 = (TypeSingle (SingleVar (start_type_var_idx + 8)), Ints.empty);
+      r9 = (TypeSingle (SingleVar (start_type_var_idx + 9)), Ints.empty);
+      r10 = (TypeSingle (SingleVar (start_type_var_idx + 10)), Ints.empty);
+      r11 = (TypeSingle (SingleVar (start_type_var_idx + 11)), Ints.empty);
+      r12 = (TypeSingle (SingleVar (start_type_var_idx + 12)), Ints.empty);
+      r13 = (TypeSingle (SingleVar (start_type_var_idx + 13)), Ints.empty);
+      r14 = (TypeSingle (SingleVar (start_type_var_idx + 14)), Ints.empty);
+      r15 = (TypeSingle (SingleVar (start_type_var_idx + 15)), Ints.empty);
+    }) *)
+
+  let init_mem_type (start_type_var_idx: int) (mem_off_list: int list) : int * mem_type =
+    List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeSingle (SingleVar acc), Ints.empty)))) start_type_var_idx mem_off_list
+
+  let init_code_type_var (start_type_var_idx: int) (prog: Isa.program) (mem_off_list: int list) : int * t =
+    let helper (acc: int) (block: Isa.basic_block) : int * block_type = begin
+      let acc1, reg_t = init_reg_type acc in
+      let acc2, mem_t = init_mem_type acc1 mem_off_list in
+      (acc2, {
+        label = block.label;
+        block_code_type = {
+          reg_type = reg_t;
+          mem_type = mem_t;
+          cond_type = ((TypeSingle (SingleConst 0), Ints.empty), (TypeSingle (SingleConst 0), Ints.empty));
+        }
+      }) 
+    end in
+    List.fold_left_map helper start_type_var_idx prog
+    
+  let get_label_type (code_type: t) (label: Isa.label) : state_type =
+    (List.find (fun x -> label = x.label) code_type).block_code_type
+
+  (* NOTE: cond i is the n-i*)
+  (* type cond_type =
+  | CondEq of (type_full_exp * type_full_exp)
+  | CondLq of (type_full_exp * type_full_exp)
+  | CondLe of (type_full_exp * type_full_exp) *)
+
+
+  (* TODO: Initialize register and stack type based on program *)
+  (* TODO: Other exception on isa side *)
+  (* TODO: set_reg_type *)
+  (* TODO: Maybe we can simply remove Lea!!! *)
+  (* TODO: Type propagation *)
+  (* TODO: Subtype relation *)
+  (* TODO: RSP type should always be represented as TypeSingle (stack_id + offset) to track stack spill. So we need to derive rsp first. *)
+end
+
