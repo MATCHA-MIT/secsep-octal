@@ -1,6 +1,7 @@
 (* ISA interface *)
 
 module Isa = struct
+  (* TODO: Other exception on isa side *)
 
   type label = string
 
@@ -45,14 +46,6 @@ module Isa = struct
     | Scale2 -> 2
     | Scale4 -> 4
     | Scale8 -> 8
-
-(*
-  let scale_val = function
-    | Scale1 -> 1
-    | Scale2 -> 2
-    | Scale4 -> 4
-    | Scale8 -> 8;;
-  val scale_val : scale -> int = <fun> *)
 
   type operand =
     | ImmOp of immediate

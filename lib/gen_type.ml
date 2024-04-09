@@ -44,8 +44,9 @@ module GenType = struct
     let init_tv_rel = SubType.init total_type_var in
     List.fold_left2 helper (init_tv_rel, []) init_code_type p
 
-  let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * (CodeType.cond_type list) =
+  let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * CodeType.t * (CodeType.cond_type list) =
     let total_type_var, init_code_type = CodeType.init_code_type_var 0 p [] in (* TODO: Add functionality to init mem_off_list!!! *) 
-    gen_subtype_rel p init_code_type total_type_var
+    let tv_rel, cond_list = gen_subtype_rel p init_code_type total_type_var in
+    (tv_rel, init_code_type, cond_list)
 
 end

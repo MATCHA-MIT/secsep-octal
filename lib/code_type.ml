@@ -235,48 +235,12 @@ module CodeType = struct
     let reg_type_list = curr_state.reg_type in
     let reg_idx = Isa.get_reg_idx r in
     List.nth reg_type_list reg_idx
-    (* match r with
-    | RAX | EAX | AX | AH | AL -> reg_dict.rax
-    | RCX | ECX | CX | CH | CL -> reg_dict.rcx
-    | RDX | EDX | DX | DH | DL -> reg_dict.rdx
-    | RBX | EBX | BX | BH | BL -> reg_dict.rbx
-    | RSP | ESP | SP | SPL -> reg_dict.rsp
-    | RBP | EBP | BP | BPL -> reg_dict.rbp
-    | RSI | ESI | SI | SIL -> reg_dict.rsi
-    | RDI | EDI | DI | DIL -> reg_dict.rdi
-    | R8 | R8D | R8W | R8B -> reg_dict.r8
-    | R9 | R9D | R9W | R9B -> reg_dict.r9
-    | R10 | R10D | R10W | R10B -> reg_dict.r10
-    | R11 | R11D | R11W | R11B -> reg_dict.r11
-    | R12 | R12D | R12W | R12B -> reg_dict.r12
-    | R13 | R13D | R13W | R13B -> reg_dict.r13
-    | R14 | R14D | R14W | R14B -> reg_dict.r14
-    | R15 | R15D | R15W | R15B -> reg_dict.r15
-    | R0 -> (TypeSingle (SingleConst 0), Ints.empty) *)
 
   let set_reg_type (curr_state: state_type) (r: Isa.register) (t: type_full_exp) : state_type =
     let reg_list = curr_state.reg_type in
     let reg_idx = Isa.get_reg_idx r in
     let new_reg_list = List.mapi (fun idx reg_type -> if idx = reg_idx then t else reg_type) reg_list in
     {curr_state with reg_type = new_reg_list}
-    (* match r with
-    | RAX | EAX | AX | AH | AL -> {curr_state with reg_type = {reg_dict with rax = t}}
-    | RCX | ECX | CX | CH | CL -> {curr_state with reg_type = {reg_dict with rcx = t}}
-    | RDX | EDX | DX | DH | DL -> {curr_state with reg_type = {reg_dict with rdx = t}}
-    | RBX | EBX | BX | BH | BL -> {curr_state with reg_type = {reg_dict with rbx = t}}
-    | RSP | ESP | SP | SPL -> {curr_state with reg_type = {reg_dict with rsp = t}}
-    | RBP | EBP | BP | BPL -> {curr_state with reg_type = {reg_dict with rbp = t}}
-    | RSI | ESI | SI | SIL -> {curr_state with reg_type = {reg_dict with rsi = t}}
-    | RDI | EDI | DI | DIL -> {curr_state with reg_type = {reg_dict with rdi = t}}
-    | R8 | R8D | R8W | R8B -> {curr_state with reg_type = {reg_dict with r8 = t}}
-    | R9 | R9D | R9W | R9B -> {curr_state with reg_type = {reg_dict with r9 = t}}
-    | R10 | R10D | R10W | R10B -> {curr_state with reg_type = {reg_dict with r10 = t}}
-    | R11 | R11D | R11W | R11B -> {curr_state with reg_type = {reg_dict with r11 = t}}
-    | R12 | R12D | R12W | R12B -> {curr_state with reg_type = {reg_dict with r12 = t}}
-    | R13 | R13D | R13W | R13B -> {curr_state with reg_type = {reg_dict with r13 = t}}
-    | R14 | R14D | R14W | R14B -> {curr_state with reg_type = {reg_dict with r14 = t}}
-    | R15 | R15D | R15W | R15B -> {curr_state with reg_type = {reg_dict with r15 = t}}
-    | R0 -> curr_state *)
 
   let get_mem_op_type (curr_state: state_type)
       (disp: Isa.immediate) (base: Isa.register)
@@ -363,24 +327,6 @@ module CodeType = struct
 
   let add_reg_type_cond (reg_list: reg_type) (cond_idx: int) : reg_type =
     List.map (fun reg_type -> add_type_cond reg_type cond_idx) reg_list
-    (* {
-      rax = add_type_cond reg_dict.rax cond_idx;
-      rcx = add_type_cond reg_dict.rcx cond_idx;
-      rdx = add_type_cond reg_dict.rdx cond_idx;
-      rbx = add_type_cond reg_dict.rbx cond_idx;
-      rsp = add_type_cond reg_dict.rsp cond_idx;
-      rbp = add_type_cond reg_dict.rbp cond_idx;
-      rsi = add_type_cond reg_dict.rsi cond_idx;
-      rdi = add_type_cond reg_dict.rdi cond_idx;
-      r8 = add_type_cond reg_dict.r8 cond_idx;
-      r9 = add_type_cond reg_dict.r9 cond_idx;
-      r10 = add_type_cond reg_dict.r10 cond_idx;
-      r11 = add_type_cond reg_dict.r11 cond_idx;
-      r12 = add_type_cond reg_dict.r12 cond_idx;
-      r13 = add_type_cond reg_dict.r13 cond_idx;
-      r14 = add_type_cond reg_dict.r14 cond_idx;
-      r15 = add_type_cond reg_dict.r15 cond_idx;
-    } *)
 
   let add_mem_type_cond (mem_list: mem_type) (cond_idx: int) : mem_type =
     List.map (fun (off, tf) -> (off, add_type_cond tf cond_idx)) mem_list
@@ -483,24 +429,6 @@ module CodeType = struct
   let init_reg_type (start_type_var_idx: int) : int * reg_type =
     (start_type_var_idx + Isa.total_reg_num,
     List.init Isa.total_reg_num (fun idx -> (TypeSingle (SingleVar (start_type_var_idx + idx)), Ints.empty)))
-    (* (start_type_var_idx + 16, {
-      rax = (TypeSingle (SingleVar start_type_var_idx), Ints.empty);
-      rcx = (TypeSingle (SingleVar (start_type_var_idx + 1)), Ints.empty);
-      rdx = (TypeSingle (SingleVar (start_type_var_idx + 2)), Ints.empty);
-      rbx = (TypeSingle (SingleVar (start_type_var_idx + 3)), Ints.empty);
-      rsp = (TypeSingle (SingleVar (start_type_var_idx + 4)), Ints.empty);
-      rbp = (TypeSingle (SingleVar (start_type_var_idx + 5)), Ints.empty);
-      rsi = (TypeSingle (SingleVar (start_type_var_idx + 6)), Ints.empty);
-      rdi = (TypeSingle (SingleVar (start_type_var_idx + 7)), Ints.empty);
-      r8 = (TypeSingle (SingleVar (start_type_var_idx + 8)), Ints.empty);
-      r9 = (TypeSingle (SingleVar (start_type_var_idx + 9)), Ints.empty);
-      r10 = (TypeSingle (SingleVar (start_type_var_idx + 10)), Ints.empty);
-      r11 = (TypeSingle (SingleVar (start_type_var_idx + 11)), Ints.empty);
-      r12 = (TypeSingle (SingleVar (start_type_var_idx + 12)), Ints.empty);
-      r13 = (TypeSingle (SingleVar (start_type_var_idx + 13)), Ints.empty);
-      r14 = (TypeSingle (SingleVar (start_type_var_idx + 14)), Ints.empty);
-      r15 = (TypeSingle (SingleVar (start_type_var_idx + 15)), Ints.empty);
-    }) *)
 
   let init_mem_type (start_type_var_idx: int) (mem_off_list: int list) : int * mem_type =
     List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeSingle (SingleVar acc), Ints.empty)))) start_type_var_idx mem_off_list
@@ -523,19 +451,9 @@ module CodeType = struct
   let get_label_type (code_type: t) (label: Isa.label) : state_type =
     (List.find (fun x -> label = x.label) code_type).block_code_type
 
-  (* NOTE: cond i is the n-i*)
-  (* type cond_type =
-  | CondEq of (type_full_exp * type_full_exp)
-  | CondLq of (type_full_exp * type_full_exp)
-  | CondLe of (type_full_exp * type_full_exp) *)
-
 
   (* TODO: Initialize register and stack type based on program *)
-  (* TODO: Other exception on isa side *)
-  (* TODO: set_reg_type *)
   (* TODO: Maybe we can simply remove Lea!!! *)
-  (* TODO: Type propagation *)
-  (* TODO: Subtype relation *)
   (* TODO: RSP type should always be represented as TypeSingle (stack_id + offset) to track stack spill. So we need to derive rsp first. *)
 end
 
