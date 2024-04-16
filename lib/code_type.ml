@@ -5,8 +5,7 @@ module CodeType = struct
   exception CodeTypeError of string
   let code_type_error msg = raise (CodeTypeError ("[Code Type Error] " ^ msg))
 
-  type single_var = int
-  let stack_base_id = 1
+  let stack_base_id : Isa.imm_var_id = 1
 
   type single_bop =
     | SingleAdd
@@ -24,7 +23,7 @@ module CodeType = struct
 
   type single_exp =
     | SingleConst of int
-    | SingleVar of single_var
+    | SingleVar of Isa.imm_var_id
     | SingleBExp of single_bop * single_exp * single_exp
     | SingleUExp of single_uop * single_exp
 
@@ -60,7 +59,7 @@ module CodeType = struct
       end
     | _ -> e
 
-  type type_var = int
+  type type_var_id = int
 
   type type_bop =
     | TypeAdd
@@ -82,7 +81,7 @@ module CodeType = struct
   type type_exp =
     | TypeSingle of single_exp
     | TypeRange of single_exp * bool * single_exp * bool * int (* begin, inc, end, inc, step *)
-    | TypeVar of type_var
+    | TypeVar of type_var_id
     | TypeTop
     | TypeBot
     | TypeBExp of type_bop * type_exp * type_exp
@@ -108,7 +107,7 @@ module CodeType = struct
         | TypeInter -> 
           begin match s1, s2 with
           | SingleConst v1, SingleConst v2 -> if v1 = v2 then TypeSingle (SingleConst v1) else TypeBot
-          | SingleVar v1, SingleConst v2 -> if v1 = v2 then TypeSingle (SingleVar v1) else e (* TODO Double check this!*)
+          | SingleVar v1, SingleVar v2 -> if v1 = v2 then TypeSingle (SingleVar v1) else e (* TODO Double check this! *)
           | _ -> default_type
           end
         | TypeDiff -> 
@@ -243,13 +242,30 @@ module CodeType = struct
     {curr_state with reg_type = new_reg_list}
 
   let get_mem_op_type (curr_state: state_type)
-      (disp: Isa.immediate) (base: Isa.register)
-      (index: Isa.register) (scale: Isa.scale) : type_full_exp =
-    let disp_type, _ = get_imm_type disp in
-    let base_type, base_cond = get_reg_type curr_state base in
-    let index_type, index_cond = get_reg_type curr_state index in
-    let scale_val = Isa.scale_val scale in
-    let new_type = eval_type_exp (TypeBExp (TypeAdd, TypeBExp (TypeAdd, disp_type, base_type), TypeBExp (TypeMul, index_type, TypeSingle (SingleConst scale_val)))) in
+      (disp: Isa.immediate option) (base: Isa.register option)
+      (index: Isa.register option) (scale: Isa.scale option) : type_full_exp =
+    let disp_type, _ = match disp with
+    | Some d -> get_imm_type d
+    | None -> get_imm_type (ImmNum 0)
+    in
+    let base_type, base_cond = match base with
+    | Some b -> get_reg_type curr_state b
+    | None -> get_imm_type (ImmNum 0)
+    in
+    let index_type, index_cond = match index with
+    | Some i -> get_reg_type curr_state i
+    | None -> get_imm_type (ImmNum 0)
+    in
+    let scale_val = match scale with
+    | Some s -> Isa.scale_val s
+    | None -> 1
+    in
+    let new_type = eval_type_exp (
+      TypeBExp (TypeAdd,
+        TypeBExp (TypeAdd, disp_type, base_type),
+        TypeBExp (TypeMul, index_type, TypeSingle (SingleConst scale_val))
+      )
+    ) in
     let new_cond = Ints.union base_cond index_cond in
     (new_type, new_cond)
 
@@ -286,17 +302,17 @@ module CodeType = struct
     | None -> {curr_state with mem_type = (offset, new_type) :: mem_type}
 
   let get_ld_op_type (curr_state: state_type)
-      (disp: Isa.immediate) (base: Isa.register)
-      (index: Isa.register) (scale: Isa.scale) : type_full_exp =
+      (disp: Isa.immediate option) (base: Isa.register option)
+      (index: Isa.register option) (scale: Isa.scale option) : type_full_exp =
     let addr_type, _ = get_mem_op_type curr_state disp base index scale in
     let mem_idx = get_mem_idx addr_type in
     match mem_idx with
     | Some v -> get_mem_idx_type curr_state v
     | None -> (TypeTop, Ints.empty)
 
-  let set_st_op_type (curr_state: state_type) 
-      (disp: Isa.immediate) (base: Isa.register)
-      (index: Isa.register) (scale: Isa.scale)
+  let set_st_op_type(curr_state: state_type) 
+      (disp: Isa.immediate option) (base: Isa.register option)
+      (index: Isa.register option) (scale: Isa.scale option)
       (new_type: type_full_exp) : state_type =
     let addr_type, _ = get_mem_op_type curr_state disp base index scale in
     let mem_idx = get_mem_idx addr_type in

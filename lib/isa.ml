@@ -4,6 +4,7 @@ module Isa = struct
   (* TODO: Other exception on isa side *)
 
   type label = string
+  type imm_var_id = int
 
   type register =
     |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
@@ -36,7 +37,7 @@ module Isa = struct
 
   type immediate =
     | ImmNum of int
-    | ImmLabel of int
+    | ImmLabel of imm_var_id
 
   type scale = Scale1 | Scale2 | Scale4 | Scale8
 
@@ -50,9 +51,9 @@ module Isa = struct
   type operand =
     | ImmOp of immediate
     | RegOp of register
-    | MemOp of immediate * register * register * scale (* disp, base, index, scale *)
-    | LdOp of immediate * register * register * scale
-    | StOp of immediate * register * register * scale
+    | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
+    | LdOp of immediate option * register option * register option * scale option
+    | StOp of immediate option * register option * register option * scale option
     | LabelOp of label
 
   type branch_cond =
@@ -83,5 +84,10 @@ module Isa = struct
   }
 
   type program = basic_block list
+
+  let is_jmp_mnemonic (m: string) : bool =
+    match m with
+    | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge" -> true
+    | _ -> false
 
 end
