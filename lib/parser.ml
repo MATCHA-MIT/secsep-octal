@@ -233,7 +233,7 @@ module Parser = struct
               if M.mem name imm_var_map
               then (imm_var_map, ImmTok (ImmLabel (M.find name imm_var_map), Some name))
               else begin
-                let id = M.cardinal imm_var_map in
+                let id = M.cardinal imm_var_map in (* TODO: start stack id *)
                 print_endline (name ^ " " ^ (string_of_int id));
                 (M.add name id imm_var_map, ImmTok (ImmLabel id, Some name))
               end

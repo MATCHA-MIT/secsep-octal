@@ -442,15 +442,15 @@ module CodeType = struct
 
   type t = block_type list
 
-  let init_reg_type (start_type_var_idx: int) : int * reg_type =
+  let init_reg_type (start_type_var_idx: type_var_id) : int * reg_type =
     (start_type_var_idx + Isa.total_reg_num,
-    List.init Isa.total_reg_num (fun idx -> (TypeSingle (SingleVar (start_type_var_idx + idx)), Ints.empty)))
+    List.init Isa.total_reg_num (fun idx -> (TypeVar (start_type_var_idx + idx), Ints.empty))) (* TODO: for rsp, use a passed in "init offset" *)
 
   let init_mem_type (start_type_var_idx: int) (mem_off_list: int list) : int * mem_type =
-    List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeSingle (SingleVar acc), Ints.empty)))) start_type_var_idx mem_off_list
+    List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list
 
-  let init_code_type_var (start_type_var_idx: int) (prog: Isa.program) (mem_off_list: int list) : int * t =
-    let helper (acc: int) (block: Isa.basic_block) : int * block_type = begin
+  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : int * t =
+    let helper (acc: type_var_id) (block: Isa.basic_block) : type_var_id * block_type = begin
       let acc1, reg_t = init_reg_type acc in
       let acc2, mem_t = init_mem_type acc1 mem_off_list in
       (acc2, {

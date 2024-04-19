@@ -8,7 +8,7 @@ module SubType = struct
   let sub_type_error msg = raise (SubTypeError ("[Sub Type Error] " ^ msg))
 
   type type_var_rel = {
-    type_var_idx: int;
+    type_var_idx: CodeType.type_var_id;
     subtype_list: CodeType.type_full_exp list;
     supertype_list: (CodeType.Ints.t * int) list; (* Entry (set, idx) refers to (TypeVar type_var_idx, set) -> (TypeVar idx, {}) *)
   }
