@@ -1,5 +1,6 @@
 (* Type and type derivation *)
 open Isa
+open Pretty_print
 
 module CodeType = struct
   exception CodeTypeError of string
@@ -66,6 +67,7 @@ module CodeType = struct
     | TypeSub
     | TypeMul
     | TypeSal
+    | TypeShr
     | TypeSar
     | TypeXor
     | TypeAnd
@@ -183,7 +185,7 @@ module CodeType = struct
   module Ints = Set.Make(Int)
 
   type type_full_exp = type_exp * Ints.t
-  (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=2 *)
+  (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=0 *)
 
   type reg_type = type_full_exp list
   (* type reg_type = {
@@ -377,6 +379,11 @@ module CodeType = struct
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
       let dest_type = (eval_type_exp (TypeBExp (TypeSal, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
+    | Shr (dest, src1, src2) ->
+      let src1_type, src1_cond = get_src_op_type curr_state src1 in
+      let src2_type, src2_cond = get_src_op_type curr_state src2 in
+      let dest_type = (eval_type_exp (TypeBExp (TypeShr, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      (set_dest_op_type curr_state dest dest_type, cond_list)
     | Sar (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
@@ -431,7 +438,10 @@ module CodeType = struct
         end in
       let new_cond_list, new_cond_idx = add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list)
-    | _ -> (curr_state, cond_list) (* TODO *)
+    | _ -> begin
+        print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
+        (curr_state, cond_list) (* TODO *)
+    end
 
 
 
@@ -467,6 +477,116 @@ module CodeType = struct
   let get_label_type (code_type: t) (label: Isa.label) : state_type =
     (List.find (fun x -> label = x.label) code_type).block_code_type
 
+  let rec string_of_single_exp (se: single_exp) =
+    match se with
+    | SingleConst v -> "Const " ^ (string_of_int v)
+    | SingleVar v -> "SymImm " ^ (string_of_int v)
+    | SingleBExp (op, l, r) -> 
+      let op_str = match op with
+      | SingleAdd -> "Add"
+      | SingleSub -> "Sub"
+      | SingleMul -> "Mul"
+      | SingleSal -> "Sal"
+      | SingleSar -> "Sar"
+      | SingleXor -> "Xor"
+      | SingleAnd -> "And"
+      | SingleOr -> "Or"
+      in
+      "S-BinaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp l) ^ ", " ^ (string_of_single_exp r) ^ ")"
+    | SingleUExp (op, e) ->
+      let op_str = match op with
+      | SingleNot -> "Not"
+      in
+      "S-UnaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp e) ^ ")"
+
+  let rec string_of_type_exp (t: type_exp) =
+    match t with
+    | TypeSingle ts -> string_of_single_exp ts
+    | TypeRange (bg, bgi, ed, edi, step) -> 
+      let bg_str = if bgi then "[" else "(" in
+      let ed_str = if edi then "]" else ")" in
+      bg_str ^ (string_of_single_exp bg) ^ ", " ^ (string_of_single_exp ed) ^ ed_str ^ " step = " ^ (string_of_int step)
+    | TypeVar v -> "TypeVar " ^ (string_of_int v)
+    | TypeTop -> "Top"
+    | TypeBot -> "Bottom"
+    | TypeBExp (op, l, r) -> 
+      let op_str = match op with
+      | TypeAdd -> "Add"
+      | TypeSub -> "Sub"
+      | TypeMul -> "Mul"
+      | TypeSal -> "Sal"
+      | TypeShr -> "Shr"
+      | TypeSar -> "Sar"
+      | TypeXor -> "Xor"
+      | TypeAnd -> "And"
+      | TypeOr -> "Or"
+      | TypeInter -> "Inter"
+      | TypeUnion -> "Union"
+      | TypeDiff -> "Diff"
+      in
+      "BinaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp l) ^ ", " ^ (string_of_type_exp r) ^ ")"
+    | TypeUExp (op, e) ->
+      let op_str = match op with
+      | TypeNot -> "Not"
+      | TypeComp -> "Comp"
+      in
+      "UnaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp e) ^ ")"
+  
+  let string_of_one_cond_status (cond: int) =
+    let cond_idx = cond / 2 in
+    let taken = if Int.rem cond 2 = 1 then "Taken" else "NotTaken" in
+    string_of_int cond_idx ^ " " ^ taken
+
+  let string_of_cond_status (conds: Ints.t) =
+    "[" ^ (Ints.fold (fun x acc -> (if acc = "" then "" else acc ^ ", ") ^ (string_of_one_cond_status x)) conds "") ^ "]"
+
+  let pp_type_full_exp (lvl: int) (tf: type_full_exp) =
+    let t, cond = tf in
+    PP.print_lvl lvl "(Type = %s, Cond = %s)"
+      (string_of_type_exp t)
+      (string_of_cond_status cond)
+
+  let pp_cond (lvl: int) (cond: cond_type) =
+    let op, str1, str2 = match cond with
+    | CondNe (l, r) -> ("Ne", string_of_type_exp (fst l), string_of_type_exp (fst r))
+    | CondEq (l, r) -> ("Eq", string_of_type_exp (fst l), string_of_type_exp (fst r))
+    | CondLq (l, r) -> ("Lq", string_of_type_exp (fst l), string_of_type_exp (fst r))
+    | CondLe (l, r) -> ("Le", string_of_type_exp (fst l), string_of_type_exp (fst r))
+    in
+    PP.print_lvl lvl "Cond %s between\n" op;
+    PP.print_lvl (lvl + 1) "%s\n" str1;
+    PP.print_lvl (lvl + 1) "%s\n" str2
+
+  let pp_cond_list (lvl: int) (cond_list: cond_type list) =
+    List.iteri (fun i x -> 
+      PP.print_lvl lvl "<Cond %d>\n" (i + 1);
+      pp_cond (lvl + 1) x
+    ) (List.rev cond_list)
+
+  let pp_state_type (lvl: int) (s: state_type) =
+    PP.print_lvl lvl "Reg:\n";
+    List.iteri (fun i x ->
+      PP.print_lvl (lvl + 1) "<Reg %d> " i;
+      pp_type_full_exp (lvl + 2) x;
+      Printf.printf "\n"
+    ) s.reg_type;
+    PP.print_lvl lvl "Mem:\n";
+    List.iter (fun (off, x) ->
+      PP.print_lvl (lvl + 1) "<offset %d> " off;
+      pp_type_full_exp (lvl + 2) x;
+      Printf.printf "\n"
+    ) s.mem_type;
+    PP.print_lvl lvl "Cond:\n";
+    pp_type_full_exp (lvl + 1) (fst s.cond_type);
+    Printf.printf "\n";
+    pp_type_full_exp (lvl + 1) (snd s.cond_type)
+
+  let pp_block_types (lvl: int) (block_types: t) =
+    List.iter (fun x ->
+      PP.print_lvl lvl "<Block \"%s\">\n" x.label;
+      pp_state_type (lvl + 1) x.block_code_type;
+      Printf.printf "\n"
+    ) block_types
 
   (* TODO: Initialize register and stack type based on program *)
   (* TODO: Maybe we can simply remove Lea!!! *)

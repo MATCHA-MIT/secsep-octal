@@ -68,6 +68,7 @@ module Isa = struct
     | Sub of operand * operand * operand
     | Sal of operand * operand * operand
     | Sar of operand * operand * operand
+    | Shr of operand * operand * operand
     | Xor of operand * operand * operand
     | Not of operand * operand
     | And of operand * operand * operand
@@ -75,6 +76,9 @@ module Isa = struct
     | Cmp of operand * operand
     | Jmp of label
     | Jcond of label * branch_cond
+    | Call of label
+    | Push of operand
+    | Pop of operand
     | Ret
     | Nop
 
@@ -85,9 +89,43 @@ module Isa = struct
 
   type program = basic_block list
 
-  let is_jmp_mnemonic (m: string) : bool =
+  let inst_referring_label (m: string) : bool =
     match m with
+    | "call"
     | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge" -> true
     | _ -> false
+
+  let mnemonic_of_instruction (inst: instruction) : string =
+    match inst with
+    | Mov _ -> "mov"
+    | MovS _ -> "movs"
+    | MovZ _ -> "movz"
+    | Lea _ -> "lea"
+    | Add _ -> "add"
+    | Sub _ -> "sub"
+    | Sal _ -> "sal"
+    | Sar _ -> "sar"
+    | Shr _ -> "shr"
+    | Xor _ -> "xor"
+    | Not _ -> "not"
+    | And _ -> "and"
+    | Or _ -> "or"
+    | Cmp _ -> "cmp"
+    | Jmp _ -> "jmp"
+    | Jcond (_, cond) ->
+      begin
+        match cond with
+        | JNe -> "jne"
+        | JE -> "je"
+        | JL -> "jl"
+        | JLe -> "jle"
+        | JG -> "jg"
+        | JGe -> "jge"
+      end
+    | Call _ -> "call"
+    | Push _ -> "push"
+    | Pop _ -> "pop"
+    | Ret -> "ret"
+    | Nop -> "nop"
 
 end

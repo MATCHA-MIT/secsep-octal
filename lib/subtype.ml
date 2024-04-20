@@ -1,6 +1,7 @@
 (* Structure to hold subtype relations *)
 
 open Code_type
+open Pretty_print
 
 module SubType = struct
   exception SubTypeError of string
@@ -10,7 +11,7 @@ module SubType = struct
   type type_var_rel = {
     type_var_idx: CodeType.type_var_id;
     subtype_list: CodeType.type_full_exp list;
-    supertype_list: (CodeType.Ints.t * int) list; (* Entry (set, idx) refers to (TypeVar type_var_idx, set) -> (TypeVar idx, {}) *)
+    supertype_list: (CodeType.Ints.t * CodeType.type_var_id) list; (* Entry (set, idx) refers to (TypeVar type_var_idx, set) -> (TypeVar idx, {}) *)
   }
 
   type t = type_var_rel list
@@ -78,6 +79,23 @@ module SubType = struct
         if start_off = end_off then add_sub_type_full_exp acc_tv_rel start_type end_type
         else sub_type_error ("add_sub_state_type: mem type offset does not match"))
       tv_rel_after_reg start_mem_type end_mem_type
+
+  let pp_tv_rels (lvl: int) (tv_rels: t) =
+    List.iter (fun x ->
+      PP.print_lvl lvl "<TypeVar %d>\n" x.type_var_idx;
+      PP.print_lvl (lvl + 1) "SubType: [\n";
+      List.iter (fun tf -> 
+        CodeType.pp_type_full_exp (lvl + 2) tf;
+        Printf.printf ";\n";
+      ) x.subtype_list;
+      PP.print_lvl (lvl + 1) "]\n";
+      PP.print_lvl (lvl + 1) "SuperType: [\n";
+      List.iter (fun (cond, id) ->
+        PP.print_lvl (lvl + 2) "(TypeVar: %d,\n" id;
+        PP.print_lvl (lvl + 2) " Cond: %s);\n" (CodeType.string_of_cond_status cond);
+      ) x.supertype_list;
+      PP.print_lvl (lvl + 1) "]\n"
+    ) tv_rels
 
 end
 

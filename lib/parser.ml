@@ -199,10 +199,10 @@ module Parser = struct
   module M = Map.Make(String)
   type imm_var_map = Isa.imm_var_id M.t
 
-  let parse_jmp (ts: token list) : Isa.operand =
+  let convert_imm_to_label (ts: token list) : Isa.operand =
     match ts with
     | ImmTok (ImmLabel _, name) :: [] -> LabelOp (Option.get name)
-    | _ -> parse_error "parse_jmp"
+    | _ -> parse_error "convert_imm_to_label"
 
   let parse_tokens (imm_var_map: imm_var_map) (ts: token list) : imm_var_map * Isa.instruction =
     let src (opr: Isa.operand) : Isa.operand =
@@ -221,8 +221,8 @@ module Parser = struct
     | MneTok mnemonic :: ts -> (mnemonic, ts)
     | _ -> parse_error ("parse_tokens: unexpected end of input: " ^ (String.concat ", " (List.map string_of_token ts)))
     in
-    let imm_var_map, operands = if Isa.is_jmp_mnemonic mnemonic
-      then imm_var_map, [parse_jmp ts]
+    let imm_var_map, operands = if Isa.inst_referring_label mnemonic
+      then imm_var_map, [convert_imm_to_label ts]
       else begin 
         let imm_var_map, ts = List.fold_left_map (fun imm_var_map token ->
           match token with
@@ -246,8 +246,9 @@ module Parser = struct
     in
     let inst: Isa.instruction = match (mnemonic, operands) with
       | ("mov", [opr1; opr2])
-      | ("movq", [opr1; opr2])
-      | ("movl", [opr1; opr2])   -> Mov   (dst(opr2), src(opr1))
+      | ("movb", [opr1; opr2])
+      | ("movl", [opr1; opr2])
+      | ("movq", [opr1; opr2])    -> Mov   (dst(opr2), src(opr1))
       | ("movs", [opr1; opr2])
       | ("movslq", [opr1; opr2]) -> MovS  (dst(opr2), src(opr1))
       | ("movz", [opr1; opr2])
@@ -259,9 +260,12 @@ module Parser = struct
       | ("sub", [opr1; opr2])
       | ("subq", [opr1; opr2])   -> Sub   (dst(opr2), src(opr2), src(opr1)) (* note that the minuend is opr2 *)
       | ("sal", [opr1; opr2])
+      | ("sall", [opr1; opr2])
       | ("salq", [opr1; opr2])   -> Sal   (dst(opr2), src(opr2), src(opr1))
       | ("sar", [opr1; opr2])
+      | ("sarl", [opr1; opr2])
       | ("sarq", [opr1; opr2])   -> Sar   (dst(opr2), src(opr2), src(opr1))
+      | ("shrl", [opr1; opr2])   -> Shr   (dst(opr2), src(opr2), src(opr1))
       | ("xor", [opr1; opr2])
       | ("xorb", [opr1; opr2])
       | ("xorl", [opr1; opr2])
@@ -275,7 +279,10 @@ module Parser = struct
       | ("cmpq", [opr1; opr2])   -> Cmp   (src(opr1), src(opr2))
       | ("jmp", [LabelOp lb])    -> Jmp   (lb)
       | ("jne", [LabelOp lb])    -> Jcond (lb, JNe)
+      | ("call", [LabelOp lb])   -> Call  (lb)
       | ("ret", []) -> Ret
+      | ("pushq", [opr])          -> Push  (src(opr))
+      | ("popq", [opr])           -> Pop   (src(opr))
       | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
     in
     imm_var_map, inst

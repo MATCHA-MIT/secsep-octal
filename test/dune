@@ -1,3 +1,5 @@
 (test
  (name test_type)
- (libraries type))
+ (libraries type)
+ (deps ../asm/salsa20_annotated.s ../asm/demo.s)
+)
