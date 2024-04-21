@@ -438,12 +438,11 @@ module CodeType = struct
         end in
       let new_cond_list, new_cond_idx = add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list)
+    | Jmp _ -> (curr_state, cond_list)
     | _ -> begin
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
         (curr_state, cond_list) (* TODO *)
     end
-
-
 
   type block_type = {
     label: Isa.label;
@@ -452,16 +451,28 @@ module CodeType = struct
 
   type t = block_type list
 
-  let init_reg_type (start_type_var_idx: type_var_id) : int * reg_type =
-    (start_type_var_idx + Isa.total_reg_num,
-    List.init Isa.total_reg_num (fun idx -> (TypeVar (start_type_var_idx + idx), Ints.empty))) (* TODO: for rsp, use a passed in "init offset" *)
+  let init_reg_type (start_type_var_idx: type_var_id) (init_rsp: single_exp option) : type_var_id * reg_type = 
+    let rec helper (acc: (type_var_id * reg_type)) (idx: int) : type_var_id * reg_type =
+      if idx = Isa.total_reg_num
+      then acc
+      else begin
+        let type_var_idx, reg_type = acc in
+        if Option.is_some init_rsp && idx = Isa.rsp_idx then
+          helper (type_var_idx, (TypeSingle (Option.get init_rsp), Ints.empty) :: reg_type) (idx + 1)
+        else
+          helper (type_var_idx + 1, (TypeVar type_var_idx, Ints.empty) :: reg_type) (idx + 1)
+      end
+    in
+    let type_var_idx, reg_type = helper (start_type_var_idx, []) 0 in
+    (type_var_idx, List.rev reg_type)
 
-  let init_mem_type (start_type_var_idx: int) (mem_off_list: int list) : int * mem_type =
+  let init_mem_type (start_type_var_idx: type_var_id) (mem_off_list: int list) : type_var_id * mem_type =
     List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list
 
-  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : int * t =
+  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : type_var_id * t =
     let helper (acc: type_var_id) (block: Isa.basic_block) : type_var_id * block_type = begin
-      let acc1, reg_t = init_reg_type acc in
+      let init_rsp = if Isa.is_label_function_entry block.label then Some (SingleVar stack_base_id) else None in
+      let acc1, reg_t = init_reg_type acc init_rsp in
       let acc2, mem_t = init_mem_type acc1 mem_off_list in
       (acc2, {
         label = block.label;
@@ -472,7 +483,7 @@ module CodeType = struct
         }
       }) 
     end in
-    List.fold_left_map helper start_type_var_idx prog
+    List.fold_left_map helper start_type_var_idx prog.bbs
     
   let get_label_type (code_type: t) (label: Isa.label) : state_type =
     (List.find (fun x -> label = x.label) code_type).block_code_type
@@ -592,4 +603,3 @@ module CodeType = struct
   (* TODO: Maybe we can simply remove Lea!!! *)
   (* TODO: RSP type should always be represented as TypeSingle (stack_id + offset) to track stack spill. So we need to derive rsp first. *)
 end
-

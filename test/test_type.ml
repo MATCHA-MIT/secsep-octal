@@ -1,11 +1,11 @@
 
-open Type.Isa
+(* open Type.Isa *)
 open Type.Code_type
 open Type.Gen_type
 open Type.Subtype
 open Type.Parser
 
-let _ : Isa.program = 
+(* let _ : Isa.program = 
   [ { label = "foo";
       insts =
       [ Isa.Xor (Isa.RegOp Isa.RAX, Isa.RegOp Isa.RAX, Isa.RegOp Isa.RAX);
@@ -20,7 +20,7 @@ let _ : Isa.program =
         Isa.Ret
       ]
     }
-];;
+];; *)
 
 
 let read_file (filename: string) : string =

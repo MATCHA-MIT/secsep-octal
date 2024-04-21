@@ -1,4 +1,5 @@
 open Isa
+open Code_type
 
 module Parser = struct
 
@@ -196,15 +197,12 @@ module Parser = struct
     in
     go ts []
 
-  module M = Map.Make(String)
-  type imm_var_map = Isa.imm_var_id M.t
-
   let convert_imm_to_label (ts: token list) : Isa.operand =
     match ts with
     | ImmTok (ImmLabel _, name) :: [] -> LabelOp (Option.get name)
     | _ -> parse_error "convert_imm_to_label"
 
-  let parse_tokens (imm_var_map: imm_var_map) (ts: token list) : imm_var_map * Isa.instruction =
+  let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * Isa.instruction =
     let src (opr: Isa.operand) : Isa.operand =
       match opr with
       | MemOp (disp, base, index, scale) -> LdOp (disp, base, index, scale)
@@ -230,12 +228,12 @@ module Parser = struct
             if v <> imm_var_unset
             then (imm_var_map, token)
             else begin
-              if M.mem name imm_var_map
-              then (imm_var_map, ImmTok (ImmLabel (M.find name imm_var_map), Some name))
+              if Isa.StrM.mem name imm_var_map
+              then (imm_var_map, ImmTok (ImmLabel (Isa.StrM.find name imm_var_map), Some name))
               else begin
-                let id = M.cardinal imm_var_map in (* TODO: start stack id *)
-                print_endline (name ^ " " ^ (string_of_int id));
-                (M.add name id imm_var_map, ImmTok (ImmLabel id, Some name))
+                let id = CodeType.stack_base_id + 1 + (Isa.StrM.cardinal imm_var_map) in (* id starts from stack_base_id + 1 *)
+                Printf.printf "new imm_var: %s %d\n" name id;
+                (Isa.StrM.add name id imm_var_map, ImmTok (ImmLabel id, Some name))
               end
             end
           | _ -> (imm_var_map, token)
@@ -287,18 +285,21 @@ module Parser = struct
     in
     imm_var_map, inst
 
-  let parse_instr (imm_var_map: imm_var_map) (line: string) : imm_var_map * Isa.instruction =
+  let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : Isa.imm_var_map * Isa.instruction =
     (* print_endline ("Parsing " ^ line); *)
     let tokens = tokenize_line line in
     (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
     parse_tokens imm_var_map tokens
 
-  let parse_basic_block (imm_var_map: imm_var_map) (lines: string list) : imm_var_map * Isa.basic_block =
+  let parse_basic_block (info: (Isa.imm_var_map * (Isa.label option))) (lines: string list)
+  : (Isa.imm_var_map * (Isa.label option)) * Isa.basic_block =
+    let imm_var_map, func = info in
     let label = parse_label (List.hd lines) in
+    let func = if Isa.is_label_function_entry label then Some label else func in
     let imm_var_map, insts = List.fold_left_map (
       fun imm_var_map line -> parse_instr imm_var_map line
     ) imm_var_map (List.tl lines) in
-    (imm_var_map, {label = label; insts = insts})
+    (imm_var_map, func), {label = label; func = Option.get func; insts = insts}
 
   let parse_program (source: string) : Isa.program =
     let lines = source
@@ -327,9 +328,23 @@ module Parser = struct
           else bb_spliter lines [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
     in
     let bbs = bb_spliter lines [] [] in
-    let _, bbs = List.fold_left_map (
-      fun imm_var_map bb -> parse_basic_block imm_var_map bb
-    ) M.empty bbs in
-    bbs
+    let (imm_var_map, _), bbs = List.fold_left_map (
+      fun info bb -> parse_basic_block info bb
+    ) (Isa.StrM.empty, None) bbs in
+
+    (* add jmp for two adjacent basic blocks if the previous one does not end with ret *)
+    let rec add_jmp_for_adj_bb (bbs: Isa.basic_block list) (acc: Isa.basic_block list) =
+      match bbs with
+      | [] -> List.rev acc
+      | bb :: [] -> List.rev (bb :: acc)
+      | bb1 :: bb2 :: bbs ->
+          let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_ret (List.hd (List.rev bb1.insts))
+            then bb1
+            else {bb1 with insts = bb1.insts @ [Jmp bb2.label]}
+          in
+          add_jmp_for_adj_bb (bb2 :: bbs) (bb1 :: acc)
+    in
+    let bbs = add_jmp_for_adj_bb bbs [] in
+    {bbs = bbs; imm_var_map = imm_var_map}
 
 end

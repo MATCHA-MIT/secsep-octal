@@ -42,7 +42,7 @@ module GenType = struct
         gen_block_subtype_rel acc_tv_rel block_type.block_code_type acc_cond_list block_inst.insts init_code_type
       else gen_type_error ("gen_subtype_rel helper: block type and block label mismatch: " ^ block_type.label ^ " != " ^ block_inst.label) in
     let init_tv_rel = SubType.init total_type_var in
-    List.fold_left2 helper (init_tv_rel, []) init_code_type p
+    List.fold_left2 helper (init_tv_rel, []) init_code_type p.bbs
 
   let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * CodeType.t * (CodeType.cond_type list) =
     (* TODO: for the block at function start, assign symbolic immediates instead? *)

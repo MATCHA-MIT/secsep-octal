@@ -6,6 +6,9 @@ module Isa = struct
   type label = string
   type imm_var_id = int
 
+  module StrM = Map.Make(String)
+  type imm_var_map = imm_var_id StrM.t
+
   type register =
     |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
@@ -32,6 +35,8 @@ module Isa = struct
     | R14 | R14D | R14W | R14B -> 14
     | R15 | R15D | R15W | R15B -> 15
     (* | R0 -> 16 *)
+
+  let rsp_idx = get_reg_idx RSP
 
   let total_reg_num : int = 16
 
@@ -84,15 +89,26 @@ module Isa = struct
 
   type basic_block = {
     label: label;
+    func: label;
     insts: instruction list;
   }
 
-  type program = basic_block list
+  type program = {
+    bbs: basic_block list;
+    imm_var_map: imm_var_map;
+  }
+
+  let is_label_function_entry (l: label) = l.[0] <> '.'
 
   let inst_referring_label (m: string) : bool =
     match m with
     | "call"
     | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge" -> true
+    | _ -> false
+
+  let inst_is_ret (inst: instruction) : bool =
+    match inst with
+    | Ret -> true
     | _ -> false
 
   let mnemonic_of_instruction (inst: instruction) : string =
