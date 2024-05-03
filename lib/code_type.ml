@@ -18,15 +18,39 @@ module CodeType = struct
     | SingleAnd
     | SingleOr
 
+  let cmp_single_bop (op1: single_bop) (op2: single_bop) : bool =
+    match op1, op2 with
+    | SingleAdd, SingleAdd
+    | SingleSub, SingleSub
+    | SingleMul, SingleMul
+    | SingleSal, SingleSal
+    | SingleSar, SingleSar
+    | SingleXor, SingleXor
+    | SingleAnd, SingleAnd
+    | SingleOr, SingleOr -> true
+    | _ -> false
+
   type single_uop =
     | SingleNot
     (* TODO: Should we add SingleNeg? *)
+
+  let cmp_single_uop (op1: single_uop) (op2: single_uop) : bool =
+    match op1, op2 with
+    | SingleNot, SingleNot -> true
 
   type single_exp =
     | SingleConst of int
     | SingleVar of Isa.imm_var_id
     | SingleBExp of single_bop * single_exp * single_exp
     | SingleUExp of single_uop * single_exp
+
+  let rec cmp_single_exp (e1: single_exp) (e2: single_exp) : bool =
+    match e1, e2 with
+    | SingleConst c1, SingleConst c2 -> c1 = c2
+    | SingleVar v1, SingleVar v2 -> v1 = v2
+    | SingleBExp (bop1, l1, r1), SingleBExp (bop2, l2, r2) -> (cmp_single_bop bop1 bop2) && (cmp_single_exp l1 l2) && (cmp_single_exp r1 r2)
+    | SingleUExp (uop1, l1), SingleUExp (uop2, l2) -> (cmp_single_uop uop1 uop2) && (cmp_single_exp l1 l2)
+    | _ -> false
 
   let rec eval_single_exp (e: single_exp) : single_exp =
     match e with
@@ -76,9 +100,31 @@ module CodeType = struct
     | TypeUnion
     | TypeDiff
 
+  let cmp_type_bop (op1: type_bop) (op2: type_bop) : bool =
+    match op1, op2 with
+    | TypeAdd, TypeAdd
+    | TypeSub, TypeSub
+    | TypeMul, TypeMul
+    | TypeSal, TypeSal
+    | TypeShr, TypeShr
+    | TypeSar, TypeSar
+    | TypeXor, TypeXor
+    | TypeAnd, TypeAnd
+    | TypeOr, TypeOr
+    | TypeInter, TypeInter
+    | TypeUnion, TypeUnion
+    | TypeDiff, TypeDiff -> true
+    | _ -> false
+
   type type_uop =
     | TypeNot
     | TypeComp
+
+  let cmp_type_uop (op1: type_uop) (op2: type_uop) : bool = 
+    match op1, op2 with
+    | TypeNot, TypeNot
+    | TypeComp, TypeComp ->  true
+    | _ -> false
 
   type type_exp =
     | TypeSingle of single_exp
@@ -88,6 +134,20 @@ module CodeType = struct
     | TypeBot
     | TypeBExp of type_bop * type_exp * type_exp
     | TypeUExp of type_uop * type_exp
+
+  let rec cmp_type_exp (e1: type_exp) (e2: type_exp) : bool =
+    match e1, e2 with
+    | TypeSingle s1, TypeSingle s2 -> cmp_single_exp s1 s2
+    | TypeRange (l1, bl1, r1, br1, s1), TypeRange (l2, bl2, r2, br2, s2) ->
+      (cmp_single_exp l1 l2) && (bl1 == bl2) && (cmp_single_exp r1 r2) && (br1 == br2) && (s1 == s2)
+    | TypeVar v1, TypeVar v2 -> v1 == v2
+    | TypeTop, TypeTop -> true
+    | TypeBot, TypeBot -> true
+    | TypeBExp (bop1, l1, r1), TypeBExp (bop2, l2, r2) ->
+      (cmp_type_bop bop1 bop2) && (cmp_type_exp l1 l2) && (cmp_type_exp r1 r2)
+    | TypeUExp (uop1, l1), TypeUExp (uop2, l2) ->
+      (cmp_type_uop uop1 uop2) && (cmp_type_exp l1 l2)
+    | _ -> false
 
   let rec eval_type_exp (e: type_exp) : type_exp =
     match e with

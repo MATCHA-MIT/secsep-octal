@@ -22,11 +22,48 @@ module SubType = struct
   let get_type_var_rel (tv_rel: t) (idx: int) : type_var_rel =
     List.find (fun x -> x.type_var_idx = idx) tv_rel
 
-  let add_one_sub_type (tv_rel: type_var_rel) (t: CodeType.type_full_exp) : type_var_rel =
-    {tv_rel with subtype_list = t :: tv_rel.subtype_list}
+  let type_list_insert (type_list: CodeType.type_full_exp list) (ty: CodeType.type_full_exp) : CodeType.type_full_exp list =
+    let t_exp, t_cond = ty in
+    let helper (x: CodeType.type_full_exp) : (CodeType.type_full_exp, CodeType.type_full_exp) Either.t =
+      let x_exp, x_cond = x in
+      if (CodeType.cmp_type_exp x_exp t_exp) then Right (x_exp, CodeType.Ints.inter x_cond t_cond)
+      else Left x
+    in
+    let l_list, r_list = List.partition_map helper type_list in
+    match r_list with
+    | [] -> ty :: l_list
+    | hd :: tl ->
+      begin match tl with
+      | [] -> hd :: l_list
+      | _ -> sub_type_error ("type_list_insert: find more than one match")
+      end
+
+  let add_one_sub_type (tv_rel: type_var_rel) (ty: CodeType.type_full_exp) : type_var_rel =
+    {tv_rel with subtype_list = type_list_insert tv_rel.subtype_list ty}
+    (* {tv_rel with subtype_list = ty :: tv_rel.subtype_list} *)
+
+  let type_var_list_insert 
+      (type_var_list: (CodeType.Ints.t * CodeType.type_var_id) list) 
+      (a_cond: CodeType.Ints.t) 
+      (b_idx) : (CodeType.Ints.t * CodeType.type_var_id) list =
+    let helper (x: CodeType.Ints.t * CodeType.type_var_id) : 
+        (CodeType.Ints.t * CodeType.type_var_id, CodeType.Ints.t * CodeType.type_var_id) Either.t =
+      let x_cond, x_idx = x in 
+      if x_idx = b_idx then Right (CodeType.Ints.inter x_cond a_cond, x_idx)
+      else Left x
+    in
+    let l_list, r_list = List.partition_map helper type_var_list in
+    match r_list with
+    | [] -> (a_cond, b_idx) :: l_list
+    | hd :: tl ->
+      begin match tl with
+      | [] -> hd :: l_list
+      | _ -> sub_type_error ("type_var_list_insert: find more than one match")
+      end
 
   let add_one_super_type (tv_rel: type_var_rel) (a_cond: CodeType.Ints.t) (b_idx) : type_var_rel =
-    {tv_rel with supertype_list = (a_cond, b_idx) :: tv_rel.supertype_list}
+    {tv_rel with supertype_list = type_var_list_insert tv_rel.supertype_list a_cond b_idx}
+    (* {tv_rel with supertype_list = (a_cond, b_idx) :: tv_rel.supertype_list} *)
 
   (* Connect a->b *)
   let add_one_sub_super (tv_rel: t) (a: CodeType.type_full_exp) (b_idx: int) : t =
@@ -34,12 +71,14 @@ module SubType = struct
     | (TypeVar a_idx, a_cond) ->
       List.map (fun x -> 
                   if x.type_var_idx = a_idx then 
-                    {x with supertype_list = (a_cond, b_idx) :: x.supertype_list}
+                    (* {x with supertype_list = (a_cond, b_idx) :: x.supertype_list} *)
+                    add_one_super_type x a_cond b_idx
                   else if x.type_var_idx = b_idx then
-                    {x with subtype_list = a :: x.subtype_list}
+                    (* {x with subtype_list = a :: x.subtype_list} *)
+                    add_one_sub_type x a
                   else x) tv_rel
     | _ ->
-      List.map (fun x -> if x.type_var_idx = b_idx then {x with subtype_list = a :: x.subtype_list} else x) tv_rel
+      List.map (fun x -> if x.type_var_idx = b_idx then add_one_sub_type x a else x) tv_rel
 
   let add_sub_sub_super (tv_rel: t) (a: CodeType.type_full_exp) (b_idx: int) : t =
     match a with
