@@ -27,6 +27,7 @@ module SubType = struct
     let helper (x: CodeType.type_full_exp) : (CodeType.type_full_exp, CodeType.type_full_exp) Either.t =
       let x_exp, x_cond = x in
       if (CodeType.cmp_type_exp x_exp t_exp) then Right (x_exp, CodeType.Ints.inter x_cond t_cond)
+        (* Here we are being conservative on calculating OR of two conds with Ints.Inter *)
       else Left x
     in
     let l_list, r_list = List.partition_map helper type_list in
@@ -50,6 +51,7 @@ module SubType = struct
         (CodeType.Ints.t * CodeType.type_var_id, CodeType.Ints.t * CodeType.type_var_id) Either.t =
       let x_cond, x_idx = x in 
       if x_idx = b_idx then Right (CodeType.Ints.inter x_cond a_cond, x_idx)
+        (* Here we are being conservative on calculating OR of two conds with Ints.Inter *)
       else Left x
     in
     let l_list, r_list = List.partition_map helper type_var_list in
@@ -69,14 +71,16 @@ module SubType = struct
   let add_one_sub_super (tv_rel: t) (a: CodeType.type_full_exp) (b_idx: int) : t =
     match a with
     | (TypeVar a_idx, a_cond) ->
-      List.map (fun x -> 
-                  if x.type_var_idx = a_idx then 
-                    (* {x with supertype_list = (a_cond, b_idx) :: x.supertype_list} *)
-                    add_one_super_type x a_cond b_idx
-                  else if x.type_var_idx = b_idx then
-                    (* {x with subtype_list = a :: x.subtype_list} *)
-                    add_one_sub_type x a
-                  else x) tv_rel
+      if a_idx = b_idx then tv_rel
+      else
+        List.map (fun x -> 
+                    if x.type_var_idx = a_idx then 
+                      (* {x with supertype_list = (a_cond, b_idx) :: x.supertype_list} *)
+                      add_one_super_type x a_cond b_idx
+                    else if x.type_var_idx = b_idx then
+                      (* {x with subtype_list = a :: x.subtype_list} *)
+                      add_one_sub_type x a
+                    else x) tv_rel
     | _ ->
       List.map (fun x -> if x.type_var_idx = b_idx then add_one_sub_type x a else x) tv_rel
 
