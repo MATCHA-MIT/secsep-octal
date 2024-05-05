@@ -46,7 +46,7 @@ module GenType = struct
 
   let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * CodeType.t * (CodeType.cond_type list) =
     (* TODO: for the block at function start, assign symbolic immediates instead? *)
-    let total_type_var, init_code_type = CodeType.init_code_type_var 0 p [] in (* TODO: Add functionality to init mem_off_list!!! *) 
+    let (total_type_var, _), init_code_type = CodeType.init_code_type_var 0 p [] in (* TODO: Add functionality to init mem_off_list!!! *) 
     let tv_rel, cond_list = gen_subtype_rel p init_code_type total_type_var in
     (tv_rel, init_code_type, cond_list)
 

@@ -10,6 +10,7 @@ module SubType = struct
 
   type type_var_rel = {
     type_var_idx: CodeType.type_var_id;
+    type_sol: CodeType.type_exp option;
     subtype_list: CodeType.type_full_exp list;
     supertype_list: (CodeType.Ints.t * CodeType.type_var_id) list; (* Entry (set, idx) refers to (TypeVar type_var_idx, set) -> (TypeVar idx, {}) *)
   }
@@ -17,7 +18,7 @@ module SubType = struct
   type t = type_var_rel list
 
   let init (total_var: int) =
-    List.init total_var (fun x -> {type_var_idx = x; subtype_list = []; supertype_list = []})
+    List.init total_var (fun x -> {type_var_idx = x; type_sol = None; subtype_list = []; supertype_list = []})
 
   let get_type_var_rel (tv_rel: t) (idx: int) : type_var_rel =
     List.find (fun x -> x.type_var_idx = idx) tv_rel
@@ -108,7 +109,11 @@ module SubType = struct
     | (TypeVar b_idx, b_cond) ->
       if CodeType.Ints.is_empty b_cond then add_sub_sub_super_super tv_rel a b_idx
       else sub_type_error ("add_sub_type_full_exp: super type must has empty condition")
-    | _ -> sub_type_error ("add_sub_type_full_exp: super type must be type var")
+    | _ -> 
+      let a_exp, _ = a in
+      let b_exp, _ = b in
+      if CodeType.cmp_type_exp a_exp b_exp then tv_rel (* Handle the special case for rsp *)
+      else sub_type_error ("add_sub_type_full_exp: super type must be type var")
 
   let add_sub_state_type (tv_rel: t) (start_type: CodeType.state_type) (end_type: CodeType.state_type) : t =
     let start_code_type = start_type.reg_type in
@@ -122,10 +127,91 @@ module SubType = struct
         if start_off = end_off then add_sub_type_full_exp acc_tv_rel start_type end_type
         else sub_type_error ("add_sub_state_type: mem type offset does not match"))
       tv_rel_after_reg start_mem_type end_mem_type
+  
+  let rec simplify_one_sub  
+      (new_type_var_idx: CodeType.type_var_id) 
+      (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list)
+      (fe: CodeType.type_full_exp) : CodeType.type_full_exp =
+    let e, old_cond = fe in
+    match e with
+    | TypeVar v ->
+      begin match List.find_opt (fun (_, super_idx) -> super_idx = v) super_type_list with
+      | Some (cond, _) -> (TypeVar new_type_var_idx, CodeType.Ints.union old_cond cond)
+      | None -> fe
+      end
+    | TypeBExp (op, l, r) ->
+      let l', cond_l = simplify_one_sub new_type_var_idx super_type_list (l, old_cond) in
+      let r', cond_r = simplify_one_sub new_type_var_idx super_type_list (r, old_cond) in
+      (TypeBExp (op, l', r'), CodeType.Ints.union cond_l cond_r)
+    | TypeUExp (op, e) ->
+      let e', cond_e = simplify_one_sub new_type_var_idx super_type_list (e, old_cond) in
+      (TypeUExp (op, e'), cond_e)
+    | _ -> fe
+
+  let simplify_one_var (tv_rel: type_var_rel) : type_var_rel =
+    let no_var_subtype = 
+      List.filter (fun (exp: CodeType.type_full_exp) -> 
+        match exp with
+        | (TypeVar _, _)
+        | (TypeBot, _ ) -> false
+        | _ -> true) tv_rel.subtype_list in
+    { tv_rel with subtype_list = List.map (simplify_one_sub tv_rel.type_var_idx tv_rel.supertype_list) no_var_subtype }
+    (* {
+      type_var_idx = tv_rel.type_var_idx;
+      subtype_list = List.map (simplify_one_sub tv_rel.type_var_idx tv_rel.supertype_list) no_var_subtype;
+      supertype_list = tv_rel.supertype_list
+    } *)
+
+  let simplify_all_var (tv_rel: t) : t =
+    List.map simplify_one_var tv_rel
+
+  let try_solve_single_sub_val (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
+    match subtype_list with
+    | hd :: [] ->
+      let exp, _  = hd in
+      if CodeType.is_type_exp_val exp then Some exp else None
+    | _ -> None
+
+  let try_solve_one_var (tv_rel: type_var_rel) : type_var_rel =
+    let subtype_list = tv_rel.subtype_list in
+    match try_solve_single_sub_val subtype_list with
+    | Some e -> { tv_rel with type_sol = Some e }
+    | None -> { tv_rel with type_sol = None } (* TODO Add more rules *)
+
+  let try_solve_vars (tv_rel_list: t) : ((CodeType.type_var_id * CodeType.type_exp) list) * t =
+    let helper (acc: (CodeType.type_var_id * CodeType.type_exp) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_exp) list) * type_var_rel =
+      let new_tv_rel = try_solve_one_var tv_rel in
+      match new_tv_rel.type_sol with
+      | Some e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
+      | None -> (acc, new_tv_rel)
+    in
+    List.fold_left_map helper [] tv_rel_list
+
+  let update_type_var_rel (tv_rel: type_var_rel) (sol: CodeType.type_var_id * CodeType.type_exp) : type_var_rel =
+    match tv_rel.type_sol with
+    | Some _ -> tv_rel
+    | None -> { tv_rel with subtype_list = List.map (CodeType.repl_type_full_exp sol) tv_rel.subtype_list }
+
+  let rec solve_vars (tv_rel_list: t) (num_iter: int) : t =
+    if num_iter == 0 then tv_rel_list
+    else begin
+      let new_sol_list, new_tv_rel_list = try_solve_vars tv_rel_list in
+      match new_sol_list with
+      | [] -> new_tv_rel_list
+      | _ ->
+        let update_tv_rel_list = List.map (fun (tv: type_var_rel) -> List.fold_left update_type_var_rel tv new_sol_list) new_tv_rel_list in
+        solve_vars update_tv_rel_list (num_iter - 1)
+    end
+
+  let string_of_sol (sol: CodeType.type_exp option) =
+    match sol with
+    | None -> "None"
+    | Some e -> "Some " ^ (CodeType.string_of_type_exp e)
 
   let pp_tv_rels (lvl: int) (tv_rels: t) =
     List.iter (fun x ->
       PP.print_lvl lvl "<TypeVar %d>\n" x.type_var_idx;
+      PP.print_lvl (lvl + 1) "Solution: %s\n" (string_of_sol x.type_sol);
       PP.print_lvl (lvl + 1) "SubType: [\n";
       List.iter (fun tf -> 
         CodeType.pp_type_full_exp (lvl + 2) tf;

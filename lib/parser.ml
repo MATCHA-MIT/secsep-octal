@@ -299,7 +299,13 @@ module Parser = struct
     let imm_var_map, insts = List.fold_left_map (
       fun imm_var_map line -> parse_instr imm_var_map line
     ) imm_var_map (List.tl lines) in
-    (imm_var_map, func), {label = label; func = Option.get func; insts = insts}
+    (imm_var_map, func), 
+    {
+      label = label; 
+      func = Option.get func;
+      rsp_offset = 0;
+      insts = insts
+      }
 
   let parse_program (source: string) : Isa.program =
     let lines = source

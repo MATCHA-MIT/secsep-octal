@@ -90,6 +90,7 @@ module Isa = struct
   type basic_block = {
     label: label;
     func: label;
+    rsp_offset: int;
     insts: instruction list;
   }
 

@@ -241,11 +241,36 @@ module CodeType = struct
       end
     | _ -> e
 
+  
+  let is_type_exp_val (e: type_exp) : bool =
+    match e with
+    | TypeSingle _
+    | TypeRange _
+    | TypeTop
+    | TypeBot -> true
+    | _ -> false
 
   module Ints = Set.Make(Int)
 
   type type_full_exp = type_exp * Ints.t
   (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=0 *)
+
+  let rec repl_type_exp (sol: type_var_id * type_exp) (e: type_exp) : type_exp =
+    let idx, re = sol in
+    match e with
+    | TypeVar v -> if v = idx then re else e
+    | TypeBExp (op, l, r) ->
+      let l' = repl_type_exp sol l in
+      let r' = repl_type_exp sol r in
+      eval_type_exp (TypeBExp (op, l', r'))
+    | TypeUExp (op, ee) ->
+      let ee' = repl_type_exp sol ee in
+      eval_type_exp (TypeUExp (op, ee'))
+    | _ -> e
+
+  let repl_type_full_exp (sol: type_var_id * type_exp) (fe: type_full_exp) : type_full_exp =
+    let e, cond = fe in
+    let new_e = repl_type_exp sol e in (new_e, cond)
 
   type reg_type = type_full_exp list
   (* type reg_type = {
@@ -511,28 +536,39 @@ module CodeType = struct
 
   type t = block_type list
 
-  let init_reg_type (start_type_var_idx: type_var_id) (init_rsp: single_exp option) : type_var_id * reg_type = 
-    let rec helper (acc: (type_var_id * reg_type)) (idx: int) : type_var_id * reg_type =
+  let init_reg_type (start_var_idx: (type_var_id, Isa.imm_var_id) Either.t) (rsp_offset: int) : ((type_var_id, Isa.imm_var_id) Either.t) * reg_type = 
+    let rec helper (var_idx: (type_var_id, Isa.imm_var_id) Either.t) (r_type: reg_type) (idx: int) : ((type_var_id, Isa.imm_var_id) Either.t) * reg_type =
       if idx = Isa.total_reg_num
-      then acc
+      then (var_idx, r_type)
       else begin
-        let type_var_idx, reg_type = acc in
-        if Option.is_some init_rsp && idx = Isa.rsp_idx then
-          helper (type_var_idx, (TypeSingle (Option.get init_rsp), Ints.empty) :: reg_type) (idx + 1)
-        else
-          helper (type_var_idx + 1, (TypeVar type_var_idx, Ints.empty) :: reg_type) (idx + 1)
+        if idx = Isa.rsp_idx then
+          helper var_idx ((TypeSingle (SingleBExp (SingleAdd, SingleVar stack_base_id, SingleConst rsp_offset)), Ints.empty) :: r_type) (idx + 1)
+          (* helper (type_var_idx, (TypeSingle (Option.get init_rsp), Ints.empty) :: reg_type) (idx + 1) *)
+        else begin
+          match var_idx with
+          | Left type_var_idx -> helper (Left (type_var_idx + 1)) ((TypeVar type_var_idx, Ints.empty) :: r_type) (idx + 1)
+          | Right imm_var_idx -> helper (Right (imm_var_idx + 1)) ((TypeSingle (SingleVar imm_var_idx), Ints.empty) :: r_type) (idx + 1)
+          (* helper (type_var_idx + 1, (TypeVar type_var_idx, Ints.empty) :: reg_type) (idx + 1) *)
+        end
       end
     in
-    let type_var_idx, reg_type = helper (start_type_var_idx, []) 0 in
-    (type_var_idx, List.rev reg_type)
+    let var_idx, reg_type = helper start_var_idx [] 0 in
+    (var_idx, List.rev reg_type)
 
-  let init_mem_type (start_type_var_idx: type_var_id) (mem_off_list: int list) : type_var_id * mem_type =
-    List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list
+  let init_mem_type (start_var_idx: (type_var_id, Isa.imm_var_id) Either.t) (mem_off_list: int list) : ((type_var_id, Isa.imm_var_id) Either.t) * mem_type =
+    match start_var_idx with
+    | Left start_type_var_idx -> 
+      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list in
+      (Left end_id, end_type)
+    | Right start_imm_var_idx -> 
+      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeSingle (SingleVar acc), Ints.empty)))) start_imm_var_idx mem_off_list in
+      (Right end_id, end_type)
+    (* List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list *)
 
-  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : type_var_id * t =
-    let helper (acc: type_var_id) (block: Isa.basic_block) : type_var_id * block_type = begin
-      let init_rsp = if Isa.is_label_function_entry block.label then Some (SingleVar stack_base_id) else None in
-      let acc1, reg_t = init_reg_type acc init_rsp in
+  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : (type_var_id * Isa.imm_var_id) * t =
+    let start_imm_var = stack_base_id + Isa.StrM.cardinal prog.imm_var_map + 1 in
+    let helper_0 (acc: (type_var_id, Isa.imm_var_id) Either.t) (block: Isa.basic_block) : ((type_var_id, Isa.imm_var_id) Either.t) * block_type =
+      let acc1, reg_t = init_reg_type acc block.rsp_offset in
       let acc2, mem_t = init_mem_type acc1 mem_off_list in
       (acc2, {
         label = block.label;
@@ -541,9 +577,32 @@ module CodeType = struct
           mem_type = mem_t;
           cond_type = ((TypeSingle (SingleConst 0), Ints.empty), (TypeSingle (SingleConst 0), Ints.empty));
         }
-      }) 
+      }) in
+    let helper (acc: type_var_id * Isa.imm_var_id) (block: Isa.basic_block) : (type_var_id * Isa.imm_var_id) * block_type = begin
+      let type_acc, imm_acc = acc in
+      if Isa.is_label_function_entry block.label then begin
+        let new_acc, b_type = helper_0 (Right imm_acc) block in
+        match new_acc with
+        | Left _ -> code_type_error ("init_code_type_var: return idx should be imm_idx")
+        | Right new_imm_acc -> ((type_acc, new_imm_acc), b_type) 
+      end else begin
+        let new_acc, b_type = helper_0 (Left type_acc) block in
+        match new_acc with
+        | Left new_type_acc -> ((new_type_acc, imm_acc), b_type)
+        | Right _ ->  code_type_error ("init_code_type_var: return idx should be type_idx")
+      end
+      (* let acc1, reg_t = init_reg_type acc rsp_offset in
+      let acc2, mem_t = init_mem_type acc1 mem_off_list in
+      (acc2, {
+        label = block.label;
+        block_code_type = {
+          reg_type = reg_t;
+          mem_type = mem_t;
+          cond_type = ((TypeSingle (SingleConst 0), Ints.empty), (TypeSingle (SingleConst 0), Ints.empty));
+        }
+      })  *)
     end in
-    List.fold_left_map helper start_type_var_idx prog.bbs
+    List.fold_left_map helper (start_type_var_idx, start_imm_var) prog.bbs
     
   let get_label_type (code_type: t) (label: Isa.label) : state_type =
     (List.find (fun x -> label = x.label) code_type).block_code_type
