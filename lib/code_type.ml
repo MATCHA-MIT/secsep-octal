@@ -70,6 +70,21 @@ module CodeType = struct
         | SingleAnd -> SingleConst (Int.logand v1 v2)
         | SingleOr -> SingleConst (Int.logor v1 v2)
         end
+      | _, SingleConst v2 ->
+        if v2 = 0 then
+          begin match op with
+          | SingleMul | SingleAnd -> SingleConst 0
+          | _ -> ee1
+          end
+        else default_single
+      | SingleConst v1, _ ->
+        if v1 = 0 then
+          begin match op with
+          | SingleMul | SingleSal | SingleSar | SingleAnd -> SingleConst 0
+          | SingleAdd | SingleXor | SingleOr -> ee2
+          | _ -> default_single
+          end
+        else default_single
       | _ -> default_single
       end
     | SingleUExp (op, e) -> 
@@ -226,6 +241,18 @@ module CodeType = struct
         (* TODO: TypeXor TypeAnd TypeOr *)
         | _ -> default_type
         end
+      | TypeTop, _ ->
+        begin match tbop with
+        | TypeInter -> ee2
+        | TypeDiff -> TypeUExp (TypeComp, ee2)
+        | _ -> TypeTop
+        end
+      | _, TypeTop ->
+        begin match tbop with
+        | TypeInter -> ee1
+        | TypeDiff -> TypeBot
+        | _ -> TypeTop
+        end
       | _ -> default_type
       end
     | TypeUExp (tuop, e) ->
@@ -377,7 +404,9 @@ module CodeType = struct
     let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
     match idx_find with
     | Some (_, t) -> t
-    | None -> code_type_error ("get_mem_idx_type: stack offset " ^ (string_of_int offset) ^ " not in record")
+    | None -> (TypeTop, Ints.empty)
+      (* TODO: Add this assert back later!!! *)
+      (* code_type_error ("get_mem_idx_type: stack offset " ^ (string_of_int offset) ^ " not in record") *)
 
   let set_mem_idx_type (curr_state: state_type) (offset: int) (new_type: type_full_exp) : state_type =
     let mem_type = curr_state.mem_type in
@@ -542,7 +571,7 @@ module CodeType = struct
       then (var_idx, r_type)
       else begin
         if idx = Isa.rsp_idx then
-          helper var_idx ((TypeSingle (SingleBExp (SingleAdd, SingleVar stack_base_id, SingleConst rsp_offset)), Ints.empty) :: r_type) (idx + 1)
+          helper var_idx ((TypeSingle (eval_single_exp (SingleBExp (SingleAdd, SingleVar stack_base_id, SingleConst rsp_offset))), Ints.empty) :: r_type) (idx + 1)
           (* helper (type_var_idx, (TypeSingle (Option.get init_rsp), Ints.empty) :: reg_type) (idx + 1) *)
         else begin
           match var_idx with
