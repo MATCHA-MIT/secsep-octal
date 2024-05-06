@@ -210,7 +210,8 @@ module SubType = struct
       (cond_set: CodeType.Ints.t) 
       (tv_idx: CodeType.type_var_id)
       (bound: CodeType.type_exp)
-      (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list) : (CodeType.single_exp * bool) option =
+      (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list)
+      (base: CodeType.single_exp) (step: int) (inc: bool) : CodeType.type_exp option =
     let helper (cond_list: CodeType.cond_type list) (cond_idx: int) : (CodeType.single_exp * bool) option =
       let cond = CodeType.get_cond_type cond_list cond_idx in
       match cond with
@@ -220,7 +221,13 @@ module SubType = struct
         if CodeType.cmp_type_exp bound new_e then Some (s, false) else None
       | _ -> None
     in
-    List.find_map (helper cond_list) (CodeType.Ints.to_list cond_set)
+    let find_cond = List.find_map (helper cond_list) (CodeType.Ints.to_list cond_set) in
+    match find_cond with
+    | Some (bound, close) -> 
+      if inc then Some (TypeRange (base, true, bound, close, step))
+      else Some (TypeRange (bound, close, base, true, step))
+    (* TODO: Maybe use close for both sides!!! *)
+    | _ -> None
 
   let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CodeType.cond_type list) : type_var_rel =
     let try_solve_top (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
@@ -249,15 +256,7 @@ module SubType = struct
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
       match find_base, find_bound with
       | Some base, Some ((bound_var, bound_cond), step, inc) -> 
-        let find_cond = find_cond_naive cond_list bound_cond tv_rel.type_var_idx bound_var tv_rel.supertype_list in
-        begin match find_cond with
-        | Some (bound, close) -> 
-          if inc then Some (TypeRange (base, true, bound, close, step))
-          else Some (TypeRange (bound, close, base, true, step))
-        (* TODO: Maybe use close for both sides!!! *)
-        | _ -> None
-        end
-        (* Some (TypeRange (base, true, SingleConst 0, false, 1)) *)
+        find_cond_naive cond_list bound_cond tv_rel.type_var_idx bound_var tv_rel.supertype_list base step inc
       | _ -> None
     in
     let solve_rules : ((CodeType.type_full_exp list) -> CodeType.type_exp option) list = [
