@@ -195,7 +195,7 @@ module SubType = struct
       | TypeBExp (bop, TypeSingle s, TypeVar v) ->
         if v = idx && bop = TypeAdd then
           match s with
-          | CodeType.SingleConst c ->
+          | SingleConst c ->
             if c = 0 then sub_type_error ("find_loop_bound: step should be non-zero")
             else if c > 0 then Some (fe, c, true)
             else Some (fe, -c, false)
@@ -212,7 +212,7 @@ module SubType = struct
       (bound: CodeType.type_exp)
       (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list)
       (base: CodeType.single_exp) (step: int) (inc: bool) : CodeType.type_exp option =
-    let helper (cond_list: CodeType.cond_type list) (cond_idx: int) : (CodeType.single_exp * bool) option =
+    let helper (cond_idx: int) : (CodeType.single_exp * bool) option =
       let cond = CodeType.get_cond_type cond_list cond_idx in
       match cond with
       | CondNe (fe, (TypeSingle s, _))
@@ -221,7 +221,7 @@ module SubType = struct
         if CodeType.cmp_type_exp bound new_e then Some (s, false) else None
       | _ -> None
     in
-    let find_cond = List.find_map (helper cond_list) (CodeType.Ints.to_list cond_set) in
+    let find_cond = List.find_map helper (CodeType.Ints.to_list cond_set) in
     match find_cond with
     | Some (bound, close) -> 
       if inc then Some (TypeRange (base, true, bound, close, step))
@@ -229,7 +229,61 @@ module SubType = struct
     (* TODO: Maybe use close for both sides!!! *)
     | _ -> None
 
-  let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CodeType.cond_type list) : type_var_rel =
+  let find_cond_other
+      (cond_list: CodeType.cond_type list)
+      (cond_set: CodeType.Ints.t) 
+      (* (tv_idx: CodeType.type_var_id) *)
+      (* (bound: CodeType.type_exp) *)
+      (base: CodeType.single_exp) (step: int) (inc: bool)
+      (tv_rel_list: t) : CodeType.type_exp option =
+    let helper (acc: CodeType.type_exp option) (cond_idx: int) : CodeType.type_exp option =
+      match acc with
+      | Some _ -> acc
+      | None ->
+        let cond = CodeType.get_cond_type cond_list cond_idx in
+        begin match cond with
+        | CondNe ((e, _), (TypeSingle _, _))
+        | CondNe ((TypeSingle _, _), (e, _)) ->
+          begin match e with
+          | TypeBExp (TypeAdd, TypeVar v, TypeSingle (SingleConst c))
+          | TypeBExp (TypeAdd, TypeSingle (SingleConst c), TypeVar v) ->
+            let v_tv_rel = List.find (fun (x: type_var_rel) -> x.type_var_idx = v) tv_rel_list in
+            let v_cond_set_option = List.find_map 
+              (fun (fx: CodeType.type_full_exp) ->
+                let x, cond = fx in
+                if CodeType.cmp_type_exp x e then Some cond else None)
+              v_tv_rel.subtype_list
+            in
+            begin match v_cond_set_option with
+            | Some v_cond_set ->
+              if CodeType.Ints.equal v_cond_set cond_set then
+                (* Use v to represent solution of tv_idx *)
+                let v_base_option = List.find_map
+                  (fun (fx: CodeType.type_full_exp) ->
+                    let x, _ = fx in
+                    match x with 
+                    | TypeSingle s -> Some s
+                    | _ -> None)
+                  v_tv_rel.subtype_list
+                in
+                begin match v_base_option with
+                | None -> None
+                | Some v_base -> 
+                  let original_step = if inc then step else -step in
+                  (* TODO: Check whether c divides original_step or not *)
+                  Some (CodeType.eval_type_exp (TypeBExp (TypeAdd, TypeBExp (TypeMul, TypeBExp (TypeSub, TypeVar v, TypeSingle v_base), TypeSingle (SingleConst (original_step / c))), TypeSingle base)))
+                end
+              else None
+            | _ -> None
+            end
+          | _ -> None
+          end
+        | _ -> None
+        end
+    in
+    List.fold_left helper None (CodeType.Ints.to_list cond_set)
+
+  let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CodeType.cond_type list) (tv_rel_list: t) : type_var_rel =
     let try_solve_top (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
       let helper (found: bool) (fe: CodeType.type_full_exp) : bool =
         if found then true
@@ -256,7 +310,11 @@ module SubType = struct
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
       match find_base, find_bound with
       | Some base, Some ((bound_var, bound_cond), step, inc) -> 
-        find_cond_naive cond_list bound_cond tv_rel.type_var_idx bound_var tv_rel.supertype_list base step inc
+        begin match find_cond_naive cond_list bound_cond tv_rel.type_var_idx bound_var tv_rel.supertype_list base step inc with
+        | Some e -> Some e
+        | None -> find_cond_other cond_list bound_cond base step inc tv_rel_list
+        (* TODO: Add rule for another case, and check whether this rule only works in the second round *)
+        end
       | _ -> None
     in
     let solve_rules : ((CodeType.type_full_exp list) -> CodeType.type_exp option) list = [
@@ -279,7 +337,7 @@ module SubType = struct
 
   let try_solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list)  : ((CodeType.type_var_id * CodeType.type_exp) list) * t =
     let helper (acc: (CodeType.type_var_id * CodeType.type_exp) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_exp) list) * type_var_rel =
-      let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list in
+      let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list tv_rel_list in
       match new_tv_rel.type_sol with
       | Some e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
       | None -> (acc, tv_rel)

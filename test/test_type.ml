@@ -46,5 +46,5 @@ let _ = CodeType.pp_block_types 0 code_type
 
 (* let _ = SubType.pp_tv_rels 0 tv_rel *)
 
-let _= SubType.pp_tv_rels 0 (SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel) cond_list 1)
+let _= SubType.pp_tv_rels 0 (SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel) cond_list 2)
 
