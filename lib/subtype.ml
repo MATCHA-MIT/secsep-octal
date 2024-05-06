@@ -128,6 +128,19 @@ module SubType = struct
         else sub_type_error ("add_sub_state_type: mem type offset does not match"))
       tv_rel_after_reg start_mem_type end_mem_type
   
+  let remove_one_var_dummy_sub (tv_rel: type_var_rel) : type_var_rel =
+    let no_var_subtype = 
+      List.filter (fun (exp: CodeType.type_full_exp) -> 
+        match exp with
+        | (TypeVar _, _)
+        | (TypeBot, _ ) -> false
+        | _ -> true) tv_rel.subtype_list
+      in
+      { tv_rel with subtype_list = no_var_subtype }
+
+  let remove_all_var_dummy_sub (tv_rel: t) : t =
+    List.map remove_one_var_dummy_sub tv_rel
+
   let rec simplify_one_sub  
       (new_type_var_idx: CodeType.type_var_id) 
       (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list)
@@ -149,13 +162,13 @@ module SubType = struct
     | _ -> fe
 
   let simplify_one_var (tv_rel: type_var_rel) : type_var_rel =
-    let no_var_subtype = 
+    (* let no_var_subtype = 
       List.filter (fun (exp: CodeType.type_full_exp) -> 
         match exp with
         | (TypeVar _, _)
         | (TypeBot, _ ) -> false
-        | _ -> true) tv_rel.subtype_list in
-    { tv_rel with subtype_list = List.map (simplify_one_sub tv_rel.type_var_idx tv_rel.supertype_list) no_var_subtype }
+        | _ -> true) tv_rel.subtype_list in *)
+    { tv_rel with subtype_list = List.map (simplify_one_sub tv_rel.type_var_idx tv_rel.supertype_list) tv_rel.subtype_list }
     (* {
       type_var_idx = tv_rel.type_var_idx;
       subtype_list = List.map (simplify_one_sub tv_rel.type_var_idx tv_rel.supertype_list) no_var_subtype;
@@ -267,10 +280,10 @@ module SubType = struct
 
   let try_solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list)  : ((CodeType.type_var_id * CodeType.type_exp) list) * t =
     let helper (acc: (CodeType.type_var_id * CodeType.type_exp) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_exp) list) * type_var_rel =
-      let new_tv_rel = try_solve_one_var tv_rel cond_list in
+      let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list in
       match new_tv_rel.type_sol with
       | Some e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
-      | None -> (acc, new_tv_rel)
+      | None -> (acc, tv_rel)
     in
     List.fold_left_map helper [] tv_rel_list
 
