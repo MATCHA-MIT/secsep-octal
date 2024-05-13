@@ -208,16 +208,17 @@ module SubType = struct
   let find_cond_naive 
       (cond_list: CodeType.cond_type list) 
       (cond_set: CodeType.Ints.t) 
-      (tv_idx: CodeType.type_var_id)
+      (* (tv_idx: CodeType.type_var_id) *)
       (bound: CodeType.type_exp)
-      (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list)
+      (* (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list) *)
       (base: CodeType.single_exp) (step: int) (inc: bool) : CodeType.type_exp option =
     let helper (cond_idx: int) : (CodeType.single_exp * bool) option =
       let cond = CodeType.get_cond_type cond_list cond_idx in
       match cond with
       | CondNe (fe, (TypeSingle s, _))
       | CondNe ((TypeSingle s, _), fe) ->
-        let new_e, _ = simplify_one_sub tv_idx super_type_list fe in
+        (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
+        let new_e, _ = fe in
         if CodeType.cmp_type_exp bound new_e then Some (s, false) else None
       | _ -> None
     in
@@ -310,7 +311,7 @@ module SubType = struct
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
       match find_base, find_bound with
       | Some base, Some ((bound_var, bound_cond), step, inc) -> 
-        begin match find_cond_naive cond_list bound_cond tv_rel.type_var_idx bound_var tv_rel.supertype_list base step inc with
+        begin match find_cond_naive cond_list bound_cond bound_var base step inc with
         | Some e -> Some e
         | None -> find_cond_other cond_list bound_cond base step inc tv_rel_list
         (* TODO: Add rule for another case, and check whether this rule only works in the second round *)
@@ -337,7 +338,8 @@ module SubType = struct
 
   let try_solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list)  : ((CodeType.type_var_id * CodeType.type_exp) list) * t =
     let helper (acc: (CodeType.type_var_id * CodeType.type_exp) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_exp) list) * type_var_rel =
-      let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list tv_rel_list in
+      (* let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list tv_rel_list in *)
+      let new_tv_rel = try_solve_one_var tv_rel cond_list tv_rel_list in
       match new_tv_rel.type_sol with
       | Some e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
       | None -> (acc, tv_rel)
@@ -345,6 +347,7 @@ module SubType = struct
     List.fold_left_map helper [] tv_rel_list
 
   let update_type_var_rel (tv_rel: type_var_rel) (sol: CodeType.type_var_id * CodeType.type_exp) : type_var_rel =
+    (* TODO: When replace variables with their solutions, we should consider about the effects of conditions!!! *)
     match tv_rel.type_sol with
     | Some _ -> tv_rel
     | None -> { tv_rel with subtype_list = List.map (CodeType.repl_type_full_exp sol) tv_rel.subtype_list }
