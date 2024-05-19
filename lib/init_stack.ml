@@ -9,8 +9,10 @@ module InitStack = struct
 
   let add_stack_slots (stack_slots: Ints.t) (offset: int) (operand: Isa.operand) : Ints.t =
     match operand with
-    | MemOp (None, Some Isa.RSP, None, None) -> Ints.add offset stack_slots
-    | MemOp (Some (ImmNum x), Some Isa.RSP, None, None) -> Ints.add (offset + x) stack_slots
+    | LdOp (None, Some Isa.RSP, None, None)
+    | StOp (None, Some Isa.RSP, None, None) -> Ints.add offset stack_slots
+    | LdOp (Some (ImmNum x), Some Isa.RSP, None, None)
+    | StOp (Some (ImmNum x), Some Isa.RSP, None, None) -> Ints.add (offset + x) stack_slots
     | _ -> stack_slots
 
   let find_offset_helper (offset_list: (int option) list) (stack_slots: Ints.t) (p: Isa.program) : (int option) list * Ints.t =
@@ -63,7 +65,8 @@ module InitStack = struct
         (new_offset_list, new_stack_slots, idx + 1)
       | None -> (offset_list, old_stack_slots, idx + 1)
     in
-    let new_offset_list, new_stack_slots, _ = List.fold_left helper (offset_list, stack_slots, 0) p.bbs in (new_offset_list, new_stack_slots)
+    let new_offset_list, new_stack_slots, _ = List.fold_left helper (offset_list, stack_slots, 0) p.bbs in 
+    (new_offset_list, new_stack_slots)
 
   let offset_solved (offset_list: (int option) list) : bool =
     let helper (acc: bool) (offset: int option) =
