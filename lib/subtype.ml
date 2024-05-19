@@ -113,7 +113,8 @@ module SubType = struct
       let a_exp, _ = a in
       let b_exp, _ = b in
       if CodeType.cmp_type_exp a_exp b_exp then tv_rel (* Handle the special case for rsp *)
-      else sub_type_error ("add_sub_type_full_exp: super type must be type var")
+      else sub_type_error ("add_sub_type_full_exp: incorrect sub/super types " ^ 
+        (CodeType.string_of_type_exp a_exp) ^ " " ^ (CodeType.string_of_type_exp b_exp))
 
   let add_sub_state_type (tv_rel: t) (start_type: CodeType.state_type) (end_type: CodeType.state_type) : t =
     let start_code_type = start_type.reg_type in

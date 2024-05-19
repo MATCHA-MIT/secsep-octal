@@ -70,6 +70,14 @@ module CodeType = struct
         | SingleAnd -> SingleConst (Int.logand v1 v2)
         | SingleOr -> SingleConst (Int.logor v1 v2)
         end
+      | (SingleBExp (op_out, SingleVar var, SingleConst v1)), (SingleConst v2) ->
+        begin match op_out, op with
+        | SingleAdd, SingleAdd -> SingleBExp (SingleAdd, SingleVar var, SingleConst (v1 + v2))
+        | SingleAdd, SingleSub -> SingleBExp (SingleAdd, SingleVar var, SingleConst (v1 - v2))
+        | SingleSub, SingleAdd -> SingleBExp (SingleAdd, SingleVar var, SingleConst (- v1 + v2))
+        | SingleSub, SingleSub -> SingleBExp (SingleAdd, SingleVar var, SingleConst (- v1 - v2))
+        | _ -> default_single
+        end
       | _, SingleConst v2 ->
         if v2 = 0 then
           begin match op with
@@ -600,6 +608,18 @@ module CodeType = struct
       let new_cond_list, new_cond_idx = add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list)
     | Jmp _ -> (curr_state, cond_list)
+    | Push _ ->
+      let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
+      let src2_type = TypeSingle (SingleConst (-8)) in
+      (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
+      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
+      (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
+    | Pop _ ->
+      let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
+      let src2_type = TypeSingle (SingleConst 8) in
+      (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
+      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
+      (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
     | _ -> begin
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
         (curr_state, cond_list) (* TODO *)
