@@ -268,6 +268,20 @@ module CodeType = struct
       end
     | _ -> e
 
+  let merge_type_exp (e1: type_exp) (e2: type_exp) : type_exp option =
+    match e1, e2 with
+    | TypeSingle s, TypeRange (l, lb, r, rb, step)
+    | TypeRange (l, lb, r, rb, step), TypeSingle s ->
+      if lb && (cmp_single_exp (eval_single_exp (SingleBExp (SingleAdd, s, SingleConst step))) l) then
+        Some (TypeRange (s, lb, r, rb, step))
+      else if rb && (cmp_single_exp (eval_single_exp (SingleBExp (SingleAdd, r, SingleConst step))) s) then
+        Some (TypeRange (l, lb, s, rb, step))
+      else if cmp_single_exp s l then
+        Some (TypeRange (l, true, r, rb, step))
+      else if cmp_single_exp r s then
+        Some (TypeRange (l, lb, r, true, step))
+      else None
+    | _ -> None
   
   let is_type_exp_val (e: type_exp) : bool =
     match e with
@@ -281,6 +295,13 @@ module CodeType = struct
 
   type type_full_exp = type_exp * Ints.t
   (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=0 *)
+
+  let merge_type_full_exp (fe1: type_full_exp) (fe2: type_full_exp) : type_full_exp option =
+    let e1, cond1 = fe1 in
+    let e2, cond2 = fe2 in
+    match merge_type_exp e1 e2 with
+    | Some e -> Some (e, Ints.inter cond1 cond2)
+    | None -> None
 
   type type_sol =
     | SolNone

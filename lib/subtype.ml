@@ -230,7 +230,7 @@ module SubType = struct
               SolCond (
                 TypeRange (base, true, bound_1, true, step), 
                 pure_cond_idx, 
-                TypeRange (base, true, bound_2, false, step),
+                TypeRange (base, true, bound_2, true, step),
                 TypeSingle bound_1
                 )
             else
@@ -374,6 +374,34 @@ module SubType = struct
     | SolNone -> { tv_rel with subtype_list = List.map (CodeType.repl_type_sol_full_exp sol) tv_rel.subtype_list }
     | _ -> tv_rel
 
+  let merge_sub_type (fe_list: CodeType.type_full_exp list) : CodeType.type_full_exp list =
+    let helper (acc: CodeType.type_full_exp) (fe: CodeType.type_full_exp) : ((CodeType.type_full_exp) * CodeType.type_full_exp) =
+      let acc_e, _ = acc in
+      let e, _ = fe in
+      match acc_e, e with
+      | TypeBot, TypeSingle _
+      | TypeBot, TypeRange _ -> (fe, (TypeBot, CodeType.Ints.empty))
+      | TypeSingle _, TypeRange _
+      | TypeRange _, TypeSingle _ ->
+        begin match CodeType.merge_type_full_exp acc fe with
+        | Some new_fe -> ((TypeBot, CodeType.Ints.empty), new_fe)
+        | None -> (acc, fe)
+        end
+      | _ -> (acc, fe)
+    in
+    let new_acc, new_list = List.fold_left_map helper (TypeBot, CodeType.Ints.empty) fe_list in
+    let helper (fe: CodeType.type_full_exp) : bool =
+      match fe with
+      | (TypeBot, _) -> false
+      | _ -> true
+    in
+    List.filter helper (new_acc :: new_list)
+
+  let simplify_tv_rel_sub (tv_rel: type_var_rel) : type_var_rel =
+    match tv_rel.type_sol with
+    | SolNone -> {tv_rel with subtype_list = merge_sub_type tv_rel.subtype_list}
+    | _ -> tv_rel
+
   let rec solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list) (num_iter: int) : t =
     if num_iter == 0 then tv_rel_list
     else begin
@@ -382,7 +410,8 @@ module SubType = struct
       | [] -> new_tv_rel_list
       | _ ->
         let update_tv_rel_list = List.map (fun (tv: type_var_rel) -> List.fold_left update_type_var_rel tv new_sol_list) new_tv_rel_list in
-        solve_vars update_tv_rel_list cond_list (num_iter - 1)
+        let merged_tv_rel_list = List.map simplify_tv_rel_sub update_tv_rel_list in
+        solve_vars merged_tv_rel_list cond_list (num_iter - 1)
     end
 
   let string_of_sol (sol: CodeType.type_exp option) =
