@@ -282,22 +282,11 @@ module CodeType = struct
   type type_full_exp = type_exp * Ints.t
   (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=0 *)
 
-  let rec repl_type_exp (sol: type_var_id * type_exp) (e: type_exp) : type_exp =
-    let idx, re = sol in
-    match e with
-    | TypeVar v -> if v = idx then re else e
-    | TypeBExp (op, l, r) ->
-      let l' = repl_type_exp sol l in
-      let r' = repl_type_exp sol r in
-      eval_type_exp (TypeBExp (op, l', r'))
-    | TypeUExp (op, ee) ->
-      let ee' = repl_type_exp sol ee in
-      eval_type_exp (TypeUExp (op, ee'))
-    | _ -> e
-
-  let repl_type_full_exp (sol: type_var_id * type_exp) (fe: type_full_exp) : type_full_exp =
-    let e, cond = fe in
-    let new_e = repl_type_exp sol e in (new_e, cond)
+  type type_sol =
+    | SolNone
+    | SolSimple of type_exp
+    | SolCond of type_exp * int * type_exp * type_exp
+      (* sol, cond, sol when taken, sol when not taken *)
 
   type reg_type = type_full_exp list
   (* type reg_type = {
@@ -329,9 +318,46 @@ module CodeType = struct
     if taken = 1 then cond
     else not_cond_type cond
 
+  let get_cond_idx (idx: int) (taken: bool) : int =
+    if taken then idx * 2 + 1
+    else idx * 2
+
   let add_cond_type (cond_list: cond_type list) (cond: cond_type) (taken: bool) : (cond_type list) * int =
     let cond_suffix = if taken then 1 else 0 in
     (cond::cond_list, ((List.length cond_list) + 1) * 2 + cond_suffix)
+
+  let rec repl_type_exp (sol: type_var_id * type_exp) (e: type_exp) : type_exp =
+    let idx, re = sol in
+    match e with
+    | TypeVar v -> if v = idx then re else e
+    | TypeBExp (op, l, r) ->
+      let l' = repl_type_exp sol l in
+      let r' = repl_type_exp sol r in
+      eval_type_exp (TypeBExp (op, l', r'))
+    | TypeUExp (op, ee) ->
+      let ee' = repl_type_exp sol ee in
+      eval_type_exp (TypeUExp (op, ee'))
+    | _ -> e
+
+  let repl_type_full_exp (sol: type_var_id * type_exp) (fe: type_full_exp) : type_full_exp =
+    let e, cond = fe in
+    let new_e = repl_type_exp sol e in (new_e, cond)
+
+  let repl_type_sol_full_exp (sol: type_var_id * type_sol) (fe: type_full_exp) : type_full_exp =
+    let idx, s = sol in
+    let e, cond = fe in
+    match s with
+    | SolNone -> fe
+    | SolSimple sol_e -> (repl_type_exp (idx, sol_e) e, cond)
+    | SolCond (sol_e, pure_cond_idx, sol_taken, sol_not_taken) ->
+      begin match Ints.find_opt (get_cond_idx pure_cond_idx true) cond with 
+      | Some _ -> (repl_type_exp (idx, sol_taken) e, cond) (* Taken *)
+      | None ->
+        begin match Ints.find_opt (get_cond_idx pure_cond_idx false) cond with
+        | Some _ -> (repl_type_exp (idx, sol_not_taken) e, cond) (* Not Taken *)
+        | None -> (repl_type_exp (idx, sol_e) e, cond) (* No branch *)
+        end
+      end
 
   type state_type = {
     reg_type: reg_type;
@@ -691,6 +717,12 @@ module CodeType = struct
       in
       "UnaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp e) ^ ")"
   
+  let string_of_type_sol (t: type_sol) =
+    match t with
+    | SolSimple e -> "SolSimple " ^ (string_of_type_exp e)
+    | SolCond (e, c, e1, e2) -> "SolCond " ^ (string_of_type_exp e) ^ " cond " ^ (string_of_int c) ^ " taken " ^ (string_of_type_exp e1) ^ " not taken " ^ (string_of_type_exp e2)
+    | SolNone -> "SolNone"
+
   let string_of_one_cond_status (cond: int) =
     let cond_idx = cond / 2 in
     let taken = if Int.rem cond 2 = 1 then "Taken" else "NotTaken" in

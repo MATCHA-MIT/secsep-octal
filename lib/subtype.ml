@@ -10,7 +10,7 @@ module SubType = struct
 
   type type_var_rel = {
     type_var_idx: CodeType.type_var_id;
-    type_sol: CodeType.type_exp option;
+    type_sol: CodeType.type_sol;
     subtype_list: CodeType.type_full_exp list;
     supertype_list: (CodeType.Ints.t * CodeType.type_var_id) list; (* Entry (set, idx) refers to (TypeVar type_var_idx, set) -> (TypeVar idx, {}) *)
   }
@@ -18,7 +18,7 @@ module SubType = struct
   type t = type_var_rel list
 
   let init (total_var: int) =
-    List.init total_var (fun x -> {type_var_idx = x; type_sol = None; subtype_list = []; supertype_list = []})
+    List.init total_var (fun x -> {type_var_idx = x; type_sol = SolNone; subtype_list = []; supertype_list = []})
 
   let get_type_var_rel (tv_rel: t) (idx: int) : type_var_rel =
     List.find (fun x -> x.type_var_idx = idx) tv_rel
@@ -209,38 +209,60 @@ module SubType = struct
       (cond_list: CodeType.cond_type list) 
       (cond_set: CodeType.Ints.t) 
       (* (tv_idx: CodeType.type_var_id) *)
-      (bound: CodeType.type_exp)
+      (bound_exp: CodeType.type_exp)
       (* (super_type_list: (CodeType.Ints.t * CodeType.type_var_id) list) *)
-      (base: CodeType.single_exp) (step: int) (inc: bool) : CodeType.type_exp option =
-    let helper (cond_idx: int) : (CodeType.single_exp * bool) option =
-      let cond = CodeType.get_cond_type cond_list cond_idx in
-      match cond with
-      | CondNe (fe, (TypeSingle s, _))
-      | CondNe ((TypeSingle s, _), fe) ->
-        (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
-        let new_e, _ = fe in
-        if CodeType.cmp_type_exp bound new_e then Some (s, false) else None
-      | _ -> None
+      (base: CodeType.single_exp) (step: int) (inc: bool) : CodeType.type_sol =
+    let helper (acc: CodeType.type_sol) (cond_idx: int) : CodeType.type_sol = (* (CodeType.single_exp * bool) option = *)
+      match acc with
+      | SolSimple _ | SolCond _ -> acc
+      | SolNone ->
+        let cond = CodeType.get_cond_type cond_list cond_idx in
+        let pure_cond_idx = cond_idx / 2 in
+        begin match cond with
+        | CondNe (fe, (TypeSingle bound, _))
+        | CondNe ((TypeSingle bound, _), fe) ->
+          (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
+          let new_e, _ = fe in
+          if CodeType.cmp_type_exp bound_exp new_e then 
+            if inc then
+              let bound_1 = CodeType.eval_single_exp (CodeType.SingleBExp (CodeType.SingleSub, bound, CodeType.SingleConst step)) in
+              let bound_2 = CodeType.eval_single_exp (CodeType.SingleBExp (CodeType.SingleSub, bound_1, CodeType.SingleConst step)) in
+              SolCond (
+                TypeRange (base, true, bound_1, true, step), 
+                pure_cond_idx, 
+                TypeRange (base, true, bound_2, false, step),
+                TypeSingle bound_1
+                )
+            else
+              let bound_1 = CodeType.eval_single_exp (CodeType.SingleBExp (CodeType.SingleSub, bound, CodeType.SingleConst step)) in
+              let bound_2 = CodeType.eval_single_exp (CodeType.SingleBExp (CodeType.SingleSub, bound_1, CodeType.SingleConst step)) in
+              SolCond (
+                TypeRange (bound_1, true, base, true, step), 
+                pure_cond_idx, 
+                TypeRange (bound_2, true, base, true, step),
+                TypeSingle bound_1
+                )
+            (* Some (bound, false)  *)
+          else SolNone
+        | _ -> SolNone
+        end
     in
-    let find_cond = List.find_map helper (CodeType.Ints.to_list cond_set) in
-    match find_cond with
-    | Some (bound, close) -> 
-      if inc then Some (TypeRange (base, true, bound, close, step))
-      else Some (TypeRange (bound, close, base, true, step))
+    (* TODO: merge the following match to helper *)
+    List.fold_left helper SolNone (CodeType.Ints.to_list cond_set)
     (* TODO: Maybe use close for both sides!!! *)
-    | _ -> None
 
+  (* TODO: these two functions should both use find_map or fold_left *)
   let find_cond_other
       (cond_list: CodeType.cond_type list)
       (cond_set: CodeType.Ints.t) 
       (* (tv_idx: CodeType.type_var_id) *)
       (* (bound: CodeType.type_exp) *)
       (base: CodeType.single_exp) (step: int) (inc: bool)
-      (tv_rel_list: t) : CodeType.type_exp option =
-    let helper (acc: CodeType.type_exp option) (cond_idx: int) : CodeType.type_exp option =
+      (tv_rel_list: t) : CodeType.type_sol =
+    let helper (acc: CodeType.type_sol) (cond_idx: int) : CodeType.type_sol =
       match acc with
-      | Some _ -> acc
-      | None ->
+      | SolSimple _ | SolCond _ -> acc
+      | SolNone ->
         let cond = CodeType.get_cond_type cond_list cond_idx in
         begin match cond with
         | CondNe ((e, _), (TypeSingle _, _))
@@ -268,24 +290,24 @@ module SubType = struct
                   v_tv_rel.subtype_list
                 in
                 begin match v_base_option with
-                | None -> None
+                | None -> SolNone
                 | Some v_base -> 
                   let original_step = if inc then step else -step in
                   (* TODO: Check whether c divides original_step or not *)
-                  Some (CodeType.eval_type_exp (TypeBExp (TypeAdd, TypeBExp (TypeMul, TypeBExp (TypeSub, TypeVar v, TypeSingle v_base), TypeSingle (SingleConst (original_step / c))), TypeSingle base)))
+                  SolSimple (CodeType.eval_type_exp (TypeBExp (TypeAdd, TypeBExp (TypeMul, TypeBExp (TypeSub, TypeVar v, TypeSingle v_base), TypeSingle (SingleConst (original_step / c))), TypeSingle base)))
                 end
-              else None
-            | _ -> None
+              else SolNone
+            | _ -> SolNone
             end
-          | _ -> None
+          | _ -> SolNone
           end
-        | _ -> None
+        | _ -> SolNone
         end
     in
-    List.fold_left helper None (CodeType.Ints.to_list cond_set)
+    List.fold_left helper SolNone (CodeType.Ints.to_list cond_set)
 
   let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CodeType.cond_type list) (tv_rel_list: t) : type_var_rel =
-    let try_solve_top (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
+    let try_solve_top (subtype_list: CodeType.type_full_exp list) : CodeType.type_sol =
       let helper (found: bool) (fe: CodeType.type_full_exp) : bool =
         if found then true
         else begin
@@ -296,39 +318,39 @@ module SubType = struct
         end
       in
       let found = List.fold_left helper false subtype_list in
-      if found then Some CodeType.TypeTop
-      else None
+      if found then SolSimple CodeType.TypeTop
+      else SolNone
     in
-    let try_solve_single_sub_val (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
+    let try_solve_single_sub_val (subtype_list: CodeType.type_full_exp list) : CodeType.type_sol =
       match subtype_list with
       | hd :: [] ->
         let exp, _  = hd in
-        if CodeType.is_type_exp_val exp then Some exp else None
-      | _ -> None
+        if CodeType.is_type_exp_val exp then SolSimple exp else SolNone
+      | _ -> SolNone
     in
-    let try_solve_loop_cond (subtype_list: CodeType.type_full_exp list) : CodeType.type_exp option =
+    let try_solve_loop_cond (subtype_list: CodeType.type_full_exp list) : CodeType.type_sol =
       let find_base = find_loop_base subtype_list in
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
       match find_base, find_bound with
       | Some base, Some ((bound_var, bound_cond), step, inc) -> 
         begin match find_cond_naive cond_list bound_cond bound_var base step inc with
-        | Some e -> Some e
-        | None -> find_cond_other cond_list bound_cond base step inc tv_rel_list
+        | SolNone -> find_cond_other cond_list bound_cond base step inc tv_rel_list
+        | naive_sol -> naive_sol
         (* TODO: Add rule for another case, and check whether this rule only works in the second round *)
         end
-      | _ -> None
+      | _ -> SolNone
     in
-    let solve_rules : ((CodeType.type_full_exp list) -> CodeType.type_exp option) list = [
+    let solve_rules : ((CodeType.type_full_exp list) -> CodeType.type_sol) list = [
       try_solve_top;
       try_solve_single_sub_val;
       try_solve_loop_cond
     ]
     in
     let subtype_list = tv_rel.subtype_list in
-    let helper (acc: CodeType.type_exp option) (rule: (CodeType.type_full_exp list) -> CodeType.type_exp option) : CodeType.type_exp option =
+    let helper (acc: CodeType.type_sol) (rule: (CodeType.type_full_exp list) -> CodeType.type_sol) : CodeType.type_sol =
       match acc with
-      | Some _ -> acc
-      | None -> rule subtype_list
+      | SolNone -> rule subtype_list
+      | _ -> acc
     in
     { tv_rel with type_sol = List.fold_left helper tv_rel.type_sol solve_rules }
     (* match try_solve_single_sub_val subtype_list with
@@ -336,21 +358,21 @@ module SubType = struct
     | None -> { tv_rel with type_sol = None }  *)
     (* TODO Add more rules *)
 
-  let try_solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list)  : ((CodeType.type_var_id * CodeType.type_exp) list) * t =
-    let helper (acc: (CodeType.type_var_id * CodeType.type_exp) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_exp) list) * type_var_rel =
+  let try_solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list)  : ((CodeType.type_var_id * CodeType.type_sol) list) * t =
+    let helper (acc: (CodeType.type_var_id * CodeType.type_sol) list) (tv_rel: type_var_rel) : ((CodeType.type_var_id * CodeType.type_sol) list) * type_var_rel =
       (* let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list tv_rel_list in *)
       let new_tv_rel = try_solve_one_var tv_rel cond_list tv_rel_list in
       match new_tv_rel.type_sol with
-      | Some e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
-      | None -> (acc, tv_rel)
+      | SolNone -> (acc, tv_rel)
+      | e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
     in
     List.fold_left_map helper [] tv_rel_list
 
-  let update_type_var_rel (tv_rel: type_var_rel) (sol: CodeType.type_var_id * CodeType.type_exp) : type_var_rel =
+  let update_type_var_rel (tv_rel: type_var_rel) (sol: CodeType.type_var_id * CodeType.type_sol) : type_var_rel =
     (* TODO: When replace variables with their solutions, we should consider about the effects of conditions!!! *)
     match tv_rel.type_sol with
-    | Some _ -> tv_rel
-    | None -> { tv_rel with subtype_list = List.map (CodeType.repl_type_full_exp sol) tv_rel.subtype_list }
+    | SolNone -> { tv_rel with subtype_list = List.map (CodeType.repl_type_sol_full_exp sol) tv_rel.subtype_list }
+    | _ -> tv_rel
 
   let rec solve_vars (tv_rel_list: t) (cond_list: CodeType.cond_type list) (num_iter: int) : t =
     if num_iter == 0 then tv_rel_list
@@ -371,7 +393,7 @@ module SubType = struct
   let pp_tv_rels (lvl: int) (tv_rels: t) =
     List.iter (fun x ->
       PP.print_lvl lvl "<TypeVar %d>\n" x.type_var_idx;
-      PP.print_lvl (lvl + 1) "Solution: %s\n" (string_of_sol x.type_sol);
+      PP.print_lvl (lvl + 1) "Solution: %s\n" (CodeType.string_of_type_sol x.type_sol);
       PP.print_lvl (lvl + 1) "SubType: [\n";
       List.iter (fun tf -> 
         CodeType.pp_type_full_exp (lvl + 2) tf;
