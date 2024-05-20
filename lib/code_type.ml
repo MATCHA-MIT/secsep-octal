@@ -496,14 +496,14 @@ module CodeType = struct
     | ImmOp imm -> get_imm_type imm
     | RegOp r -> get_reg_type curr_state r
     | MemOp (disp, base, index, scale) -> get_mem_op_type curr_state disp base index scale
-    | LdOp (disp, base, index, scale) -> get_ld_op_type curr_state disp base index scale
+    | LdOp (disp, base, index, scale, _) -> get_ld_op_type curr_state disp base index scale
     | StOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a label op")
 
   let set_dest_op_type (curr_state: state_type) (dest: Isa.operand) (new_type: type_full_exp) : state_type =
     match dest with
     | RegOp r -> set_reg_type curr_state r new_type
-    | StOp (disp, base, index, scale) -> set_st_op_type curr_state disp base index scale new_type
+    | StOp (disp, base, index, scale, _) -> set_st_op_type curr_state disp base index scale new_type
     | _ -> code_type_error ("set_dest_op_type: dest is not reg or st op")
 
   let add_type_cond (tf: type_full_exp) (cond_idx: int) : type_full_exp =

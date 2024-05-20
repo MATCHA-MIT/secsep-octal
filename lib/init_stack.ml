@@ -9,10 +9,10 @@ module InitStack = struct
 
   let add_stack_slots (stack_slots: Ints.t) (offset: int) (operand: Isa.operand) : Ints.t =
     match operand with
-    | LdOp (None, Some Isa.RSP, None, None)
-    | StOp (None, Some Isa.RSP, None, None) -> Ints.add offset stack_slots
-    | LdOp (Some (ImmNum x), Some Isa.RSP, None, None)
-    | StOp (Some (ImmNum x), Some Isa.RSP, None, None) -> Ints.add (offset + x) stack_slots
+    | LdOp (None, Some Isa.RSP, None, None, _)
+    | StOp (None, Some Isa.RSP, None, None, _) -> Ints.add offset stack_slots
+    | LdOp (Some (ImmNum x), Some Isa.RSP, None, None, _)
+    | StOp (Some (ImmNum x), Some Isa.RSP, None, None, _) -> Ints.add (offset + x) stack_slots
     | _ -> stack_slots
 
   let find_offset_helper (offset_list: (int option) list) (stack_slots: Ints.t) (p: Isa.program) : (int option) list * Ints.t =

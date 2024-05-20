@@ -203,17 +203,25 @@ module Parser = struct
     | _ -> parse_error "convert_imm_to_label"
 
   let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * Isa.instruction =
-    let src (opr: Isa.operand) : Isa.operand =
-      match opr with
-      | MemOp (disp, base, index, scale) -> LdOp (disp, base, index, scale)
-      | StOp _ -> parse_error "src"
-      | _ -> opr
+    let src (opr_size: Isa.operand * int option) : Isa.operand =
+      match opr_size with
+      | MemOp (disp, base, index, scale), Some size -> LdOp (disp, base, index, scale, size)
+      | MemOp _, None -> parse_error "no size for mem op"
+      | StOp _, _ -> parse_error "src"
+      | LdOp (disp, base, index, scale, _), Some size -> LdOp (disp, base, index, scale, size)
+      | LdOp _, None -> parse_error "no size for ld op"
+      (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "src reg size does not match opcode size" *)
+      | opr, _ -> opr
     in
-    let dst (opr: Isa.operand) : Isa.operand =
-      match opr with
-      | MemOp (disp, base, index, scale) -> StOp (disp, base, index, scale)
-      | LdOp _ -> parse_error "dst"
-      | _ -> opr
+    let dst (opr_size: Isa.operand * int option) : Isa.operand =
+      match opr_size with
+      | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size)
+      | MemOp _, None -> parse_error "no size for mem op"
+      | LdOp _, _ -> parse_error "dst"
+      | StOp (disp, base, index, scale, _), Some size -> StOp (disp, base, index, scale, size)
+      | StOp _, None -> parse_error "no size for st op"
+      (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
+      | opr, _ -> opr
     in
     let (mnemonic, ts) = match ts with
     | MneTok mnemonic :: ts -> (mnemonic, ts)
@@ -242,45 +250,47 @@ module Parser = struct
         imm_var_map, parse_operands ts
       end
     in
+    let dirty_op_size = Isa.get_reg_op_size operands in
     let inst: Isa.instruction = match (mnemonic, operands) with
-      | ("mov", [opr1; opr2])
-      | ("movb", [opr1; opr2])
-      | ("movl", [opr1; opr2])
-      | ("movq", [opr1; opr2])    -> Mov   (dst(opr2), src(opr1))
-      | ("movs", [opr1; opr2])
-      | ("movslq", [opr1; opr2]) -> MovS  (dst(opr2), src(opr1))
-      | ("movz", [opr1; opr2])
-      | ("movzbl", [opr1; opr2]) -> MovZ  (dst(opr2), src(opr1))
-      | ("lea", [opr1; opr2])
-      | ("leaq", [opr1; opr2])   -> Lea   (dst(opr2), opr1) (* the memory operand in LEA is not converted to ld/st *)
-      | ("add", [opr1; opr2])
-      | ("addq", [opr1; opr2])   -> Add   (dst(opr2), src(opr1), src(opr2))
-      | ("sub", [opr1; opr2])
-      | ("subq", [opr1; opr2])   -> Sub   (dst(opr2), src(opr2), src(opr1)) (* note that the minuend is opr2 *)
-      | ("sal", [opr1; opr2])
-      | ("sall", [opr1; opr2])
-      | ("salq", [opr1; opr2])   -> Sal   (dst(opr2), src(opr2), src(opr1))
-      | ("sar", [opr1; opr2])
-      | ("sarl", [opr1; opr2])
-      | ("sarq", [opr1; opr2])   -> Sar   (dst(opr2), src(opr2), src(opr1))
-      | ("shrl", [opr1; opr2])   -> Shr   (dst(opr2), src(opr2), src(opr1))
-      | ("xor", [opr1; opr2])
-      | ("xorb", [opr1; opr2])
-      | ("xorl", [opr1; opr2])
-      | ("xorq", [opr1; opr2])   -> Xor   (dst(opr2), src(opr1), src(opr2))
-      | ("not", [opr])
-      | ("notq", [opr])          -> Not   (dst(opr), src(opr))
-      | ("and", [opr1; opr2])
-      | ("andl", [opr1; opr2])
-      | ("andq", [opr1; opr2])   -> And   (dst(opr2), src(opr1), src(opr2))
-      | ("cmp", [opr1; opr2])
-      | ("cmpq", [opr1; opr2])   -> Cmp   (src(opr1), src(opr2))
-      | ("jmp", [LabelOp lb])    -> Jmp   (lb)
-      | ("jne", [LabelOp lb])    -> Jcond (lb, JNe)
-      | ("call", [LabelOp lb])   -> Call  (lb)
+      | ("mov", [opr1; opr2]) -> Mov (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("movb", [opr1; opr2]) -> Mov (dst(opr2, Some 1), src(opr1, Some 1))
+      | ("movw", [opr1; opr2]) -> Mov (dst(opr2, Some 2), src(opr1, Some 2))
+      | ("movl", [opr1; opr2]) -> Mov (dst(opr2, Some 4), src(opr1, Some 4))
+      | ("movq", [opr1; opr2]) -> Mov (dst(opr2, Some 8), src(opr1, Some 8))
+      | ("movs", [opr1; opr2]) -> MovS (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("movslq", [opr1; opr2]) -> MovS (dst(opr2, Some 8), src(opr1, Some 4))
+      | ("movz", [opr1; opr2]) -> MovZ (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("movzbl", [opr1; opr2]) -> MovZ  (dst(opr2, Some 4), src(opr1, Some 1))
+      | ("lea", [opr1; opr2]) -> Lea (dst(opr2, dirty_op_size), opr1)
+      | ("leaq", [opr1; opr2]) -> Lea (dst(opr2, Some 8), opr1) (* the memory operand in LEA is not converted to ld/st *)
+      | ("add", [opr1; opr2]) -> Add (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("addq", [opr1; opr2]) -> Add (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8))
+      | ("sub", [opr1; opr2]) -> Sub (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("subq", [opr1; opr2]) -> Sub (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8)) (* note that the minuend is opr2 *)
+      | ("sal", [opr1; opr2]) -> Sal (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("sall", [opr1; opr2]) -> Sal (dst(opr2, Some 4), src(opr2, Some 4), src(opr1, Some 4))
+      | ("salq", [opr1; opr2]) -> Sal (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8))
+      | ("sar", [opr1; opr2]) -> Sar (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("sarl", [opr1; opr2]) -> Sar (dst(opr2, Some 4), src(opr2, Some 4), src(opr1, Some 4))
+      | ("sarq", [opr1; opr2]) -> Sar (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8))
+      | ("shrl", [opr1; opr2])   -> Shr (dst(opr2, Some 4), src(opr2, Some 4), src(opr1, Some 4))
+      | ("xor", [opr1; opr2]) -> Xor (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("xorb", [opr1; opr2]) -> Xor (dst(opr2, Some 1), src(opr2, Some 1), src(opr1, Some 1))
+      | ("xorl", [opr1; opr2]) -> Xor (dst(opr2, Some 4), src(opr2, Some 4), src(opr1, Some 4))
+      | ("xorq", [opr1; opr2]) -> Xor (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8))
+      | ("not", [opr]) -> Not (dst(opr, dirty_op_size), src(opr, dirty_op_size))
+      | ("notq", [opr]) -> Not (dst(opr, Some 8), src(opr, Some 8))
+      | ("and", [opr1; opr2]) -> And (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("andl", [opr1; opr2]) -> And (dst(opr2, Some 4), src(opr2, Some 4), src(opr1, Some 4))
+      | ("andq", [opr1; opr2]) -> And (dst(opr2, Some 8), src(opr2, Some 8), src(opr1, Some 8))
+      | ("cmp", [opr1; opr2]) -> Cmp (src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("cmpq", [opr1; opr2]) -> Cmp (src(opr2, Some 8), src(opr1, Some 8))
+      | ("jmp", [LabelOp lb]) -> Jmp (lb)
+      | ("jne", [LabelOp lb]) -> Jcond (lb, JNe)
+      | ("call", [LabelOp lb]) -> Call (lb)
       | ("ret", []) -> Jmp (Isa.ret_label)
-      | ("pushq", [opr])          -> Push  (src(opr))
-      | ("popq", [opr])           -> Pop   (src(opr))
+      | ("pushq", [opr]) -> Push (src(opr, Some 8))
+      | ("popq", [opr]) -> Pop (src(opr, Some 8))
       | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
     in
     imm_var_map, inst

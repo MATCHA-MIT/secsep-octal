@@ -2,6 +2,9 @@
 
 module Isa = struct
   (* TODO: Other exception on isa side *)
+  exception IsaError of string
+
+  let isa_error msg = raise (IsaError ("[Isa Error] " ^ msg))
 
   type label = string
 
@@ -43,6 +46,13 @@ module Isa = struct
 
   let total_reg_num : int = 16
 
+  let get_reg_size (r: register) : int =
+    match r with
+    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15  -> 8
+    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4
+    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2
+    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1
+
   type immediate =
     | ImmNum of int
     | ImmLabel of imm_var_id
@@ -60,9 +70,19 @@ module Isa = struct
     | ImmOp of immediate
     | RegOp of register
     | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
-    | LdOp of immediate option * register option * register option * scale option
-    | StOp of immediate option * register option * register option * scale option
+    | LdOp of immediate option * register option * register option * scale option * int
+    | StOp of immediate option * register option * register option * scale option * int
     | LabelOp of label
+
+  let get_reg_op_size (op_list: operand list) : int option =
+    let helper (acc: int option) (op: operand) : int option =
+      match op, acc with
+      | RegOp _, Some size -> Some size (* Note: this result should not be used when operand size does not match!!! *)
+        (* if get_reg_size r = size then acc else isa_error "reg size does not match" *)
+      | RegOp r, None -> Some (get_reg_size r)
+      | _, _ -> acc
+    in
+    List.fold_left helper None op_list
 
   type branch_cond =
     | JNe | JE | JL | JLe | JG | JGe
