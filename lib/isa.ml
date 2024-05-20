@@ -4,6 +4,9 @@ module Isa = struct
   (* TODO: Other exception on isa side *)
 
   type label = string
+
+  let ret_label = ".Ret"
+
   type imm_var_id = int
 
   module StrM = Map.Make(String)

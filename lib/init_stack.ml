@@ -87,7 +87,7 @@ module InitStack = struct
     let helper (new_offset: int option) (block: Isa.basic_block) : Isa.basic_block =
       match new_offset with
       | Some o -> { block with rsp_offset = o }
-      | None -> init_stack_error "offset not initialized"
+      | None -> init_stack_error ("offset not initialized " ^ block.label)
     in
     ({ p with bbs = List.map2 helper offset_list p.bbs }, Ints.to_list stack_slots)
 

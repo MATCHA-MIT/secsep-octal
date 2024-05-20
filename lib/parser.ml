@@ -278,7 +278,7 @@ module Parser = struct
       | ("jmp", [LabelOp lb])    -> Jmp   (lb)
       | ("jne", [LabelOp lb])    -> Jcond (lb, JNe)
       | ("call", [LabelOp lb])   -> Call  (lb)
-      | ("ret", []) -> Ret
+      | ("ret", []) -> Jmp (Isa.ret_label)
       | ("pushq", [opr])          -> Push  (src(opr))
       | ("popq", [opr])           -> Pop   (src(opr))
       | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
@@ -334,7 +334,7 @@ module Parser = struct
           else bb_spliter lines [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
     in
     let bbs = bb_spliter lines [] [] in
-    let (imm_var_map, _), bbs = List.fold_left_map (
+    let (imm_var_map, func), bbs = List.fold_left_map (
       fun info bb -> parse_basic_block info bb
     ) (Isa.StrM.empty, None) bbs in
 
@@ -351,6 +351,8 @@ module Parser = struct
           add_jmp_for_adj_bb (bb2 :: bbs) (bb1 :: acc)
     in
     let bbs = add_jmp_for_adj_bb bbs [] in
-    {bbs = bbs; imm_var_map = imm_var_map}
+    let get_ret_bb : Isa.basic_block =
+      { label = Isa.ret_label; func = Option.get func; rsp_offset = 0; insts = [] } in
+    {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map}
 
 end
