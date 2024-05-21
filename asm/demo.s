@@ -3,6 +3,7 @@ table_select:
 # Reg read: rdx: k1, rsi: k2
 # Reg write: r9
 # Reg unused:
+subq $8, %rsp
 movl %edx, %r9d
 movslq %esi, %rsi
 leaq (%rsi,%rsi,2), %rsi
@@ -50,4 +51,5 @@ jne .L80
 # To next:
 # rax: any/data, rcx: any/data, rdi: {9}, rsi: k8+96,
 # ...
+addq $8, %rsp
 ret

@@ -4,6 +4,7 @@ open Type.Code_type
 open Type.Gen_type
 open Type.Subtype
 open Type.Parser
+open Type.Init_mem
 
 (* let _ : Isa.program = 
   [ { label = "foo";
@@ -46,5 +47,21 @@ let _ = CodeType.pp_block_types 0 code_type
 
 (* let _ = SubType.pp_tv_rels 0 tv_rel *)
 
-let _= SubType.pp_tv_rels 0 (SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel) cond_list 2)
+let subtype_sol = SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel) cond_list 2
+let pure_sol = SubType.get_pure_sol subtype_sol
+
+let _= SubType.pp_tv_rels 0 subtype_sol
+
+let addr_exp_list = InitMem.init_addr_exp p code_type
+
+let _ = InitMem.pp_addr_exp 0 addr_exp_list
+
+let addr_repl_list = InitMem.repl_addr_exp addr_exp_list pure_sol
+
+let _ = InitMem.pp_addr_exp 0 addr_repl_list
+
+let addr_range_list = InitMem.get_addr_range addr_repl_list
+
+let _ = InitMem.pp_addr_range 0 addr_range_list
+
 

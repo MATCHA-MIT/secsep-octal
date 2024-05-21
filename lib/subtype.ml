@@ -20,6 +20,9 @@ module SubType = struct
   let init (total_var: int) =
     List.init total_var (fun x -> {type_var_idx = x; type_sol = SolNone; subtype_list = []; supertype_list = []})
 
+  let get_pure_sol (sol: t) : (CodeType.type_var_id * CodeType.type_sol) list =
+    List.map (fun x -> (x.type_var_idx, x.type_sol)) sol
+
   let get_type_var_rel (tv_rel: t) (idx: int) : type_var_rel =
     List.find (fun x -> x.type_var_idx = idx) tv_rel
 

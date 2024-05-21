@@ -70,29 +70,36 @@ module CodeType = struct
         | SingleAnd -> SingleConst (Int.logand v1 v2)
         | SingleOr -> SingleConst (Int.logor v1 v2)
         end
-      | (SingleBExp (op_out, SingleVar var, SingleConst v1)), (SingleConst v2) ->
+      | (SingleBExp (op_out, e, SingleConst v1)), (SingleConst v2) ->
         begin match op_out, op with
-        | SingleAdd, SingleAdd -> SingleBExp (SingleAdd, SingleVar var, SingleConst (v1 + v2))
-        | SingleAdd, SingleSub -> SingleBExp (SingleAdd, SingleVar var, SingleConst (v1 - v2))
-        | SingleSub, SingleAdd -> SingleBExp (SingleAdd, SingleVar var, SingleConst (- v1 + v2))
-        | SingleSub, SingleSub -> SingleBExp (SingleAdd, SingleVar var, SingleConst (- v1 - v2))
+        | SingleAdd, SingleAdd -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (v1 + v2)))
+        | SingleAdd, SingleSub -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (v1 - v2)))
+        | SingleSub, SingleAdd -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (- v1 + v2)))
+        | SingleSub, SingleSub -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (- v1 - v2)))
         | _ -> default_single
         end
-      | _, SingleConst v2 ->
-        if v2 = 0 then
-          begin match op with
-          | SingleMul | SingleAnd -> SingleConst 0
-          | _ -> ee1
-          end
-        else default_single
-      | SingleConst v1, _ ->
-        if v1 = 0 then
-          begin match op with
-          | SingleMul | SingleSal | SingleSar | SingleAnd -> SingleConst 0
-          | SingleAdd | SingleXor | SingleOr -> ee2
-          | _ -> default_single
-          end
-        else default_single
+      | l, SingleConst v2 ->
+        begin match op with
+        | SingleAdd -> if v2 = 0 then l else default_single
+        | SingleSub -> if v2 = 0 then l else SingleBExp (SingleAdd, l, SingleConst (-v2))
+        | SingleMul -> if v2 = 0 then SingleConst 0 else if v2 = 1 then l else default_single
+        | SingleSal -> if v2 = 0 then l else default_single
+        | SingleSar -> if v2 = 0 then l else default_single
+        | SingleXor -> if v2 = 0 then l else default_single
+        | SingleAnd -> if v2 = 0 then SingleConst 0 else default_single
+        | SingleOr -> if v2 = 0 then l else default_single
+        end
+      | SingleConst v1, r ->
+        begin match op with
+        | SingleAdd -> if v1 = 0 then r else default_single
+        | SingleSub -> default_single
+        | SingleMul -> if v1 = 0 then SingleConst 0 else if v1 = 1 then r else default_single
+        | SingleSal -> if v1 = 0 then SingleConst 0 else default_single
+        | SingleSar -> if v1 = 0 then SingleConst 0 else default_single
+        | SingleXor -> if v1 = 0 then r else default_single
+        | SingleAnd -> if v1 = 0 then SingleConst 0 else default_single
+        | SingleOr -> if v1 = 0 then r else default_single
+        end
       | _ -> default_single
       end
     | SingleUExp (op, e) -> 
@@ -205,14 +212,20 @@ module CodeType = struct
         end
       | TypeSingle s0, TypeRange (s1, b1, s2, b2, step) ->
         begin match tbop with
-        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s1, s0))), b1,
-                                (eval_single_exp (SingleBExp (SingleAdd, s2, s0))), b2, step)
-        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s0, s1))), b2,
+        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s0, s1))), b1,
+                                (eval_single_exp (SingleBExp (SingleAdd, s0, s2))), b2, step)
+        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s0, s2))), b2,
                                 (eval_single_exp (SingleBExp (SingleSub, s0, s1))), b1, step)
         | TypeMul -> 
           begin match s0 with
-          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
-                                         (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step * i0)
+          | SingleConst i0 -> 
+            if i0 = 0 then TypeSingle (SingleConst 0)
+            else if i0 > 0 then
+              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1,
+                        (eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
+            else
+              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, 
+                        (eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
           | _ -> default_type
             (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
                             (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
@@ -222,14 +235,20 @@ module CodeType = struct
         end
       | TypeRange (s1, b1, s2, b2, step), TypeSingle s0 -> 
         begin match tbop with
-        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s1, s0))), b1,
-                                (eval_single_exp (SingleBExp (SingleAdd, s2, s0))), b2, step)
+        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s0, s1))), b1,
+                                (eval_single_exp (SingleBExp (SingleAdd, s0, s2))), b2, step)
         | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s1, s0))), b1,
                                 (eval_single_exp (SingleBExp (SingleSub, s2, s0))), b2, step)
         | TypeMul -> 
           begin match s0 with
-          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
-                                         (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step * i0)
+          | SingleConst i0 -> 
+            if i0 = 0 then TypeSingle (SingleConst 0)
+            else if i0 > 0 then
+              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1,
+                        (eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
+            else
+              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, 
+                        (eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
           | _ -> default_type
             (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
                             (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
@@ -247,6 +266,18 @@ module CodeType = struct
           | _ -> default_type
           end
         (* TODO: TypeXor TypeAnd TypeOr *)
+        | _ -> default_type
+        end
+      | TypeRange (s1, true, s2, true, step), TypeRange (s1', true, s2', true, step') ->
+        begin match tbop with
+        | TypeAdd -> 
+          TypeRange (
+            eval_single_exp (SingleBExp (SingleAdd, s1, s1')), true,
+            eval_single_exp (SingleBExp (SingleAdd, s2, s2')), true,
+            if step mod step' = 0 then step' 
+            else if step' mod step = 0 then step 
+            else code_type_error ("steps not divide by each other " ^ (string_of_int step) ^ " " ^ (string_of_int step))
+          )
         | _ -> default_type
         end
       | TypeTop, _ ->
@@ -388,6 +419,20 @@ module CodeType = struct
         end
       end
 
+  let repl_all_sol_full_exp (sol: (type_var_id * type_sol) list) (fe: type_full_exp) : type_full_exp =
+    let e, cond = fe in
+    (* Trick: Use sub-function helper can reduce times of copying large objects!!! *)
+    let rec helper (e: type_exp) : type_exp =
+      match e with
+      | TypeVar v ->
+        let sol = List.find (fun (idx, _) -> idx = v) sol in
+        let new_ve, _ = repl_type_sol_full_exp sol (TypeVar v, cond) in new_ve
+      | TypeBExp (bop, e1, e2) -> TypeBExp (bop, helper e1, helper e2)
+      | TypeUExp (uop, e) -> TypeUExp (uop, helper e)
+      | _ -> e
+    in
+    (eval_type_exp (helper (helper e)), cond)
+
   type state_type = {
     reg_type: reg_type;
     mem_type: mem_type;
@@ -431,7 +476,7 @@ module CodeType = struct
     in
     let new_type = eval_type_exp (
       TypeBExp (TypeAdd,
-        TypeBExp (TypeAdd, disp_type, base_type),
+        TypeBExp (TypeAdd, base_type, disp_type),
         TypeBExp (TypeMul, index_type, TypeSingle (SingleConst scale_val))
       )
     ) in
@@ -771,6 +816,9 @@ module CodeType = struct
 
   let string_of_cond_status (conds: Ints.t) =
     "[" ^ (Ints.fold (fun x acc -> (if acc = "" then "" else acc ^ ", ") ^ (string_of_one_cond_status x)) conds "") ^ "]"
+
+  let pp_single_exp (lvl: int) (s: single_exp) =
+    PP.print_lvl lvl "%s" (string_of_single_exp s)
 
   let pp_type_full_exp (lvl: int) (tf: type_full_exp) =
     let t, cond = tf in

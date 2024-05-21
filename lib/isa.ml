@@ -168,4 +168,14 @@ module Isa = struct
     | Ret -> "ret"
     | Nop -> "nop"
 
+  let get_op_list (inst: instruction) : operand list =
+    match inst with
+    | Mov (op0, op1) | MovS (op0, op1) | MovZ (op0, op1) 
+    | Lea (op0, op1) | Not (op0, op1) | Cmp (op0, op1) -> [op0; op1]
+    | Add (op0, op1, op2) | Sub (op0, op1, op2) | Sal (op0, op1, op2)
+    | Sar (op0, op1, op2) | Shr (op0, op1, op2) | Xor (op0, op1, op2)
+    | And (op0, op1, op2) | Or (op0, op1, op2) -> [op0; op1; op2]
+    | Push op | Pop op -> [op]
+    | _ -> []
+
 end
