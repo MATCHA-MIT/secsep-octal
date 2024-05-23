@@ -249,7 +249,24 @@ module SingleExp = struct
       | merged_r -> [ [SingleBExp (SingleSal, convert_t ul, merged_r)] ]
       end
     | SingleBExp (bop, l, r) ->
-      [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]
+      let eval_l = convert_t (eval_t l) in
+      let eval_r = convert_t (eval_t r) in
+      begin match eval_l, eval_r with
+      | SingleConst v1, SingleConst v2 ->
+        let x = 
+          begin match bop with
+          | SingleAdd -> SingleConst (v1 + v2)
+          | SingleSub -> SingleConst (v1 - v2)
+          | SingleMul -> SingleConst (v1 * v2) (* These three cases are not needed here *)
+          | SingleSal -> SingleConst (Int.shift_left v1 v2)
+          | SingleSar -> SingleConst (Int.shift_right v1 v2)
+          | SingleXor -> SingleConst (Int.logxor v1 v2)
+          | SingleAnd -> SingleConst (Int.logand v1 v2)
+          | SingleOr -> SingleConst (Int.logor v1 v2)
+          end
+        in [ [x] ]
+      | _ -> [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]
+      end
     | SingleUExp (uop, l) ->
       [ [SingleUExp (uop, convert_t (eval_t l))] ]
     | _ -> [ [e] ]

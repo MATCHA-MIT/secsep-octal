@@ -50,6 +50,18 @@ let test_cases : SingleExp.t list = [
       SingleBExp (SingleAdd, SingleConst 3, z),
       SingleBExp (SingleAdd, x, x)
     )
+  );
+
+  SingleBExp (
+    SingleXor,
+    SingleBExp (SingleAdd, SingleConst 1, SingleConst 2),
+    SingleBExp (SingleMul, SingleConst 5, SingleConst 5)
+  );
+
+  SingleBExp (
+    SingleAnd,
+    SingleBExp (SingleAdd, SingleConst 1, SingleConst 2),
+    SingleBExp (SingleMul, SingleConst 5, SingleConst 5)
   )
 ]
 
