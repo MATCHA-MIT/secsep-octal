@@ -1,4 +1,5 @@
 open Isa
+open Pretty_print
 
 module SingleExp = struct
   exception SingleExpError of string
@@ -22,6 +23,41 @@ module SingleExp = struct
     | SingleVar of Isa.imm_var_id
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
+
+  let rec string_of_single_exp (se: t) =
+    match se with
+    | SingleConst v -> "Const " ^ (string_of_int v)
+    | SingleVar v -> "SymImm " ^ (string_of_int v)
+    | SingleBExp (op, l, r) -> 
+      let op_str = match op with
+      | SingleAdd -> "Add"
+      | SingleSub -> "Sub"
+      | SingleMul -> "Mul"
+      | SingleSal -> "Sal"
+      | SingleSar -> "Sar"
+      | SingleXor -> "Xor"
+      | SingleAnd -> "And"
+      | SingleOr -> "Or"
+      in
+      "S-BinaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp l) ^ ", " ^ (string_of_single_exp r) ^ ")"
+    | SingleUExp (op, e) ->
+      let op_str = match op with
+      | SingleNot -> "Not"
+      in
+      "S-UnaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp e) ^ ")"
+
+  let pp_single_exp (lvl: int) (s: t) =
+    PP.print_lvl lvl "%s" (string_of_single_exp s)
+
+  let pp_split_exp (lvl: int) (s: t list list) =
+    List.iter (fun x -> 
+      PP.print_lvl (lvl + 1) "+\n";
+      List.iter (fun y ->
+        PP.print_lvl (lvl + 2) "*";
+        pp_single_exp (lvl + 2) y;
+        Printf.printf "\n"
+        ) x;
+      ) s
 
   let cmp_single_bop (op1: single_bop) (op2: single_bop) : int =
     match op1, op2 with
@@ -102,7 +138,7 @@ module SingleExp = struct
     match e with
     | Mul (coeff, terms) ->  *)
 
-  let rec unroll_t (e: t) : t list list =
+  (* let rec unroll_t (e: t) : t list list =
     match e with
     | SingleBExp (SingleAdd, l, r) ->
       (unroll_t l) @ (unroll_t r)
@@ -121,7 +157,104 @@ module SingleExp = struct
     | SingleBExp (SingleSal, l, SingleConst r) ->
       let ul = unroll_t l in
       List.map (fun x -> (SingleConst (Int.shift_left 1 r)) :: x) ul
+    | _ -> [ [e] ] *)
+
+  let convert_t (e: t list list) : t =
+    let rec helper_mul (x: t list) =
+      match x with
+      | [] -> SingleConst 0
+      | hd :: [] -> hd
+      | hd :: tl -> SingleBExp (SingleMul, helper_mul tl, hd)
+    in
+    let rec helper_add (x: t list) =
+      match x with
+      | [] -> SingleConst 0
+      | hd :: [] -> hd
+      | hd :: tl -> SingleBExp (SingleAdd, helper_add tl, hd)
+    in
+    helper_add (List.map helper_mul e)
+
+  let mul_const (coeff: int) (e: t list) : t list =
+    match e with
+    | [] -> []
+    | (SingleConst c) :: tl -> (SingleConst (coeff * c)) :: tl
+    | tl -> SingleConst coeff :: tl
+
+  let mul_t (e1: t list) (e2: t list) : t list =
+    let x = List.sort cmp_single_exp (e1 @ e2) in
+    match x with
+    | SingleConst c1 :: SingleConst c2 :: tl ->
+      let c12 = c1 * c2 in
+      if c12 = 0 then []
+      else if c12 = 1 then tl
+      else SingleConst c12 :: tl
+    | SingleConst c :: _ ->
+      if c = 0 then [] else x
+    | _ -> x
+
+  let add_t (e1: t list) (e2: t list) : (t list) option =
+    let equal (l: t) (r: t) : bool = if cmp_single_exp l r = 0 then true else false in
+    match e1, e2 with
+    | [], [] -> Some []
+    | [], hd :: tl | hd :: tl, [] -> Some (hd :: tl)
+    | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
+      if List.equal equal tl1 tl2 
+      then Some (SingleConst (c1 + c2) :: tl1)
+      else None
+    | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
+      if List.equal equal tl1 tl2 
+      then Some (SingleConst (c + 1) :: tl1)
+      else None
+    | hd1 :: tl1, hd2 :: tl2 ->
+      if List.equal equal (hd1 :: tl1) (hd2 :: tl2) 
+      then Some (SingleConst 2 :: hd1 :: tl1)
+      else None
+
+  let add_t_list (e1: t list list) (e2: t list list) : t list list =
+    let rec helper (acc: t list list) (y: t list) : t list list =
+      match acc with
+      | [] -> [y]
+      | hd :: tl ->
+        begin match add_t hd y with
+        | Some e -> e :: tl
+        | None -> hd :: (helper tl y) 
+        end
+    in
+    List.fold_left helper e1 e2
+
+  let rec eval_t (e: t) : t list list =
+    match e with
+    | SingleBExp (SingleAdd, l, r) ->
+      add_t_list (eval_t l) (eval_t r)
+    | SingleBExp (SingleSub, l, r) ->
+      let ul = eval_t l in
+      let ur = eval_t r in
+      let neg_ur = List.map (mul_const (-1)) ur in
+      add_t_list ul neg_ur
+    | SingleBExp (SingleMul, l, r) ->
+      let ul = eval_t l in
+      let ur = eval_t r in
+      let helper (x: t list) : t list list =
+        List.map (mul_t x) ur
+      in
+      let helper2 (acc: t list list) (x: t list) : t list list =
+        add_t_list acc (helper x)
+      in
+      List.fold_left helper2 [] ul
+    | SingleBExp (SingleSal, l, r) ->
+      let ul = eval_t l in
+      let ur = eval_t r in
+      begin match convert_t ur with
+      | SingleConst c -> List.map (mul_const (Int.shift_left 1 c)) ul
+      | merged_r -> [ [SingleBExp (SingleSal, convert_t ul, merged_r)] ]
+      end
+    | SingleBExp (bop, l, r) ->
+      [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]
+    | SingleUExp (uop, l) ->
+      [ [SingleUExp (uop, convert_t (eval_t l))] ]
     | _ -> [ [e] ]
-      
+
+  let eval (e: t) : t =
+    convert_t (eval_t e)
 
 end
