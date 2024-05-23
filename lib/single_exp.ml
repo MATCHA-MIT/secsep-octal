@@ -94,7 +94,7 @@ module SingleExp = struct
     match op1, op2 with
     | SingleNot, SingleNot -> 0
 
-  let rec cmp_single_exp (e1: t) (e2: t) : int =
+  let rec cmp (e1: t) (e2: t) : int =
     match e1, e2 with
     | SingleConst c1, SingleConst c2 ->
       if c1 = c2 then 0 else if c1 > c2 then 1 else -1
@@ -105,8 +105,8 @@ module SingleExp = struct
     | SingleVar _, _ -> -1
     | SingleBExp (bop1, l1, r1), SingleBExp (bop2, l2, r2) -> 
       let c_bop = cmp_single_bop bop1 bop2 in
-      let c_l = cmp_single_exp l1 l2 in
-      let c_r = cmp_single_exp r1 r2 in
+      let c_l = cmp l1 l2 in
+      let c_r = cmp r1 r2 in
       if c_bop = 0 then
         if c_l = 0 then c_r
         else c_l
@@ -114,50 +114,10 @@ module SingleExp = struct
     | SingleBExp _, _ -> 1
     | SingleUExp (uop1, l1), SingleUExp (uop2, l2) -> 
       let c_uop = cmp_single_uop uop1 uop2 in
-      let c_l = cmp_single_exp l1 l2 in
+      let c_l = cmp l1 l2 in
       if c_uop = 0 then c_l else c_uop
     | SingleUExp _, SingleBExp _ -> -1
     | SingleUExp _, _ -> 1
-
-
-  (* type t_exp =
-    | Mul of (t list)
-    | Add of (t_exp list)
-
-  let rec try_split (e: t) : t_exp =
-    match e with
-    | SingleBExp (SingleAdd, l, r) ->
-      let split_l = try_split l in
-      let split_r = try_split r in
-      begin match (split_l, split_r) with
-      | (Mul m1, Mul m2) -> Add [Mul m1, Mul m2]
-      | (SingleAdd, Mul)
-      end
-
-  let rec eval_t_exp (e: t_exp) : t_exp =
-    match e with
-    | Mul (coeff, terms) ->  *)
-
-  (* let rec unroll_t (e: t) : t list list =
-    match e with
-    | SingleBExp (SingleAdd, l, r) ->
-      (unroll_t l) @ (unroll_t r)
-    | SingleBExp (SingleSub, l, r) ->
-      let ul = unroll_t l in
-      let ur = unroll_t r in
-      let neg_ur = List.map (fun x -> (SingleConst (-1)) :: x) ur in
-      ul @ neg_ur
-    | SingleBExp (SingleMul, l, r) ->
-      let ul = unroll_t l in
-      let ur = unroll_t r in
-      let helper (x: t list) : t list list =
-        List.map (fun y -> x @ y) ur
-      in
-      List.concat_map helper ul
-    | SingleBExp (SingleSal, l, SingleConst r) ->
-      let ul = unroll_t l in
-      List.map (fun x -> (SingleConst (Int.shift_left 1 r)) :: x) ul
-    | _ -> [ [e] ] *)
 
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =
@@ -181,7 +141,7 @@ module SingleExp = struct
     | tl -> SingleConst coeff :: tl
 
   let mul_t (e1: t list) (e2: t list) : t list =
-    let x = List.sort cmp_single_exp (e1 @ e2) in
+    let x = List.sort cmp (e1 @ e2) in
     match x with
     | SingleConst c1 :: SingleConst c2 :: tl ->
       let c12 = c1 * c2 in
@@ -193,7 +153,7 @@ module SingleExp = struct
     | _ -> x
 
   let add_t (e1: t list) (e2: t list) : (t list) option =
-    let equal (l: t) (r: t) : bool = if cmp_single_exp l r = 0 then true else false in
+    let equal (l: t) (r: t) : bool = if cmp l r = 0 then true else false in
     match e1, e2 with
     | [], [] -> Some []
     | [], hd :: tl | hd :: tl, [] -> Some (hd :: tl)
@@ -211,14 +171,20 @@ module SingleExp = struct
       else None
 
   let add_t_list (e1: t list list) (e2: t list list) : t list list =
-    let rec helper (acc: t list list) (y: t list) : t list list =
+    let helper0 (acc: (t list) option) (x: t list) : (t list) option * t list =
       match acc with
-      | [] -> [y]
-      | hd :: tl ->
-        begin match add_t hd y with
-        | Some e -> e :: tl
-        | None -> hd :: (helper tl y) 
+      | None -> (None, x)
+      | Some v ->
+        begin match add_t v x with
+        | Some e -> (None, e)
+        | None -> (acc, x)
         end
+    in
+    let helper (acc: t list list) (y: t list) : t list list =
+      let new_y, new_x = List.fold_left_map helper0 (Some y) acc in
+      match new_y with
+      | Some v -> v :: new_x
+      | None -> new_x
     in
     List.fold_left helper e1 e2
 

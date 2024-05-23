@@ -1,6 +1,7 @@
 (* Type generation *)
 
 open Isa
+open Cond_type
 open Code_type
 open Subtype
 open Init_stack
@@ -14,10 +15,10 @@ module GenType = struct
   let gen_block_subtype_rel 
       (tv_rel: SubType.t) 
       (block_type: CodeType.state_type) 
-      (cond_list: CodeType.cond_type list) 
+      (cond_list: CondType.t list) 
       (inst_list: Isa.instruction list) 
-      (code_type: CodeType.t) : SubType.t * (CodeType.cond_type list) =
-    let helper (acc: SubType.t * CodeType.state_type * (CodeType.cond_type list)) (inst: Isa.instruction) : SubType.t * CodeType.state_type * (CodeType.cond_type list) =
+      (code_type: CodeType.t) : SubType.t * (CondType.t list) =
+    let helper (acc: SubType.t * CodeType.state_type * (CondType.t list)) (inst: Isa.instruction) : SubType.t * CodeType.state_type * (CondType.t list) =
       let acc_tv_rel, acc_state_type, acc_cond_list = acc in
       let new_state_type, new_cond_list = CodeType.type_prop_inst acc_state_type acc_cond_list inst in
       match inst with
@@ -36,8 +37,8 @@ module GenType = struct
   (* NOTE: For convenience, we should add uncond jmp at the end of each block (except those end with ret)!!!*)
 
   (* TODO: Condsider to rename program to code or CodeType, code_type, etc. to program type *)
-  let gen_subtype_rel (p: Isa.program) (init_code_type: CodeType.t) (total_type_var: int) : SubType.t * (CodeType.cond_type list) =
-    let helper (acc: SubType.t * (CodeType.cond_type list)) (block_type: CodeType.block_type) (block_inst: Isa.basic_block) : SubType.t * (CodeType.cond_type list) =
+  let gen_subtype_rel (p: Isa.program) (init_code_type: CodeType.t) (total_type_var: int) : SubType.t * (CondType.t list) =
+    let helper (acc: SubType.t * (CondType.t list)) (block_type: CodeType.block_type) (block_inst: Isa.basic_block) : SubType.t * (CondType.t list) =
       if block_type.label = block_inst.label then
         let acc_tv_rel, acc_cond_list = acc in
         gen_block_subtype_rel acc_tv_rel block_type.block_code_type acc_cond_list block_inst.insts init_code_type
@@ -45,7 +46,7 @@ module GenType = struct
     let init_tv_rel = SubType.init total_type_var in
     List.fold_left2 helper (init_tv_rel, []) init_code_type p.bbs
 
-  let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * CodeType.t * (CodeType.cond_type list) =
+  let gen_init_type_subtype_rel (p: Isa.program) : SubType.t * CodeType.t * (CondType.t list) =
     (* TODO: for the block at function start, assign symbolic immediates instead? *)
     let p, stack_slots = InitStack.update_offset p in
     let (total_type_var, _), init_code_type = CodeType.init_code_type_var 0 p stack_slots in (* TODO: Add functionality to init mem_off_list!!! *) 

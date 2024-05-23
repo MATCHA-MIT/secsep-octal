@@ -1,4 +1,4 @@
-open Code_type
+open Type_full_exp
 
 module FunctionType = struct
   exception FunctionTypeError of string
@@ -12,7 +12,7 @@ module FunctionType = struct
     | TaintVar of taint_var_id
 
   type taint_type_exp = {
-    type_exp: CodeType.type_full_exp;
+    type_exp: TypeFullExp.t;
     taint_exp: taint_exp;
   }
 

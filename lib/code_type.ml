@@ -1,5 +1,9 @@
 (* Type and type derivation *)
 open Isa
+open Single_exp
+open Type_exp
+open Type_full_exp
+open Cond_type
 open Pretty_print
 
 module CodeType = struct
@@ -8,448 +12,27 @@ module CodeType = struct
 
   let stack_base_id : Isa.imm_var_id = 1
 
-  type single_bop =
-    | SingleAdd
-    | SingleSub
-    | SingleMul
-    | SingleSal
-    | SingleSar
-    | SingleXor
-    | SingleAnd
-    | SingleOr
+  type reg_type = TypeFullExp.t list
 
-  let cmp_single_bop (op1: single_bop) (op2: single_bop) : bool =
-    match op1, op2 with
-    | SingleAdd, SingleAdd
-    | SingleSub, SingleSub
-    | SingleMul, SingleMul
-    | SingleSal, SingleSal
-    | SingleSar, SingleSar
-    | SingleXor, SingleXor
-    | SingleAnd, SingleAnd
-    | SingleOr, SingleOr -> true
-    | _ -> false
-
-  type single_uop =
-    | SingleNot
-    (* TODO: Should we add SingleNeg? *)
-
-  let cmp_single_uop (op1: single_uop) (op2: single_uop) : bool =
-    match op1, op2 with
-    | SingleNot, SingleNot -> true
-
-  type single_exp =
-    | SingleConst of int
-    | SingleVar of Isa.imm_var_id
-    | SingleBExp of single_bop * single_exp * single_exp
-    | SingleUExp of single_uop * single_exp
-
-  let rec cmp_single_exp (e1: single_exp) (e2: single_exp) : bool =
-    match e1, e2 with
-    | SingleConst c1, SingleConst c2 -> c1 = c2
-    | SingleVar v1, SingleVar v2 -> v1 = v2
-    | SingleBExp (bop1, l1, r1), SingleBExp (bop2, l2, r2) -> (cmp_single_bop bop1 bop2) && (cmp_single_exp l1 l2) && (cmp_single_exp r1 r2)
-    | SingleUExp (uop1, l1), SingleUExp (uop2, l2) -> (cmp_single_uop uop1 uop2) && (cmp_single_exp l1 l2)
-    | _ -> false
-
-  let rec eval_single_exp (e: single_exp) : single_exp =
-    match e with
-    | SingleBExp (op, e1, e2) -> 
-      let ee1 = eval_single_exp e1 in 
-      let ee2 = eval_single_exp e2 in
-      let default_single = SingleBExp (op, ee1, ee2) in
-      begin match ee1, ee2 with
-      | (SingleConst v1), (SingleConst v2) -> 
-        begin match op with
-        | SingleAdd -> SingleConst (v1 + v2)
-        | SingleSub -> SingleConst (v1 - v2)
-        | SingleMul -> SingleConst (v1 * v2)
-        | SingleSal -> SingleConst (Int.shift_left v1 v2)
-        | SingleSar -> SingleConst (Int.shift_right v1 v2)
-        | SingleXor -> SingleConst (Int.logxor v1 v2)
-        | SingleAnd -> SingleConst (Int.logand v1 v2)
-        | SingleOr -> SingleConst (Int.logor v1 v2)
-        end
-      | (SingleBExp (op_out, e, SingleConst v1)), (SingleConst v2) ->
-        begin match op_out, op with
-        | SingleAdd, SingleAdd -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (v1 + v2)))
-        | SingleAdd, SingleSub -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (v1 - v2)))
-        | SingleSub, SingleAdd -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (- v1 + v2)))
-        | SingleSub, SingleSub -> eval_single_exp (SingleBExp (SingleAdd, e, SingleConst (- v1 - v2)))
-        | _ -> default_single
-        end
-      | l, SingleConst v2 ->
-        begin match op with
-        | SingleAdd -> if v2 = 0 then l else default_single
-        | SingleSub -> if v2 = 0 then l else SingleBExp (SingleAdd, l, SingleConst (-v2))
-        | SingleMul -> if v2 = 0 then SingleConst 0 else if v2 = 1 then l else default_single
-        | SingleSal -> if v2 = 0 then l else default_single
-        | SingleSar -> if v2 = 0 then l else default_single
-        | SingleXor -> if v2 = 0 then l else default_single
-        | SingleAnd -> if v2 = 0 then SingleConst 0 else default_single
-        | SingleOr -> if v2 = 0 then l else default_single
-        end
-      | SingleConst v1, r ->
-        begin match op with
-        | SingleAdd -> if v1 = 0 then r else default_single
-        | SingleSub -> default_single
-        | SingleMul -> if v1 = 0 then SingleConst 0 else if v1 = 1 then r else default_single
-        | SingleSal -> if v1 = 0 then SingleConst 0 else default_single
-        | SingleSar -> if v1 = 0 then SingleConst 0 else default_single
-        | SingleXor -> if v1 = 0 then r else default_single
-        | SingleAnd -> if v1 = 0 then SingleConst 0 else default_single
-        | SingleOr -> if v1 = 0 then r else default_single
-        end
-      | _ -> default_single
-      end
-    | SingleUExp (op, e) -> 
-      let ee = eval_single_exp e in
-      let default_single = SingleUExp (op, ee) in
-      begin match ee with
-      | SingleConst v -> begin
-          match op with
-          | SingleNot -> SingleConst (Int.lognot v)
-        end
-      | _ -> default_single
-      end
-    | _ -> e
-
-  type type_var_id = int
-
-  type type_bop =
-    | TypeAdd
-    | TypeSub
-    | TypeMul
-    | TypeSal
-    | TypeShr
-    | TypeSar
-    | TypeXor
-    | TypeAnd
-    | TypeOr
-    | TypeInter
-    | TypeUnion
-    | TypeDiff
-
-  let cmp_type_bop (op1: type_bop) (op2: type_bop) : bool =
-    match op1, op2 with
-    | TypeAdd, TypeAdd
-    | TypeSub, TypeSub
-    | TypeMul, TypeMul
-    | TypeSal, TypeSal
-    | TypeShr, TypeShr
-    | TypeSar, TypeSar
-    | TypeXor, TypeXor
-    | TypeAnd, TypeAnd
-    | TypeOr, TypeOr
-    | TypeInter, TypeInter
-    | TypeUnion, TypeUnion
-    | TypeDiff, TypeDiff -> true
-    | _ -> false
-
-  type type_uop =
-    | TypeNot
-    | TypeComp
-
-  let cmp_type_uop (op1: type_uop) (op2: type_uop) : bool = 
-    match op1, op2 with
-    | TypeNot, TypeNot
-    | TypeComp, TypeComp ->  true
-    | _ -> false
-
-  type type_exp =
-    | TypeSingle of single_exp
-    | TypeRange of single_exp * bool * single_exp * bool * int (* begin, inc, end, inc, step *)
-    | TypeVar of type_var_id
-    | TypeTop
-    | TypeBot
-    | TypeBExp of type_bop * type_exp * type_exp
-    | TypeUExp of type_uop * type_exp
-
-  let rec cmp_type_exp (e1: type_exp) (e2: type_exp) : bool =
-    match e1, e2 with
-    | TypeSingle s1, TypeSingle s2 -> cmp_single_exp s1 s2
-    | TypeRange (l1, bl1, r1, br1, s1), TypeRange (l2, bl2, r2, br2, s2) ->
-      (cmp_single_exp l1 l2) && (bl1 == bl2) && (cmp_single_exp r1 r2) && (br1 == br2) && (s1 == s2)
-    | TypeVar v1, TypeVar v2 -> v1 == v2
-    | TypeTop, TypeTop -> true
-    | TypeBot, TypeBot -> true
-    | TypeBExp (bop1, l1, r1), TypeBExp (bop2, l2, r2) ->
-      (cmp_type_bop bop1 bop2) && (cmp_type_exp l1 l2) && (cmp_type_exp r1 r2)
-    | TypeUExp (uop1, l1), TypeUExp (uop2, l2) ->
-      (cmp_type_uop uop1 uop2) && (cmp_type_exp l1 l2)
-    | _ -> false
-
-  let rec eval_type_exp (e: type_exp) : type_exp =
-    match e with
-    | TypeBExp (tbop, e1, e2) -> 
-      let ee1 = eval_type_exp e1 in
-      let ee2 = eval_type_exp e2 in
-      let default_type = TypeBExp (tbop, ee1, ee2) in
-      begin match ee1, ee2 with
-      | TypeSingle s1, TypeSingle s2 -> 
-        begin match tbop with
-        | TypeAdd -> TypeSingle (eval_single_exp (SingleBExp (SingleAdd, s1, s2)))
-        | TypeSub -> TypeSingle (eval_single_exp (SingleBExp (SingleSub, s1, s2)))
-        | TypeMul -> TypeSingle (eval_single_exp (SingleBExp (SingleMul, s1, s2)))
-        | TypeSal -> TypeSingle (eval_single_exp (SingleBExp (SingleSal, s1, s2)))
-        | TypeSar -> TypeSingle (eval_single_exp (SingleBExp (SingleSal, s1, s2)))
-        | TypeXor -> TypeSingle (eval_single_exp (SingleBExp (SingleXor, s1, s2)))
-        | TypeAnd -> TypeSingle (eval_single_exp (SingleBExp (SingleAnd, s1, s2)))
-        | TypeOr -> TypeSingle (eval_single_exp (SingleBExp (SingleOr, s1, s2)))
-        | TypeInter -> 
-          begin match s1, s2 with
-          | SingleConst v1, SingleConst v2 -> if v1 = v2 then TypeSingle (SingleConst v1) else TypeBot
-          | SingleVar v1, SingleVar v2 -> if v1 = v2 then TypeSingle (SingleVar v1) else e (* TODO Double check this! *)
-          | _ -> default_type
-          end
-        | TypeDiff -> 
-          begin match s1, s2 with
-          | SingleConst v1, SingleConst v2 -> if v1 = v2 then TypeBot else TypeSingle (SingleConst v1)
-          | SingleVar v1, SingleVar v2 -> if v1 = v2 then TypeBot else TypeSingle (SingleVar v1)
-          | _ -> default_type
-          end
-        | _ -> default_type
-        end
-      | TypeSingle s0, TypeRange (s1, b1, s2, b2, step) ->
-        begin match tbop with
-        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s0, s1))), b1,
-                                (eval_single_exp (SingleBExp (SingleAdd, s0, s2))), b2, step)
-        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s0, s2))), b2,
-                                (eval_single_exp (SingleBExp (SingleSub, s0, s1))), b1, step)
-        | TypeMul -> 
-          begin match s0 with
-          | SingleConst i0 -> 
-            if i0 = 0 then TypeSingle (SingleConst 0)
-            else if i0 > 0 then
-              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1,
-                        (eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
-            else
-              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, 
-                        (eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
-          | _ -> default_type
-            (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
-                            (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
-          end
-        (* TODO: TypeXor TypeAnd TypeOr *)
-        | _ -> default_type
-        end
-      | TypeRange (s1, b1, s2, b2, step), TypeSingle s0 -> 
-        begin match tbop with
-        | TypeAdd -> TypeRange ((eval_single_exp (SingleBExp (SingleAdd, s0, s1))), b1,
-                                (eval_single_exp (SingleBExp (SingleAdd, s0, s2))), b2, step)
-        | TypeSub -> TypeRange ((eval_single_exp (SingleBExp (SingleSub, s1, s0))), b1,
-                                (eval_single_exp (SingleBExp (SingleSub, s2, s0))), b2, step)
-        | TypeMul -> 
-          begin match s0 with
-          | SingleConst i0 -> 
-            if i0 = 0 then TypeSingle (SingleConst 0)
-            else if i0 > 0 then
-              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1,
-                        (eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
-            else
-              TypeRange ((eval_single_exp (SingleBExp (SingleMul, s0, s2))), b2, 
-                        (eval_single_exp (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
-          | _ -> default_type
-            (* TypeRange ((eval_single_exp (SingleBExp (SingleMul, s1, s0))), b1,
-                            (eval_single_exp (SingleBExp (SingleMul, s2, s0))), b2, step) *)
-          end
-        | TypeSal ->
-          begin match s0 with
-          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleSal, s1, s0))), b1,
-                                         (eval_single_exp (SingleBExp (SingleSal, s2, s0))), b2, Int.shift_left step i0)
-          | _ -> default_type
-          end
-        | TypeSar ->
-          begin match s0 with
-          | SingleConst i0 -> TypeRange ((eval_single_exp (SingleBExp (SingleSar, s1, s0))), b1,
-                                          (eval_single_exp (SingleBExp (SingleSar, s2, s0))), b2, Int.shift_right step i0)
-          | _ -> default_type
-          end
-        (* TODO: TypeXor TypeAnd TypeOr *)
-        | _ -> default_type
-        end
-      | TypeRange (s1, true, s2, true, step), TypeRange (s1', true, s2', true, step') ->
-        begin match tbop with
-        | TypeAdd -> 
-          TypeRange (
-            eval_single_exp (SingleBExp (SingleAdd, s1, s1')), true,
-            eval_single_exp (SingleBExp (SingleAdd, s2, s2')), true,
-            if step mod step' = 0 then step' 
-            else if step' mod step = 0 then step 
-            else code_type_error ("steps not divide by each other " ^ (string_of_int step) ^ " " ^ (string_of_int step))
-          )
-        | _ -> default_type
-        end
-      | TypeTop, _ ->
-        begin match tbop with
-        | TypeInter -> ee2
-        | TypeDiff -> TypeUExp (TypeComp, ee2)
-        | _ -> TypeTop
-        end
-      | _, TypeTop ->
-        begin match tbop with
-        | TypeInter -> ee1
-        | TypeDiff -> TypeBot
-        | _ -> TypeTop
-        end
-      | _ -> default_type
-      end
-    | TypeUExp (tuop, e) ->
-      let ee = eval_type_exp e in
-      let default_type = TypeUExp (tuop, ee) in
-      begin match ee with
-      | TypeSingle s ->
-        begin match tuop with
-        | TypeNot -> TypeSingle (eval_single_exp (SingleUExp (SingleNot, s)))
-        | _ -> default_type
-        end
-      | _ -> default_type
-      end
-    | _ -> e
-
-  let merge_type_exp (e1: type_exp) (e2: type_exp) : type_exp option =
-    match e1, e2 with
-    | TypeSingle s, TypeRange (l, lb, r, rb, step)
-    | TypeRange (l, lb, r, rb, step), TypeSingle s ->
-      if lb && (cmp_single_exp (eval_single_exp (SingleBExp (SingleAdd, s, SingleConst step))) l) then
-        Some (TypeRange (s, lb, r, rb, step))
-      else if rb && (cmp_single_exp (eval_single_exp (SingleBExp (SingleAdd, r, SingleConst step))) s) then
-        Some (TypeRange (l, lb, s, rb, step))
-      else if cmp_single_exp s l then
-        Some (TypeRange (l, true, r, rb, step))
-      else if cmp_single_exp r s then
-        Some (TypeRange (l, lb, r, true, step))
-      else None
-    | _ -> None
-  
-  let is_type_exp_val (e: type_exp) : bool =
-    match e with
-    | TypeSingle _
-    | TypeRange _
-    | TypeTop
-    | TypeBot -> true
-    | _ -> false
-
-  module Ints = Set.Make(Int)
-
-  type type_full_exp = type_exp * Ints.t
-  (* Record cond with a list [cond * 2 + Taken/NotTaken, ...] where Taken=1 and NotTaken=0 *)
-
-  let merge_type_full_exp (fe1: type_full_exp) (fe2: type_full_exp) : type_full_exp option =
-    let e1, cond1 = fe1 in
-    let e2, cond2 = fe2 in
-    match merge_type_exp e1 e2 with
-    | Some e -> Some (e, Ints.inter cond1 cond2)
-    | None -> None
-
-  type type_sol =
-    | SolNone
-    | SolSimple of type_exp
-    | SolCond of type_exp * int * type_exp * type_exp
-      (* sol, cond, sol when taken, sol when not taken *)
-
-  type reg_type = type_full_exp list
-  (* type reg_type = {
-    rax: type_full_exp; rcx: type_full_exp; rdx: type_full_exp; rbx: type_full_exp;
-    rsp: type_full_exp; rbp: type_full_exp; rsi: type_full_exp; rdi: type_full_exp;
-    r8:  type_full_exp; r9:  type_full_exp; r10: type_full_exp; r11: type_full_exp;
-    r12: type_full_exp; r13: type_full_exp; r14: type_full_exp; r15: type_full_exp;
-  } *)
-
-  type mem_type = (int * type_full_exp) list
-
-  type cond_type =
-    | CondNe of (type_full_exp * type_full_exp)
-    | CondEq of (type_full_exp * type_full_exp)
-    | CondLq of (type_full_exp * type_full_exp)
-    | CondLe of (type_full_exp * type_full_exp)
-
-  let not_cond_type (cond: cond_type) : cond_type = 
-    match cond with
-    | CondNe (l, r) -> CondEq (l, r)
-    | CondEq (l, r) -> CondNe (l, r)
-    | CondLq (l, r) -> CondLq (r, l)
-    | CondLe (l, r) -> CondLe (r, l)
-  
-  let get_cond_type (cond_list: cond_type list) (cond_idx: int) : cond_type =
-    let idx = cond_idx / 2 in
-    let cond = List.nth cond_list ((List.length cond_list) - idx) in
-    let taken = Int.rem cond_idx 2 in
-    if taken = 1 then cond
-    else not_cond_type cond
-
-  let get_cond_idx (idx: int) (taken: bool) : int =
-    if taken then idx * 2 + 1
-    else idx * 2
-
-  let add_cond_type (cond_list: cond_type list) (cond: cond_type) (taken: bool) : (cond_type list) * int =
-    let cond_suffix = if taken then 1 else 0 in
-    (cond::cond_list, ((List.length cond_list) + 1) * 2 + cond_suffix)
-
-  let rec repl_type_exp (sol: type_var_id * type_exp) (e: type_exp) : type_exp =
-    let idx, re = sol in
-    match e with
-    | TypeVar v -> if v = idx then re else e
-    | TypeBExp (op, l, r) ->
-      let l' = repl_type_exp sol l in
-      let r' = repl_type_exp sol r in
-      eval_type_exp (TypeBExp (op, l', r'))
-    | TypeUExp (op, ee) ->
-      let ee' = repl_type_exp sol ee in
-      eval_type_exp (TypeUExp (op, ee'))
-    | _ -> e
-
-  let repl_type_full_exp (sol: type_var_id * type_exp) (fe: type_full_exp) : type_full_exp =
-    let e, cond = fe in
-    let new_e = repl_type_exp sol e in (new_e, cond)
-
-  let repl_type_sol_full_exp (sol: type_var_id * type_sol) (fe: type_full_exp) : type_full_exp =
-    let idx, s = sol in
-    let e, cond = fe in
-    match s with
-    | SolNone -> fe
-    | SolSimple sol_e -> (repl_type_exp (idx, sol_e) e, cond)
-    | SolCond (sol_e, pure_cond_idx, sol_taken, sol_not_taken) ->
-      begin match Ints.find_opt (get_cond_idx pure_cond_idx true) cond with 
-      | Some _ -> (repl_type_exp (idx, sol_taken) e, cond) (* Taken *)
-      | None ->
-        begin match Ints.find_opt (get_cond_idx pure_cond_idx false) cond with
-        | Some _ -> (repl_type_exp (idx, sol_not_taken) e, cond) (* Not Taken *)
-        | None -> (repl_type_exp (idx, sol_e) e, cond) (* No branch *)
-        end
-      end
-
-  let repl_all_sol_full_exp (sol: (type_var_id * type_sol) list) (fe: type_full_exp) : type_full_exp =
-    let e, cond = fe in
-    (* Trick: Use sub-function helper can reduce times of copying large objects!!! *)
-    let rec helper (e: type_exp) : type_exp =
-      match e with
-      | TypeVar v ->
-        let sol = List.find (fun (idx, _) -> idx = v) sol in
-        let new_ve, _ = repl_type_sol_full_exp sol (TypeVar v, cond) in new_ve
-      | TypeBExp (bop, e1, e2) -> TypeBExp (bop, helper e1, helper e2)
-      | TypeUExp (uop, e) -> TypeUExp (uop, helper e)
-      | _ -> e
-    in
-    (eval_type_exp (helper (helper e)), cond)
+  type mem_type = (int * TypeFullExp.t) list
 
   type state_type = {
     reg_type: reg_type;
     mem_type: mem_type;
-    cond_type: (type_full_exp * type_full_exp)  (* Cmp and test and etc. will set this; Cond branch will use this *)
+    cond_type: (TypeFullExp.t * TypeFullExp.t)  (* Cmp and test and etc. will set this; Cond branch will use this *)
   }
 
-  let get_imm_type (i: Isa.immediate) : type_full_exp =
+  let get_imm_type (i: Isa.immediate) : TypeFullExp.t =
     match i with
-    | ImmNum v -> (TypeSingle (SingleConst v), Ints.empty)
-    | ImmLabel v -> (TypeSingle (SingleVar v), Ints.empty)
+    | ImmNum v -> (TypeSingle (SingleConst v), TypeFullExp.CondVarSet.empty)
+    | ImmLabel v -> (TypeSingle (SingleVar v), TypeFullExp.CondVarSet.empty)
 
-  let get_reg_type (curr_state: state_type) (r: Isa.register) : type_full_exp =
+  let get_reg_type (curr_state: state_type) (r: Isa.register) : TypeFullExp.t =
     let reg_type_list = curr_state.reg_type in
     let reg_idx = Isa.get_reg_idx r in
     List.nth reg_type_list reg_idx
 
-  let set_reg_type (curr_state: state_type) (r: Isa.register) (t: type_full_exp) : state_type =
+  let set_reg_type (curr_state: state_type) (r: Isa.register) (t: TypeFullExp.t) : state_type =
     let reg_list = curr_state.reg_type in
     let reg_idx = Isa.get_reg_idx r in
     let new_reg_list = List.mapi (fun idx reg_type -> if idx = reg_idx then t else reg_type) reg_list in
@@ -457,7 +40,7 @@ module CodeType = struct
 
   let get_mem_op_type (curr_state: state_type)
       (disp: Isa.immediate option) (base: Isa.register option)
-      (index: Isa.register option) (scale: Isa.scale option) : type_full_exp =
+      (index: Isa.register option) (scale: Isa.scale option) : TypeFullExp.t =
     let disp_type, _ = match disp with
     | Some d -> get_imm_type d
     | None -> get_imm_type (ImmNum 0)
@@ -474,16 +57,16 @@ module CodeType = struct
     | Some s -> Isa.scale_val s
     | None -> 1
     in
-    let new_type = eval_type_exp (
+    let new_type = TypeExp.eval (
       TypeBExp (TypeAdd,
         TypeBExp (TypeAdd, base_type, disp_type),
         TypeBExp (TypeMul, index_type, TypeSingle (SingleConst scale_val))
       )
     ) in
-    let new_cond = Ints.union base_cond index_cond in
+    let new_cond = TypeFullExp.CondVarSet.union base_cond index_cond in
     (new_type, new_cond)
 
-  let get_mem_idx (addr_type: type_exp) : int option =
+  let get_mem_idx (addr_type: TypeExp.t) : int option =
     match addr_type with
     | TypeSingle s -> 
       begin match s with
@@ -499,16 +82,16 @@ module CodeType = struct
       end
     | _ -> None
 
-  let get_mem_idx_type (curr_state: state_type) (offset: int) : type_full_exp =
+  let get_mem_idx_type (curr_state: state_type) (offset: int) : TypeFullExp.t =
     let mem_type = curr_state.mem_type in
     let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
     match idx_find with
     | Some (_, t) -> t
-    | None -> (TypeTop, Ints.empty)
+    | None -> (TypeTop, TypeFullExp.CondVarSet.empty)
       (* TODO: Add this assert back later!!! *)
       (* code_type_error ("get_mem_idx_type: stack offset " ^ (string_of_int offset) ^ " not in record") *)
 
-  let set_mem_idx_type (curr_state: state_type) (offset: int) (new_type: type_full_exp) : state_type =
+  let set_mem_idx_type (curr_state: state_type) (offset: int) (new_type: TypeFullExp.t) : state_type =
     let mem_type = curr_state.mem_type in
     let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
     match idx_find with
@@ -519,24 +102,24 @@ module CodeType = struct
 
   let get_ld_op_type (curr_state: state_type)
       (disp: Isa.immediate option) (base: Isa.register option)
-      (index: Isa.register option) (scale: Isa.scale option) : type_full_exp =
+      (index: Isa.register option) (scale: Isa.scale option) : TypeFullExp.t =
     let addr_type, _ = get_mem_op_type curr_state disp base index scale in
     let mem_idx = get_mem_idx addr_type in
     match mem_idx with
     | Some v -> get_mem_idx_type curr_state v
-    | None -> (TypeTop, Ints.empty)
+    | None -> (TypeTop, TypeFullExp.CondVarSet.empty)
 
   let set_st_op_type(curr_state: state_type) 
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (new_type: type_full_exp) : state_type =
+      (new_type: TypeFullExp.t) : state_type =
     let addr_type, _ = get_mem_op_type curr_state disp base index scale in
     let mem_idx = get_mem_idx addr_type in
     match mem_idx with
     | Some v -> set_mem_idx_type curr_state v new_type (* TODO!!!*)
     | None -> curr_state
 
-  let get_src_op_type (curr_state: state_type) (src: Isa.operand) : type_full_exp =
+  let get_src_op_type (curr_state: state_type) (src: Isa.operand) : TypeFullExp.t =
     match src with
     | ImmOp imm -> get_imm_type imm
     | RegOp r -> get_reg_type curr_state r
@@ -545,17 +128,17 @@ module CodeType = struct
     | StOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a label op")
 
-  let set_dest_op_type (curr_state: state_type) (dest: Isa.operand) (new_type: type_full_exp) : state_type =
+  let set_dest_op_type (curr_state: state_type) (dest: Isa.operand) (new_type: TypeFullExp.t) : state_type =
     match dest with
     | RegOp r -> set_reg_type curr_state r new_type
     | StOp (disp, base, index, scale, _) -> set_st_op_type curr_state disp base index scale new_type
     | _ -> code_type_error ("set_dest_op_type: dest is not reg or st op")
 
-  let add_type_cond (tf: type_full_exp) (cond_idx: int) : type_full_exp =
-    let t, cond = tf in (t, Ints.add cond_idx cond)
+  let add_type_cond (tf: TypeFullExp.t) (cond_idx: int) : TypeFullExp.t =
+    let t, cond = tf in (t, TypeFullExp.CondVarSet.add cond_idx cond)
   
-  let add_type_cond_set (tf: type_full_exp) (cond_set: Ints.t) : type_full_exp =
-    let t, cond = tf in (t, Ints.union cond_set cond)
+  let add_type_cond_set (tf: TypeFullExp.t) (cond_set: TypeFullExp.CondVarSet.t) : TypeFullExp.t =
+    let t, cond = tf in (t, TypeFullExp.CondVarSet.union cond_set cond)
 
   let add_reg_type_cond (reg_list: reg_type) (cond_idx: int) : reg_type =
     List.map (fun reg_type -> add_type_cond reg_type cond_idx) reg_list
@@ -570,7 +153,7 @@ module CodeType = struct
       cond_type = curr_state.cond_type
     }
 
-  let type_prop_inst (curr_state: state_type) (cond_list: cond_type list) (inst: Isa.instruction) : state_type * (cond_type list) =
+  let type_prop_inst (curr_state: state_type) (cond_list: CondType.t list) (inst: Isa.instruction) : state_type * (CondType.t list) =
     match inst with
     | Mov (dest, src)
     | MovS (dest, src)
@@ -581,58 +164,58 @@ module CodeType = struct
     | Add (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Sub (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeSub, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeSub, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Sal (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeSal, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeSal, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Shr (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeShr, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeShr, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Sar (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeSar, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeSar, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Xor (dest, src1, src2) ->
       (* TODO: Add special case for xor %rax %rax *)
       begin match src1, src2 with
       | RegOp r1, RegOp r2 ->
-        if r1 = r2 then (set_dest_op_type curr_state dest (TypeSingle (SingleConst 0), Ints.empty), cond_list)
+        if r1 = r2 then (set_dest_op_type curr_state dest (TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty), cond_list)
         else begin
           let src1_type, src1_cond = get_src_op_type curr_state src1 in
           let src2_type, src2_cond = get_src_op_type curr_state src2 in
-          let dest_type = (eval_type_exp (TypeBExp (TypeXor, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+          let dest_type = (TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
           (set_dest_op_type curr_state dest dest_type, cond_list)
         end
       | _ ->
         let src1_type, src1_cond = get_src_op_type curr_state src1 in
         let src2_type, src2_cond = get_src_op_type curr_state src2 in
-        let dest_type = (eval_type_exp (TypeBExp (TypeXor, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+        let dest_type = (TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
         (set_dest_op_type curr_state dest dest_type, cond_list)
       end
     | Not (dest, src) ->
       let src_type, src_cond = get_src_op_type curr_state src in
-      let dest_type = (eval_type_exp (TypeUExp (TypeNot, src_type)), src_cond) in
+      let dest_type = (TypeExp.eval (TypeUExp (TypeNot, src_type)), src_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | And (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeAnd, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeAnd, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Or (dest, src1, src2) ->
       let src1_type, src1_cond = get_src_op_type curr_state src1 in
       let src2_type, src2_cond = get_src_op_type curr_state src2 in
-      let dest_type = (eval_type_exp (TypeBExp (TypeOr, src1_type, src2_type)), Ints.union src1_cond src2_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeOr, src1_type, src2_type)), TypeFullExp.CondVarSet.union src1_cond src2_cond) in
       (set_dest_op_type curr_state dest dest_type, cond_list)
     | Cmp (src1, src2) ->
       let src1_full_type = get_src_op_type curr_state src1 in
@@ -643,27 +226,27 @@ module CodeType = struct
       let cond_left, cond_right = curr_state.cond_type in
       let new_cond = 
         begin match branch_cond with
-        | JNe -> CondNe (cond_left, cond_right)
-        | JE -> CondEq (cond_left, cond_right)
-        | JL -> CondLq (cond_left, cond_right)
-        | JLe -> CondLe (cond_left, cond_right)
-        | JG -> CondLq (cond_right, cond_left)
-        | JGe -> CondLe (cond_right, cond_left)
+        | JNe -> CondType.CondNe (cond_left, cond_right)
+        | JE -> CondType.CondEq (cond_left, cond_right)
+        | JL -> CondType.CondLq (cond_left, cond_right)
+        | JLe -> CondType.CondLe (cond_left, cond_right)
+        | JG -> CondType.CondLq (cond_right, cond_left)
+        | JGe -> CondType.CondLe (cond_right, cond_left)
         end in
-      let new_cond_list, new_cond_idx = add_cond_type cond_list new_cond false in
+      let new_cond_list, new_cond_idx = CondType.add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list)
     | Jmp _ -> (curr_state, cond_list)
     | Push _ ->
       let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
-      let src2_type = TypeSingle (SingleConst (-8)) in
+      let src2_type = TypeExp.TypeSingle (SingleConst (-8)) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
-      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
       (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
     | Pop _ ->
       let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
-      let src2_type = TypeSingle (SingleConst 8) in
+      let src2_type = TypeExp.TypeSingle (SingleConst 8) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
-      let dest_type = (eval_type_exp (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
+      let dest_type = (TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
       (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
     | _ -> begin
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
@@ -677,38 +260,38 @@ module CodeType = struct
 
   type t = block_type list
 
-  let init_reg_type (start_var_idx: (type_var_id, Isa.imm_var_id) Either.t) (rsp_offset: int) : ((type_var_id, Isa.imm_var_id) Either.t) * reg_type = 
-    let rec helper (var_idx: (type_var_id, Isa.imm_var_id) Either.t) (r_type: reg_type) (idx: int) : ((type_var_id, Isa.imm_var_id) Either.t) * reg_type =
+  let init_reg_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (rsp_offset: int) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * reg_type = 
+    let rec helper (var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (r_type: reg_type) (idx: int) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * reg_type =
       if idx = Isa.total_reg_num
       then (var_idx, r_type)
       else begin
         if idx = Isa.rsp_idx then
-          helper var_idx ((TypeSingle (eval_single_exp (SingleBExp (SingleAdd, SingleVar stack_base_id, SingleConst rsp_offset))), Ints.empty) :: r_type) (idx + 1)
-          (* helper (type_var_idx, (TypeSingle (Option.get init_rsp), Ints.empty) :: reg_type) (idx + 1) *)
+          helper var_idx ((TypeSingle (SingleExp.eval (SingleBExp (SingleAdd, SingleVar stack_base_id, SingleConst rsp_offset))), TypeFullExp.CondVarSet.empty) :: r_type) (idx + 1)
+          (* helper (type_var_idx, (TypeSingle (Option.get init_rsp), TypeFullExp.CondVarSet.empty) :: reg_type) (idx + 1) *)
         else begin
           match var_idx with
-          | Left type_var_idx -> helper (Left (type_var_idx + 1)) ((TypeVar type_var_idx, Ints.empty) :: r_type) (idx + 1)
-          | Right imm_var_idx -> helper (Right (imm_var_idx + 1)) ((TypeSingle (SingleVar imm_var_idx), Ints.empty) :: r_type) (idx + 1)
-          (* helper (type_var_idx + 1, (TypeVar type_var_idx, Ints.empty) :: reg_type) (idx + 1) *)
+          | Left type_var_idx -> helper (Left (type_var_idx + 1)) ((TypeVar type_var_idx, TypeFullExp.CondVarSet.empty) :: r_type) (idx + 1)
+          | Right imm_var_idx -> helper (Right (imm_var_idx + 1)) ((TypeSingle (SingleVar imm_var_idx), TypeFullExp.CondVarSet.empty) :: r_type) (idx + 1)
+          (* helper (type_var_idx + 1, (TypeVar type_var_idx, TypeFullExp.CondVarSet.empty) :: reg_type) (idx + 1) *)
         end
       end
     in
     let var_idx, reg_type = helper start_var_idx [] 0 in
     (var_idx, List.rev reg_type)
 
-  let init_mem_type (start_var_idx: (type_var_id, Isa.imm_var_id) Either.t) (mem_off_list: int list) : ((type_var_id, Isa.imm_var_id) Either.t) * mem_type =
+  let init_mem_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (mem_off_list: int list) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * mem_type =
     match start_var_idx with
     | Left start_type_var_idx -> 
-      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list in
+      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeExp.TypeVar acc, TypeFullExp.CondVarSet.empty)))) start_type_var_idx mem_off_list in
       (Left end_id, end_type)
     | Right start_imm_var_idx -> 
-      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeSingle (SingleVar acc), Ints.empty)))) start_imm_var_idx mem_off_list in
+      let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeExp.TypeSingle (SingleVar acc), TypeFullExp.CondVarSet.empty)))) start_imm_var_idx mem_off_list in
       (Right end_id, end_type)
-    (* List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, Ints.empty)))) start_type_var_idx mem_off_list *)
+    (* List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, TypeFullExp.CondVarSet.empty)))) start_type_var_idx mem_off_list *)
 
-  let init_code_type_var (start_type_var_idx: type_var_id) (prog: Isa.program) (mem_off_list: int list) : (type_var_id * Isa.imm_var_id) * t =
+  let init_code_type_var (start_type_var_idx: TypeExp.type_var_id) (prog: Isa.program) (mem_off_list: int list) : (TypeExp.type_var_id * Isa.imm_var_id) * t =
     let start_imm_var = stack_base_id + Isa.StrM.cardinal prog.imm_var_map + 1 in
-    let helper_0 (acc: (type_var_id, Isa.imm_var_id) Either.t) (block: Isa.basic_block) : ((type_var_id, Isa.imm_var_id) Either.t) * block_type =
+    let helper_0 (acc: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (block: Isa.basic_block) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * block_type =
       let acc1, reg_t = init_reg_type acc block.rsp_offset in
       let acc2, mem_t = init_mem_type acc1 mem_off_list in
       (acc2, {
@@ -716,10 +299,10 @@ module CodeType = struct
         block_code_type = {
           reg_type = reg_t;
           mem_type = mem_t;
-          cond_type = ((TypeSingle (SingleConst 0), Ints.empty), (TypeSingle (SingleConst 0), Ints.empty));
+          cond_type = ((TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty), (TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty));
         }
       }) in
-    let helper (acc: type_var_id * Isa.imm_var_id) (block: Isa.basic_block) : (type_var_id * Isa.imm_var_id) * block_type = begin
+    let helper (acc: TypeExp.type_var_id * Isa.imm_var_id) (block: Isa.basic_block) : (TypeExp.type_var_id * Isa.imm_var_id) * block_type = begin
       let type_acc, imm_acc = acc in
       if Isa.is_label_function_entry block.label then begin
         let new_acc, b_type = helper_0 (Right imm_acc) block in
@@ -739,7 +322,7 @@ module CodeType = struct
         block_code_type = {
           reg_type = reg_t;
           mem_type = mem_t;
-          cond_type = ((TypeSingle (SingleConst 0), Ints.empty), (TypeSingle (SingleConst 0), Ints.empty));
+          cond_type = ((TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty), (TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty));
         }
       })  *)
     end in
@@ -748,118 +331,23 @@ module CodeType = struct
   let get_label_type (code_type: t) (label: Isa.label) : state_type =
     (List.find (fun x -> label = x.label) code_type).block_code_type
 
-  let rec string_of_single_exp (se: single_exp) =
-    match se with
-    | SingleConst v -> "Const " ^ (string_of_int v)
-    | SingleVar v -> "SymImm " ^ (string_of_int v)
-    | SingleBExp (op, l, r) -> 
-      let op_str = match op with
-      | SingleAdd -> "Add"
-      | SingleSub -> "Sub"
-      | SingleMul -> "Mul"
-      | SingleSal -> "Sal"
-      | SingleSar -> "Sar"
-      | SingleXor -> "Xor"
-      | SingleAnd -> "And"
-      | SingleOr -> "Or"
-      in
-      "S-BinaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp l) ^ ", " ^ (string_of_single_exp r) ^ ")"
-    | SingleUExp (op, e) ->
-      let op_str = match op with
-      | SingleNot -> "Not"
-      in
-      "S-UnaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp e) ^ ")"
-
-  let rec string_of_type_exp (t: type_exp) =
-    match t with
-    | TypeSingle ts -> string_of_single_exp ts
-    | TypeRange (bg, bgi, ed, edi, step) -> 
-      let bg_str = if bgi then "[" else "(" in
-      let ed_str = if edi then "]" else ")" in
-      bg_str ^ (string_of_single_exp bg) ^ ", " ^ (string_of_single_exp ed) ^ ed_str ^ " step = " ^ (string_of_int step)
-    | TypeVar v -> "TypeVar " ^ (string_of_int v)
-    | TypeTop -> "Top"
-    | TypeBot -> "Bottom"
-    | TypeBExp (op, l, r) -> 
-      let op_str = match op with
-      | TypeAdd -> "Add"
-      | TypeSub -> "Sub"
-      | TypeMul -> "Mul"
-      | TypeSal -> "Sal"
-      | TypeShr -> "Shr"
-      | TypeSar -> "Sar"
-      | TypeXor -> "Xor"
-      | TypeAnd -> "And"
-      | TypeOr -> "Or"
-      | TypeInter -> "Inter"
-      | TypeUnion -> "Union"
-      | TypeDiff -> "Diff"
-      in
-      "BinaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp l) ^ ", " ^ (string_of_type_exp r) ^ ")"
-    | TypeUExp (op, e) ->
-      let op_str = match op with
-      | TypeNot -> "Not"
-      | TypeComp -> "Comp"
-      in
-      "UnaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp e) ^ ")"
-  
-  let string_of_type_sol (t: type_sol) =
-    match t with
-    | SolSimple e -> "SolSimple " ^ (string_of_type_exp e)
-    | SolCond (e, c, e1, e2) -> "SolCond " ^ (string_of_type_exp e) ^ " cond " ^ (string_of_int c) ^ " taken " ^ (string_of_type_exp e1) ^ " not taken " ^ (string_of_type_exp e2)
-    | SolNone -> "SolNone"
-
-  let string_of_one_cond_status (cond: int) =
-    let cond_idx = cond / 2 in
-    let taken = if Int.rem cond 2 = 1 then "Taken" else "NotTaken" in
-    string_of_int cond_idx ^ " " ^ taken
-
-  let string_of_cond_status (conds: Ints.t) =
-    "[" ^ (Ints.fold (fun x acc -> (if acc = "" then "" else acc ^ ", ") ^ (string_of_one_cond_status x)) conds "") ^ "]"
-
-  let pp_single_exp (lvl: int) (s: single_exp) =
-    PP.print_lvl lvl "%s" (string_of_single_exp s)
-
-  let pp_type_full_exp (lvl: int) (tf: type_full_exp) =
-    let t, cond = tf in
-    PP.print_lvl lvl "(Type = %s, Cond = %s)"
-      (string_of_type_exp t)
-      (string_of_cond_status cond)
-
-  let pp_cond (lvl: int) (cond: cond_type) =
-    let op, str1, str2 = match cond with
-    | CondNe (l, r) -> ("Ne", string_of_type_exp (fst l), string_of_type_exp (fst r))
-    | CondEq (l, r) -> ("Eq", string_of_type_exp (fst l), string_of_type_exp (fst r))
-    | CondLq (l, r) -> ("Lq", string_of_type_exp (fst l), string_of_type_exp (fst r))
-    | CondLe (l, r) -> ("Le", string_of_type_exp (fst l), string_of_type_exp (fst r))
-    in
-    PP.print_lvl lvl "Cond %s between\n" op;
-    PP.print_lvl (lvl + 1) "%s\n" str1;
-    PP.print_lvl (lvl + 1) "%s\n" str2
-
-  let pp_cond_list (lvl: int) (cond_list: cond_type list) =
-    List.iteri (fun i x -> 
-      PP.print_lvl lvl "<Cond %d>\n" (i + 1);
-      pp_cond (lvl + 1) x
-    ) (List.rev cond_list)
-
   let pp_state_type (lvl: int) (s: state_type) =
     PP.print_lvl lvl "Reg:\n";
     List.iteri (fun i x ->
       PP.print_lvl (lvl + 1) "<Reg %d> " i;
-      pp_type_full_exp (lvl + 2) x;
+      TypeFullExp.pp_type_full_exp (lvl + 2) x;
       Printf.printf "\n"
     ) s.reg_type;
     PP.print_lvl lvl "Mem:\n";
     List.iter (fun (off, x) ->
       PP.print_lvl (lvl + 1) "<offset %d> " off;
-      pp_type_full_exp (lvl + 2) x;
+      TypeFullExp.pp_type_full_exp (lvl + 2) x;
       Printf.printf "\n"
     ) s.mem_type;
     PP.print_lvl lvl "Cond:\n";
-    pp_type_full_exp (lvl + 1) (fst s.cond_type);
+    TypeFullExp.pp_type_full_exp (lvl + 1) (fst s.cond_type);
     Printf.printf "\n";
-    pp_type_full_exp (lvl + 1) (snd s.cond_type)
+    TypeFullExp.pp_type_full_exp (lvl + 1) (snd s.cond_type)
 
   let pp_block_types (lvl: int) (block_types: t) =
     List.iter (fun x ->

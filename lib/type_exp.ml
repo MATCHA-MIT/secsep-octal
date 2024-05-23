@@ -34,25 +34,25 @@ module TypeExp = struct
     | TypeBExp of type_bop * t * t
     | TypeUExp of type_uop * t
 
-  let rec cmp_type_exp (e1: t) (e2: t) : bool =
+  let rec cmp (e1: t) (e2: t) : bool =
     match e1, e2 with
-    | TypeSingle s1, TypeSingle s2 -> SingleExp.cmp_single_exp s1 s2 = 0
+    | TypeSingle s1, TypeSingle s2 -> SingleExp.cmp s1 s2 = 0
     | TypeRange (l1, bl1, r1, br1, s1), TypeRange (l2, bl2, r2, br2, s2) ->
-      (SingleExp.cmp_single_exp l1 l2 = 0) && (bl1 = bl2) && (SingleExp.cmp_single_exp r1 r2 = 0) && (br1 = br2) && (s1 = s2)
+      (SingleExp.cmp l1 l2 = 0) && (bl1 = bl2) && (SingleExp.cmp r1 r2 = 0) && (br1 = br2) && (s1 = s2)
     | TypeVar v1, TypeVar v2 -> v1 = v2
     | TypeTop, TypeTop -> true
     | TypeBot, TypeBot -> true
     | TypeBExp (bop1, l1, r1), TypeBExp (bop2, l2, r2) ->
-      (bop1 = bop2) && (cmp_type_exp l1 l2) && (cmp_type_exp r1 r2)
+      (bop1 = bop2) && (cmp l1 l2) && (cmp r1 r2)
     | TypeUExp (uop1, l1), TypeUExp (uop2, l2) ->
-      (uop1 = uop2) && (cmp_type_exp l1 l2)
+      (uop1 = uop2) && (cmp l1 l2)
     | _ -> false
 
-  let rec eval_type_exp (e: t) : t =
+  let rec eval (e: t) : t =
     match e with
     | TypeBExp (tbop, e1, e2) -> 
-      let ee1 = eval_type_exp e1 in
-      let ee2 = eval_type_exp e2 in
+      let ee1 = eval e1 in
+      let ee2 = eval e2 in
       let default_type = TypeBExp (tbop, ee1, ee2) in
       begin match ee1, ee2 with
       | TypeSingle s1, TypeSingle s2 -> 
@@ -164,7 +164,7 @@ module TypeExp = struct
       | _ -> default_type
       end
     | TypeUExp (tuop, e) ->
-      let ee = eval_type_exp e in
+      let ee = eval e in
       let default_type = TypeUExp (tuop, ee) in
       begin match ee with
       | TypeSingle s ->
@@ -176,28 +176,41 @@ module TypeExp = struct
       end
     | _ -> e
 
-  let merge_type_exp (e1: t) (e2: t) : t option =
+  let merge (e1: t) (e2: t) : t option =
     match e1, e2 with
     | TypeSingle s, TypeRange (l, lb, r, rb, step)
     | TypeRange (l, lb, r, rb, step), TypeSingle s ->
-      if lb && (SingleExp.cmp_single_exp (SingleExp.eval (SingleBExp (SingleAdd, s, SingleConst step))) l = 0) then
+      if lb && (SingleExp.cmp (SingleExp.eval (SingleBExp (SingleAdd, s, SingleConst step))) l = 0) then
         Some (TypeRange (s, lb, r, rb, step))
-      else if rb && (SingleExp.cmp_single_exp (SingleExp.eval (SingleBExp (SingleAdd, r, SingleConst step))) s = 0) then
+      else if rb && (SingleExp.cmp (SingleExp.eval (SingleBExp (SingleAdd, r, SingleConst step))) s = 0) then
         Some (TypeRange (l, lb, s, rb, step))
-      else if SingleExp.cmp_single_exp s l = 0 then
+      else if SingleExp.cmp s l = 0 then
         Some (TypeRange (l, true, r, rb, step))
-      else if SingleExp.cmp_single_exp r s = 0 then
+      else if SingleExp.cmp r s = 0 then
         Some (TypeRange (l, lb, r, true, step))
       else None
     | _ -> None
   
-  let is_type_exp_val (e: t) : bool =
+  let is_val (e: t) : bool =
     match e with
     | TypeSingle _
     | TypeRange _
     | TypeTop
     | TypeBot -> true
     | _ -> false
+
+  let rec repl_type_exp (sol: type_var_id * t) (e: t) : t =
+    let idx, re = sol in
+    match e with
+    | TypeVar v -> if v = idx then re else e
+    | TypeBExp (op, l, r) ->
+      let l' = repl_type_exp sol l in
+      let r' = repl_type_exp sol r in
+      eval (TypeBExp (op, l', r'))
+    | TypeUExp (op, ee) ->
+      let ee' = repl_type_exp sol ee in
+      eval (TypeUExp (op, ee'))
+    | _ -> e
 
   let rec string_of_type_exp (t: t) =
     match t with

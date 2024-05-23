@@ -2,4 +2,7 @@
  (name test_type)
  (libraries type)
  (deps ../asm/salsa20_annotated.s ../asm/demo.s)
+
+ ; (name test_single_exp)
+ ; (libraries type)
 )

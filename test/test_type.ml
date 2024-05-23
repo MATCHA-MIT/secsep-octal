@@ -1,5 +1,6 @@
 
 (* open Type.Isa *)
+open Type.Cond_type
 open Type.Code_type
 open Type.Gen_type
 open Type.Subtype
@@ -41,7 +42,7 @@ let p = Parser.parse_program (read_file "../asm/demo.s")
 
 let tv_rel, code_type, cond_list = GenType.gen_init_type_subtype_rel p [@@deriving show]
 
-let _ = CodeType.pp_cond_list 0 cond_list
+let _ = CondType.pp_cond_list 0 cond_list
 
 let _ = CodeType.pp_block_types 0 code_type
 
