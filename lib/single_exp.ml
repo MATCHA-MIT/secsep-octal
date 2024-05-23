@@ -176,9 +176,13 @@ module SingleExp = struct
     match e1, e2 with
     | [], [] -> Either.left []
     | [], hd :: tl | hd :: tl, [] -> Either.left (hd :: tl)
+    | [SingleConst 0], e | e, [SingleConst 0] -> Either.left e
     | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
       let cmp_tl = cmp_list_helper tl1 tl2 in
-      if cmp_tl = 0 then Either.left (SingleConst (c1 + c2) :: tl1)
+      if cmp_tl = 0 then 
+        let c12 = c1 + c2 in
+        if c12 = 0 then Either.left []
+        else Either.left (SingleConst c12 :: tl1)
       else if cmp_tl = 1 then Either.right true
       else Either.right false
       (* if List.equal equal tl1 tl2 
@@ -186,7 +190,10 @@ module SingleExp = struct
       else None *)
     | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
       let cmp_tl = cmp_list_helper tl1 tl2 in
-      if cmp_tl = 0 then Either.left (SingleConst (c + 1) :: tl1)
+      if cmp_tl = 0 then 
+        let c1 = c + 1 in
+        if c1 = 0 then Either.left []
+        else Either.left (SingleConst (c + 1) :: tl1)
       else if cmp_tl = 1 then Either.right true
       else Either.right false
       (* if List.equal equal tl1 tl2 
@@ -208,6 +215,7 @@ module SingleExp = struct
       | [] -> [ y ]
       | hd :: tl ->
         begin match add_t y hd with
+        | Left [] -> tl
         | Left e -> e :: tl
         | Right larger ->
           if larger then hd :: (helper tl y)

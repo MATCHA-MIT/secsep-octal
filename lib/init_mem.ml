@@ -52,9 +52,8 @@ module InitMem = struct
       let (addr, _), size = addr_exp in
       match addr with
       | TypeSingle s -> (s, SingleExp.SingleConst size)
-      | TypeRange (s1, true, SingleExp.SingleBExp (SingleExp.SingleAdd, s2, range_size), true, _) ->
-        if SingleExp.cmp s1 s2 = 0 then (s1, SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, range_size, SingleExp.SingleConst size)))
-        else init_mem_error "get_addr_range not implement this case for range simplification"
+      | TypeRange (s1, true, s2, true, _) ->
+        (s1, SingleExp.eval (SingleBExp (SingleExp.SingleAdd, SingleBExp (SingleExp.SingleSub, s2, s1), SingleExp.SingleConst size)))
       | _ -> init_mem_error "get_addr_range not implement this case"
     in
     List.map helper addr_exp_list
