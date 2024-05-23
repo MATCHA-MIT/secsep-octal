@@ -119,6 +119,22 @@ module SingleExp = struct
     | SingleUExp _, SingleBExp _ -> -1
     | SingleUExp _, _ -> 1
 
+  let rec cmp_list_helper (e1: t list) (e2: t list) : int =
+    match e1, e2 with
+    | [], [] -> 0
+    | [], _ :: _ -> -1
+    | _ :: _, [] -> 1
+    | hd1 :: tl1, hd2 :: tl2 ->
+      let cmp_hd = cmp hd1 hd2 in
+      if cmp_hd = 0 then cmp_list_helper tl1 tl2 else cmp_hd
+
+  let cmp_list (e1: t list) (e2: t list) : int =
+    match e1, e2 with
+    | (SingleConst _) :: ee1, (SingleConst _) :: ee2
+    | SingleConst _ :: ee1, ee2
+    | ee1, SingleConst _ :: ee2
+    | ee1, ee2 -> cmp_list_helper ee1 ee2
+
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =
       match x with
@@ -152,26 +168,53 @@ module SingleExp = struct
       if c = 0 then [] else x
     | _ -> x
 
-  let add_t (e1: t list) (e2: t list) : (t list) option =
-    let equal (l: t) (r: t) : bool = if cmp l r = 0 then true else false in
+  let add_t (e1: t list) (e2: t list) : (t list, bool) Either.t =
+    (* Printf.printf "=======================\n@@@";
+    pp_split_exp 0 [e1; e2];
+    Printf.printf "\n=======================\n"; *)
+    (* let equal (l: t) (r: t) : bool = if cmp l r = 0 then true else false in *)
     match e1, e2 with
-    | [], [] -> Some []
-    | [], hd :: tl | hd :: tl, [] -> Some (hd :: tl)
+    | [], [] -> Either.left []
+    | [], hd :: tl | hd :: tl, [] -> Either.left (hd :: tl)
     | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
-      if List.equal equal tl1 tl2 
+      let cmp_tl = cmp_list_helper tl1 tl2 in
+      if cmp_tl = 0 then Either.left (SingleConst (c1 + c2) :: tl1)
+      else if cmp_tl = 1 then Either.right true
+      else Either.right false
+      (* if List.equal equal tl1 tl2 
       then Some (SingleConst (c1 + c2) :: tl1)
-      else None
+      else None *)
     | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
-      if List.equal equal tl1 tl2 
+      let cmp_tl = cmp_list_helper tl1 tl2 in
+      if cmp_tl = 0 then Either.left (SingleConst (c + 1) :: tl1)
+      else if cmp_tl = 1 then Either.right true
+      else Either.right false
+      (* if List.equal equal tl1 tl2 
       then Some (SingleConst (c + 1) :: tl1)
-      else None
-    | hd1 :: tl1, hd2 :: tl2 ->
+      else None *)
+    | _, _ ->
+      let cmp_tl = cmp_list_helper e1 e2 in
+      if cmp_tl = 0 then Either.left (SingleConst 2 :: e1)
+      else if cmp_tl = 1 then Either.right true
+      else Either.right false
+    (* | hd1 :: tl1, hd2 :: tl2 ->
       if List.equal equal (hd1 :: tl1) (hd2 :: tl2) 
       then Some (SingleConst 2 :: hd1 :: tl1)
-      else None
+      else None *)
 
   let add_t_list (e1: t list list) (e2: t list list) : t list list =
-    let helper0 (acc: (t list) option) (x: t list) : (t list) option * t list =
+    let rec helper (x_list: t list list) (y: t list) : t list list =
+      match x_list with
+      | [] -> [ y ]
+      | hd :: tl ->
+        begin match add_t y hd with
+        | Left e -> e :: tl
+        | Right larger ->
+          if larger then hd :: (helper tl y)
+          else y :: hd :: tl
+        end
+    in
+    (* let helper0 (acc: (t list) option) (x: t list) : (t list) option * t list =
       match acc with
       | None -> (None, x)
       | Some v ->
@@ -185,7 +228,7 @@ module SingleExp = struct
       match new_y with
       | Some v -> v :: new_x
       | None -> new_x
-    in
+    in *)
     List.fold_left helper e1 e2
 
   let rec eval_t (e: t) : t list list =
@@ -238,6 +281,13 @@ module SingleExp = struct
     | _ -> [ [e] ]
 
   let eval (e: t) : t =
+    (* Printf.printf "====================\n";
+    pp_single_exp 0 e;
+    Printf.printf "\n--------------------\n";
+    pp_split_exp 0 (eval_t e);
+    Printf.printf "\n--------------------\n";
+    pp_single_exp 0 (convert_t (eval_t e));
+    Printf.printf "\n====================\n"; *)
     convert_t (eval_t e)
 
 end
