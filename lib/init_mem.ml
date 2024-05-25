@@ -79,4 +79,13 @@ module InitMem = struct
         SingleExp.pp_single_exp (lvl + 2) size;
         Printf.printf "\n"
     ) addr_range
+
+  let get_base_set (e: SingleExp.t list) : SingleExp.SingleVarSet =
+    let helper (acc: SingleExp.SingleVarSet) (e: SingleExp.t list) : SingleExp.SingleVarSet =
+      match e with
+      | [ SingleVar v ] -> SingleExp.SingleVarSet.add v acc
+      | _ -> acc
+    in
+    List.fold_left helper SingleExp.SingleVarSet.empty e
+
 end
