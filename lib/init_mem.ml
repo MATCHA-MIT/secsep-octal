@@ -80,12 +80,20 @@ module InitMem = struct
         Printf.printf "\n"
     ) addr_range
 
-  let get_base_set (e: SingleExp.t list) : SingleExp.SingleVarSet =
-    let helper (acc: SingleExp.SingleVarSet) (e: SingleExp.t list) : SingleExp.SingleVarSet =
-      match e with
-      | [ SingleVar v ] -> SingleExp.SingleVarSet.add v acc
-      | _ -> acc
-    in
-    List.fold_left helper SingleExp.SingleVarSet.empty e
+  let rec get_single_base_set (e: SingleExp.t) : SingleExp.SingleVarSet.t = 
+    match e with
+    | SingleConst _ -> SingleExp.SingleVarSet.empty
+    | SingleVar x -> SingleExp.SingleVarSet.singleton x
+    | SingleBExp (SingleExp.SingleAdd, l, r) ->
+      let left_set = get_single_base_set l in
+      let right_set = get_single_base_set r in
+      SingleExp.SingleVarSet.union left_set right_set
+    | _ -> SingleExp.SingleVarSet.empty
+
+  let get_type_base_set (e: TypeExp.t) : SingleExp.SingleVarSet.t =
+    match e with
+    | TypeSingle s -> get_single_base_set s
+    | TypeRange (a, _, b, _, _) -> SingleExp.SingleVarSet.inter (get_single_base_set a) (get_single_base_set b)
+    | _ -> SingleExp.SingleVarSet.empty
 
 end

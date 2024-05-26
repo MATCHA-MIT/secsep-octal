@@ -5,7 +5,7 @@ module SingleExp = struct
   exception SingleExpError of string
   let single_exp_error msg = raise (SingleExpError ("[Single Exp Error] " ^ msg))
 
-  module SingleVasrSet = Set.Make(Isa.imm_var_id)
+  module SingleVarSet = Set.Make(Int)
 
   type single_bop =
     | SingleAdd
