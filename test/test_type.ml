@@ -1,5 +1,6 @@
 
 (* open Type.Isa *)
+open Type.Single_exp
 open Type.Cond_type
 open Type.Code_type
 open Type.Gen_type
@@ -61,8 +62,12 @@ let addr_repl_list = InitMem.repl_addr_exp addr_exp_list pure_sol
 
 let _ = InitMem.pp_addr_exp 0 addr_repl_list
 
-let addr_range_list = InitMem.get_addr_range addr_repl_list
+let addr_base_list = InitMem.get_base (SingleExp.SingleVarSet.of_list [ 1 ]) addr_repl_list
 
-let _ = InitMem.pp_addr_range 0 addr_range_list
+let _ = InitMem.pp_base 0 addr_base_list
+
+(* let addr_range_list = InitMem.get_addr_range addr_repl_list
+
+let _ = InitMem.pp_addr_range 0 addr_range_list *)
 
 

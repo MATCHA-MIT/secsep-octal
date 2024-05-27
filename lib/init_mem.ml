@@ -80,20 +80,83 @@ module InitMem = struct
         Printf.printf "\n"
     ) addr_range
 
-  let rec get_single_base_set (e: SingleExp.t) : SingleExp.SingleVarSet.t = 
+  let rec filter_single_var (e: SingleExp.t) : SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t =
     match e with
-    | SingleConst _ -> SingleExp.SingleVarSet.empty
-    | SingleVar x -> SingleExp.SingleVarSet.singleton x
+    | SingleVar x -> (SingleExp.SingleVarSet.singleton x, SingleExp.SingleVarSet.empty)
     | SingleBExp (SingleExp.SingleAdd, l, r) ->
-      let left_set = get_single_base_set l in
-      let right_set = get_single_base_set r in
-      SingleExp.SingleVarSet.union left_set right_set
-    | _ -> SingleExp.SingleVarSet.empty
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      (SingleExp.SingleVarSet.union left_ptr right_ptr, SingleExp.SingleVarSet.union left_no_ptr right_no_ptr)
+    | SingleBExp (SingleExp.SingleMul, l, r) ->
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union left_ptr right_ptr) (SingleExp.SingleVarSet.union left_no_ptr right_no_ptr))
+    | _ -> (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.empty)
 
-  let get_type_base_set (e: TypeExp.t) : SingleExp.SingleVarSet.t =
+  let filter_type_single_var (e: TypeExp.t) : SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t =
     match e with
-    | TypeSingle s -> get_single_base_set s
-    | TypeRange (a, _, b, _, _) -> SingleExp.SingleVarSet.inter (get_single_base_set a) (get_single_base_set b)
-    | _ -> SingleExp.SingleVarSet.empty
+    | TypeSingle s -> filter_single_var s
+    | TypeRange (l, _, r, _, _) ->
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      let diff1 = SingleExp.SingleVarSet.diff left_ptr right_ptr in
+      let diff2 = SingleExp.SingleVarSet.diff right_ptr left_ptr in
+      (SingleExp.SingleVarSet.inter left_ptr right_ptr,
+      SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union diff1 diff2) (SingleExp.SingleVarSet.union left_no_ptr right_no_ptr))
+    | _ -> (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.empty)
+
+  let try_solve_base 
+      (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
+      (base_list: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) =
+    let ptr_list, no_ptr_list = acc in
+    match base_list with
+    | Left base_list ->
+      let base_list = SingleExp.SingleVarSet.diff base_list no_ptr_list in
+      let inter_list = SingleExp.SingleVarSet.inter base_list ptr_list in
+      let diff_list = SingleExp.SingleVarSet.diff base_list ptr_list in
+      begin match SingleExp.SingleVarSet.elements inter_list, SingleExp.SingleVarSet.elements diff_list with
+      | [], [] -> init_mem_error "try_solve_base get empty base candidate"
+      | [], hd :: [] -> ((SingleExp.SingleVarSet.add hd ptr_list, no_ptr_list), Right hd)
+      | [], _ :: _ -> (acc, Left diff_list)
+      | hd :: [], _ -> ((ptr_list, SingleExp.SingleVarSet.union diff_list no_ptr_list), Right hd)
+      | _ :: _, _ -> init_mem_error "try_solve_base add more than one ptrs"
+      end
+      (* begin match SingleExp.SingleVarSet.elements base_list with
+      | [] -> init_mem_error "try_solve_base get empty base candidate"
+      | hd :: [] -> Right ((SingleExp.SingleVarSet.add hd ptr_list, no_ptr_list), Right hd)
+      end *)
+    | Right _ -> (acc, base_list)
+  
+  let rec solve_base 
+      (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
+      (base_list: ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) list)
+      (iter: int) : 
+      Isa.imm_var_id list =
+    let to_id (x: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : Isa.imm_var_id =
+      match x with
+      | Left _ -> init_mem_error "solve_base cannot find solution"
+      | Right id -> id
+    in
+    if iter = 0 then List.map to_id base_list
+    else
+      let new_acc, new_list = List.fold_left_map try_solve_base acc base_list in
+      solve_base new_acc new_list (iter - 1)
+
+  let get_base (ptr_list: SingleExp.SingleVarSet.t) (addr_list: (TypeFullExp.t * int) list) : Isa.imm_var_id list =
+    let ptr_set_list, no_ptr_set_list = List.split (List.map (fun ((e, _), _) -> filter_type_single_var e) addr_list) in
+    let no_ptr_set = List.fold_left (fun acc x -> SingleExp.SingleVarSet.union acc x) SingleExp.SingleVarSet.empty no_ptr_set_list in
+    let ptr_set_list = List.map (
+      fun x : (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t -> 
+        Left (SingleExp.SingleVarSet.diff x no_ptr_set)) 
+      ptr_set_list in
+    solve_base (ptr_list, SingleExp.SingleVarSet.empty) ptr_set_list 1
+    
+  let pp_base (lvl: int) (base_list: Isa.imm_var_id list) =
+    PP.print_lvl lvl "Base list:\n";
+    List.iteri (
+      fun i x ->
+        PP.print_lvl (lvl + 1) "<Addr Range %d> %d\n" i x
+    ) base_list
 
 end
