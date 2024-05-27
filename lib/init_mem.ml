@@ -159,4 +159,39 @@ module InitMem = struct
         PP.print_lvl (lvl + 1) "<Addr Range %d> %d\n" i x
     ) base_list
 
+  let get_addr_base_range 
+      (ptr_list: SingleExp.SingleVarSet.t) 
+      (addr_list: (TypeFullExp.t * int) list) : 
+      (Isa.imm_var_id * SingleExp.t * SingleExp.t) list =
+    let base_list = get_base ptr_list addr_list in
+    let helper (base_id: Isa.imm_var_id) (mem_access: TypeFullExp.t * int) : Isa.imm_var_id * SingleExp.t * SingleExp.t =
+      let (addr, _), size = mem_access in
+      match addr with
+      | TypeSingle x -> (base_id, 
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id)),
+          SingleExp.eval (SingleExp.SingleBExp (
+            SingleExp.SingleAdd, 
+            SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id), 
+            SingleExp.SingleConst size)))
+      | TypeRange (l, _, r, _, _) -> (base_id,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, l, SingleExp.SingleVar base_id)),
+          SingleExp.eval (SingleExp.SingleBExp (
+            SingleExp.SingleAdd,
+            SingleExp.SingleBExp (SingleExp.SingleSub, r, SingleExp.SingleVar base_id),
+            SingleExp.SingleConst size)))
+      | _ -> init_mem_error "get_addr_base_range cannot handle this case"
+    in
+    List.map2 helper base_list addr_list
+
+  let pp_base_range (lvl: int) (base_range_list: (Isa.imm_var_id * SingleExp.t * SingleExp.t) list) =
+    PP.print_lvl lvl "Base range list:\n";
+    List.iteri (
+      fun i x ->
+        let base_id, left, right = x in
+        PP.print_lvl (lvl + 1) "<Addr Range %d> %d" i base_id;
+        SingleExp.pp_single_exp (lvl + 2) left;
+        SingleExp.pp_single_exp (lvl + 2) right;
+        Printf.printf "\n"
+    ) base_range_list
+
 end
