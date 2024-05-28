@@ -21,14 +21,14 @@ module SingleExp = struct
     | SingleNot
 
   type t =
-    | SingleConst of int
+    | SingleConst of int64
     | SingleVar of Isa.imm_var_id
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
 
   let rec string_of_single_exp (se: t) =
     match se with
-    | SingleConst v -> "Const " ^ (string_of_int v)
+    | SingleConst v -> "Const " ^ (Int64.to_string v)
     | SingleVar v -> "SymImm " ^ (string_of_int v)
     | SingleBExp (op, l, r) -> 
       let op_str = match op with
@@ -140,34 +140,34 @@ module SingleExp = struct
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =
       match x with
-      | [] -> SingleConst 0
+      | [] -> SingleConst 0L
       | hd :: [] -> hd
       | hd :: tl -> SingleBExp (SingleMul, helper_mul tl, hd)
     in
     let rec helper_add (x: t list) =
       match x with
-      | [] -> SingleConst 0
+      | [] -> SingleConst 0L
       | hd :: [] -> hd
       | hd :: tl -> SingleBExp (SingleAdd, helper_add tl, hd)
     in
     helper_add (List.map helper_mul e)
 
-  let mul_const (coeff: int) (e: t list) : t list =
+  let mul_const (coeff: int64) (e: t list) : t list =
     match e with
     | [] -> []
-    | (SingleConst c) :: tl -> (SingleConst (coeff * c)) :: tl
+    | (SingleConst c) :: tl -> (SingleConst (Int64.mul coeff c)) :: tl
     | tl -> SingleConst coeff :: tl
 
   let mul_t (e1: t list) (e2: t list) : t list =
     let x = List.sort cmp (e1 @ e2) in
     match x with
     | SingleConst c1 :: SingleConst c2 :: tl ->
-      let c12 = c1 * c2 in
-      if c12 = 0 then []
-      else if c12 = 1 then tl
+      let c12 = Int64.mul c1 c2 in
+      if c12 = 0L then []
+      else if c12 = 1L then tl
       else SingleConst c12 :: tl
     | SingleConst c :: _ ->
-      if c = 0 then [] else x
+      if c = 0L then [] else x
     | _ -> x
 
   let add_t (e1: t list) (e2: t list) : (t list, bool) Either.t =
@@ -178,12 +178,12 @@ module SingleExp = struct
     match e1, e2 with
     | [], [] -> Either.left []
     | [], hd :: tl | hd :: tl, [] -> Either.left (hd :: tl)
-    | [SingleConst 0], e | e, [SingleConst 0] -> Either.left e
+    | [SingleConst 0L], e | e, [SingleConst 0L] -> Either.left e
     | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
       let cmp_tl = cmp_list_helper tl1 tl2 in
       if cmp_tl = 0 then 
-        let c12 = c1 + c2 in
-        if c12 = 0 then Either.left []
+        let c12 = Int64.add c1 c2 in
+        if c12 = 0L then Either.left []
         else Either.left (SingleConst c12 :: tl1)
       else if cmp_tl = 1 then Either.right true
       else Either.right false
@@ -193,9 +193,9 @@ module SingleExp = struct
     | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
       let cmp_tl = cmp_list_helper tl1 tl2 in
       if cmp_tl = 0 then 
-        let c1 = c + 1 in
-        if c1 = 0 then Either.left []
-        else Either.left (SingleConst (c + 1) :: tl1)
+        let c1 = Int64.add c 1L in
+        if c1 = 0L then Either.left []
+        else Either.left (SingleConst (Int64.add c 1L) :: tl1)
       else if cmp_tl = 1 then Either.right true
       else Either.right false
       (* if List.equal equal tl1 tl2 
@@ -203,7 +203,7 @@ module SingleExp = struct
       else None *)
     | _, _ ->
       let cmp_tl = cmp_list_helper e1 e2 in
-      if cmp_tl = 0 then Either.left (SingleConst 2 :: e1)
+      if cmp_tl = 0 then Either.left (SingleConst 2L :: e1)
       else if cmp_tl = 1 then Either.right true
       else Either.right false
     (* | hd1 :: tl1, hd2 :: tl2 ->
@@ -248,7 +248,7 @@ module SingleExp = struct
     | SingleBExp (SingleSub, l, r) ->
       let ul = eval_t l in
       let ur = eval_t r in
-      let neg_ur = List.map (mul_const (-1)) ur in
+      let neg_ur = List.map (mul_const (-1L)) ur in
       add_t_list ul neg_ur
     | SingleBExp (SingleMul, l, r) ->
       let ul = eval_t l in
@@ -264,7 +264,7 @@ module SingleExp = struct
       let ul = eval_t l in
       let ur = eval_t r in
       begin match convert_t ur with
-      | SingleConst c -> List.map (mul_const (Int.shift_left 1 c)) ul
+      | SingleConst c -> List.map (mul_const (Int64.shift_left 1L (Int64.to_int c))) ul
       | merged_r -> [ [SingleBExp (SingleSal, convert_t ul, merged_r)] ]
       end
     | SingleBExp (bop, l, r) ->
@@ -274,14 +274,14 @@ module SingleExp = struct
       | SingleConst v1, SingleConst v2 ->
         let x = 
           begin match bop with
-          | SingleAdd -> SingleConst (v1 + v2)
-          | SingleSub -> SingleConst (v1 - v2)
-          | SingleMul -> SingleConst (v1 * v2) (* These three cases are not needed here *)
-          | SingleSal -> SingleConst (Int.shift_left v1 v2)
-          | SingleSar -> SingleConst (Int.shift_right v1 v2)
-          | SingleXor -> SingleConst (Int.logxor v1 v2)
-          | SingleAnd -> SingleConst (Int.logand v1 v2)
-          | SingleOr -> SingleConst (Int.logor v1 v2)
+          | SingleAdd -> SingleConst (Int64.add v1 v2)
+          | SingleSub -> SingleConst (Int64.sub v1 v2)
+          | SingleMul -> SingleConst (Int64.mul v1 v2) (* These three cases are not needed here *)
+          | SingleSal -> SingleConst (Int64.shift_left v1 (Int64.to_int v2))
+          | SingleSar -> SingleConst (Int64.shift_right v1 (Int64.to_int v2))
+          | SingleXor -> SingleConst (Int64.logxor v1 v2)
+          | SingleAnd -> SingleConst (Int64.logand v1 v2)
+          | SingleOr -> SingleConst (Int64.logor v1 v2)
           end
         in [ [x] ]
       | _ -> [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]

@@ -46,36 +46,43 @@ module Isa = struct
 
   let total_reg_num : int = 16
 
-  let get_reg_size (r: register) : int =
+  let get_reg_size (r: register) : int64 =
     match r with
-    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15  -> 8
-    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4
-    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2
-    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1
+    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15  -> 8L
+    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4L
+    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
+    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
 
   type immediate =
-    | ImmNum of int
+    | ImmNum of int64
     | ImmLabel of imm_var_id
+    | ImmBExp of immediate * immediate
+
+  let rec string_of_immediate (i: immediate) : string =
+    match i with
+    | ImmNum x -> Int64.to_string x
+    | ImmLabel x -> "var " ^ (string_of_int x)
+    | ImmBExp (i1, i2) -> "(" ^ (string_of_immediate i1) ^ ") + (" ^ (string_of_immediate i2) ^ ")"
 
   type scale = Scale1 | Scale2 | Scale4 | Scale8
 
-  let scale_val (s: scale) : int =
+  let scale_val (s: scale) : int64 =
     match s with
-    | Scale1 -> 1
-    | Scale2 -> 2
-    | Scale4 -> 4
-    | Scale8 -> 8
+    | Scale1 -> 1L
+    | Scale2 -> 2L
+    | Scale4 -> 4L
+    | Scale8 -> 8L
 
   type operand =
     | ImmOp of immediate
     | RegOp of register
     | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
-    | LdOp of immediate option * register option * register option * scale option * int
-    | StOp of immediate option * register option * register option * scale option * int
+    | LdOp of immediate option * register option * register option * scale option * int64
+    | StOp of immediate option * register option * register option * scale option * int64
     | LabelOp of label
 
-  let get_reg_op_size (op_list: operand list) : int option =
-    let helper (acc: int option) (op: operand) : int option =
+  let get_reg_op_size (op_list: operand list) : int64 option =
+    let helper (acc: int64 option) (op: operand) : int64 option =
       match op, acc with
       | RegOp _, Some size -> Some size (* Note: this result should not be used when operand size does not match!!! *)
         (* if get_reg_size r = size then acc else isa_error "reg size does not match" *)
@@ -113,7 +120,7 @@ module Isa = struct
   type basic_block = {
     label: label;
     func: label;
-    rsp_offset: int;
+    rsp_offset: int64;
     insts: instruction list;
   }
 

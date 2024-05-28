@@ -194,8 +194,8 @@ module SubType = struct
     in
     List.find_map helper fe_list
 
-  let find_loop_bound (fe_list: TypeFullExp.t list) (idx: TypeExp.type_var_id) : (TypeFullExp.t * int * bool) option =
-    let helper (fe: TypeFullExp.t) : (TypeFullExp.t * int * bool) option =
+  let find_loop_bound (fe_list: TypeFullExp.t list) (idx: TypeExp.type_var_id) : (TypeFullExp.t * int64 * bool) option =
+    let helper (fe: TypeFullExp.t) : (TypeFullExp.t * int64 * bool) option =
       let e, _ = fe in
       match e with
       | TypeBExp (bop, TypeVar v, TypeSingle s)
@@ -203,9 +203,9 @@ module SubType = struct
         if v = idx && bop = TypeAdd then
           match s with
           | SingleConst c ->
-            if c = 0 then sub_type_error ("find_loop_bound: step should be non-zero")
-            else if c > 0 then Some (fe, c, true)
-            else Some (fe, -c, false)
+            if c = 0L then sub_type_error ("find_loop_bound: step should be non-zero")
+            else if c > 0L then Some (fe, c, true)
+            else Some (fe, Int64.neg c, false)
           | _ -> None (* TODO!!! *)
         else None
       | _ -> None
@@ -218,7 +218,7 @@ module SubType = struct
       (* (tv_idx: TypeExp.type_var_id) *)
       (bound_exp: TypeExp.t)
       (* (super_type_list: (TypeFullExp.CondVarSet.t * TypeExp.type_var_id) list) *)
-      (base: SingleExp.t) (step: int) (inc: bool) : TypeFullExp.type_sol =
+      (base: SingleExp.t) (step: int64) (inc: bool) : TypeFullExp.type_sol =
     let helper (acc: TypeFullExp.type_sol) (cond_idx: int) : TypeFullExp.type_sol = (* (SingleExp.t * bool) option = *)
       match acc with
       | SolSimple _ | SolCond _ -> acc
@@ -264,7 +264,7 @@ module SubType = struct
       (cond_set: TypeFullExp.CondVarSet.t) 
       (* (tv_idx: TypeExp.type_var_id) *)
       (* (bound: TypeExp.t) *)
-      (base: SingleExp.t) (step: int) (inc: bool)
+      (base: SingleExp.t) (step: int64) (inc: bool)
       (tv_rel_list: t) : TypeFullExp.type_sol =
     let helper (acc: TypeFullExp.type_sol) (cond_idx: int) : TypeFullExp.type_sol =
       match acc with
@@ -299,9 +299,9 @@ module SubType = struct
                 begin match v_base_option with
                 | None -> SolNone
                 | Some v_base -> 
-                  let original_step = if inc then step else -step in
+                  let original_step = if inc then step else Int64.neg step in
                   (* TODO: Check whether c divides original_step or not *)
-                  SolSimple (TypeExp.eval (TypeBExp (TypeAdd, TypeBExp (TypeMul, TypeBExp (TypeSub, TypeVar v, TypeSingle v_base), TypeSingle (SingleConst (original_step / c))), TypeSingle base)))
+                  SolSimple (TypeExp.eval (TypeBExp (TypeAdd, TypeBExp (TypeMul, TypeBExp (TypeSub, TypeVar v, TypeSingle v_base), TypeSingle (SingleConst (Int64.div original_step c))), TypeSingle base)))
                 end
               else SolNone
             | _ -> SolNone

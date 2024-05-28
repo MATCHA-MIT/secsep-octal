@@ -14,7 +14,7 @@ module CodeType = struct
 
   type reg_type = TypeFullExp.t list
 
-  type mem_type = (int * TypeFullExp.t) list
+  type mem_type = (int64 * TypeFullExp.t) list
 
   type state_type = {
     reg_type: reg_type;
@@ -22,10 +22,14 @@ module CodeType = struct
     cond_type: (TypeFullExp.t * TypeFullExp.t)  (* Cmp and test and etc. will set this; Cond branch will use this *)
   }
 
-  let get_imm_type (i: Isa.immediate) : TypeFullExp.t =
+  let rec get_imm_single_exp (i: Isa.immediate) : SingleExp.t =
     match i with
-    | ImmNum v -> (TypeSingle (SingleConst v), TypeFullExp.CondVarSet.empty)
-    | ImmLabel v -> (TypeSingle (SingleVar v), TypeFullExp.CondVarSet.empty)
+    | ImmNum v -> SingleConst v
+    | ImmLabel v -> SingleVar v
+    | ImmBExp (i1, i2) -> SingleBExp (SingleAdd, get_imm_single_exp i1, get_imm_single_exp i2)
+
+  let get_imm_type (i: Isa.immediate) : TypeFullExp.t =
+    (TypeSingle (get_imm_single_exp i), TypeFullExp.CondVarSet.empty)
 
   let get_reg_type (curr_state: state_type) (r: Isa.register) : TypeFullExp.t =
     let reg_type_list = curr_state.reg_type in
@@ -43,19 +47,19 @@ module CodeType = struct
       (index: Isa.register option) (scale: Isa.scale option) : TypeFullExp.t =
     let disp_type, _ = match disp with
     | Some d -> get_imm_type d
-    | None -> get_imm_type (ImmNum 0)
+    | None -> get_imm_type (ImmNum 0L)
     in
     let base_type, base_cond = match base with
     | Some b -> get_reg_type curr_state b
-    | None -> get_imm_type (ImmNum 0)
+    | None -> get_imm_type (ImmNum 0L)
     in
     let index_type, index_cond = match index with
     | Some i -> get_reg_type curr_state i
-    | None -> get_imm_type (ImmNum 0)
+    | None -> get_imm_type (ImmNum 0L)
     in
     let scale_val = match scale with
     | Some s -> Isa.scale_val s
-    | None -> 1
+    | None -> 1L
     in
     let new_type = TypeExp.eval (
       TypeBExp (TypeAdd,
@@ -66,23 +70,23 @@ module CodeType = struct
     let new_cond = TypeFullExp.CondVarSet.union base_cond index_cond in
     (new_type, new_cond)
 
-  let get_mem_idx (addr_type: TypeExp.t) : int option =
+  let get_mem_idx (addr_type: TypeExp.t) : int64 option =
     match addr_type with
     | TypeSingle s -> 
       begin match s with
-      | SingleVar v -> if v = stack_base_id then Some 0 else None
+      | SingleVar v -> if v = stack_base_id then Some 0L else None
       | SingleBExp (op, v1, v2) -> 
         begin match op, v1, v2 with
         | SingleAdd, SingleVar v, SingleConst c
         | SingleAdd, SingleConst c, SingleVar v -> if v = stack_base_id then Some c else None
-        | SingleSub, SingleVar v, SingleConst c -> if v = stack_base_id then Some (-c) else None (* NOTE: this maybe not needed*)
+        | SingleSub, SingleVar v, SingleConst c -> if v = stack_base_id then Some (Int64.neg c) else None (* NOTE: this maybe not needed*)
         | _ -> None
         end
       | _ -> None
       end
     | _ -> None
 
-  let get_mem_idx_type (curr_state: state_type) (offset: int) : TypeFullExp.t =
+  let get_mem_idx_type (curr_state: state_type) (offset: int64) : TypeFullExp.t =
     let mem_type = curr_state.mem_type in
     let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
     match idx_find with
@@ -91,7 +95,7 @@ module CodeType = struct
       (* TODO: Add this assert back later!!! *)
       (* code_type_error ("get_mem_idx_type: stack offset " ^ (string_of_int offset) ^ " not in record") *)
 
-  let set_mem_idx_type (curr_state: state_type) (offset: int) (new_type: TypeFullExp.t) : state_type =
+  let set_mem_idx_type (curr_state: state_type) (offset: int64) (new_type: TypeFullExp.t) : state_type =
     let mem_type = curr_state.mem_type in
     let idx_find = List.find_opt (fun (off, _) -> off = offset) mem_type in
     match idx_find with
@@ -190,7 +194,7 @@ module CodeType = struct
       (* TODO: Add special case for xor %rax %rax *)
       begin match src1, src2 with
       | RegOp r1, RegOp r2 ->
-        if r1 = r2 then (set_dest_op_type curr_state dest (TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty), cond_list)
+        if r1 = r2 then (set_dest_op_type curr_state dest (TypeSingle (SingleConst 0L), TypeFullExp.CondVarSet.empty), cond_list)
         else begin
           let src1_type, src1_cond = get_src_op_type curr_state src1 in
           let src2_type, src2_cond = get_src_op_type curr_state src2 in
@@ -238,13 +242,13 @@ module CodeType = struct
     | Jmp _ -> (curr_state, cond_list)
     | Push _ ->
       let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
-      let src2_type = TypeExp.TypeSingle (SingleConst (-8)) in
+      let src2_type = TypeExp.TypeSingle (SingleConst (-8L)) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
       let dest_type = (TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
       (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
     | Pop _ ->
       let src1_type, src1_cond = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
-      let src2_type = TypeExp.TypeSingle (SingleConst 8) in
+      let src2_type = TypeExp.TypeSingle (SingleConst 8L) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
       let dest_type = (TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)), src1_cond) in
       (set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type, cond_list)
@@ -260,7 +264,7 @@ module CodeType = struct
 
   type t = block_type list
 
-  let init_reg_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (rsp_offset: int) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * reg_type = 
+  let init_reg_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (rsp_offset: int64) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * reg_type = 
     let rec helper (var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (r_type: reg_type) (idx: int) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * reg_type =
       if idx = Isa.total_reg_num
       then (var_idx, r_type)
@@ -279,7 +283,7 @@ module CodeType = struct
     let var_idx, reg_type = helper start_var_idx [] 0 in
     (var_idx, List.rev reg_type)
 
-  let init_mem_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (mem_off_list: int list) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * mem_type =
+  let init_mem_type (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (mem_off_list: int64 list) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * mem_type =
     match start_var_idx with
     | Left start_type_var_idx -> 
       let end_id, end_type = List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeExp.TypeVar acc, TypeFullExp.CondVarSet.empty)))) start_type_var_idx mem_off_list in
@@ -289,7 +293,7 @@ module CodeType = struct
       (Right end_id, end_type)
     (* List.fold_left_map (fun acc a -> (acc + 1, (a, (TypeVar acc, TypeFullExp.CondVarSet.empty)))) start_type_var_idx mem_off_list *)
 
-  let init_code_type_var (start_type_var_idx: TypeExp.type_var_id) (prog: Isa.program) (mem_off_list: int list) : (TypeExp.type_var_id * Isa.imm_var_id) * t =
+  let init_code_type_var (start_type_var_idx: TypeExp.type_var_id) (prog: Isa.program) (mem_off_list: int64 list) : (TypeExp.type_var_id * Isa.imm_var_id) * t =
     let start_imm_var = stack_base_id + Isa.StrM.cardinal prog.imm_var_map + 1 in
     let helper_0 (acc: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) (block: Isa.basic_block) : ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * block_type =
       let acc1, reg_t = init_reg_type acc block.rsp_offset in
@@ -299,7 +303,7 @@ module CodeType = struct
         block_code_type = {
           reg_type = reg_t;
           mem_type = mem_t;
-          cond_type = ((TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty), (TypeSingle (SingleConst 0), TypeFullExp.CondVarSet.empty));
+          cond_type = ((TypeSingle (SingleConst 0L), TypeFullExp.CondVarSet.empty), (TypeSingle (SingleConst 0L), TypeFullExp.CondVarSet.empty));
         }
       }) in
     let helper (acc: TypeExp.type_var_id * Isa.imm_var_id) (block: Isa.basic_block) : (TypeExp.type_var_id * Isa.imm_var_id) * block_type = begin
@@ -340,7 +344,7 @@ module CodeType = struct
     ) s.reg_type;
     PP.print_lvl lvl "Mem:\n";
     List.iter (fun (off, x) ->
-      PP.print_lvl (lvl + 1) "<offset %d> " off;
+      PP.print_lvl (lvl + 1) "<offset %Ld> " off;
       TypeFullExp.pp_type_full_exp (lvl + 2) x;
       Printf.printf "\n"
     ) s.mem_type;

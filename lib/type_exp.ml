@@ -27,7 +27,7 @@ module TypeExp = struct
 
   type t =
     | TypeSingle of SingleExp.t
-    | TypeRange of SingleExp.t * bool * SingleExp.t * bool * int (* begin, inc, end, inc, step *)
+    | TypeRange of SingleExp.t * bool * SingleExp.t * bool * int64 (* begin, inc, end, inc, step *)
     | TypeVar of type_var_id
     | TypeTop
     | TypeBot
@@ -88,13 +88,13 @@ module TypeExp = struct
         | TypeMul -> 
           begin match s0 with
           | SingleConst i0 -> 
-            if i0 = 0 then TypeSingle (SingleConst 0)
-            else if i0 > 0 then
+            if i0 = 0L then TypeSingle (SingleConst 0L)
+            else if i0 > 0L then
               TypeRange ((SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1,
-                        (SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
+                        (SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, Int64.mul step i0)
             else
               TypeRange ((SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, 
-                        (SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
+                        (SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1, Int64.neg (Int64.mul step i0))
           | _ -> default_type
             (* TypeRange ((eval (SingleBExp (SingleMul, s1, s0))), b1,
                             (eval (SingleBExp (SingleMul, s2, s0))), b2, step) *)
@@ -111,13 +111,13 @@ module TypeExp = struct
         | TypeMul -> 
           begin match s0 with
           | SingleConst i0 -> 
-            if i0 = 0 then TypeSingle (SingleConst 0)
-            else if i0 > 0 then
+            if i0 = 0L then TypeSingle (SingleConst 0L)
+            else if i0 > 0L then
               TypeRange ((SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1,
-                        (SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, step * i0)
+                        (SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, Int64.mul step i0)
             else
               TypeRange ((SingleExp.eval (SingleBExp (SingleMul, s0, s2))), b2, 
-                        (SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1, - step * i0)
+                        (SingleExp.eval (SingleBExp (SingleMul, s0, s1))), b1, Int64.neg (Int64.mul step i0))
           | _ -> default_type
             (* TypeRange ((eval (SingleBExp (SingleMul, s1, s0))), b1,
                             (eval (SingleBExp (SingleMul, s2, s0))), b2, step) *)
@@ -125,13 +125,13 @@ module TypeExp = struct
         | TypeSal ->
           begin match s0 with
           | SingleConst i0 -> TypeRange ((SingleExp.eval (SingleBExp (SingleSal, s1, s0))), b1,
-                                         (SingleExp.eval (SingleBExp (SingleSal, s2, s0))), b2, Int.shift_left step i0)
+                                         (SingleExp.eval (SingleBExp (SingleSal, s2, s0))), b2, Int64.shift_left step (Int64.to_int i0))
           | _ -> default_type
           end
         | TypeSar ->
           begin match s0 with
           | SingleConst i0 -> TypeRange ((SingleExp.eval (SingleBExp (SingleSar, s1, s0))), b1,
-                                          (SingleExp.eval (SingleBExp (SingleSar, s2, s0))), b2, Int.shift_right step i0)
+                                          (SingleExp.eval (SingleBExp (SingleSar, s2, s0))), b2, Int64.shift_right step (Int64.to_int i0))
           | _ -> default_type
           end
         (* TODO: TypeXor TypeAnd TypeOr *)
@@ -143,9 +143,9 @@ module TypeExp = struct
           TypeRange (
             SingleExp.eval (SingleBExp (SingleAdd, s1, s1')), true,
             SingleExp.eval (SingleBExp (SingleAdd, s2, s2')), true,
-            if step mod step' = 0 then step' 
-            else if step' mod step = 0 then step 
-            else type_exp_error ("steps not divide by each other " ^ (string_of_int step) ^ " " ^ (string_of_int step))
+            if Int64.rem step step' = 0L then step' 
+            else if Int64.rem step' step = 0L then step 
+            else type_exp_error ("steps not divide by each other " ^ (Int64.to_string step) ^ " " ^ (Int64.to_string step'))
           )
         | _ -> default_type
         end
@@ -218,7 +218,7 @@ module TypeExp = struct
     | TypeRange (bg, bgi, ed, edi, step) -> 
       let bg_str = if bgi then "[" else "(" in
       let ed_str = if edi then "]" else ")" in
-      bg_str ^ (SingleExp.string_of_single_exp bg) ^ ", " ^ (SingleExp.string_of_single_exp ed) ^ ed_str ^ " step = " ^ (string_of_int step)
+      bg_str ^ (SingleExp.string_of_single_exp bg) ^ ", " ^ (SingleExp.string_of_single_exp ed) ^ ed_str ^ " step = " ^ (Int64.to_string step)
     | TypeVar v -> "TypeVar " ^ (string_of_int v)
     | TypeTop -> "Top"
     | TypeBot -> "Bottom"
