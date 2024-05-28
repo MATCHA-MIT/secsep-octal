@@ -34,7 +34,87 @@ module TypeExp = struct
     | TypeBExp of type_bop * t * t
     | TypeUExp of type_uop * t
 
-  let rec cmp (e1: t) (e2: t) : bool =
+  let cmp_type_bop (op1: type_bop) (op2: type_bop) : int =
+    match op1, op2 with
+    | TypeAdd, TypeAdd -> 0
+    | TypeAdd, _ -> -1
+    | TypeSub, TypeAdd -> 1
+    | TypeSub, TypeSub -> 0
+    | TypeSub, _ -> -1
+    | TypeMul, TypeAdd | TypeMul, TypeSub -> 1
+    | TypeMul, TypeMul -> 0
+    | TypeMul, _ -> -1
+    | TypeSal, TypeAdd | TypeSal, TypeSub | TypeSal, TypeMul -> 1
+    | TypeSal, TypeSal -> 0
+    | TypeSal, _ -> -1
+    | TypeShr, TypeAdd | TypeShr, TypeSub | TypeShr, TypeMul | TypeShr, TypeSal -> 1
+    | TypeShr, TypeShr -> 0
+    | TypeShr, _ -> -1
+    | TypeSar, TypeAdd | TypeSar, TypeSub | TypeSar, TypeMul | TypeSar, TypeSal | TypeSar, TypeShr -> 1
+    | TypeSar, TypeSar -> 0
+    | TypeSar, _ -> -1
+    | TypeXor, TypeDiff | TypeXor, TypeUnion | TypeXor, TypeInter | TypeXor, TypeOr | TypeXor, TypeAnd -> -1
+    | TypeXor, TypeXor -> 0
+    | TypeXor, _ -> 1
+    | TypeAnd, TypeDiff | TypeAnd, TypeUnion | TypeAnd, TypeInter | TypeAnd, TypeOr -> -1
+    | TypeAnd, TypeAnd -> 0
+    | TypeAnd, _ -> 1
+    | TypeOr, TypeDiff | TypeOr, TypeUnion | TypeOr, TypeInter -> -1
+    | TypeOr, TypeOr -> 0
+    | TypeOr, _ -> 1
+    | TypeInter, TypeDiff | TypeInter, TypeUnion -> -1
+    | TypeInter, TypeInter -> 0
+    | TypeInter, _ -> 1
+    | TypeUnion, TypeDiff -> -1
+    | TypeUnion, TypeUnion -> 0
+    | TypeUnion, _ -> 1
+    | TypeDiff, TypeDiff -> 0
+    | TypeDiff, _ -> 1
+
+  let cmp_type_uop (op1: type_uop) (op2: type_uop) : int =
+    if op1 = op2 then 0
+    else if op1 = TypeNot then -1
+    else 1
+
+  let rec cmp (e1: t) (e2: t) : int =
+    match e1, e2 with
+    | TypeBot, TypeBot -> 0
+    | TypeBot, _ -> -1
+    | TypeTop, TypeBot -> 1
+    | TypeTop, TypeTop -> 0
+    | TypeTop, _ -> -1
+    | TypeSingle _, TypeBot | TypeSingle _, TypeTop -> 1
+    | TypeSingle s1, TypeSingle s2 -> SingleExp.cmp s1 s2
+    | TypeSingle _, _ -> -1
+    | TypeRange _, TypeBot | TypeRange _, TypeTop | TypeRange _, TypeSingle _ -> 1
+    | TypeRange (a1, _, b1, _, s1), TypeRange (a2, _, b2, _, s2) ->
+      let cmp_a = SingleExp.cmp a1 a2 in
+      if cmp_a = 0 then
+        let cmp_b = SingleExp.cmp b1 b2 in
+        if cmp_b = 0 then if s1 < s2 then -1 else if s1 = s2 then 0 else 1
+        else cmp_b
+      else cmp_a
+    | TypeRange _, _ -> -1
+    | TypeVar _, TypeBExp _ | TypeVar _, TypeUExp _ -> -1
+    | TypeVar v1, TypeVar v2 ->
+      if v1 < v2 then -1 else if v1 = v2 then 0 else 1
+    | TypeVar _, _ -> 1
+    | TypeBExp (bop1, l1, r1), TypeBExp (bop2, l2, r2) ->
+      let c_bop = cmp_type_bop bop1 bop2 in
+      let c_l = cmp l1 l2 in
+      let c_r = cmp r1 r2 in
+      if c_bop = 0 then
+        if c_l = 0 then c_r else c_l
+      else c_bop
+    | TypeBExp _, _ -> 1
+    | TypeUExp (uop1, l1), TypeUExp (uop2, l2) ->
+      let c_uop = cmp_type_uop uop1 uop2 in
+      let c_l = cmp l1 l2 in
+      if c_uop = 0 then c_l else c_uop
+    | TypeUExp _, TypeBExp _ -> -1
+    | TypeUExp _, _ -> 1
+
+  (* let rec cmp (e1: t) (e2: t) : bool =
     match e1, e2 with
     | TypeSingle s1, TypeSingle s2 -> SingleExp.cmp s1 s2 = 0
     | TypeRange (l1, bl1, r1, br1, s1), TypeRange (l2, bl2, r2, br2, s2) ->
@@ -46,7 +126,67 @@ module TypeExp = struct
       (bop1 = bop2) && (cmp l1 l2) && (cmp r1 r2)
     | TypeUExp (uop1, l1), TypeUExp (uop2, l2) ->
       (uop1 = uop2) && (cmp l1 l2)
-    | _ -> false
+    | _ -> false *)
+
+  (* let rec strip_type_exp (e: t list) : t list =
+    match e with
+    | [] -> e
+    | TypeBot :: tl | TypeTop :: tl | TypeSingle _ :: tl | TypeRange _ :: tl -> strip_type_exp tl
+    | _ -> e
+
+  let rec cmp_list_helper (e1: t list) (e2: t list) : int =
+    match e1, e2 with
+    | [], [] -> 0
+    | [], _ :: _ -> -1
+    | _ :: _, [] -> 1
+    | hd1 :: tl1, hd2 :: tl2 ->
+      let cmp_hd = cmp hd1 hd2 in
+      if cmp_hd = 0 then cmp_list_helper tl1 tl2 else cmp_hd
+    
+  let cmp_list (e1: t list) (e2: t list) : int =
+    cmp_list_helper (strip_type_exp e1) (strip_type_exp e2)
+
+  let convert_t (e: t list list) : t =
+    let rec helper_mul (x: t list) =
+      match x with
+      | [] -> TypeBot
+      | hd :: [] -> hd
+      | hd :: tl -> TypeBExp (TypeMul, helper_mul tl, hd)
+    in
+    let rec helper_add (x: t list) =
+      match x with
+      | [] -> TypeBot
+      | hd :: [] -> hd
+      | hd :: tl -> TypeBExp (TypeAdd, helper_add tl, hd)
+    in
+    helper_add (List.map helper_mul e)
+
+  let mul_const (coeff: int64) (e: t list) : t list =
+    match e with
+    | [] -> []
+    | TypeBot :: _ -> [ TypeBot ]
+    | TypeTop :: _ -> [ TypeTop ]
+    | (TypeSingle c) :: tl -> (TypeSingle (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, SingleConst coeff, c)))) :: tl
+    | tl -> TypeSingle (SingleConst coeff) :: tl
+
+  let mul_t (e1: t list) (e2: t list) : t list =
+    let x = List.sort cmp (e1 @ e2) in
+    match x with
+    | TypeBot :: _ -> [ TypeBot ]
+    | TypeTop :: _ -> [ TypeTop ]
+    | TypeSingle c1 :: TypeSingle c2 :: tl ->
+      let c12 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, c1, c2)) in
+      begin match c12 with
+      | SingleConst c -> 
+        if c = 0L then [ TypeSingle (SingleConst 0L) ]
+        else if c = 1L then tl
+        else (TypeSingle c12) :: tl
+      | _ -> (TypeSingle c12) :: tl
+      end
+    | TypeSingle (SingleConst 0L) :: _ -> [ TypeSingle (SingleConst 0L) ]
+    (* | SingleConst c :: _ ->
+      if c = 0L then [] else x *)
+    | _ -> x *)
 
   let rec eval (e: t) : t =
     match e with
@@ -160,6 +300,11 @@ module TypeExp = struct
         | TypeInter -> ee1
         | TypeDiff -> TypeBot
         | _ -> TypeTop
+        end
+      | _, TypeSingle s ->
+        begin match tbop with
+        | TypeSub -> TypeBExp (TypeAdd, ee1, TypeSingle (SingleExp.eval (SingleBExp (SingleExp.SingleMul, SingleConst (-1L), s))))
+        | _ -> default_type
         end
       | _ -> default_type
       end

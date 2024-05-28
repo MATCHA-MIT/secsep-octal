@@ -32,6 +32,13 @@ module CondType = struct
     (cond::cond_list, ((List.length cond_list) + 1) * 2 + cond_suffix) *)
     (cond::cond_list, TypeFullExp.get_cond_idx ((List.length cond_list) + 1) taken)
 
+  let repl_type_sol (e: t) (sol: TypeExp.type_var_id * TypeFullExp.type_sol) : t =
+    match e with
+    | CondNe (e1, e2) -> CondNe (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
+    | CondEq (e1, e2) -> CondEq (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
+    | CondLq (e1, e2) -> CondLq (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
+    | CondLe (e1, e2) -> CondLe (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
+
   let pp_cond (lvl: int) (cond: t) =
     let op, str1, str2 = match cond with
     | CondNe (l, r) -> ("Ne", TypeExp.string_of_type_exp (fst l), TypeExp.string_of_type_exp (fst r))

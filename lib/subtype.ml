@@ -33,7 +33,7 @@ module SubType = struct
     let t_exp, t_cond = ty in
     let helper (x: TypeFullExp.t) : (TypeFullExp.t, TypeFullExp.t) Either.t =
       let x_exp, x_cond = x in
-      if (TypeExp.cmp x_exp t_exp) then Right (x_exp, TypeFullExp.CondVarSet.inter x_cond t_cond)
+      if (TypeExp.cmp x_exp t_exp = 0) then Right (x_exp, TypeFullExp.CondVarSet.inter x_cond t_cond)
         (* Here we are being conservative on calculating OR of two conds with Ints.Inter *)
       else Left x
     in
@@ -118,7 +118,7 @@ module SubType = struct
     | _ -> 
       let a_exp, _ = a in
       let b_exp, _ = b in
-      if TypeExp.cmp a_exp b_exp then tv_rel (* Handle the special case for rsp *)
+      if TypeExp.cmp a_exp b_exp = 0 then tv_rel (* Handle the special case for rsp *)
       else sub_type_error ("add_sub_type_full_exp: incorrect sub/super types " ^ 
         (TypeExp.string_of_type_exp a_exp) ^ " " ^ (TypeExp.string_of_type_exp b_exp))
 
@@ -230,7 +230,7 @@ module SubType = struct
         | CondNe ((TypeSingle bound, _), fe) ->
           (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
           let new_e, _ = fe in
-          if TypeExp.cmp bound_exp new_e then 
+          if TypeExp.cmp bound_exp new_e = 0 then 
             if inc then
               let bound_1 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound, SingleExp.SingleConst step)) in
               let bound_2 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound_1, SingleExp.SingleConst step)) in
@@ -281,7 +281,7 @@ module SubType = struct
             let v_cond_set_option = List.find_map 
               (fun (fx: TypeFullExp.t) ->
                 let x, cond = fx in
-                if TypeExp.cmp x e then Some cond else None)
+                if TypeExp.cmp x e = 0 then Some cond else None)
               v_tv_rel.subtype_list
             in
             begin match v_cond_set_option with
@@ -417,8 +417,9 @@ module SubType = struct
       | [] -> new_tv_rel_list
       | _ ->
         let update_tv_rel_list = List.map (fun (tv: type_var_rel) -> List.fold_left update_type_var_rel tv new_sol_list) new_tv_rel_list in
+        let update_cond_list = List.map (fun (cond: CondType.t) -> List.fold_left CondType.repl_type_sol cond new_sol_list) cond_list in
         let merged_tv_rel_list = List.map simplify_tv_rel_sub update_tv_rel_list in
-        solve_vars merged_tv_rel_list cond_list (num_iter - 1)
+        solve_vars merged_tv_rel_list update_cond_list (num_iter - 1)
     end
 
   let string_of_sol (sol: TypeExp.t option) =
