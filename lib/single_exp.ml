@@ -300,4 +300,22 @@ module SingleExp = struct
     Printf.printf "\n====================\n"; *)
     convert_t (eval_t e)
 
+  let must_ge (e1: t) (e2: t) : bool =
+    match eval (SingleBExp (SingleSub, e1, e2)) with
+    | SingleConst diff ->
+      if diff >= 0L then true else false
+    | _ -> false
+
+  let get_greater (e1: t) (e2: t) : t option =
+    match eval (SingleBExp (SingleSub, e1, e2)) with
+    | SingleConst diff ->
+      if diff >= 0L then Some e1 else Some e2
+    | _ -> None
+
+  let get_less (e1: t) (e2: t) : t option =
+    match eval (SingleBExp (SingleSub, e1, e2)) with
+    | SingleConst diff ->
+      if diff <= 0L then Some e1 else Some e2
+    | _ -> None
+
 end

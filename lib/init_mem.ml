@@ -194,4 +194,51 @@ module InitMem = struct
         Printf.printf "\n"
     ) base_range_list
 
+  let rec add_mem_key (mem_key_list: (SingleExp.t * SingleExp.t) list) (key: SingleExp.t * SingleExp.t) :
+        (SingleExp.t * SingleExp.t) list =
+    let left, right = key in
+    match mem_key_list with
+    | [] -> [ key ]
+    | (hd_left, hd_right) :: tl ->
+      if SingleExp.must_ge hd_left right then key :: (hd_left, hd_right) :: tl
+      else if SingleExp.must_ge left hd_right then (hd_left, hd_right) :: (add_mem_key tl key)
+      else
+        begin match SingleExp.get_less left hd_left, SingleExp.get_greater right hd_right with
+        | Some l, Some r -> add_mem_key tl (l, r)
+        | _ -> init_mem_error "add_mem_key cannot merge address range" 
+        end
+
+  let get_mem_key_list (mem_access_list: (Isa.imm_var_id * SingleExp.t * SingleExp.t) list) :
+        (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list =
+    let helper (acc: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list) (mem_access: Isa.imm_var_id * SingleExp.t * SingleExp.t)
+          : (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list =
+      let id, left, right = mem_access in
+      let helper0 (id_mem_key_list: Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) : 
+            (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list), Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) Either.t =
+        let curr_id, mem_key_list = id_mem_key_list in
+        if curr_id = id then Either.left (curr_id, add_mem_key mem_key_list (left, right))
+        else Either.right id_mem_key_list
+      in
+      let left_list, right_list = List.partition_map helper0 acc in
+      match left_list with
+      | [] -> (id, [ (left, right) ]) :: right_list
+      | hd :: [] -> hd :: right_list
+      | _ -> init_mem_error "get_mem_key_list merged with more than one key"
+    in
+    List.fold_left helper [] mem_access_list
+
+  let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list) =
+    PP.print_lvl lvl "Mem key list:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i (left, right) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            Printf.printf "\n"
+        ) key_list
+    ) mem_key_list
+    
 end
