@@ -1,7 +1,7 @@
 (* Type generation *)
 
 open Isa
-open Cond_type
+open Cond_type_old
 open Code_type
 open Subtype
 open Init_stack

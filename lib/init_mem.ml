@@ -2,7 +2,7 @@ open Isa
 open Single_exp
 open Type_exp
 open Type_full_exp
-open Cond_type
+open Cond_type_old
 open Code_type
 open Pretty_print
 

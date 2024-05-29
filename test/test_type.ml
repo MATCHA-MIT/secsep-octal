@@ -1,7 +1,7 @@
 
 (* open Type.Isa *)
 open Type.Single_exp
-open Type.Cond_type
+open Type.Cond_type_old
 open Type.Code_type
 open Type.Gen_type
 open Type.Subtype

@@ -33,6 +33,7 @@ module TypeExp = struct
     | TypeBot
     | TypeBExp of type_bop * t * t
     | TypeUExp of type_uop * t
+    | TypePtr of t * int64
 
   let cmp_type_bop (op1: type_bop) (op2: type_bop) : int =
     match op1, op2 with
@@ -99,6 +100,13 @@ module TypeExp = struct
     | TypeVar v1, TypeVar v2 ->
       if v1 < v2 then -1 else if v1 = v2 then 0 else 1
     | TypeVar _, _ -> 1
+    | TypePtr (ee1, size1), TypePtr (ee2, size2) ->
+      let cmp_ee = cmp ee1 ee2 in
+      if cmp_ee = 0 then
+        if size1 < size2 then -1 else if size1 = size2 then 0 else 1
+      else cmp_ee
+    | TypePtr _, _ -> 1
+    | TypeBExp _, TypePtr _ -> -1
     | TypeBExp (bop1, l1, r1), TypeBExp (bop2, l2, r2) ->
       let c_bop = cmp_type_bop bop1 bop2 in
       let c_l = cmp l1 l2 in
@@ -111,7 +119,7 @@ module TypeExp = struct
       let c_uop = cmp_type_uop uop1 uop2 in
       let c_l = cmp l1 l2 in
       if c_uop = 0 then c_l else c_uop
-    | TypeUExp _, TypeBExp _ -> -1
+    | TypeUExp _, TypePtr _ | TypeUExp _, TypeBExp _ -> -1
     | TypeUExp _, _ -> 1
 
   (* let rec cmp (e1: t) (e2: t) : bool =
@@ -319,6 +327,8 @@ module TypeExp = struct
         end
       | _ -> default_type
       end
+    | TypePtr (e, size) ->
+      TypePtr (eval e, size)
     | _ -> e
 
   let merge (e1: t) (e2: t) : t option =
@@ -355,6 +365,8 @@ module TypeExp = struct
     | TypeUExp (op, ee) ->
       let ee' = repl_type_exp sol ee in
       eval (TypeUExp (op, ee'))
+    | TypePtr (ee, size) ->
+      TypePtr (repl_type_exp sol ee, size)
     | _ -> e
 
   let rec string_of_type_exp (t: t) =
@@ -389,6 +401,8 @@ module TypeExp = struct
       | TypeComp -> "Comp"
       in
       "UnaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp e) ^ ")"
+    | TypePtr (e, size) ->
+      "Ptr (" ^ (string_of_type_exp e) ^ ", " ^ (Int64.to_string size) ^ ")"
 
   let pp_type_exp (lvl: int) (s: t) =
     PP.print_lvl lvl "%s" (string_of_type_exp s)

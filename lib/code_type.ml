@@ -3,7 +3,7 @@ open Isa
 open Single_exp
 open Type_exp
 open Type_full_exp
-open Cond_type
+open Cond_type_old
 open Pretty_print
 
 module CodeType = struct
@@ -106,12 +106,15 @@ module CodeType = struct
 
   let get_ld_op_type (curr_state: state_type)
       (disp: Isa.immediate option) (base: Isa.register option)
-      (index: Isa.register option) (scale: Isa.scale option) : TypeFullExp.t =
+      (index: Isa.register option) (scale: Isa.scale option)
+      (size: int64) : TypeFullExp.t =
     let addr_type, _ = get_mem_op_type curr_state disp base index scale in
     let mem_idx = get_mem_idx addr_type in
     match mem_idx with
     | Some v -> get_mem_idx_type curr_state v
-    | None -> (TypeTop, TypeFullExp.CondVarSet.empty)
+    | None -> 
+      (TypeExp.TypePtr (addr_type, size), TypeFullExp.CondVarSet.empty) (* NOTE: Cond here is not correct *)
+      (* (TypeTop, TypeFullExp.CondVarSet.empty) *)
 
   let set_st_op_type(curr_state: state_type) 
       (disp: Isa.immediate option) (base: Isa.register option)
@@ -128,7 +131,7 @@ module CodeType = struct
     | ImmOp imm -> get_imm_type imm
     | RegOp r -> get_reg_type curr_state r
     | MemOp (disp, base, index, scale) -> get_mem_op_type curr_state disp base index scale
-    | LdOp (disp, base, index, scale, _) -> get_ld_op_type curr_state disp base index scale
+    | LdOp (disp, base, index, scale, size) -> get_ld_op_type curr_state disp base index scale size
     | StOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> code_type_error ("get_src_op_type: cannot get src op type of a label op")
 

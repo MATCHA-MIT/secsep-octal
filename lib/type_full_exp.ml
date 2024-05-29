@@ -59,6 +59,7 @@ module TypeFullExp = struct
         let new_ve, _ = repl_type_sol sol (TypeVar v, cond) in new_ve
       | TypeBExp (bop, e1, e2) -> TypeBExp (bop, helper e1, helper e2)
       | TypeUExp (uop, e) -> TypeUExp (uop, helper e)
+      | TypePtr (e, size) -> TypePtr (helper e, size)
       | _ -> e
     in
     (TypeExp.eval (helper (helper e)), cond)
