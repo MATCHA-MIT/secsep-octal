@@ -38,61 +38,63 @@ sha512_final_impl:
 	subq	%rdi, %rsi
 	leal	(%rdx,%rsi), %ecx
 	shrl	$3, %ecx
-	rep stosq
+#	rep stosq
 .L22:
 	movq	72(%rbx), %rax
 	movq	64(%rbx), %rdx
 	movq	%r13, %rsi
 	movq	%rbx, %rdi
-	bswap	%rdx
-	bswap	%rax
-	movq	%rdx, %xmm1
-	movq	%rax, %xmm0
-	punpcklqdq	%xmm1, %xmm0
+#	bswap	%rdx
+#	bswap	%rax
+#	movq	%rdx, %xmm1
+#	movq	%rax, %xmm0
+#	punpcklqdq	%xmm1, %xmm0
 	movl	$1, %edx
-	movups	%xmm0, 192(%rbx)
+#	movups	%xmm0, 192(%rbx)
+	movq	%rax, 192(%rbx) # Replace the last store with this store - not the same meaning
 	call	sha512_block_data_order
-	testq	%r12, %r12
+#	testq	%r12, %r12
+	cmpq	%r12, $0
 	je	.L31
 	shrq	$3, %rbp
 	je	.L30
 	movq	(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, (%r12)
 	cmpq	$1, %rbp
 	je	.L30
 	movq	8(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 8(%r12)
 	cmpq	$2, %rbp
 	je	.L30
 	movq	16(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 16(%r12)
 	cmpq	$3, %rbp
 	je	.L30
 	movq	24(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 24(%r12)
 	cmpq	$4, %rbp
 	je	.L30
 	movq	32(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 32(%r12)
 	cmpq	$5, %rbp
 	je	.L30
 	movq	40(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 40(%r12)
 	cmpq	$6, %rbp
 	je	.L30
 	movq	48(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 48(%r12)
 	cmpq	$7, %rbp
 	je	.L30
 	movq	56(%rbx), %rax
-	bswap	%rax
+#	bswap	%rax
 	movq	%rax, 56(%r12)
 .L30:
 	addq	$8, %rsp
@@ -102,21 +104,20 @@ sha512_final_impl:
 	popq	%r12
 	popq	%r13
 	ret
-	.p2align 4,,10
-	.p2align 3
 .L74:
 	andl	$4, %edx
 	jne	.L75
-	testl	%ecx, %ecx
+#	testl	%ecx, %ecx
+	cmpl	%ecx, $0
 	je	.L22
 	movb	$0, (%rsi)
-	testb	$2, %cl
+#	testb	$2, %cl
+	andb	$2, %cl
+	cmpb	%cl, $0
 	je	.L22
 	xorl	%eax, %eax
 	movw	%ax, -2(%rsi,%rcx)
 	jmp	.L22
-	.p2align 4,,10
-	.p2align 3
 .L73:
 	xorl	%edi, %edi
 	cmpq	$8, %rdx
@@ -138,28 +139,27 @@ sha512_final_impl:
 	cmpq	%rdx, %rax
 	jb	.L19
 	jmp	.L14
-	.p2align 4,,10
-	.p2align 3
 .L13:
 	movl	$112, %edx
 	subq	%rax, %rdx
 	je	.L22
 	jmp	.L21
-	.p2align 4,,10
-	.p2align 3
 .L76:
-	testb	$4, %dl
+#	testb	$4, %dl
+	andb	$4, %dl
+	cmpb	%dl, $0
 	jne	.L77
-	testq	%rdx, %rdx
+#	testq	%rdx, %rdx
+	cmpq	%rdx, $0
 	je	.L14
 	movb	$0, (%rsi)
-	testb	$2, %dl
+#	testb	$2, %dl
+	andb	$2, %dl
+	cmpb	%dl, $0
 	je	.L14
 	xorl	%ecx, %ecx
 	movw	%cx, -2(%rsi,%rdx)
 	jmp	.L14
-	.p2align 4,,10
-	.p2align 3
 .L31:
 	addq	$8, %rsp
 	xorl	%eax, %eax

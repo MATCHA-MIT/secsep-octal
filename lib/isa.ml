@@ -134,12 +134,13 @@ module Isa = struct
   let inst_referring_label (m: string) : bool =
     match m with
     | "call"
-    | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge" -> true
+    | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge"
+    | "jbe" | "jb" -> true
     | _ -> false
 
-  let inst_is_ret (inst: instruction) : bool =
+  let inst_is_uncond_jump (inst: instruction) : bool =
     match inst with
-    | Ret -> true
+    | Jmp _ | Ret -> true
     | _ -> false
 
   let mnemonic_of_instruction (inst: instruction) : string =

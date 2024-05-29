@@ -37,7 +37,8 @@ let read_file (filename: string) : string =
     raise e
 
 (* let p = Parser.parse_program (read_file "../asm/demo.s")  *)
-let p = Parser.parse_program (read_file "../asm/sha512_block_data_order.s") 
+(* let p = Parser.parse_program (read_file "../asm/sha512_block_data_order.s")  *)
+let p = Parser.parse_program (read_file "../asm/sha512_final_impl.s") 
 
 (* TODO: print subtype relation *)
 (* TODO: run this test case *)

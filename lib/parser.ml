@@ -317,6 +317,7 @@ module Parser = struct
       | ("movz", [opr1; opr2]) -> MovZ (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("movzbl", [opr1; opr2]) -> MovZ  (dst(opr2, Some 4L), src(opr1, Some 1L))
       | ("lea", [opr1; opr2]) -> Lea (dst(opr2, dirty_op_size), opr1)
+      | ("leal", [opr1; opr2]) -> Lea (dst(opr2, Some 4L), opr1)
       | ("leaq", [opr1; opr2]) -> Lea (dst(opr2, Some 8L), opr1) (* the memory operand in LEA is not converted to ld/st *)
       | ("add", [opr1; opr2]) -> Add (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("addq", [opr1; opr2]) -> Add (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
@@ -337,12 +338,20 @@ module Parser = struct
       | ("not", [opr]) -> Not (dst(opr, dirty_op_size), src(opr, dirty_op_size))
       | ("notq", [opr]) -> Not (dst(opr, Some 8L), src(opr, Some 8L))
       | ("and", [opr1; opr2]) -> And (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("andb", [opr1; opr2]) -> And (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("andw", [opr1; opr2]) -> And (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
       | ("andl", [opr1; opr2]) -> And (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("andq", [opr1; opr2]) -> And (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
       | ("cmp", [opr1; opr2]) -> Cmp (src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("cmpb", [opr1; opr2]) -> Cmp (src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("cmpw", [opr1; opr2]) -> Cmp (src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("cmpl", [opr1; opr2]) -> Cmp (src(opr2, Some 4L), src(opr1, Some 4L))
       | ("cmpq", [opr1; opr2]) -> Cmp (src(opr2, Some 8L), src(opr1, Some 8L))
       | ("jmp", [LabelOp lb]) -> Jmp (lb)
+      | ("je", [LabelOp lb]) -> Jcond (lb, JE)
       | ("jne", [LabelOp lb]) -> Jcond (lb, JNe)
+      | ("jbe", [LabelOp lb]) -> Jcond (lb, JLe) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jb", [LabelOp lb]) -> Jcond (lb, JL) (* TODO: Note that this is not correct, just for quick test only *)
       | ("call", [LabelOp lb]) -> Call (lb)
       | ("ret", []) -> Jmp (Isa.ret_label)
       | ("pushq", [opr]) -> Push (src(opr, Some 8L))
@@ -410,7 +419,7 @@ module Parser = struct
       | [] -> List.rev acc
       | bb :: [] -> List.rev (bb :: acc)
       | bb1 :: bb2 :: bbs ->
-          let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_ret (List.hd (List.rev bb1.insts))
+          let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_uncond_jump (List.hd (List.rev bb1.insts))
             then bb1
             else {bb1 with insts = bb1.insts @ [Jmp bb2.label]}
           in
