@@ -1,5 +1,4 @@
 open Type_exp
-open Type_full_exp
 open Pretty_print
 
 module CondType = struct
@@ -7,10 +6,10 @@ module CondType = struct
   let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
 
   type t =
-    | CondNe of (TypeFullExp.t * TypeFullExp.t)
-    | CondEq of (TypeFullExp.t * TypeFullExp.t)
-    | CondLq of (TypeFullExp.t * TypeFullExp.t)
-    | CondLe of (TypeFullExp.t * TypeFullExp.t)
+    | CondNe of (TypeExp.t * TypeExp.t)
+    | CondEq of (TypeExp.t * TypeExp.t)
+    | CondLq of (TypeExp.t * TypeExp.t)
+    | CondLe of (TypeExp.t * TypeExp.t)
 
   let not_cond_type (cond: t) : t = 
     match cond with
@@ -18,9 +17,16 @@ module CondType = struct
     | CondEq (l, r) -> CondNe (l, r)
     | CondLq (l, r) -> CondLq (r, l)
     | CondLe (l, r) -> CondLe (r, l)
+
+  let get_cond_idx (idx: int) (taken: bool) : int =
+    if taken then idx * 2 + 1
+    else idx * 2
+
+  let parse_cond_idx (cond_idx: int) : int * bool =
+    (cond_idx / 2, Int.rem cond_idx 2 = 1)
   
   let get_cond_type (cond_list: t list) (cond_idx: int) : t =
-    let idx, taken = TypeFullExp.parse_cond_idx cond_idx in
+    let idx, taken = parse_cond_idx cond_idx in
     (* let idx = cond_idx / 2 in *)
     let cond = List.nth cond_list ((List.length cond_list) - idx) in
     (* let taken = Int.rem cond_idx 2 in *)
@@ -30,21 +36,21 @@ module CondType = struct
   let add_cond_type (cond_list: t list) (cond: t) (taken: bool) : (t list) * int =
     (* let cond_suffix = if taken then 1 else 0 in
     (cond::cond_list, ((List.length cond_list) + 1) * 2 + cond_suffix) *)
-    (cond::cond_list, TypeFullExp.get_cond_idx ((List.length cond_list) + 1) taken)
+    (cond::cond_list, get_cond_idx ((List.length cond_list) + 1) taken)
 
-  let repl_type_sol (e: t) (sol: TypeExp.type_var_id * TypeFullExp.type_sol) : t =
+  let repl_type_exp (sol: TypeExp.type_var_id * TypeExp.t) (e: t) : t =
     match e with
-    | CondNe (e1, e2) -> CondNe (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
-    | CondEq (e1, e2) -> CondEq (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
-    | CondLq (e1, e2) -> CondLq (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
-    | CondLe (e1, e2) -> CondLe (TypeFullExp.repl_type_sol sol e1, TypeFullExp.repl_type_sol sol e2)
+    | CondNe (e1, e2) -> CondNe (TypeExp.repl_type_exp sol e1, TypeExp.repl_type_exp sol e2)
+    | CondEq (e1, e2) -> CondEq (TypeExp.repl_type_exp sol e1, TypeExp.repl_type_exp sol e2)
+    | CondLq (e1, e2) -> CondLq (TypeExp.repl_type_exp sol e1, TypeExp.repl_type_exp sol e2)
+    | CondLe (e1, e2) -> CondLe (TypeExp.repl_type_exp sol e1, TypeExp.repl_type_exp sol e2)
 
   let pp_cond (lvl: int) (cond: t) =
     let op, str1, str2 = match cond with
-    | CondNe (l, r) -> ("Ne", TypeExp.string_of_type_exp (fst l), TypeExp.string_of_type_exp (fst r))
-    | CondEq (l, r) -> ("Eq", TypeExp.string_of_type_exp (fst l), TypeExp.string_of_type_exp (fst r))
-    | CondLq (l, r) -> ("Lq", TypeExp.string_of_type_exp (fst l), TypeExp.string_of_type_exp (fst r))
-    | CondLe (l, r) -> ("Le", TypeExp.string_of_type_exp (fst l), TypeExp.string_of_type_exp (fst r))
+    | CondNe (l, r) -> ("Ne", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
+    | CondEq (l, r) -> ("Eq", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
+    | CondLq (l, r) -> ("Lq", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
+    | CondLe (l, r) -> ("Le", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
     in
     PP.print_lvl lvl "Cond %s between\n" op;
     PP.print_lvl (lvl + 1) "%s\n" str1;
