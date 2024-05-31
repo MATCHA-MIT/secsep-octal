@@ -5,7 +5,7 @@ open Type_full_exp
 open Cond_type
 open Reg_type
 open Mem_type
-(* open Pretty_print *)
+open Pretty_print
 
 module StateType = struct
   exception StateTypeError of string
@@ -21,6 +21,29 @@ module StateType = struct
     cond_type: TypeExp.t * TypeExp.t;
     cond_hist: CondVarSet.t
   }
+
+  let init_state_type 
+      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) : 
+      ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * t =
+    let idx0, r_type = RegType.init_reg_type start_var_idx in
+    let m_type = MemType.init_mem_type in
+    (idx0, 
+    { 
+      reg_type = r_type; 
+      mem_type = m_type; 
+      cond_type = (TypeSingle (SingleConst 0L), 
+      TypeSingle (SingleConst 0L)); cond_hist = CondVarSet.empty 
+    })
+    
+  let update_state_type
+      (update_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list)
+      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
+      (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
+      (old_state: t) :
+      ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t * t =
+    let new_mem_type, var_idx, n_var_set, d_var_set = 
+          MemType.update_type_all_ptr old_state.mem_type start_var_idx new_var_set drop_var_set update_list in
+    (var_idx, n_var_set, d_var_set, { old_state with mem_type = new_mem_type })
 
   let rec get_imm_single_exp (i: Isa.immediate) : SingleExp.t =
     match i with
@@ -64,43 +87,52 @@ module StateType = struct
     ) in
     new_type
 
-  let get_ld_op_type (curr_state: t)
+  let get_ld_op_type 
+      (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
+      (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) : (TypeExp.t, TypeExp.t * int64) Either.t =
     let addr_type = get_mem_op_type curr_state disp base index scale in
+    let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
     MemType.get_mem_type curr_state.mem_type (addr_type, size)
 
-  let set_st_op_type (curr_state: t)
+  let set_st_op_type 
+      (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
+      (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64)
       (new_type: TypeExp.t) : (t, TypeExp.t * int64) Either.t =
     let addr_type = get_mem_op_type curr_state disp base index scale in
+    let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
     match MemType.set_mem_type curr_state.mem_type (addr_type, size) new_type with
     | Left m_type -> Left { curr_state with mem_type = m_type }
     | Right other -> Right other
 
   let get_src_op_type 
-    (curr_state: t)
-    (src: Isa.operand) : TypeExp.t * ((TypeExp.t * int64) option) =
+      (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
+      (curr_state: t)
+      (src: Isa.operand) : TypeExp.t * ((TypeExp.t * int64) option) =
     match src with
     | ImmOp imm -> (get_imm_type imm, None)
     | RegOp r -> (get_reg_type curr_state r, None)
     | MemOp (disp, base, index, scale) -> (get_mem_op_type curr_state disp base index scale, None)
     | LdOp (disp, base, index, scale, size) ->
-      begin match get_ld_op_type curr_state disp base index scale size with
+      begin match get_ld_op_type sol curr_state disp base index scale size with
       | Left exp -> (exp, None)
       | Right (addr, size) -> (TypeExp.TypePtr (addr, size), Some (addr, size))
       end
     | StOp _ -> state_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> state_type_error ("get_src_op_type: cannot get src op type of a label op")
 
-  let set_dest_op_type (curr_state: t) (dest: Isa.operand) (new_type: TypeExp.t) : t * ((TypeExp.t * int64) option) =
+  let set_dest_op_type
+      (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
+      (curr_state: t) (dest: Isa.operand) (new_type: TypeExp.t) : t * ((TypeExp.t * int64) option) =
     match dest with
     | RegOp r -> (set_reg_type curr_state r new_type, None)
     | StOp (disp, base, index, scale, size) ->
-      begin match set_st_op_type curr_state disp base index scale size new_type with
+      begin match set_st_op_type sol curr_state disp base index scale size new_type with
       | Left exp -> (exp, None)
       | Right addr_exp -> (curr_state, Some addr_exp)
       end
@@ -109,7 +141,8 @@ module StateType = struct
   let add_state_type_cond (curr_state: t) (cond_idx: int) : t =
     { curr_state with cond_hist = CondVarSet.add cond_idx curr_state.cond_hist }
 
-  let type_prop_inst 
+  let type_prop_inst
+      (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t) 
       (cond_list: CondType.t list) 
       (unknown_addr_list: (TypeFullExp.t * int64) list) 
@@ -128,114 +161,128 @@ module StateType = struct
     | MovS (dest, src)
     | MovZ (dest, src)
     | Lea (dest, src) ->
-      let src_type, ua1 = get_src_op_type curr_state src in
-      let new_state, ua2 = set_dest_op_type curr_state dest src_type in
+      let src_type, ua1 = get_src_op_type sol curr_state src in
+      let new_state, ua2 = set_dest_op_type sol curr_state dest src_type in
       (new_state, cond_list, (get_unknown_list [ua2; ua1]) @ unknown_addr_list)
     | Add (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Sub (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSub, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Sal (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSal, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Shr (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeShr, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Sar (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSar, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Xor (dest, src1, src2) ->
       (* TODO: Add special case for xor %rax %rax *)
       begin match src1, src2 with
       | RegOp r1, RegOp r2 ->
         if r1 = r2 then 
-          let new_state, ua = set_dest_op_type curr_state dest (TypeSingle (SingleConst 0L)) in
+          let new_state, ua = set_dest_op_type sol curr_state dest (TypeSingle (SingleConst 0L)) in
           (new_state, cond_list, (get_unknown_list [ua]) @ unknown_addr_list)
         else begin
-          let src1_type, ua1 = get_src_op_type curr_state src1 in
-          let src2_type, ua2 = get_src_op_type curr_state src2 in
+          let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+          let src2_type, ua2 = get_src_op_type sol curr_state src2 in
           let dest_type = TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)) in
-          let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+          let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
           (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
         end
       | _ ->
-        let src1_type, ua1 = get_src_op_type curr_state src1 in
-        let src2_type, ua2 = get_src_op_type curr_state src2 in
+        let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+        let src2_type, ua2 = get_src_op_type sol curr_state src2 in
         let dest_type = TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)) in
-        let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+        let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
         (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
       end
     | Not (dest, src) ->
-      let src_type, ua1 = get_src_op_type curr_state src in
+      let src_type, ua1 = get_src_op_type sol curr_state src in
       let dest_type = TypeExp.eval (TypeUExp (TypeNot, src_type)) in
-      let new_state, ua2 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua2 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua2; ua1]) @ unknown_addr_list)
     | And (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeAnd, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Or (dest, src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeOr, src1_type, src2_type)) in
-      let new_state, ua3 = set_dest_op_type curr_state dest dest_type in
+      let new_state, ua3 = set_dest_op_type sol curr_state dest dest_type in
       (new_state, cond_list, (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list)
     | Cmp (src1, src2) ->
-      let src1_type, ua1 = get_src_op_type curr_state src1 in
-      let src2_type, ua2 = get_src_op_type curr_state src2 in
+      let src1_type, ua1 = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2 = get_src_op_type sol curr_state src2 in
       ({curr_state with cond_type = (src1_type, src2_type)}, cond_list, (get_unknown_list [ua2; ua1]) @ unknown_addr_list)
       (* TODO: Handle the case where some other instructions set flags and some other instructions use flags!!! *)
     | Jcond (_, branch_cond) ->
       let cond_left, cond_right = curr_state.cond_type in
       let new_cond = 
         begin match branch_cond with
-        | JNe -> CondType.CondNe (cond_left, cond_right)
-        | JE -> CondType.CondEq (cond_left, cond_right)
-        | JL -> CondType.CondLq (cond_left, cond_right)
-        | JLe -> CondType.CondLe (cond_left, cond_right)
-        | JG -> CondType.CondLq (cond_right, cond_left)
-        | JGe -> CondType.CondLe (cond_right, cond_left)
+        | JNe -> CondType.CondNe (cond_left, cond_right, curr_state.cond_hist)
+        | JE -> CondType.CondEq (cond_left, cond_right, curr_state.cond_hist)
+        | JL -> CondType.CondLq (cond_left, cond_right, curr_state.cond_hist)
+        | JLe -> CondType.CondLe (cond_left, cond_right, curr_state.cond_hist)
+        | JG -> CondType.CondLq (cond_right, cond_left, curr_state.cond_hist)
+        | JGe -> CondType.CondLe (cond_right, cond_left, curr_state.cond_hist)
         end in
       let new_cond_list, new_cond_idx = CondType.add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list, unknown_addr_list)
     | Jmp _ -> (curr_state, cond_list, unknown_addr_list)
     | Push _ ->
-      let src1_type, ua1 = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
+      let src1_type, ua1 = get_src_op_type sol curr_state (Isa.RegOp Isa.RSP) in
       let src2_type = TypeExp.TypeSingle (SingleConst (-8L)) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
       let dest_type = TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)) in
-      let new_state, ua2 = set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type in
+      let new_state, ua2 = set_dest_op_type sol curr_state (Isa.RegOp Isa.RSP) dest_type in
       (new_state, cond_list, (get_unknown_list [ua2; ua1]) @ unknown_addr_list)
     | Pop _ ->
-      let src1_type, ua1 = get_src_op_type curr_state (Isa.RegOp Isa.RSP) in
+      let src1_type, ua1 = get_src_op_type sol curr_state (Isa.RegOp Isa.RSP) in
       let src2_type = TypeExp.TypeSingle (SingleConst 8L) in
       (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
       let dest_type = TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)) in
-      let new_state, ua2 = set_dest_op_type curr_state (Isa.RegOp Isa.RSP) dest_type in
+      let new_state, ua2 = set_dest_op_type sol curr_state (Isa.RegOp Isa.RSP) dest_type in
       (new_state, cond_list, (get_unknown_list [ua2; ua1]) @ unknown_addr_list)
     | _ -> begin
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
         (curr_state, cond_list, unknown_addr_list) (* TODO *)
     end
+
+  let pp_state_type (lvl: int) (s: t) =
+    PP.print_lvl lvl "Reg:\n";
+    List.iteri (fun i x ->
+      PP.print_lvl (lvl + 1) "<Reg %d> " i;
+      TypeExp.pp_type_exp (lvl + 2) x;
+      Printf.printf "\n"
+    ) s.reg_type;
+    PP.print_lvl lvl "Mem:\n";
+    MemType.pp_mem_type (lvl + 1) s.mem_type.mem_type;
+    PP.print_lvl lvl "Cond:\n";
+    TypeExp.pp_type_exp (lvl + 1) (fst s.cond_type);
+    Printf.printf "\n";
+    TypeExp.pp_type_exp (lvl + 1) (snd s.cond_type)
 
 end
 

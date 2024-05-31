@@ -1,6 +1,8 @@
 open Isa
 open Single_exp
 open Type_exp
+open Type_full_exp
+open Pretty_print
 
 
 module MemType = struct
@@ -141,10 +143,25 @@ module MemType = struct
     let acc = format_convert_helper old_mem_type in
     List.fold_left helper acc mem_access_list
 
+  let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list) =
+    PP.print_lvl lvl "Mem key list:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i (left, right) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            Printf.printf "\n"
+        ) key_list
+    ) mem_key_list
+
   let rec update_offset_all_ptr
       (old_mem_type: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * TypeExp.t) list) list)
       (mem_access_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t) list) list) :
       (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list =
+    pp_mem_key 0 mem_access_list;
     match old_mem_type, mem_access_list with
     | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
       if id1 = id2 then
@@ -242,5 +259,197 @@ module MemType = struct
       ({ result with mem_type = (id2, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
       (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr [] tl2) *)
     | _, [] -> (old_t, start_var_idx, new_var_set, drop_var_set)
+
+
+  (* Find base for previously unknown addresses *)
+  let repl_addr_exp (addr_exp_list: (TypeFullExp.t * int64) list) (subtype_sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) : (TypeFullExp.t * int64) list =
+    let helper (x: TypeFullExp.t * int64) : TypeFullExp.t * int64 =
+      let e, size = x in 
+      let new_e = TypeFullExp.repl_all_sol subtype_sol e in (new_e, size)
+    in
+    List.map helper addr_exp_list
+
+  let rec filter_single_var (e: SingleExp.t) : SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t =
+    match e with
+    | SingleVar x -> (SingleExp.SingleVarSet.singleton x, SingleExp.SingleVarSet.empty)
+    | SingleBExp (SingleExp.SingleAdd, l, r) ->
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      (SingleExp.SingleVarSet.union left_ptr right_ptr, SingleExp.SingleVarSet.union left_no_ptr right_no_ptr)
+    | SingleBExp (SingleExp.SingleMul, l, r) ->
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union left_ptr right_ptr) (SingleExp.SingleVarSet.union left_no_ptr right_no_ptr))
+    | _ -> (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.empty)
+
+  let filter_type_single_var (e: TypeExp.t) : SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t =
+    match e with
+    | TypeSingle s -> filter_single_var s
+    | TypeRange (l, _, r, _, _) ->
+      let left_ptr, left_no_ptr = filter_single_var l in
+      let right_ptr, right_no_ptr = filter_single_var r in
+      let diff1 = SingleExp.SingleVarSet.diff left_ptr right_ptr in
+      let diff2 = SingleExp.SingleVarSet.diff right_ptr left_ptr in
+      (SingleExp.SingleVarSet.inter left_ptr right_ptr,
+      SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union diff1 diff2) (SingleExp.SingleVarSet.union left_no_ptr right_no_ptr))
+    | _ -> (SingleExp.SingleVarSet.empty, SingleExp.SingleVarSet.empty)
+
+  let try_solve_base 
+      (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
+      (base_list: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) =
+    let ptr_list, no_ptr_list = acc in
+    match base_list with
+    | Left base_list ->
+      let base_list = SingleExp.SingleVarSet.diff base_list no_ptr_list in
+      let inter_list = SingleExp.SingleVarSet.inter base_list ptr_list in
+      let diff_list = SingleExp.SingleVarSet.diff base_list ptr_list in
+      begin match SingleExp.SingleVarSet.elements inter_list, SingleExp.SingleVarSet.elements diff_list with
+      | [], [] -> mem_type_error "try_solve_base get empty base candidate"
+      | [], hd :: [] -> ((SingleExp.SingleVarSet.add hd ptr_list, no_ptr_list), Right hd)
+      | [], _ :: _ -> (acc, Left diff_list)
+      | hd :: [], _ -> ((ptr_list, SingleExp.SingleVarSet.union diff_list no_ptr_list), Right hd)
+      | _ :: _, _ -> mem_type_error "try_solve_base add more than one ptrs"
+      end
+    | Right _ -> (acc, base_list)
+  
+  let rec solve_base 
+      (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
+      (base_list: ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) list)
+      (iter: int) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * Isa.imm_var_id list =
+    let to_id (x: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : Isa.imm_var_id =
+      match x with
+      | Left _ -> mem_type_error "solve_base cannot find solution"
+      | Right id -> id
+    in
+    if iter = 0 then (acc, List.map to_id base_list)
+    else
+      let new_acc, new_list = List.fold_left_map try_solve_base acc base_list in
+      solve_base new_acc new_list (iter - 1)
+
+  let get_base 
+      (ptr_list: SingleExp.SingleVarSet.t) 
+      (no_ptr_list: SingleExp.SingleVarSet.t) 
+      (addr_list: (TypeFullExp.t * int64) list) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * Isa.imm_var_id list =
+    let ptr_set_list, no_ptr_set_list = List.split (List.map (fun ((e, _), _) -> filter_type_single_var e) addr_list) in
+    let no_ptr_set = List.fold_left (fun acc x -> SingleExp.SingleVarSet.union acc x) SingleExp.SingleVarSet.empty no_ptr_set_list in
+    let ptr_set_list = List.map (
+      fun x : (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t -> 
+        Left (SingleExp.SingleVarSet.diff x no_ptr_set)) 
+      ptr_set_list in
+    solve_base (ptr_list, no_ptr_list) ptr_set_list 1
+    
+  let pp_base (lvl: int) (base_list: Isa.imm_var_id list) =
+    PP.print_lvl lvl "Base list:\n";
+    List.iteri (
+      fun i x ->
+        PP.print_lvl (lvl + 1) "<Addr Range %d> %d\n" i x
+    ) base_list
+
+  let filter_addr_list (addr_list: (TypeFullExp.t * int64) list) : (TypeFullExp.t * int64) list =
+    List.filter (
+      fun ((e, _), _) ->
+        match e with
+        | TypeExp.TypeSingle _ | TypeExp.TypeRange _ -> true
+        | _ -> false
+    ) addr_list
+
+  let get_addr_base_range 
+      (ptr_list: SingleExp.SingleVarSet.t)
+      (no_ptr_list: SingleExp.SingleVarSet.t)
+      (addr_list: (TypeFullExp.t * int64) list) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((Isa.imm_var_id * SingleExp.t * SingleExp.t) list) =
+    let addr_list = filter_addr_list addr_list in
+    let (new_ptr_list, new_no_ptr_list), base_list = get_base ptr_list no_ptr_list addr_list in
+    let helper (base_id: Isa.imm_var_id) (mem_access: TypeFullExp.t * int64) : Isa.imm_var_id * SingleExp.t * SingleExp.t =
+      let (addr, _), size = mem_access in
+      match addr with
+      | TypeSingle x -> (base_id, 
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id)),
+          SingleExp.eval (SingleExp.SingleBExp (
+            SingleExp.SingleAdd, 
+            SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id), 
+            SingleExp.SingleConst size)))
+      | TypeRange (l, _, r, _, _) -> (base_id,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, l, SingleExp.SingleVar base_id)),
+          SingleExp.eval (SingleExp.SingleBExp (
+            SingleExp.SingleAdd,
+            SingleExp.SingleBExp (SingleExp.SingleSub, r, SingleExp.SingleVar base_id),
+            SingleExp.SingleConst size)))
+      | _ -> mem_type_error "get_addr_base_range cannot handle this case"
+    in
+    ((new_ptr_list, new_no_ptr_list), List.map2 helper base_list addr_list)
+
+  let reshape_mem_key_list (mem_access_list: (Isa.imm_var_id * SingleExp.t * SingleExp.t) list) :
+      (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list =
+    let helper (acc: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list) (mem_access: Isa.imm_var_id * SingleExp.t * SingleExp.t) : 
+        (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) list =
+      let id, left, right = mem_access in
+      let helper0 (id_mem_key_list: Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) : 
+            (Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list), Isa.imm_var_id * ((SingleExp.t * SingleExp.t) list)) Either.t =
+        let curr_id, mem_key_list = id_mem_key_list in
+        if curr_id = id then Either.left (curr_id, (left, right) :: mem_key_list)
+        else Either.right id_mem_key_list
+      in
+      let left_list, right_list = List.partition_map helper0 acc in
+      match left_list with
+      | [] -> (id, [ (left, right) ]) :: right_list
+      | hd :: [] -> hd :: right_list
+      | _ -> mem_type_error "get_mem_key_list merged with more than one key"
+    in
+    List.fold_left helper [] mem_access_list
+
+  let pp_addr_exp (lvl: int) (addr_exp: (TypeFullExp.t * int64) list) =
+    PP.print_lvl lvl "Addr exp list:\n";
+    List.iteri (
+      fun i x ->
+        let exp, size = x in
+        PP.print_lvl (lvl + 1) "<Addr %d>" i;
+        TypeFullExp.pp_type_full_exp (lvl + 2) exp;
+        PP.print_lvl (lvl + 1) "%Ld" size;
+        Printf.printf "\n"
+    ) addr_exp
+
+  let pp_base_range (lvl: int) (base_range_list: (Isa.imm_var_id * SingleExp.t * SingleExp.t) list) =
+    PP.print_lvl lvl "Base range list:\n";
+    List.iteri (
+      fun i x ->
+        let base_id, left, right = x in
+        PP.print_lvl (lvl + 1) "<Addr Range %d> %d" i base_id;
+        SingleExp.pp_single_exp (lvl + 2) left;
+        SingleExp.pp_single_exp (lvl + 2) right;
+        Printf.printf "\n"
+    ) base_range_list
+
+  let pp_update_list (lvl: int) (update_list: ((Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list)) =
+    PP.print_lvl lvl "Update list:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i (left, right, b) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            Printf.printf " %b\n" b
+        ) key_list
+    ) update_list
+
+  let pp_mem_type (lvl: int) (mem_key_list: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t * TypeExp.t) list)) list) =
+    PP.print_lvl lvl "Mem key list:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i (left, right, mem_type) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            TypeExp.pp_type_exp (lvl + 2) mem_type;
+            Printf.printf "\n"
+        ) key_list
+    ) mem_key_list
 
 end

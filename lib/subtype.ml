@@ -2,8 +2,8 @@
 open Single_exp
 open Type_exp
 open Type_full_exp
-open Cond_type_old
-open Code_type
+open Cond_type
+open State_type
 open Pretty_print
 
 module SubType = struct
@@ -23,11 +23,30 @@ module SubType = struct
   let init (total_var: int) =
     List.init total_var (fun x -> {type_var_idx = x; type_sol = SolNone; subtype_list = []; supertype_list = []})
 
+  let remove_unused (tv_rel_list: t) (drop_var_set: TypeExp.TypeVarSet.t) : t =
+    List.filter (fun x -> (TypeExp.TypeVarSet.find_opt x.type_var_idx drop_var_set) = None) tv_rel_list
+
+  let add_new (tv_rel_list: t) (new_var_set: TypeExp.TypeVarSet.t) : t =
+    let new_tv_rel_list = 
+      List.map 
+        (fun x -> {type_var_idx = x; type_sol = SolNone; subtype_list = []; supertype_list = []}) 
+        (TypeExp.TypeVarSet.elements new_var_set) 
+    in
+    tv_rel_list @ new_tv_rel_list
+
+  let clear (tv_rel_list: t) : t =
+    List.map 
+    (fun rel -> { type_var_idx = rel.type_var_idx; type_sol = SolNone; subtype_list = []; supertype_list = []})
+    tv_rel_list
+
   let get_pure_sol (sol: t) : (TypeExp.type_var_id * TypeFullExp.type_sol) list =
     List.map (fun x -> (x.type_var_idx, x.type_sol)) sol
 
   let get_type_var_rel (tv_rel: t) (idx: TypeExp.type_var_id) : type_var_rel =
-    List.find (fun x -> x.type_var_idx = idx) tv_rel
+    let find_result = List.find_opt (fun x -> x.type_var_idx = idx) tv_rel in
+    match find_result with
+    | Some x -> x
+    | None -> { type_var_idx = idx; type_sol = SolNone; subtype_list = []; supertype_list = [] }
 
   let type_list_insert (type_list: TypeFullExp.t list) (ty: TypeFullExp.t) : TypeFullExp.t list =
     let t_exp, t_cond = ty in
@@ -97,7 +116,7 @@ module SubType = struct
       let a_rel = get_type_var_rel tv_rel a_idx in
       let new_tv_rel = List.fold_left 
                         (fun acc_tv_rel sub_a -> 
-                          add_one_sub_super acc_tv_rel (CodeType.add_type_cond_set sub_a a_cond) b_idx) 
+                          add_one_sub_super acc_tv_rel (TypeFullExp.add_type_cond_set sub_a a_cond) b_idx) 
                         tv_rel a_rel.subtype_list in
       add_one_sub_super new_tv_rel a b_idx
     | _ -> add_one_sub_super tv_rel a b_idx
@@ -106,7 +125,7 @@ module SubType = struct
     let b_rel = get_type_var_rel tv_rel b_idx in
     let new_tv_rel = List.fold_left
                       (fun acc_tv_rel (b_cond, super_b_idx) ->
-                        add_sub_sub_super acc_tv_rel (CodeType.add_type_cond_set a b_cond) super_b_idx)
+                        add_sub_sub_super acc_tv_rel (TypeFullExp.add_type_cond_set a b_cond) super_b_idx)
                       tv_rel b_rel.supertype_list in
     add_sub_sub_super new_tv_rel a b_idx
       
@@ -121,19 +140,34 @@ module SubType = struct
       if TypeExp.cmp a_exp b_exp = 0 then tv_rel (* Handle the special case for rsp *)
       else sub_type_error ("add_sub_type_full_exp: incorrect sub/super types " ^ 
         (TypeExp.string_of_type_exp a_exp) ^ " " ^ (TypeExp.string_of_type_exp b_exp))
+  
+  let add_sub_type_exp (a_cond: TypeFullExp.CondVarSet.t) (tv_rel: t) (a: TypeExp.t) (b: TypeExp.t) : t =
+    match b with
+    | TypeVar b_idx ->
+      add_sub_sub_super_super tv_rel (a, a_cond) b_idx
+    | _ -> 
+      sub_type_error ("add_sub_type_exp: incorrect sub/super types " ^ 
+        (TypeExp.string_of_type_exp a) ^ " " ^ (TypeExp.string_of_type_exp b))
 
-  let add_sub_state_type (tv_rel: t) (start_type: CodeType.state_type) (end_type: CodeType.state_type) : t =
+  let add_sub_state_type (tv_rel: t) (start_type: StateType.t) (end_type: StateType.t) : t =
     let start_code_type = start_type.reg_type in
-    let start_mem_type = start_type.mem_type in
+    let start_mem_type = start_type.mem_type.mem_type in
     let end_code_type = end_type.reg_type in
-    let end_mem_type = end_type.mem_type in
+    let end_mem_type = end_type.mem_type.mem_type in
     let tv_rel_after_reg =
-      List.fold_left2 add_sub_type_full_exp tv_rel start_code_type end_code_type in
-    List.fold_left2 
-      (fun acc_tv_rel (start_off, start_type) (end_off, end_type) ->
-        if start_off = end_off then add_sub_type_full_exp acc_tv_rel start_type end_type
-        else sub_type_error ("add_sub_state_type: mem type offset does not match"))
-      tv_rel_after_reg start_mem_type end_mem_type
+      List.fold_left2 (add_sub_type_exp start_type.cond_hist) tv_rel start_code_type end_code_type in
+    List.fold_left2 (
+      fun acc_tv_rel (start_ptr, start_mem_type) (end_ptr, end_mem_type) ->
+        if start_ptr = end_ptr then
+          List.fold_left2 
+            (fun acc_tv_rel (start_off1, start_off2, start_mem_type) (end_off1, end_off2, end_mem_type) ->
+              if SingleExp.cmp start_off1 end_off1 = 0 && SingleExp.cmp start_off2 end_off2 = 0 then 
+                (add_sub_type_exp start_type.cond_hist) acc_tv_rel start_mem_type end_mem_type
+              else sub_type_error ("add_sub_state_type: mem type offset does not match"))
+            acc_tv_rel
+            start_mem_type end_mem_type
+        else sub_type_error ("add_sub_state_type: mem type ptr does not match")
+    ) tv_rel_after_reg start_mem_type end_mem_type
   
   let remove_one_var_dummy_sub (tv_rel: type_var_rel) : type_var_rel =
     let no_var_subtype = 
@@ -226,10 +260,9 @@ module SubType = struct
         let cond = CondType.get_cond_type cond_list cond_idx in
         let pure_cond_idx = cond_idx / 2 in
         begin match cond with
-        | CondNe (fe, (TypeSingle bound, _))
-        | CondNe ((TypeSingle bound, _), fe) ->
+        | CondNe (new_e, TypeSingle bound, _)
+        | CondNe (TypeSingle bound, new_e, _) ->
           (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
-          let new_e, _ = fe in
           if TypeExp.cmp bound_exp new_e = 0 then 
             if inc then
               let bound_1 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound, SingleExp.SingleConst step)) in
@@ -272,8 +305,8 @@ module SubType = struct
       | SolNone ->
         let cond = CondType.get_cond_type cond_list cond_idx in
         begin match cond with
-        | CondNe ((e, _), (TypeSingle _, _))
-        | CondNe ((TypeSingle _, _), (e, _)) ->
+        | CondNe (e, TypeSingle _, _)
+        | CondNe (TypeSingle _, e, _) ->
           begin match e with
           | TypeBExp (TypeAdd, TypeVar v, TypeSingle (SingleConst c))
           | TypeBExp (TypeAdd, TypeSingle (SingleConst c), TypeVar v) ->
@@ -417,9 +450,10 @@ module SubType = struct
       | [] -> new_tv_rel_list
       | _ ->
         let update_tv_rel_list = List.map (fun (tv: type_var_rel) -> List.fold_left update_type_var_rel tv new_sol_list) new_tv_rel_list in
-        let update_cond_list = List.map (fun (cond: CondType.t) -> List.fold_left CondType.repl_type_sol cond new_sol_list) cond_list in
+        (* TODO: It seems that for some case we need to update condition, while for other cases we should not??? *)
+        (* let cond_list = List.map (fun (cond: CondType.t) -> List.fold_left CondType.repl_type_sol cond new_sol_list) cond_list in *)
         let merged_tv_rel_list = List.map simplify_tv_rel_sub update_tv_rel_list in
-        solve_vars merged_tv_rel_list update_cond_list (num_iter - 1)
+        solve_vars merged_tv_rel_list cond_list (num_iter - 1)
     end
 
   let string_of_sol (sol: TypeExp.t option) =

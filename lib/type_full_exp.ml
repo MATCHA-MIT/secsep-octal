@@ -55,8 +55,11 @@ module TypeFullExp = struct
     let rec helper (e: TypeExp.t) : TypeExp.t =
       match e with
       | TypeVar v ->
-        let sol = List.find (fun (idx, _) -> idx = v) sol in
-        let new_ve, _ = repl_type_sol sol (TypeVar v, cond) in new_ve
+        let sol_opt = List.find_opt (fun (idx, _) -> idx = v) sol in
+        begin match sol_opt with
+        | Some sol -> let new_ve, _ = repl_type_sol sol (TypeVar v, cond) in new_ve
+        | None -> e
+        end
       | TypeBExp (bop, e1, e2) -> TypeBExp (bop, helper e1, helper e2)
       | TypeUExp (uop, e) -> TypeUExp (uop, helper e)
       | TypePtr (e, size) -> TypePtr (helper e, size)
@@ -64,6 +67,11 @@ module TypeFullExp = struct
     in
     (TypeExp.eval (helper (helper e)), cond)
 
+  let add_type_cond (tf: t) (cond_idx: int) : t =
+    let t, cond = tf in (t, CondVarSet.add cond_idx cond)
+  
+  let add_type_cond_set (tf: t) (cond_set: CondVarSet.t) : t =
+    let t, cond = tf in (t, CondVarSet.union cond_set cond)
 
   let string_of_type_sol (t: type_sol) =
     match t with

@@ -1,5 +1,9 @@
 (test
- (name test_type)
+ ; (name test_type)
+ ; (libraries type)
+ ; (deps ../asm/salsa20_annotated.s ../asm/demo.s ../asm/sha512_block_data_order.s ../asm/sha512_final_impl.s)
+
+ (name test_prog_type)
  (libraries type)
  (deps ../asm/salsa20_annotated.s ../asm/demo.s ../asm/sha512_block_data_order.s ../asm/sha512_final_impl.s)
 
