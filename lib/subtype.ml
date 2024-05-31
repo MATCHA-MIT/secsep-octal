@@ -26,7 +26,7 @@ module SubType = struct
   let get_pure_sol (sol: t) : (TypeExp.type_var_id * TypeFullExp.type_sol) list =
     List.map (fun x -> (x.type_var_idx, x.type_sol)) sol
 
-  let get_type_var_rel (tv_rel: t) (idx: int) : type_var_rel =
+  let get_type_var_rel (tv_rel: t) (idx: TypeExp.type_var_id) : type_var_rel =
     List.find (fun x -> x.type_var_idx = idx) tv_rel
 
   let type_list_insert (type_list: TypeFullExp.t list) (ty: TypeFullExp.t) : TypeFullExp.t list =
