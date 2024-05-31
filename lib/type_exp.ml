@@ -6,6 +6,7 @@ module TypeExp = struct
   let type_exp_error msg = raise (TypeExpError ("[Type Exp Error] " ^ msg))
 
   type type_var_id = int
+  module TypeVarSet = Set.Make(Int)
 
   type type_bop =
     | TypeAdd

@@ -8,7 +8,6 @@ module MemType = struct
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
   module MemKeySet = Set.Make(Int)
-  module TypeVarSet = Set.Make(Int)
 
   type t = {
     ptr_list: MemKeySet.t;
@@ -162,9 +161,9 @@ module MemType = struct
 
   let rec find_drop_head
       (old_mem_type: (SingleExp.t * SingleExp.t * TypeExp.t) list)
-      (drop_set: TypeVarSet.t)
+      (drop_set: TypeExp.TypeVarSet.t)
       (left: SingleExp.t) (right: SingleExp.t) :
-      TypeExp.t * ((SingleExp.t * SingleExp.t * TypeExp.t) list) * TypeVarSet.t =
+      TypeExp.t * ((SingleExp.t * SingleExp.t * TypeExp.t) list) * TypeExp.TypeVarSet.t =
     match old_mem_type with
     | [] -> mem_type_error "find_drop_head type target not found"
     | (l, r, mem_t) :: tl ->
@@ -173,19 +172,19 @@ module MemType = struct
       else
         begin match mem_t with
         | TypeVar x ->
-          find_drop_head tl (TypeVarSet.add x drop_set) left right
+          find_drop_head tl (TypeExp.TypeVarSet.add x drop_set) left right
         | TypeSingle _ -> find_drop_head tl drop_set left right
         | _ -> mem_type_error "find_drop_head type being processed is not TypeVar or TypeSingle"
         end
 
   let drop_all
       (old_mem_type: (SingleExp.t * SingleExp.t * TypeExp.t) list)
-      (drop_set: TypeVarSet.t) :
-      TypeVarSet.t =
-    let helper (acc: TypeVarSet.t) (entry: SingleExp.t * SingleExp.t * TypeExp.t) : TypeVarSet.t =
+      (drop_set: TypeExp.TypeVarSet.t) :
+      TypeExp.TypeVarSet.t =
+    let helper (acc: TypeExp.TypeVarSet.t) (entry: SingleExp.t * SingleExp.t * TypeExp.t) : TypeExp.TypeVarSet.t =
       let _, _, mem_t = entry in
       match mem_t with
-      | TypeVar x -> TypeVarSet.add x acc
+      | TypeVar x -> TypeExp.TypeVarSet.add x acc
       | TypeSingle _ -> acc
       | _ -> mem_type_error "drop_all type being processed is not TypeVar or TypeSingle"
     in
@@ -194,9 +193,9 @@ module MemType = struct
   let rec update_type_one_ptr
       (old_mem_type: (SingleExp.t * SingleExp.t * TypeExp.t) list)
       (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
-      (new_var_set: TypeVarSet.t) (drop_var_set: TypeVarSet.t)
+      (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
       (update_list: (SingleExp.t * SingleExp.t * bool) list) :
-      ((SingleExp.t * SingleExp.t * TypeExp.t) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeVarSet.t * TypeVarSet.t =
+      ((SingleExp.t * SingleExp.t * TypeExp.t) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
     match update_list with
     | [] -> 
       let d_set = drop_all old_mem_type drop_var_set in
@@ -209,39 +208,39 @@ module MemType = struct
       begin match start_var_idx with
       | Left type_var_idx ->
         let d_mem_type, update_var_idx, n_set, d_set = update_type_one_ptr old_mem_type (Left (type_var_idx + 1)) new_var_set drop_var_set tl in
-        ((left, right, TypeVar type_var_idx) :: d_mem_type, update_var_idx, TypeVarSet.add type_var_idx n_set, d_set)
+        ((left, right, TypeVar type_var_idx) :: d_mem_type, update_var_idx, TypeExp.TypeVarSet.add type_var_idx n_set, d_set)
       | Right single_var_idx ->
         let d_mem_type, update_var_idx, n_set, d_set = update_type_one_ptr old_mem_type (Right (single_var_idx + 1)) new_var_set drop_var_set tl in
         ((left, right, TypeSingle (SingleVar single_var_idx)) :: d_mem_type, update_var_idx, n_set, d_set)
       end
     
   let rec update_type_all_ptr
-      (old_mem_type: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * TypeExp.t) list) list)
+      (old_t: t)
       (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
-      (new_var_set: TypeVarSet.t) (drop_var_set: TypeVarSet.t)
+      (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
       (update_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list) :
-      ((Isa.imm_var_id * (SingleExp.t * SingleExp.t * TypeExp.t) list) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeVarSet.t * TypeVarSet.t =
-    match old_mem_type, update_list with
+      t * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
+    match old_t.mem_type, update_list with
     | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
       if id1 = id2 then
         let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr mem1 start_var_idx new_var_set drop_var_set mem2 in
-        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr tl1 var_idx n_var_set d_var_set tl2 in
-        ((id1, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr { old_t with mem_type = tl1 } var_idx n_var_set d_var_set tl2 in
+        ({ result with mem_type = (id1, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
         (* (id1, update_type_one_ptr mem1 mem2) :: (update_type_all_ptr tl1 tl2) *)
       else if id1 < id2 then
-        let result, var_idx, n_var_set, d_var_set = update_type_all_ptr tl1 start_var_idx new_var_set drop_var_set update_list in
-        ((id1, mem1) :: result, var_idx, n_var_set, d_var_set)
+        let result, var_idx, n_var_set, d_var_set = update_type_all_ptr { old_t with mem_type = tl1 } start_var_idx new_var_set drop_var_set update_list in
+        ({ result with mem_type = (id1, mem1) :: result.mem_type }, var_idx, n_var_set, d_var_set)
         (* (id1, mem1) :: (update_type_all_ptr tl1 mem_access_list) *)
       else (* id2 < id1 *)
         let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
-        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr old_mem_type var_idx n_var_set d_var_set tl2 in
-        ((id2, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr old_t var_idx n_var_set d_var_set tl2 in
+        ({ result with mem_type = (id2, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
         (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr old_mem_type tl2) *)
     | [], (id2, mem2) :: tl2 ->
       let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
-      let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr [] var_idx n_var_set d_var_set tl2 in
-      ((id2, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+      let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr { old_t with mem_type = [] } var_idx n_var_set d_var_set tl2 in
+      ({ result with mem_type = (id2, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
       (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr [] tl2) *)
-    | _, [] -> (old_mem_type, start_var_idx, new_var_set, drop_var_set)
+    | _, [] -> (old_t, start_var_idx, new_var_set, drop_var_set)
 
 end
