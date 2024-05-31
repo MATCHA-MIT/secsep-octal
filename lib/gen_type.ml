@@ -3,7 +3,7 @@
 open Isa
 open Cond_type_old
 open Code_type
-open Subtype
+open Subtype_old
 open Init_stack
 
 module GenType = struct
