@@ -3,6 +3,7 @@ open Single_exp
 open Type_exp
 open Type_full_exp
 open Cond_type
+open Reg_type
 open Mem_type
 (* open Pretty_print *)
 
@@ -15,7 +16,7 @@ module StateType = struct
   module CondVarSet = Set.Make(Int)
   
   type t = {
-    reg_type: TypeExp.t list;
+    reg_type: RegType.t;
     mem_type: MemType.t;
     cond_type: TypeExp.t * TypeExp.t;
     cond_hist: CondVarSet.t
@@ -31,15 +32,10 @@ module StateType = struct
     TypeSingle (get_imm_single_exp i)
 
   let get_reg_type (curr_state: t) (r: Isa.register) : TypeExp.t =
-    let reg_type_list = curr_state.reg_type in
-    let reg_idx = Isa.get_reg_idx r in
-    List.nth reg_type_list reg_idx
+    RegType.get_reg_type curr_state.reg_type r
 
-  let set_reg_type (curr_state: t) (r: Isa.register) (t: TypeExp.t) : t =
-    let reg_list = curr_state.reg_type in
-    let reg_idx = Isa.get_reg_idx r in
-    let new_reg_list = List.mapi (fun idx reg_type -> if idx = reg_idx then t else reg_type) reg_list in
-    {curr_state with reg_type = new_reg_list}
+  let set_reg_type (curr_state: t) (r: Isa.register) (new_type: TypeExp.t) : t =
+     {curr_state with reg_type = RegType.set_reg_type curr_state.reg_type r new_type}
 
   let get_mem_op_type (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
