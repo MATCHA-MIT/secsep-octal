@@ -74,7 +74,7 @@ module ProgType = struct
             StateType.update_state_type update_list (Left type_acc) n_set_acc d_set_acc block.block_type in
         match new_var with
         | Left new_type_acc -> 
-          ((type_acc, new_type_acc, new_n_set, new_d_set), { block with block_type = new_block_type})
+          ((new_type_acc, imm_acc, new_n_set, new_d_set), { block with block_type = new_block_type })
         | Right _ -> prog_type_error ("update_prog_type: return idx should be type_idx")
       end
     in
@@ -194,6 +194,10 @@ module ProgType = struct
     let tv_rel, cond_list, unknown_list = 
       prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
     let sol_tv_rel = solve_subtype tv_rel cond_list 4 in
+    Printf.printf "HHH-------------------\n";
+    SubType.pp_tv_rels 0 sol_tv_rel;
+    MemType.pp_addr_exp 0 unknown_list;
+    Printf.printf "HHH-------------------\n";
     let new_sol = get_temp_sol sol_tv_rel in
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
     let (ptr_list, no_ptr_list), update_list = get_update_list old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in

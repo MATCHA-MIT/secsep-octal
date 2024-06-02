@@ -166,8 +166,10 @@ module SingleExp = struct
       if c12 = 0L then []
       else if c12 = 1L then tl
       else SingleConst c12 :: tl
-    | SingleConst c :: _ ->
-      if c = 0L then [] else x
+    | SingleConst c :: tl ->
+      if c = 0L then []
+      else if c = 1L then tl
+      else x
     | _ -> x
 
   let add_t (e1: t list) (e2: t list) : (t list, bool) Either.t =

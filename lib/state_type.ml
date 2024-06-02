@@ -42,7 +42,7 @@ module StateType = struct
       (old_state: t) :
       ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t * t =
     let new_mem_type, var_idx, n_var_set, d_var_set = 
-          MemType.update_type_all_ptr old_state.mem_type start_var_idx new_var_set drop_var_set update_list in
+          MemType.update_mem_type old_state.mem_type start_var_idx new_var_set drop_var_set update_list in
     (var_idx, n_var_set, d_var_set, { old_state with mem_type = new_mem_type })
 
   let rec get_imm_single_exp (i: Isa.immediate) : SingleExp.t =
@@ -94,8 +94,8 @@ module StateType = struct
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) : (TypeExp.t, TypeExp.t * int64) Either.t =
     let addr_type = get_mem_op_type curr_state disp base index scale in
-    let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
-    MemType.get_mem_type curr_state.mem_type (addr_type, size)
+        let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
+        MemType.get_mem_type curr_state.mem_type (addr_type, size)
 
   let set_st_op_type 
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -278,6 +278,7 @@ module StateType = struct
       Printf.printf "\n"
     ) s.reg_type;
     PP.print_lvl lvl "Mem:\n";
+    MemType.pp_ptr_set (lvl + 1) s.mem_type.ptr_list;
     MemType.pp_mem_type (lvl + 1) s.mem_type.mem_type;
     PP.print_lvl lvl "Cond:\n";
     TypeExp.pp_type_exp (lvl + 1) (fst s.cond_type);

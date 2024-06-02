@@ -16,6 +16,16 @@ module MemType = struct
     mem_type: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t * TypeExp.t) list)) list
   }
 
+  let pp_ptr_list (lvl: int) (ptr_list: Isa.imm_var_id list) =
+    PP.print_lvl lvl "Ptr list: ";
+    List.iter (
+      fun x -> Printf.printf "%d " x
+    ) ptr_list;
+    Printf.printf "\n"
+
+  let pp_ptr_set (lvl: int) (ptr_set: MemKeySet.t) =
+    pp_ptr_list lvl (MemKeySet.elements ptr_set)
+
   let rec filter_single_var (addr: SingleExp.t) : MemKeySet.t =
     match addr with
     | SingleVar x -> MemKeySet.singleton x
@@ -36,7 +46,7 @@ module MemType = struct
 
   let find_base (e: TypeExp.t) (ptr_list: MemKeySet.t) : Isa.imm_var_id option =
     let p_list = filter_type_single_var e in
-    match MemKeySet.to_list (MemKeySet.inter p_list ptr_list) with
+        match MemKeySet.to_list (MemKeySet.inter p_list ptr_list) with
     | [] -> None
     | hd :: [] -> Some hd
     | _ -> mem_type_error "find_base find more than one base"
@@ -137,7 +147,13 @@ module MemType = struct
         else
           begin match SingleExp.get_less left hd_left, SingleExp.get_greater right hd_right with
           | Some l, Some r -> helper tl (l, r)
-          | _ -> mem_type_error "update_offset cannot merge address offset range" 
+          | _ -> 
+            Printf.printf "Cannot merge [%s, %s] [%s, %s]\n" 
+              (SingleExp.string_of_single_exp left) 
+              (SingleExp.string_of_single_exp right) 
+              (SingleExp.string_of_single_exp hd_left) 
+              (SingleExp.string_of_single_exp hd_right);
+            mem_type_error "update_offset cannot merge address offset range" 
           end
     in
     let acc = format_convert_helper old_mem_type in
@@ -232,34 +248,53 @@ module MemType = struct
       end
     
   let rec update_type_all_ptr
+      (old_t: (Isa.imm_var_id * ((SingleExp.t * SingleExp.t * TypeExp.t) list)) list)
+      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
+      (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
+      (update_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list) :
+      ((Isa.imm_var_id * ((SingleExp.t * SingleExp.t * TypeExp.t) list)) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
+    match old_t, update_list with
+    | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
+      if id1 = id2 then
+        let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr mem1 start_var_idx new_var_set drop_var_set mem2 in
+        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr tl1 var_idx n_var_set d_var_set tl2 in
+        ((id1, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+        (* (id1, update_type_one_ptr mem1 mem2) :: (update_type_all_ptr tl1 tl2) *)
+      else if id1 < id2 then
+        let result, var_idx, n_var_set, d_var_set = update_type_all_ptr tl1 start_var_idx new_var_set drop_var_set update_list in
+        ((id1, mem1) :: result, var_idx, n_var_set, d_var_set)
+        (* (id1, mem1) :: (update_type_all_ptr tl1 mem_access_list) *)
+      else (* id2 < id1 *)
+        let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
+        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr old_t var_idx n_var_set d_var_set tl2 in
+        ((id2, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+        (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr old_mem_type tl2) *)
+    | [], (id2, mem2) :: tl2 ->
+      let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
+      let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr [] var_idx n_var_set d_var_set tl2 in
+      ((id2, mem_type) :: result, var_idx2, n_var_set2, d_var_set2)
+      (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr [] tl2) *)
+    | _, [] -> (old_t, start_var_idx, new_var_set, drop_var_set)
+
+  let update_ptr_list
+      (ptr_set: MemKeySet.t)
+      (update_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list) :
+      MemKeySet.t =
+    List.fold_left (
+      fun acc (x, _) -> MemKeySet.add x acc
+    ) ptr_set update_list
+
+  let update_mem_type
       (old_t: t)
       (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
       (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
       (update_list: (Isa.imm_var_id * (SingleExp.t * SingleExp.t * bool) list) list) :
       t * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
-    match old_t.mem_type, update_list with
-    | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
-      if id1 = id2 then
-        let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr mem1 start_var_idx new_var_set drop_var_set mem2 in
-        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr { old_t with mem_type = tl1 } var_idx n_var_set d_var_set tl2 in
-        ({ result with mem_type = (id1, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
-        (* (id1, update_type_one_ptr mem1 mem2) :: (update_type_all_ptr tl1 tl2) *)
-      else if id1 < id2 then
-        let result, var_idx, n_var_set, d_var_set = update_type_all_ptr { old_t with mem_type = tl1 } start_var_idx new_var_set drop_var_set update_list in
-        ({ result with mem_type = (id1, mem1) :: result.mem_type }, var_idx, n_var_set, d_var_set)
-        (* (id1, mem1) :: (update_type_all_ptr tl1 mem_access_list) *)
-      else (* id2 < id1 *)
-        let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
-        let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr old_t var_idx n_var_set d_var_set tl2 in
-        ({ result with mem_type = (id2, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
-        (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr old_mem_type tl2) *)
-    | [], (id2, mem2) :: tl2 ->
-      let mem_type, var_idx, n_var_set, d_var_set = update_type_one_ptr [] start_var_idx new_var_set drop_var_set mem2 in
-      let result, var_idx2, n_var_set2, d_var_set2 = update_type_all_ptr { old_t with mem_type = [] } var_idx n_var_set d_var_set tl2 in
-      ({ result with mem_type = (id2, mem_type) :: result.mem_type }, var_idx2, n_var_set2, d_var_set2)
-      (* (id2, update_type_one_ptr [] mem2) :: (update_type_all_ptr [] tl2) *)
-    | _, [] -> (old_t, start_var_idx, new_var_set, drop_var_set)
-
+    let new_mem_type, x, y, z = update_type_all_ptr old_t.mem_type start_var_idx new_var_set drop_var_set update_list in
+    ({
+      ptr_list = update_ptr_list old_t.ptr_list update_list;
+      mem_type = new_mem_type;
+    }, x, y, z)
 
   (* Find base for previously unknown addresses *)
   let repl_addr_exp (addr_exp_list: (TypeFullExp.t * int64) list) (subtype_sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) : (TypeFullExp.t * int64) list =
