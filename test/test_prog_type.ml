@@ -15,7 +15,7 @@ let read_file (filename: string) : string =
 
 (* let p = Parser.parse_program (read_file "../asm/demo.s")  *)
 (* let p = Parser.parse_program (read_file "../asm/sha512_block_data_order.s")  *)
-let p = Parser.parse_program (read_file "../asm/demo.s") 
+let p = Parser.parse_program (read_file "../asm/double_layer.s") 
 
 let start_single_var_idx = StateType.stack_base_id + Isa.StrM.cardinal p.imm_var_map + 1
 

@@ -3,6 +3,7 @@ open Single_exp
 open Type_exp
 open Type_full_exp
 open Cond_type
+open Mem_offset
 open State_type
 open Pretty_print
 
@@ -160,8 +161,8 @@ module SubType = struct
       fun acc_tv_rel (start_ptr, start_mem_type) (end_ptr, end_mem_type) ->
         if start_ptr = end_ptr then
           List.fold_left2 
-            (fun acc_tv_rel (start_off1, start_off2, start_mem_type) (end_off1, end_off2, end_mem_type) ->
-              if SingleExp.cmp start_off1 end_off1 = 0 && SingleExp.cmp start_off2 end_off2 = 0 then 
+            (fun acc_tv_rel (start_off, start_mem_type) (end_off, end_mem_type) ->
+              if MemOffset.cmp start_off end_off = 0 then (* SingleExp.cmp start_off1 end_off1 = 0 && SingleExp.cmp start_off2 end_off2 = 0 *) 
                 (add_sub_type_exp start_type.cond_hist) acc_tv_rel start_mem_type end_mem_type
               else sub_type_error ("add_sub_state_type: mem type offset does not match"))
             acc_tv_rel
