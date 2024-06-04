@@ -248,7 +248,7 @@ module MemType = struct
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
       (mem_access_list: (Isa.imm_var_id * MemOffset.t list) list) :
       ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t =
-    pp_mem_key 0 mem_access_list;
+    (* pp_mem_key 0 mem_access_list; *)
     match old_mem_type, mem_access_list with
     | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
       if id1 = id2 then
@@ -556,7 +556,7 @@ module MemType = struct
     ) update_list
 
   let pp_mem_type (lvl: int) (mem_key_list: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) =
-    PP.print_lvl lvl "Mem key list:\n";
+    PP.print_lvl lvl "Mem type:\n";
     List.iter (
       fun (id, key_list) ->
         PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;

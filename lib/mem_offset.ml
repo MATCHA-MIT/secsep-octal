@@ -29,20 +29,58 @@ module MemOffset = struct
         Printf.printf "\n" 
     ) (ConstraintSet.elements constraint_set)
 
+  let heuristic_cmp (e: SingleExp.t) : int * bool = (* (sign, sign is determined or not) *)
+    match e with
+    | SingleConst v ->
+      if v > 0L then (1, true) else if v = 0L then (0, true) else (-1, true)
+    | SingleBExp (SingleAdd, _, SingleConst offset)
+    | SingleBExp (SingleAdd, _, SingleBExp (SingleMul, _, SingleConst offset))
+    | SingleBExp (SingleAdd, SingleBExp (SingleMul, _, SingleConst offset), _) ->
+      if offset > 0L then 
+        (1, false) 
+      else if offset < 0L then 
+        (-1, false)
+      else 
+        mem_offset_error "single exp +0 -> not fully evaluated"
+    | SingleBExp (SingleMul, _, SingleConst coeff) ->
+      if coeff > 0L then 
+        (1, false) 
+      else if coeff < 0L then 
+        (-1, false) 
+      else 
+        mem_offset_error "single exp * -> not fully evaluated"
+    | _ -> (1, false)
+
   let conditional_ge (e1: SingleExp.t) (e2: SingleExp.t) : bool * ConstraintSet.t =
     let diff = SingleExp.eval (SingleBExp (SingleSub, e1, e2)) in
-    match diff with
+    let cmp_result, cmp_determined = heuristic_cmp diff in
+    if cmp_determined then
+      (cmp_result >= 0, ConstraintSet.empty)
+    else
+      (cmp_result >= 0, ConstraintSet.singleton diff)
+    (* match diff with
     | SingleConst v ->
       if v >= 0L then (true, ConstraintSet.empty) else (false, ConstraintSet.empty)
     | SingleBExp (SingleAdd, SingleVar _, SingleConst offset)
     | SingleBExp (SingleAdd, SingleBExp (SingleMul, SingleVar _, SingleConst _), SingleConst offset) ->
       if offset >= 0L then (true, ConstraintSet.singleton diff) else (false, ConstraintSet.empty)
-    | _ -> (false, ConstraintSet.empty)
-  (* (ge, cond) ge = true means e1 >= e2 if cond is true; ge = false means no conclusion is made from this comparison!!! *)
+    | _ -> (false, ConstraintSet.empty) *)
+  (* This might not be true anymore!!! (ge, cond) ge = true means e1 >= e2 if cond is true; ge = false means no conclusion is made from this comparison!!! *)
 
-  let get_conditional_greater (e1: SingleExp.t) (e2: SingleExp.t) : (SingleExp.t * ConstraintSet.t) option =
+  let get_conditional_greater (e1: SingleExp.t) (e2: SingleExp.t) : SingleExp.t * ConstraintSet.t =
     let diff = SingleExp.eval (SingleBExp (SingleSub, e1, e2)) in
-    match diff with
+    let cmp_result, cmp_determined = heuristic_cmp diff in
+    if cmp_determined then
+      ((if cmp_result >= 0 then e1 else e2), ConstraintSet.empty)
+    else begin
+      if cmp_result > 0 then
+        (e1, ConstraintSet.singleton diff)
+      else if cmp_result < 0 then
+        (e2, ConstraintSet.singleton (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, diff, SingleExp.SingleConst (-1L)))))
+      else
+        mem_offset_error "get_conditional_greater cmp_result = 0 while cmp_determined = false"
+    end
+    (* match diff with
     | SingleConst v ->
       if v >= 0L then Some (e1, ConstraintSet.empty) else Some (e2, ConstraintSet.empty)
     | SingleBExp (SingleAdd, SingleVar _, SingleConst offset)
@@ -51,11 +89,22 @@ module MemOffset = struct
         Some (e1, ConstraintSet.singleton diff) 
       else 
         Some (e2, ConstraintSet.singleton (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, diff, SingleExp.SingleConst (-1L)))))
-    | _ -> None
+    | _ -> None *)
 
-  let get_conditional_less (e1: SingleExp.t) (e2: SingleExp.t) : (SingleExp.t * ConstraintSet.t) option =
+  let get_conditional_less (e1: SingleExp.t) (e2: SingleExp.t) : SingleExp.t * ConstraintSet.t =
     let diff = SingleExp.eval (SingleBExp (SingleSub, e1, e2)) in
-    match diff with
+    let cmp_result, cmp_determined = heuristic_cmp diff in
+    if cmp_determined then
+      ((if cmp_result <= 0 then e1 else e2), ConstraintSet.empty)
+    else begin
+      if cmp_result < 0 then
+        (e1, ConstraintSet.singleton (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, diff, SingleExp.SingleConst (-1L)))))
+      else if cmp_result > 0 then
+        (e2, ConstraintSet.singleton diff)
+      else
+        mem_offset_error "get_conditional_less cmp_result = 0 while cmp_determined = false"
+    end
+    (* match diff with
     | SingleConst v ->
       if v <= 0L then Some (e1, ConstraintSet.empty) else Some (e2, ConstraintSet.empty)
     | SingleBExp (SingleAdd, SingleVar _, SingleConst offset)
@@ -64,7 +113,7 @@ module MemOffset = struct
         Some (e1, ConstraintSet.singleton (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, diff, SingleExp.SingleConst (-1L))))) 
       else 
         Some (e2, ConstraintSet.singleton diff)
-    | _ -> None
+    | _ -> None *)
 
   let check_offset (offset: t) : ConstraintSet.t =
     let left, right = offset in
@@ -86,7 +135,10 @@ module MemOffset = struct
       let l1_ge_r2, l1_cond_r2 = conditional_ge l1 r2 in
       if l1_ge_r2 then (Left false, l1_cond_r2)
       else
-        match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
+        let l, cond_l = get_conditional_less l1 l2 in
+        let r, cond_r = get_conditional_greater r1 r2 in
+        (Right (l, r), ConstraintSet.union cond_l cond_r)
+        (* match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
         | Some (l, cond_l), Some (r, cond_r) -> 
           (Right (l, r), ConstraintSet.union cond_l cond_r)
         | _ ->
@@ -95,7 +147,7 @@ module MemOffset = struct
               (SingleExp.string_of_single_exp r1) 
               (SingleExp.string_of_single_exp l2) 
               (SingleExp.string_of_single_exp r2);
-          mem_offset_error "cmp_or_merge cannot merge address offset range" 
+          mem_offset_error "cmp_or_merge cannot merge address offset range"  *)
 
   let equal (o1: t) (o2: t) : bool =
     let l1, r1 = o1 in

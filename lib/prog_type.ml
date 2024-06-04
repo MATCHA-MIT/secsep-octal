@@ -176,7 +176,9 @@ module ProgType = struct
     (* MemType.pp_addr_exp 0 repl_mem_list; *)
     let new_ptr_info, addr_base_range = 
       MemType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
-    let udpate_list, constraint_set = MemType.update_offset_all_ptr old_mem_type (MemType.reshape_mem_key_list addr_base_range) in
+    let mem_access_list = (MemType.reshape_mem_key_list addr_base_range) in
+    MemType.pp_mem_key 0 mem_access_list;
+    let udpate_list, constraint_set = MemType.update_offset_all_ptr old_mem_type mem_access_list in
     (new_ptr_info, udpate_list, constraint_set)
 
   let init
@@ -203,9 +205,10 @@ module ProgType = struct
       prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
     let sol_tv_rel = solve_subtype tv_rel cond_list 4 in
     Printf.printf "HHH-------------------\n";
-    SubType.pp_tv_rels 0 sol_tv_rel;
+    (* SubType.pp_tv_rels 0 sol_tv_rel; *)
+    Printf.printf "Unknown list\n";
     MemType.pp_addr_exp 0 unknown_list;
-    Printf.printf "HHH-------------------\n";
+    Printf.printf "hhh-------------------\n";
     let new_sol = get_temp_sol sol_tv_rel in
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
     let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
