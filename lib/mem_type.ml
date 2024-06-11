@@ -5,17 +5,74 @@ open Type_full_exp
 open Mem_offset
 open Pretty_print
 
+module type MemEntrytype = sig
+  type t
+  (* val default_val : t *)
+  val partial_read_val: t -> t
+  val partial_write_val: t -> t -> t
+  val next_var : t -> t
+  val to_string : t -> string
+end
 
-module MemType = struct
+module MemKeySet = Set.Make(Int)
+
+(* module type MemType = sig
+  exception MemTypeError of string
+  val mem_type_error : string -> 'a
+  type entry_t
+  type t
+  val get_mem_type_with_key : t -> Isa.imm_var_id * MemOffset.t -> bool -> entry_t
+  val set_mem_type_with_key : t -> Isa.imm_var_id * MemOffset.t -> bool -> entry_t -> t
+  val get_mem_type_with_addr : t -> TypeExp.t * int64 -> (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t
+  val set_mem_type_with_addr : t -> TypeExp.t * int64 -> entry_t -> (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t
+  val init_mem_type : t
+  val pp_ptr_list : int -> Isa.imm_var_id list -> unit
+  val pp_ptr_set : int-> MemKeySet.t -> unit
+  val pp_mem_key : int -> (Isa.imm_var_id * (MemOffset.t list)) list -> unit
+  val pp_base_range : int -> (Isa.imm_var_id * MemOffset.t) list -> unit
+  val pp_mem_type : int -> (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list -> unit
+end *)
+
+module MemType (Entry: MemEntrytype) = struct
   exception MemTypeError of string
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
-  module MemKeySet = Set.Make(Int)
-
+  type entry_t = Entry.t
   type t = {
     ptr_list: MemKeySet.t;
-    mem_type: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list
+    mem_type: (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) list
   }
+
+  let get_mem_type_with_key (mem: t) (mem_key: Isa.imm_var_id * MemOffset.t) (full_entry: bool) : entry_t =
+    let ptr, offset = mem_key in
+    let _, ptr_mem = List.find (fun (x, _) -> x = ptr) mem.mem_type in
+    let _, mem_type = List.find (fun (x, _) -> MemOffset.cmp offset x = 0) ptr_mem in
+    if full_entry then mem_type else Entry.partial_read_val mem_type
+
+  let set_mem_type_with_key 
+      (mem: t) (mem_key: Isa.imm_var_id * MemOffset.t) (full_entry: bool) (new_type: entry_t) : t =
+    let ptr, offset = mem_key in
+    let helper (acc: bool) (entry: MemOffset.t * entry_t) : bool * (MemOffset.t * entry_t) =
+      let entry_offset, old_type = entry in
+      match acc, MemOffset.cmp entry_offset offset = 0 with
+      | true, true -> mem_type_error "set_mem_type_with_key found more than one match"
+      | true, false -> (true, entry)
+      | false, true -> 
+        if full_entry then (true, (offset, new_type)) else (true, (offset, Entry.partial_write_val old_type new_type))
+      | false, false -> (false, entry)
+    in
+    let helper2 (acc: bool) (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
+        bool * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+      let entry_ptr, entry_mem = entry in
+      if ptr == entry_ptr then
+        let found, new_entry_mem = List.fold_left_map helper false entry_mem in
+        if found then (true, (entry_ptr, new_entry_mem))
+        else mem_type_error "set_mem_type_with_key offset not found"
+      else (acc, entry)
+    in
+    let found, new_mem_type = List.fold_left_map helper2 false mem.mem_type in
+    if found then {mem with mem_type = new_mem_type}
+    else mem_type_error "set_mem_type_with_key ptr not found"
 
   let pp_ptr_list (lvl: int) (ptr_list: Isa.imm_var_id list) =
     PP.print_lvl lvl "Ptr list: ";
@@ -70,14 +127,9 @@ module MemType = struct
         SingleExp.SingleConst size))),
       false)
     | _ -> 
-      mem_type_error ("get_idx_range not implement for " ^ (TypeExp.string_of_type_exp addr))
+      mem_type_error ("get_idx_range not implement for " ^ (TypeExp.to_string addr))
 
-  (* let subset (e1: SingleExp.t * SingleExp.t) (e2: SingleExp.t * SingleExp.t) : bool =
-    let l1, r1 = e1 in
-    let l2, r2 = e2 in
-    SingleExp.must_ge l1 l2 && SingleExp.must_ge r2 r1 *)
-
-  let get_mem_type (mem: t) (addr_exp: TypeExp.t * int64) : (TypeExp.t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+  let get_mem_type_with_addr (mem: t) (addr_exp: TypeExp.t * int64) : (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
     let base_opt = find_base addr mem.ptr_list in
     match base_opt with
@@ -92,11 +144,11 @@ module MemType = struct
             begin if track_value then 
                 Some (mem_type, MemOffset.ConstraintSet.empty)
             else
-                Some (TypeExp.TypeTop, MemOffset.ConstraintSet.empty)
+                Some (Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
             end
           else
             let sub, sub_constraint = MemOffset.subset addr_range offset in
-            if sub then Some (TypeExp.TypeTop, sub_constraint)
+            if sub then Some (Entry.partial_read_val mem_type, sub_constraint)
             else None
       ) offset_list in
       begin match find_entry with
@@ -104,7 +156,9 @@ module MemType = struct
       | Some (mem_type, match_constraint) -> Left (mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
       end
 
-  let set_mem_type (mem: t) (addr_exp: TypeExp.t * int64) (new_type: TypeExp.t) : (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+  let set_mem_type_with_addr 
+      (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t) : 
+      (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
     let base_opt = find_base addr mem.ptr_list in
     match base_opt with
@@ -115,9 +169,9 @@ module MemType = struct
       let addr_constraint = MemOffset.check_offset addr_range in
       let helper0
           (acc: MemOffset.ConstraintSet.t option) 
-          (entry: MemOffset.t * TypeExp.t) : 
-          (MemOffset.ConstraintSet.t option) * (MemOffset.t * TypeExp.t) =
-        let offset, _ = entry in
+          (entry: MemOffset.t * entry_t) : 
+          (MemOffset.ConstraintSet.t option) * (MemOffset.t * entry_t) =
+        let offset, old_mem_type = entry in
         match acc with
         | Some _ -> (acc, entry)
         | None ->
@@ -125,20 +179,20 @@ module MemType = struct
             begin if track_value then
               (Some MemOffset.ConstraintSet.empty, (offset, new_type))
             else
-              (Some MemOffset.ConstraintSet.empty, (offset, TypeExp.TypeTop))
+              (Some MemOffset.ConstraintSet.empty, (offset, Entry.partial_write_val old_mem_type new_type))
             end
           else begin
             let subset, subset_constraint = MemOffset.subset addr_range offset in
             if subset then
-              (Some subset_constraint, (offset, TypeExp.TypeTop))
+              (Some subset_constraint, (offset, Entry.partial_write_val old_mem_type new_type))
             else
               (None, entry)
           end
       in
       let helper
           (acc: MemOffset.ConstraintSet.t option)
-          (entry: Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) :
-          (MemOffset.ConstraintSet.t option) * (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) =
+          (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
+          (MemOffset.ConstraintSet.t option) * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
         let k, o_list = entry in
         match acc with
         | Some acc -> (Some acc, entry)
@@ -159,33 +213,70 @@ module MemType = struct
           {mem with mem_type = new_mem_type},
           MemOffset.ConstraintSet.union addr_constraint constraint_list
         )
-      (* let find_entry = List.find_index (
-        fun (l, r, _) ->
-          if subset addr_range (l, r) then true
-          else false
-      ) offset_list in
-      begin match find_entry with
-      | None -> Right addr_exp
-      | Some idx -> Left { mem with mem_type = 
-          List.map (
-            fun (k, o_list) ->
-              if k = base then (
-                k,
-                List.mapi (
-                  fun i (l, r, old_type) ->
-                    if i = idx then (l, r, new_type) else (l, r, old_type)
-                ) o_list
-              )
-              else (k, o_list)
-          ) mem.mem_type
-        }
-      end *)
 
   let init_mem_type : t =
     {
       ptr_list = MemKeySet.empty;
       mem_type = [];
     }
+
+  let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * (MemOffset.t list)) list) =
+    PP.print_lvl lvl "Mem key list:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i (left, right) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            Printf.printf "\n"
+        ) key_list
+    ) mem_key_list
+
+  let pp_addr_exp (lvl: int) (addr_exp: (TypeFullExp.t * int64) list) =
+    PP.print_lvl lvl "Addr exp list:\n";
+    List.iteri (
+      fun i x ->
+        let exp, size = x in
+        PP.print_lvl (lvl + 1) "<Addr %d>" i;
+        TypeFullExp.pp_type_full_exp (lvl + 2) exp;
+        PP.print_lvl (lvl + 1) "%Ld" size;
+        Printf.printf "\n"
+    ) addr_exp
+
+  let pp_base_range (lvl: int) (base_range_list: (Isa.imm_var_id * MemOffset.t) list) =
+    PP.print_lvl lvl "Base range list:\n";
+    List.iteri (
+      fun i x ->
+        let base_id, (left, right) = x in
+        PP.print_lvl (lvl + 1) "<Addr Range %d> %d" i base_id;
+        SingleExp.pp_single_exp (lvl + 2) left;
+        SingleExp.pp_single_exp (lvl + 2) right;
+        Printf.printf "\n"
+    ) base_range_list
+
+  let pp_mem_type (lvl: int) (mem_key_list: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) =
+    PP.print_lvl lvl "Mem type:\n";
+    List.iter (
+      fun (id, key_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
+        List.iteri (
+          fun i ((left, right), mem_type) ->
+            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
+            SingleExp.pp_single_exp (lvl + 2) left;
+            SingleExp.pp_single_exp (lvl + 2) right;
+            TypeExp.pp_type_exp (lvl + 2) mem_type;
+            Printf.printf "\n"
+        ) key_list
+    ) mem_key_list
+
+end
+
+module MemRangeTypeBase = MemType (TypeExp)
+
+module MemRangeType = struct
+include MemRangeTypeBase
 
   let format_convert_helper = List.map (fun (off, _) -> (off, false))
 
@@ -220,29 +311,15 @@ module MemType = struct
           | Some l, Some r -> helper tl (l, r)
           | _ -> 
             Printf.printf "Cannot merge [%s, %s] [%s, %s]\n" 
-              (SingleExp.string_of_single_exp left) 
-              (SingleExp.string_of_single_exp right) 
-              (SingleExp.string_of_single_exp hd_left) 
-              (SingleExp.string_of_single_exp hd_right);
+              (SingleExp.to_string left) 
+              (SingleExp.to_string right) 
+              (SingleExp.to_string hd_left) 
+              (SingleExp.to_string hd_right);
             mem_type_error "update_offset cannot merge address offset range" 
           end *)
     in
     let acc = format_convert_helper old_mem_type in
     List.fold_left helper (acc, MemOffset.ConstraintSet.empty) mem_access_list
-
-  let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * (MemOffset.t list)) list) =
-    PP.print_lvl lvl "Mem key list:\n";
-    List.iter (
-      fun (id, key_list) ->
-        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
-        List.iteri (
-          fun i (left, right) ->
-            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
-            SingleExp.pp_single_exp (lvl + 2) left;
-            SingleExp.pp_single_exp (lvl + 2) right;
-            Printf.printf "\n"
-        ) key_list
-    ) mem_key_list
 
   let rec update_offset_all_ptr
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
@@ -519,28 +596,6 @@ module MemType = struct
     in
     List.fold_left helper [] mem_access_list
 
-  let pp_addr_exp (lvl: int) (addr_exp: (TypeFullExp.t * int64) list) =
-    PP.print_lvl lvl "Addr exp list:\n";
-    List.iteri (
-      fun i x ->
-        let exp, size = x in
-        PP.print_lvl (lvl + 1) "<Addr %d>" i;
-        TypeFullExp.pp_type_full_exp (lvl + 2) exp;
-        PP.print_lvl (lvl + 1) "%Ld" size;
-        Printf.printf "\n"
-    ) addr_exp
-
-  let pp_base_range (lvl: int) (base_range_list: (Isa.imm_var_id * MemOffset.t) list) =
-    PP.print_lvl lvl "Base range list:\n";
-    List.iteri (
-      fun i x ->
-        let base_id, (left, right) = x in
-        PP.print_lvl (lvl + 1) "<Addr Range %d> %d" i base_id;
-        SingleExp.pp_single_exp (lvl + 2) left;
-        SingleExp.pp_single_exp (lvl + 2) right;
-        Printf.printf "\n"
-    ) base_range_list
-
   let pp_update_list (lvl: int) (update_list: ((Isa.imm_var_id * (MemOffset.t * bool) list) list)) =
     PP.print_lvl lvl "Update list:\n";
     List.iter (
@@ -554,20 +609,5 @@ module MemType = struct
             Printf.printf " %b\n" b
         ) key_list
     ) update_list
-
-  let pp_mem_type (lvl: int) (mem_key_list: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) =
-    PP.print_lvl lvl "Mem type:\n";
-    List.iter (
-      fun (id, key_list) ->
-        PP.print_lvl (lvl + 1) "<Ptr SymImm %d>\n" id;
-        List.iteri (
-          fun i ((left, right), mem_type) ->
-            PP.print_lvl (lvl + 2) "<Addr Range %d> " i;
-            SingleExp.pp_single_exp (lvl + 2) left;
-            SingleExp.pp_single_exp (lvl + 2) right;
-            TypeExp.pp_type_exp (lvl + 2) mem_type;
-            Printf.printf "\n"
-        ) key_list
-    ) mem_key_list
-
 end
+

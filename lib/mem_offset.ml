@@ -120,7 +120,7 @@ module MemOffset = struct
     let cond_ge, cond = conditional_ge right left in
     if cond_ge then cond 
     else begin
-      Printf.printf "Offset [%s, %s]\n" (SingleExp.string_of_single_exp left) (SingleExp.string_of_single_exp right);
+      Printf.printf "Offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
       mem_offset_error "check_offset failed"
     end
   (* TODO: Think about whether here should be greater than instead of greater than or equal to!!! *)
@@ -143,10 +143,10 @@ module MemOffset = struct
           (Right (l, r), ConstraintSet.union cond_l cond_r)
         | _ ->
           Printf.printf "Cannot merge [%s, %s] [%s, %s]\n" 
-              (SingleExp.string_of_single_exp l1) 
-              (SingleExp.string_of_single_exp r1) 
-              (SingleExp.string_of_single_exp l2) 
-              (SingleExp.string_of_single_exp r2);
+              (SingleExp.to_string l1) 
+              (SingleExp.to_string r1) 
+              (SingleExp.to_string l2) 
+              (SingleExp.to_string r2);
           mem_offset_error "cmp_or_merge cannot merge address offset range"  *)
 
   let equal (o1: t) (o2: t) : bool =

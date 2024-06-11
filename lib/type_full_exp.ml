@@ -75,8 +75,8 @@ module TypeFullExp = struct
 
   let string_of_type_sol (t: type_sol) =
     match t with
-    | SolSimple e -> "SolSimple " ^ (TypeExp.string_of_type_exp e)
-    | SolCond (e, c, e1, e2) -> "SolCond " ^ (TypeExp.string_of_type_exp e) ^ " cond " ^ (string_of_int c) ^ " taken " ^ (TypeExp.string_of_type_exp e1) ^ " not taken " ^ (TypeExp.string_of_type_exp e2)
+    | SolSimple e -> "SolSimple " ^ (TypeExp.to_string e)
+    | SolCond (e, c, e1, e2) -> "SolCond " ^ (TypeExp.to_string e) ^ " cond " ^ (string_of_int c) ^ " taken " ^ (TypeExp.to_string e1) ^ " not taken " ^ (TypeExp.to_string e2)
     | SolNone -> "SolNone"
 
   let string_of_one_cond_status (cond: int) =
@@ -90,7 +90,7 @@ module TypeFullExp = struct
   let pp_type_full_exp (lvl: int) (tf: t) =
     let t, cond = tf in
     PP.print_lvl lvl "(Type = %s, Cond = %s)"
-      (TypeExp.string_of_type_exp t)
+      (TypeExp.to_string t)
       (string_of_cond_status cond)
 
 end

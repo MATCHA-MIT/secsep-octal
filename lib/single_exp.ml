@@ -26,7 +26,7 @@ module SingleExp = struct
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
 
-  let rec string_of_single_exp (se: t) =
+  let rec to_string (se: t) =
     match se with
     | SingleConst v -> "Const " ^ (Int64.to_string v)
     | SingleVar v -> "SymImm " ^ (string_of_int v)
@@ -41,15 +41,15 @@ module SingleExp = struct
       | SingleAnd -> "And"
       | SingleOr -> "Or"
       in
-      "S-BinaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp l) ^ ", " ^ (string_of_single_exp r) ^ ")"
+      "S-BinaryExp (" ^ op_str ^ ", " ^ (to_string l) ^ ", " ^ (to_string r) ^ ")"
     | SingleUExp (op, e) ->
       let op_str = match op with
       | SingleNot -> "Not"
       in
-      "S-UnaryExp (" ^ op_str ^ ", " ^ (string_of_single_exp e) ^ ")"
+      "S-UnaryExp (" ^ op_str ^ ", " ^ (to_string e) ^ ")"
 
   let pp_single_exp (lvl: int) (s: t) =
-    PP.print_lvl lvl "%s" (string_of_single_exp s)
+    PP.print_lvl lvl "%s" (to_string s)
 
   let pp_split_exp (lvl: int) (s: t list list) =
     List.iter (fun x -> 

@@ -36,6 +36,22 @@ module TypeExp = struct
     | TypeUExp of type_uop * t
     | TypePtr of t * int64
 
+  let default_val : t = TypeTop
+
+  let partial_read_val (e: t) : t =
+    match e with
+    | _ -> TypeTop
+  
+  let partial_write_val (orig_e: t) (write_e: t) : t =
+    match orig_e, write_e with
+    | _ -> TypeTop
+
+  let next_var (e: t) : t =
+    match e with
+    | TypeSingle (SingleVar x) -> TypeSingle (SingleVar (x + 1))
+    | TypeVar x -> TypeVar (x + 1)
+    | _ -> type_exp_error "next_var cannot find next var for non type or single var"
+
   let cmp_type_bop (op1: type_bop) (op2: type_bop) : int =
     match op1, op2 with
     | TypeAdd, TypeAdd -> 0
@@ -370,13 +386,13 @@ module TypeExp = struct
       TypePtr (repl_type_exp sol ee, size)
     | _ -> e
 
-  let rec string_of_type_exp (t: t) =
+  let rec to_string (t: t) : string =
     match t with
-    | TypeSingle ts -> SingleExp.string_of_single_exp ts
+    | TypeSingle ts -> SingleExp.to_string ts
     | TypeRange (bg, bgi, ed, edi, step) -> 
       let bg_str = if bgi then "[" else "(" in
       let ed_str = if edi then "]" else ")" in
-      bg_str ^ (SingleExp.string_of_single_exp bg) ^ ", " ^ (SingleExp.string_of_single_exp ed) ^ ed_str ^ " step = " ^ (Int64.to_string step)
+      bg_str ^ (SingleExp.to_string bg) ^ ", " ^ (SingleExp.to_string ed) ^ ed_str ^ " step = " ^ (Int64.to_string step)
     | TypeVar v -> "TypeVar " ^ (string_of_int v)
     | TypeTop -> "Top"
     | TypeBot -> "Bottom"
@@ -395,17 +411,17 @@ module TypeExp = struct
       | TypeUnion -> "Union"
       | TypeDiff -> "Diff"
       in
-      "BinaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp l) ^ ", " ^ (string_of_type_exp r) ^ ")"
+      "BinaryExp (" ^ op_str ^ ", " ^ (to_string l) ^ ", " ^ (to_string r) ^ ")"
     | TypeUExp (op, e) ->
       let op_str = match op with
       | TypeNot -> "Not"
       | TypeComp -> "Comp"
       in
-      "UnaryExp (" ^ op_str ^ ", " ^ (string_of_type_exp e) ^ ")"
+      "UnaryExp (" ^ op_str ^ ", " ^ (to_string e) ^ ")"
     | TypePtr (e, size) ->
-      "Ptr (" ^ (string_of_type_exp e) ^ ", " ^ (Int64.to_string size) ^ ")"
+      "Ptr (" ^ (to_string e) ^ ", " ^ (Int64.to_string size) ^ ")"
 
   let pp_type_exp (lvl: int) (s: t) =
-    PP.print_lvl lvl "%s" (string_of_type_exp s)
+    PP.print_lvl lvl "%s" (to_string s)
 
 end

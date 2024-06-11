@@ -17,17 +17,17 @@ module StateType = struct
   module CondVarSet = Set.Make(Int)
   
   type t = {
-    reg_type: RegType.t;
-    mem_type: MemType.t;
+    reg_type: RegRangeType.t;
+    mem_type: MemRangeType.t;
     cond_type: TypeExp.t * TypeExp.t;
     cond_hist: CondVarSet.t
   }
 
   let init_state_type 
-      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t) : 
-      ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * t =
-    let idx0, r_type = RegType.init_reg_type start_var_idx in
-    let m_type = MemType.init_mem_type in
+      (start_var: TypeExp.t) : 
+      TypeExp.t * t =
+    let idx0, r_type = RegRangeType.init_reg_type start_var in
+    let m_type = MemRangeType.init_mem_type in
     (idx0, 
     { 
       reg_type = r_type; 
@@ -43,7 +43,7 @@ module StateType = struct
       (old_state: t) :
       ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t * t =
     let new_mem_type, var_idx, n_var_set, d_var_set = 
-          MemType.update_mem_type old_state.mem_type start_var_idx new_var_set drop_var_set update_list in
+          MemRangeType.update_mem_type old_state.mem_type start_var_idx new_var_set drop_var_set update_list in
     (var_idx, n_var_set, d_var_set, { old_state with mem_type = new_mem_type })
 
   let rec get_imm_single_exp (i: Isa.immediate) : SingleExp.t =
@@ -56,10 +56,10 @@ module StateType = struct
     TypeSingle (get_imm_single_exp i)
 
   let get_reg_type (curr_state: t) (r: Isa.register) : TypeExp.t =
-    RegType.get_reg_type curr_state.reg_type r
+    RegRangeType.get_reg_type curr_state.reg_type r
 
   let set_reg_type (curr_state: t) (r: Isa.register) (new_type: TypeExp.t) : t =
-     {curr_state with reg_type = RegType.set_reg_type curr_state.reg_type r new_type}
+     {curr_state with reg_type = RegRangeType.set_reg_type curr_state.reg_type r new_type}
 
   let get_mem_op_type (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
@@ -96,7 +96,7 @@ module StateType = struct
       (size: int64) : (TypeExp.t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr_type = get_mem_op_type curr_state disp base index scale in
         let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
-        MemType.get_mem_type curr_state.mem_type (addr_type, size)
+        MemRangeType.get_mem_type_with_addr curr_state.mem_type (addr_type, size)
 
   let set_st_op_type 
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -107,7 +107,7 @@ module StateType = struct
       (new_type: TypeExp.t) : (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr_type = get_mem_op_type curr_state disp base index scale in
     let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
-    match MemType.set_mem_type curr_state.mem_type (addr_type, size) new_type with
+    match MemRangeType.set_mem_type_with_addr curr_state.mem_type (addr_type, size) new_type with
     | Left (m_type, st_constraint) -> Left ({ curr_state with mem_type = m_type }, st_constraint)
     | Right other -> Right other
 
@@ -310,8 +310,8 @@ module StateType = struct
       Printf.printf "\n"
     ) s.reg_type;
     PP.print_lvl lvl "Mem:\n";
-    MemType.pp_ptr_set (lvl + 1) s.mem_type.ptr_list;
-    MemType.pp_mem_type (lvl + 1) s.mem_type.mem_type;
+    MemRangeType.pp_ptr_set (lvl + 1) s.mem_type.ptr_list;
+    MemRangeType.pp_mem_type (lvl + 1) s.mem_type.mem_type;
     PP.print_lvl lvl "Cond:\n";
     TypeExp.pp_type_exp (lvl + 1) (fst s.cond_type);
     Printf.printf "\n";

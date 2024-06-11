@@ -23,8 +23,8 @@ module ProgType = struct
     cond_type: CondType.t list;
     subtype_sol: SubType.t;
     constraint_set: MemOffset.ConstraintSet.t;
-    ptr_set: MemType.MemKeySet.t;
-    no_ptr_set: MemType.MemKeySet.t;
+    ptr_set: MemKeySet.t;
+    no_ptr_set: MemKeySet.t;
     next_type_var_idx: TypeExp.type_var_id;
     next_single_var_idx: Isa.imm_var_id;
   }
@@ -39,15 +39,18 @@ module ProgType = struct
         (TypeExp.type_var_id * Isa.imm_var_id) * block_type =
       let type_acc, imm_acc = acc in
       if Isa.is_label_function_entry block.label then begin
-        let new_acc, state = StateType.init_state_type (Right imm_acc) in
+        (* let new_acc, state = StateType.init_state_type (Right imm_acc) in *)
+        let new_acc, state = StateType.init_state_type (TypeSingle (SingleVar imm_acc)) in
         match new_acc with
-        | Left _ -> prog_type_error ("init_prog_type: return idx should be imm_idx")
-        | Right new_imm_acc -> ((type_acc, new_imm_acc), { label = block.label; block_type = state }) 
+        (* | Left _ -> prog_type_error ("init_prog_type: return idx should be imm_idx") *)
+        | TypeSingle (SingleVar new_imm_acc) -> ((type_acc, new_imm_acc), { label = block.label; block_type = state }) 
+        | _ -> prog_type_error ("init_prog_type: return idx should be single var imm_idx")
       end else begin
-        let new_acc, state = StateType.init_state_type (Left type_acc) in
+        (* let new_acc, state = StateType.init_state_type (Left type_acc) in *)
+        let new_acc, state = StateType.init_state_type (TypeVar type_acc) in
         match new_acc with
-        | Left new_type_acc -> ((new_type_acc, imm_acc), { label = block.label; block_type = state })
-        | Right _ ->  prog_type_error ("init_prog_type: return idx should be type_idx")
+        | TypeVar new_type_acc -> ((new_type_acc, imm_acc), { label = block.label; block_type = state })
+        | _ ->  prog_type_error ("init_prog_type: return idx should be type var type_idx")
       end
     in
     List.fold_left_map helper (start_type_var_idx, start_single_var_idx) prog.bbs
@@ -169,16 +172,16 @@ module ProgType = struct
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
       (unknown_mem_list: (TypeFullExp.t * int64) list)
       (subtype_sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
-      (ptr_list: MemType.MemKeySet.t) (no_ptr_list: MemType.MemKeySet.t) :
-      (MemType.MemKeySet.t * MemType.MemKeySet.t) * ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t =
+      (ptr_list: MemKeySet.t) (no_ptr_list: MemKeySet.t) :
+      (MemKeySet.t * MemKeySet.t) * ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t =
     (* MemType.pp_addr_exp 0 unknown_mem_list; *)
-    let repl_mem_list = MemType.repl_addr_exp unknown_mem_list subtype_sol in
+    let repl_mem_list = MemRangeType.repl_addr_exp unknown_mem_list subtype_sol in
     (* MemType.pp_addr_exp 0 repl_mem_list; *)
     let new_ptr_info, addr_base_range = 
-      MemType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
-    let mem_access_list = (MemType.reshape_mem_key_list addr_base_range) in
-    MemType.pp_mem_key 0 mem_access_list;
-    let udpate_list, constraint_set = MemType.update_offset_all_ptr old_mem_type mem_access_list in
+      MemRangeType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
+    let mem_access_list = (MemRangeType.reshape_mem_key_list addr_base_range) in
+    MemRangeType.pp_mem_key 0 mem_access_list;
+    let udpate_list, constraint_set = MemRangeType.update_offset_all_ptr old_mem_type mem_access_list in
     (new_ptr_info, udpate_list, constraint_set)
 
   let init
@@ -193,8 +196,8 @@ module ProgType = struct
       cond_type = [];
       subtype_sol = SubType.init next_type_var_idx;
       constraint_set = MemOffset.ConstraintSet.empty;
-      ptr_set = MemType.MemKeySet.empty;
-      no_ptr_set = MemType.MemKeySet.empty;
+      ptr_set = MemKeySet.empty;
+      no_ptr_set = MemKeySet.empty;
       next_type_var_idx = next_type_var_idx;
       next_single_var_idx = next_single_var_idx;
     }
@@ -207,7 +210,7 @@ module ProgType = struct
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
-    MemType.pp_addr_exp 0 unknown_list;
+    MemRangeType.pp_addr_exp 0 unknown_list;
     Printf.printf "hhh-------------------\n";
     let new_sol = get_temp_sol sol_tv_rel in
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in

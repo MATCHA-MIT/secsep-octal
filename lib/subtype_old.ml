@@ -120,7 +120,7 @@ module SubType = struct
       let b_exp, _ = b in
       if TypeExp.cmp a_exp b_exp = 0 then tv_rel (* Handle the special case for rsp *)
       else sub_type_error ("add_sub_type_full_exp: incorrect sub/super types " ^ 
-        (TypeExp.string_of_type_exp a_exp) ^ " " ^ (TypeExp.string_of_type_exp b_exp))
+        (TypeExp.to_string a_exp) ^ " " ^ (TypeExp.to_string b_exp))
 
   let add_sub_state_type (tv_rel: t) (start_type: CodeType.state_type) (end_type: CodeType.state_type) : t =
     let start_code_type = start_type.reg_type in
@@ -425,7 +425,7 @@ module SubType = struct
   let string_of_sol (sol: TypeExp.t option) =
     match sol with
     | None -> "None"
-    | Some e -> "Some " ^ (TypeExp.string_of_type_exp e)
+    | Some e -> "Some " ^ (TypeExp.to_string e)
 
   let pp_tv_rels (lvl: int) (tv_rels: t) =
     List.iter (fun x ->

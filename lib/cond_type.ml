@@ -53,10 +53,10 @@ module CondType = struct
 
   let pp_cond (lvl: int) (cond: t) =
     let op, str1, str2 = match cond with
-    | CondNe (l, r, _) -> ("Ne", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
-    | CondEq (l, r, _) -> ("Eq", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
-    | CondLq (l, r, _) -> ("Lq", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
-    | CondLe (l, r, _) -> ("Le", TypeExp.string_of_type_exp l, TypeExp.string_of_type_exp r)
+    | CondNe (l, r, _) -> ("Ne", TypeExp.to_string l, TypeExp.to_string r)
+    | CondEq (l, r, _) -> ("Eq", TypeExp.to_string l, TypeExp.to_string r)
+    | CondLq (l, r, _) -> ("Lq", TypeExp.to_string l, TypeExp.to_string r)
+    | CondLe (l, r, _) -> ("Le", TypeExp.to_string l, TypeExp.to_string r)
     in
     PP.print_lvl lvl "Cond %s between\n" op;
     PP.print_lvl (lvl + 1) "%s\n" str1;
