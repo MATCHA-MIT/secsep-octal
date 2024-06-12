@@ -1,5 +1,6 @@
 open Isa
 open Type_exp
+open Taint_dep_exp
 
 module type RegEntryType = sig
   type t
@@ -41,3 +42,5 @@ module RegType (Entry: RegEntryType) = struct
 end
 
 module RegRangeType = RegType (TypeExp)
+
+module RegTaintType = RegType (TaintExp)

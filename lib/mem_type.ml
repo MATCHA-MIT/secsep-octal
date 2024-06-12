@@ -3,6 +3,7 @@ open Single_exp
 open Type_exp
 open Type_full_exp
 open Mem_offset
+open Taint_dep_exp
 open Pretty_print
 
 module type MemEntrytype = sig
@@ -38,9 +39,10 @@ module MemType (Entry: MemEntrytype) = struct
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * 'a) list)) list
   type t = {
     ptr_list: MemKeySet.t;
-    mem_type: (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) list
+    mem_type: entry_t mem_content
   }
 
   let get_mem_type_with_key (mem: t) (mem_key: Isa.imm_var_id * MemOffset.t) (full_entry: bool) : entry_t =
@@ -220,6 +222,22 @@ module MemType (Entry: MemEntrytype) = struct
       mem_type = [];
     }
 
+  let init_mem_type_from_layout 
+      (start_var: entry_t) (ptr_list: MemKeySet.t) (mem_layout: 'a mem_content) : entry_t * t =
+    let helper (acc: entry_t) (entry: MemOffset.t * 'a) : entry_t * (MemOffset.t * entry_t) =
+      let offset, _ = entry in (Entry.next_var acc, (offset, acc))
+    in
+    let helper2 
+        (acc: entry_t) (entry: Isa.imm_var_id * ((MemOffset.t * 'a) list)) :
+        entry_t * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+      let ptr, offset_list = entry in
+      let new_acc, new_offset_list = List.fold_left_map helper acc offset_list in
+      (new_acc, (ptr, new_offset_list))
+    in
+    let next_var, new_mem = List.fold_left_map helper2 start_var mem_layout in
+    (next_var, { ptr_list = ptr_list; mem_type = new_mem })
+
+
   let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * (MemOffset.t list)) list) =
     PP.print_lvl lvl "Mem key list:\n";
     List.iter (
@@ -274,6 +292,8 @@ module MemType (Entry: MemEntrytype) = struct
 end
 
 module MemRangeTypeBase = MemType (TypeExp)
+
+module MemTaintDepType = MemType (TaintDepExp)
 
 module MemRangeType = struct
 include MemRangeTypeBase
