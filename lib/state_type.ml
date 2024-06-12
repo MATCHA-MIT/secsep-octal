@@ -142,6 +142,7 @@ module StateType = struct
   let add_state_type_cond (curr_state: t) (cond_idx: int) : t =
     { curr_state with cond_hist = CondVarSet.add cond_idx curr_state.cond_hist }
 
+  (* TODO: Generate IR here!!! *)
   let type_prop_inst
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t) 

@@ -131,8 +131,39 @@ module MemType (Entry: MemEntrytype) = struct
     | _ -> 
       mem_type_error ("get_idx_range not implement for " ^ (TypeExp.to_string addr))
 
-  let get_mem_type_with_addr (mem: t) (addr_exp: TypeExp.t * int64) : (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+  (* TODO: Double check this new implementation!!! *)
+  let get_mem_entry_with_addr (mem: t) (addr_exp: TypeExp.t * int64) : ((Isa.imm_var_id * MemOffset.t * bool) * entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
+    let base_opt = find_base addr mem.ptr_list in
+    match base_opt with
+    | None -> Right addr_exp
+    | Some base ->
+      let _, offset_list = List.find (fun (i, _) -> i = base) mem.mem_type in
+      let addr_range, is_single_slot = get_idx_range addr_exp base in
+      let addr_constraint = MemOffset.check_offset addr_range in
+      let find_entry = List.find_map (
+        fun (offset, mem_type) ->
+          if MemOffset.equal addr_range offset then 
+            begin if is_single_slot then 
+                Some (offset, true, mem_type, MemOffset.ConstraintSet.empty)
+            else
+                Some (offset, false, Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
+            end
+          else
+            let sub, sub_constraint = MemOffset.subset addr_range offset in
+            if sub then Some (offset, false, Entry.partial_read_val mem_type, sub_constraint)
+            else None
+      ) offset_list in
+      begin match find_entry with
+      | None -> Right addr_exp
+      | Some (offset, is_single_full_slot, mem_type, match_constraint) -> Left ((base, offset, is_single_full_slot), mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
+      end
+
+  let get_mem_type_with_addr (mem: t) (addr_exp: TypeExp.t * int64) : (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+    match get_mem_entry_with_addr mem addr_exp with
+    | Left (_, entry_type, constraint_set) -> Left (entry_type, constraint_set)
+    | Right x -> Right x
+    (* let addr, _ = addr_exp in
     let base_opt = find_base addr mem.ptr_list in
     match base_opt with
     | None -> Right addr_exp
@@ -156,12 +187,80 @@ module MemType (Entry: MemEntrytype) = struct
       begin match find_entry with
       | None -> Right addr_exp
       | Some (mem_type, match_constraint) -> Left (mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
-      end
+      end *)
+
+  let set_mem_entry_with_addr 
+      (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t) : 
+      ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+    let addr, _ = addr_exp in
+    let base_opt = find_base addr mem.ptr_list in
+    match base_opt with
+    | None -> Right addr_exp
+    | Some base ->
+      (* let _, offset_list = List.find (fun (i, _) -> i = base) mem.mem_type in *)
+      let addr_range, is_single_slot = get_idx_range addr_exp base in
+      let addr_constraint = MemOffset.check_offset addr_range in
+      let helper0
+          (acc: (MemOffset.t * bool * MemOffset.ConstraintSet.t) option) 
+          (entry: MemOffset.t * entry_t) : 
+          ((MemOffset.t * bool * MemOffset.ConstraintSet.t) option) * (MemOffset.t * entry_t) =
+        let offset, old_mem_type = entry in
+        match acc with
+        | Some _ -> (acc, entry)
+        | None ->
+          if MemOffset.equal addr_range offset then
+            begin if is_single_slot then
+              (Some (offset, true, MemOffset.ConstraintSet.empty), (offset, new_type))
+            else
+              (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val old_mem_type new_type))
+            end
+          else begin
+            let subset, subset_constraint = MemOffset.subset addr_range offset in
+            if subset then
+              (Some (offset, false, subset_constraint), (offset, Entry.partial_write_val old_mem_type new_type))
+            else
+              (None, entry)
+          end
+      in
+      let helper
+          (acc: (Isa.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option)
+          (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
+          ((Isa.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option) * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+        let k, o_list = entry in
+        match acc with
+        | Some acc -> (Some acc, entry)
+        | None ->
+          if k = base then
+            let new_acc, new_o_list = List.fold_left_map helper0 None o_list in
+            begin match new_acc with
+            | Some (offset, is_single_full_slot, constraint_list) ->
+              (Some (k, offset, is_single_full_slot, constraint_list), (k, new_o_list))
+            | None -> (None, entry)
+            end
+            (* let (offset, is_single_full_slot, constraint_list), new_o_list = List.fold_left_map helper0 None o_list in
+            (
+              constraint_list,
+              (k, new_o_list)
+            ) *)
+          else (None, entry)
+      in
+      let new_acc, new_mem_type = List.fold_left_map helper None mem.mem_type in
+      match new_acc with
+      | None -> Right addr_exp
+      | Some (ptr, offset, is_single_full_slot, constraint_list) ->
+        Left (
+          (ptr, offset, is_single_full_slot),
+          {mem with mem_type = new_mem_type},
+          MemOffset.ConstraintSet.union addr_constraint constraint_list
+        )
 
   let set_mem_type_with_addr 
       (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t) : 
       (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
-    let addr, _ = addr_exp in
+    match set_mem_entry_with_addr mem addr_exp new_type with
+    | Left (_, new_mem, constraint_set) -> Left (new_mem, constraint_set)
+    | Right x -> Right x
+    (* let addr, _ = addr_exp in
     let base_opt = find_base addr mem.ptr_list in
     match base_opt with
     | None -> Right addr_exp
@@ -214,7 +313,7 @@ module MemType (Entry: MemEntrytype) = struct
         Left (
           {mem with mem_type = new_mem_type},
           MemOffset.ConstraintSet.union addr_constraint constraint_list
-        )
+        ) *)
 
   let init_mem_type : t =
     {

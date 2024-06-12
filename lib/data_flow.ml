@@ -10,7 +10,7 @@ module Ir = struct
 
   type operand =
     | RegOp of int
-    | MemOp of Isa.imm_var_id * MemOffset.t * bool (* Addr range & access full slot or not *)
+    | MemOp of Isa.imm_var_id * MemOffset.t * bool (* Addr range & access full slot with single inst or not *)
 
   type label = string
 
@@ -40,7 +40,7 @@ module DataStateType = struct
       MemTaintDepType.init_mem_type_from_layout 
         (next_taint_var, init_mem_dep_var) 
         mem_range_type.ptr_list mem_range_type.mem_type in
-    (next_var, { reg_type = reg_type; mem_type = mem_type }) 
+    (next_var, { reg_type = reg_type; mem_type = mem_type })
 
 end
 
