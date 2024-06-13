@@ -53,8 +53,8 @@ sha512_final_impl:
 #	movups	%xmm0, 192(%rbx)
 	movq	%rax, 192(%rbx) # Replace the last store with this store - not the same meaning
 	call	sha512_block_data_order
-#	testq	%r12, %r12
-	cmpq	%r12, $0
+	testq	%r12, %r12
+#	cmpq	%r12, $0
 	je	.L31
 	shrq	$3, %rbp
 	je	.L30
@@ -107,13 +107,13 @@ sha512_final_impl:
 .L74:
 	andl	$4, %edx
 	jne	.L75
-#	testl	%ecx, %ecx
-	cmpl	%ecx, $0
+	testl	%ecx, %ecx
+#	cmpl	%ecx, $0
 	je	.L22
 	movb	$0, (%rsi)
-#	testb	$2, %cl
-	andb	$2, %cl
-	cmpb	%cl, $0
+	testb	$2, %cl
+#	andb	$2, %cl
+#	cmpb	%cl, $0
 	je	.L22
 	xorl	%eax, %eax
 	movw	%ax, -2(%rsi,%rcx)
@@ -145,17 +145,17 @@ sha512_final_impl:
 	je	.L22
 	jmp	.L21
 .L76:
-#	testb	$4, %dl
-	andb	$4, %dl
-	cmpb	%dl, $0
+	testb	$4, %dl
+#	andb	$4, %dl
+#	cmpb	%dl, $0
 	jne	.L77
-#	testq	%rdx, %rdx
-	cmpq	%rdx, $0
+	testq	%rdx, %rdx
+#	cmpq	%rdx, $0
 	je	.L14
 	movb	$0, (%rsi)
-#	testb	$2, %dl
-	andb	$2, %dl
-	cmpb	%dl, $0
+	testb	$2, %dl
+#	andb	$2, %dl
+#	cmpb	%dl, $0
 	je	.L14
 	xorl	%ecx, %ecx
 	movw	%cx, -2(%rsi,%rdx)
