@@ -46,13 +46,13 @@ module MemOffset = struct
         (-1, false)
       else 
         mem_offset_error "single exp +0 -> not fully evaluated"
-    (* | SingleBExp (SingleMul, _, SingleConst coeff) ->
+    | SingleBExp (SingleMul, _, SingleConst coeff) ->
       if coeff > 0L then 
         (1, false) 
       else if coeff < 0L then 
         (-1, false) 
       else 
-        mem_offset_error "single exp * -> not fully evaluated" *)
+        mem_offset_error "single exp * -> not fully evaluated"
     | _ -> (1, false)
 
   let conditional_ge (e1: SingleExp.t) (e2: SingleExp.t) : bool * ConstraintSet.t =
