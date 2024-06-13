@@ -369,6 +369,19 @@ module SubType = struct
         if TypeExp.is_val exp then SolSimple exp else SolNone
       | _ -> SolNone
     in
+    let try_solve_list_single_sub_val (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
+      let helper (fe: TypeFullExp.t) : (SingleExp.t, unit) Either.t =
+        let e, _ = fe in
+        match e with
+        | TypeSingle s -> Left s
+        | _ -> Right ()
+      in
+      let left_list, right_list = List.partition_map helper subtype_list in
+      if List.length right_list = 0 then SolNone
+      else begin
+        let sorted_left = List.sort 
+      end
+    in
     let try_solve_loop_cond (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
       let find_base = find_loop_base subtype_list in
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
