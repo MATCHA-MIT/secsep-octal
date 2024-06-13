@@ -1,26 +1,6 @@
-open Isa
-open Mem_offset
 open Taint_dep_exp
 open Reg_type
 open Mem_type
-
-module Ir = struct
-  exception IrError of string
-  let ir_error msg = raise (IrError ("[Ir Error] " ^ msg))
-
-  type operand =
-    | RegOp of int
-    | MemOp of Isa.imm_var_id * MemOffset.t * bool (* Addr range & access full slot with single inst or not *)
-
-  type label = string
-
-  type t =
-    | Mov of operand * (operand list)
-    | Jump of label
-
-  (* TODO: convert x86 inst to this IR *)
-
-end
 
 module DataStateType = struct
   exception DataStateTypeError of string

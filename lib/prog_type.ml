@@ -1,4 +1,5 @@
 open Isa
+open Ir
 open Type_exp
 open Type_full_exp
 open Mem_offset
@@ -19,6 +20,7 @@ module ProgType = struct
 
   type t = {
     prog: Isa.program;
+    ir_prog: IrProgram.t;
     prog_type: block_type list;
     cond_type: CondType.t list;
     subtype_sol: SubType.t;
@@ -116,13 +118,13 @@ module ProgType = struct
       (inst_list: Isa.instruction list) 
       (code_type: block_type list)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) : 
-      SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t =
+      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * (Ir.t list) =
     let helper 
         (acc: SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) 
         (inst: Isa.instruction) : 
-        SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t  =
+        (SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * Ir.t  =
       let acc_tv_rel, acc_state_type, acc_cond_list, acc_u_mem_list, acc_prop_constraint = acc in
-      let new_state_type, new_cond_list, u_mem_list, prop_constraint = 
+      let new_state_type, new_cond_list, u_mem_list, prop_constraint, ir_inst = 
         StateType.type_prop_inst sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint inst 
       in
       match inst with
@@ -130,35 +132,38 @@ module ProgType = struct
         let taken_state_type = StateType.add_state_type_cond acc_state_type ((List.length new_cond_list) * 2 + 1) in
         let target_state_type = get_label_type code_type target_label in
         let new_tv_rel = SubType.add_sub_state_type acc_tv_rel taken_state_type target_state_type in
-        (new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint)
+        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
       | Jmp target_label ->
         let target_state_type = get_label_type code_type target_label in
         let new_tv_rel = SubType.add_sub_state_type acc_tv_rel new_state_type target_state_type in
-        (new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint)
-      | _ -> (acc_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint)
+        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
+      | _ -> ((acc_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
     in
-    let new_tv_rel, _, new_cond_list, new_unknown_list, new_prop_constraint = 
-      List.fold_left helper (tv_rel, block_type, cond_list, unknown_mem_list, prop_constraint_list) inst_list 
+    let (new_tv_rel, _, new_cond_list, new_unknown_list, new_prop_constraint), new_ir_block = 
+      List.fold_left_map helper (tv_rel, block_type, cond_list, unknown_mem_list, prop_constraint_list) inst_list 
     in
-    (new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint)
+    ((new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint), new_ir_block)
 
   let prop_all_block
       (p: Isa.program)
       (init_code_type: block_type list)
       (init_tv_rel: SubType.t) 
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) :
-      SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t =
+      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t =
     let helper 
-        (acc: SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t)
+        (acc: (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t)
         (block_type: block_type) (block_inst: Isa.basic_block) :
-        SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t =
+        (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t =
       if block_type.label = block_inst.label then
-        let acc_tv_rel, acc_cond_list, acc_u_mem_list, acc_constraint = acc in
-        prop_one_block acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint block_inst.insts init_code_type sol
+        let (acc_tv_rel, acc_cond_list, acc_u_mem_list, acc_constraint), old_ir_program = acc in
+        let other, ir_insts =
+        prop_one_block acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint block_inst.insts init_code_type sol in
+        (other, { label = block_inst.label; insts = ir_insts } :: old_ir_program)
       else 
         prog_type_error ("prop_all_block helper: block type and block label mismatch: " ^ block_type.label ^ " != " ^ block_inst.label)
     in
-    List.fold_left2 helper (init_tv_rel, [], [], MemOffset.ConstraintSet.empty) init_code_type p.bbs
+    let other, ir_program = List.fold_left2 helper ((init_tv_rel, [], [], MemOffset.ConstraintSet.empty), []) init_code_type p.bbs in
+    (other, List.rev ir_program)
 
   (* Solve subtype relation to generate new solution *)
   let solve_subtype
@@ -180,7 +185,9 @@ module ProgType = struct
     let new_ptr_info, addr_base_range = 
       MemRangeType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
     let mem_access_list = (MemRangeType.reshape_mem_key_list addr_base_range) in
+    Printf.printf "Newly resolved mem access list--------------\n";
     MemRangeType.pp_mem_key 0 mem_access_list;
+    Printf.printf "Newly resolved mem access list--------------\n";
     let udpate_list, constraint_set = MemRangeType.update_offset_all_ptr old_mem_type mem_access_list in
     (new_ptr_info, udpate_list, constraint_set)
 
@@ -192,6 +199,7 @@ module ProgType = struct
       init_prog_type start_type_var_idx start_single_var_idx prog in
     {
       prog = prog;
+      ir_prog = [];
       prog_type = prog_type;
       cond_type = [];
       subtype_sol = SubType.init next_type_var_idx;
@@ -204,7 +212,7 @@ module ProgType = struct
 
   let loop (state: t) : t =
     let temp_sol = get_temp_sol state.subtype_sol in
-    let tv_rel, cond_list, unknown_list, prop_constraint = 
+    let (tv_rel, cond_list, unknown_list, prop_constraint), ir_prog = 
       prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
     let sol_tv_rel = solve_subtype tv_rel cond_list 4 in
     Printf.printf "HHH-------------------\n";
@@ -214,12 +222,15 @@ module ProgType = struct
     Printf.printf "hhh-------------------\n";
     let new_sol = get_temp_sol sol_tv_rel in
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
+    MemRangeType.pp_mem_type 0 old_mem_type;
+    Printf.printf "ggg-------------------\n";
     let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
     let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
       update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
     let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
     {
       prog = state.prog;
+      ir_prog = ir_prog;
       prog_type = new_prog_type;
       cond_type = cond_list;
       subtype_sol = new_subtype;
@@ -232,6 +243,8 @@ module ProgType = struct
 
   let pp_prog_type (lvl: int) (state: t) =
     Printf.printf "===================================================\n";
+    IrProgram.pp_ir_program lvl state.ir_prog;
+    PP.print_lvl 0 "\n";
     PP.print_lvl lvl "Prog type\n";
     List.iter (fun x ->
       PP.print_lvl lvl "<Block \"%s\">\n" x.label;
@@ -251,8 +264,12 @@ module ProgType = struct
       (iter: int) : t =
     let init_prog = init start_type_var_idx start_single_var_idx prog in
     let rec helper (prog: t) (iter: int) : t =
-      pp_prog_type 0 prog;
-      if iter = 0 then prog else helper (loop prog) (iter - 1)
+      (* pp_prog_type 0 prog; *)
+      if iter = 0 then begin 
+        pp_prog_type 0 prog;
+        prog 
+      end else 
+        helper (loop prog) (iter - 1)
     in
     helper init_prog iter
 

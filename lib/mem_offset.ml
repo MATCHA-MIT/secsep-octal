@@ -7,6 +7,10 @@ module MemOffset = struct
 
   type t = SingleExp.t * SingleExp.t
 
+  let to_string (e: t) : string =
+    let left, right = e in
+    "[" ^ (SingleExp.to_string left) ^ ", " ^ (SingleExp.to_string right) ^ "]"
+
   module ConstraintSet = Set.Make(
     struct
       let compare = SingleExp.cmp

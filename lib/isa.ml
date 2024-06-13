@@ -42,6 +42,16 @@ module Isa = struct
     | R15 | R15D | R15W | R15B -> 15
     (* | R0 -> 16 *)
 
+  let reg_name_list = [
+    "rax"; "rcx"; "rdx"; "rbx";
+    "rsp"; "rbp"; "rsi"; "rdi";
+    "r8"; "r9"; "r10"; "r11";
+    "r12"; "r13"; "r14"; "r15"
+  ]
+
+  let string_of_reg_idx (idx: int) : string =
+    List.nth reg_name_list idx
+
   let rsp_idx = get_reg_idx RSP
 
   let total_reg_num : int = 16
