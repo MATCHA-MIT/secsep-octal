@@ -290,6 +290,14 @@ module StateType = struct
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint],
       Skip)
       (* TODO: Handle the case where some other instructions set flags and some other instructions use flags!!! *)
+    | Test (src1, src2) ->
+      let src1_type, ua1, src1_constraint = get_src_op_type sol curr_state src1 in
+      let src2_type, ua2, src2_constraint = get_src_op_type sol curr_state src2 in
+      let src_and_type = 
+        if Isa.cmp_operand src1 src2 then src1_type else TypeExp.TypeBExp (TypeAnd, src1_type, src2_type) in
+      ({curr_state with cond_type = (src_and_type, TypeExp.TypeSingle (SingleConst 0L))}, cond_list, 
+      (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
+      MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint])
     | Jcond (target, branch_cond) ->
       let cond_left, cond_right = curr_state.cond_type in
       let new_cond = 

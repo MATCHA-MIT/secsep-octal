@@ -91,6 +91,18 @@ module Isa = struct
     | StOp of immediate option * register option * register option * scale option * int64
     | LabelOp of label
 
+  let cmp_operand (op1: operand) (op2: operand) : bool = (* true for equal *)
+    match op1, op2 with
+    | ImmOp i1, ImmOp i2 -> i1 = i2
+    | RegOp r1, RegOp r2 -> r1 = r2
+    | MemOp (d1, b1, i1, s1), MemOp (d2, b2, i2, s2) ->
+      d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2
+    | LdOp (d1, b1, i1, s1, size1), LdOp (d2, b2, i2, s2, size2)
+    | StOp (d1, b1, i1, s1, size1), StOp (d2, b2, i2, s2, size2) ->
+        d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
+    | LabelOp l1, LabelOp l2 -> l1 = l2
+    | _ -> false
+
   let get_reg_op_size (op_list: operand list) : int64 option =
     let helper (acc: int64 option) (op: operand) : int64 option =
       match op, acc with
@@ -119,6 +131,7 @@ module Isa = struct
     | And of operand * operand * operand
     | Or of operand * operand * operand
     | Cmp of operand * operand
+    | Test of operand * operand
     | Jmp of label
     | Jcond of label * branch_cond
     | Call of label
@@ -169,6 +182,7 @@ module Isa = struct
     | And _ -> "and"
     | Or _ -> "or"
     | Cmp _ -> "cmp"
+    | Test _ -> "test"
     | Jmp _ -> "jmp"
     | Jcond (_, cond) ->
       begin
@@ -189,7 +203,7 @@ module Isa = struct
   let get_op_list (inst: instruction) : operand list =
     match inst with
     | Mov (op0, op1) | MovS (op0, op1) | MovZ (op0, op1) 
-    | Lea (op0, op1) | Not (op0, op1) | Cmp (op0, op1) -> [op0; op1]
+    | Lea (op0, op1) | Not (op0, op1) | Cmp (op0, op1) | Test (op0, op1) -> [op0; op1]
     | Add (op0, op1, op2) | Sub (op0, op1, op2) | Sal (op0, op1, op2)
     | Sar (op0, op1, op2) | Shr (op0, op1, op2) | Xor (op0, op1, op2)
     | And (op0, op1, op2) | Or (op0, op1, op2) -> [op0; op1; op2]
