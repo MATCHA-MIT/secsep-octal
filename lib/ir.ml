@@ -38,7 +38,7 @@ module Ir = struct
     match e with
     | Mov (dest, src_list) ->
       let src_str_list = List.map string_of_operand src_list in
-      "Mov [" ^ (String.concat "; " src_str_list) ^ "] -> " ^ (string_of_operand dest)
+      "Mov {" ^ (String.concat "; " src_str_list) ^ "} -> " ^ (string_of_operand dest)
     | Jump target -> "Jump " ^ target
     | Skip -> "Skip"
 
