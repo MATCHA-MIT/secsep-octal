@@ -16,6 +16,7 @@ module ProgType = struct
   type block_type = {
     label: Isa.label;
     block_type: StateType.t;
+    block_pc_idx: TypeExp.type_var_id;
   }
 
   type t = {
@@ -25,6 +26,7 @@ module ProgType = struct
     cond_type: CondType.t list;
     subtype_sol: SubType.t;
     constraint_set: MemOffset.ConstraintSet.t;
+    useful_set: TypeExp.TypeVarSet.t;
     ptr_set: MemKeySet.t;
     no_ptr_set: MemKeySet.t;
     next_type_var_idx: TypeExp.type_var_id;
@@ -37,25 +39,26 @@ module ProgType = struct
       (start_single_var_idx: Isa.imm_var_id)
       (prog: Isa.program)  :
       (TypeExp.type_var_id * Isa.imm_var_id) * (block_type list) =
-    let helper (acc: TypeExp.type_var_id * Isa.imm_var_id) (block: Isa.basic_block) :
-        (TypeExp.type_var_id * Isa.imm_var_id) * block_type =
-      let type_acc, imm_acc = acc in
+    let helper (acc: TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) (block: Isa.basic_block) :
+        (TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) * block_type =
+      let type_acc, imm_acc, start_pc_dest_idx = acc in
       if Isa.is_label_function_entry block.label then begin
         (* let new_acc, state = StateType.init_state_type (Right imm_acc) in *)
         let new_acc, state = StateType.init_state_type (TypeSingle (SingleVar imm_acc)) in
         match new_acc with
         (* | Left _ -> prog_type_error ("init_prog_type: return idx should be imm_idx") *)
-        | TypeSingle (SingleVar new_imm_acc) -> ((type_acc, new_imm_acc), { label = block.label; block_type = state }) 
+        | TypeSingle (SingleVar new_imm_acc) -> ((type_acc, new_imm_acc, start_pc_dest_idx - List.length block.insts), { label = block.label; block_type = state; block_pc_idx = start_pc_dest_idx; }) 
         | _ -> prog_type_error ("init_prog_type: return idx should be single var imm_idx")
       end else begin
         (* let new_acc, state = StateType.init_state_type (Left type_acc) in *)
         let new_acc, state = StateType.init_state_type (TypeVar type_acc) in
         match new_acc with
-        | TypeVar new_type_acc -> ((new_type_acc, imm_acc), { label = block.label; block_type = state })
+        | TypeVar new_type_acc -> ((new_type_acc, imm_acc, start_pc_dest_idx - List.length block.insts), { label = block.label; block_type = state; block_pc_idx = start_pc_dest_idx; })
         | _ ->  prog_type_error ("init_prog_type: return idx should be type var type_idx")
       end
     in
-    List.fold_left_map helper (start_type_var_idx, start_single_var_idx) prog.bbs
+    let (type_var_idx, imm_var_idx, _), init_type = List.fold_left_map helper (start_type_var_idx, start_single_var_idx, -1) prog.bbs in
+    (type_var_idx, imm_var_idx), init_type
 
   let update_prog_type
       (update_list: (Isa.imm_var_id * (MemOffset.t * bool) list) list)
@@ -115,61 +118,85 @@ module ProgType = struct
       (cond_list: CondType.t list)
       (unknown_mem_list: (TypeFullExp.t * int64) list)
       (prop_constraint_list: MemOffset.ConstraintSet.t)
+      (prop_useful_var: TypeExp.TypeVarSet.t)
+      (block_start_pc_idx: TypeExp.type_var_id)
       (inst_list: Isa.instruction list) 
       (code_type: block_type list)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) : 
-      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * (Ir.t list) =
+      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t) * (Ir.t list) =
     let helper 
-        (acc: SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) 
+        (acc: SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t * TypeExp.type_var_id) 
         (inst: Isa.instruction) : 
-        (SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * Ir.t  =
-      let acc_tv_rel, acc_state_type, acc_cond_list, acc_u_mem_list, acc_prop_constraint = acc in
-      let new_state_type, new_cond_list, u_mem_list, prop_constraint, ir_inst = 
-        StateType.type_prop_inst sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint inst 
+        (SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t * TypeExp.type_var_id) * Ir.t  =
+      let acc_tv_rel, acc_state_type, acc_cond_list, acc_u_mem_list, acc_prop_constraint, acc_useful_set, acc_pc_dest_idx = acc in
+      let new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, new_var_type_opt, ir_inst = 
+        StateType.type_prop_inst sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint acc_useful_set acc_pc_dest_idx inst 
       in
+      let new_tv_rel = SubType.add_type_var_rel_opt acc_tv_rel acc_pc_dest_idx new_var_type_opt in
       match inst with
       | Jcond (target_label, _) ->
         let taken_state_type = StateType.add_state_type_cond acc_state_type ((List.length new_cond_list) * 2 + 1) in
         let target_state_type = get_label_type code_type target_label in
-        let new_tv_rel = SubType.add_sub_state_type acc_tv_rel taken_state_type target_state_type in
-        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
+        let new_tv_rel = SubType.add_sub_state_type new_tv_rel taken_state_type target_state_type in
+        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, acc_pc_dest_idx - 1), ir_inst) (* acc_pc_dest_idx is -pc, so need to -1 *)
       | Jmp target_label ->
         let target_state_type = get_label_type code_type target_label in
-        let new_tv_rel = SubType.add_sub_state_type acc_tv_rel new_state_type target_state_type in
-        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
-      | _ -> ((acc_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint), ir_inst)
+        let new_tv_rel = SubType.add_sub_state_type new_tv_rel new_state_type target_state_type in
+        ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, acc_pc_dest_idx - 1), ir_inst)
+      | _ -> ((new_tv_rel, new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, acc_pc_dest_idx - 1), ir_inst) (* acc_pc_dest_idx is -pc, so need to -1 *)
     in
-    let (new_tv_rel, _, new_cond_list, new_unknown_list, new_prop_constraint), new_ir_block = 
-      List.fold_left_map helper (tv_rel, block_type, cond_list, unknown_mem_list, prop_constraint_list) inst_list 
+    let (new_tv_rel, _, new_cond_list, new_unknown_list, new_prop_constraint, new_prop_useful_var, _), new_ir_block = 
+      List.fold_left_map helper (tv_rel, block_type, cond_list, unknown_mem_list, prop_constraint_list, prop_useful_var, block_start_pc_idx) inst_list 
     in
-    ((new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint), new_ir_block)
+    ((new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint, new_prop_useful_var), new_ir_block)
 
   let prop_all_block
       (p: Isa.program)
       (init_code_type: block_type list)
-      (init_tv_rel: SubType.t) 
+      (init_tv_rel: SubType.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list) :
-      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t =
+      (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t) * IrProgram.t =
     let helper 
-        (acc: (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t)
+        (acc: (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t) * IrProgram.t)
         (block_type: block_type) (block_inst: Isa.basic_block) :
-        (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t) * IrProgram.t =
+        (SubType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t) * IrProgram.t =
       if block_type.label = block_inst.label then
-        let (acc_tv_rel, acc_cond_list, acc_u_mem_list, acc_constraint), old_ir_program = acc in
+        let (acc_tv_rel, acc_cond_list, acc_u_mem_list, acc_constraint, acc_useful_set), old_ir_program = acc in
         let other, ir_insts =
-        prop_one_block acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint block_inst.insts init_code_type sol in
+        prop_one_block acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint acc_useful_set block_type.block_pc_idx block_inst.insts init_code_type sol in
         (other, { label = block_inst.label; insts = ir_insts } :: old_ir_program)
       else 
         prog_type_error ("prop_all_block helper: block type and block label mismatch: " ^ block_type.label ^ " != " ^ block_inst.label)
     in
-    let other, ir_program = List.fold_left2 helper ((init_tv_rel, [], [], MemOffset.ConstraintSet.empty), []) init_code_type p.bbs in
+    let other, ir_program = List.fold_left2 helper ((init_tv_rel, [], [], MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty), []) init_code_type p.bbs in
     (other, List.rev ir_program)
+
+  (* A dirty fix: replace itermediate vars (with idx < 0) with its subtype expression (should be unique)
+     so that we can derive loop invariance easily *)
+  let fix_cond_list (cond_list: CondType.t list) (tv_rel_list: SubType.t) : CondType.t list =
+    let helper (acc: CondType.t list) (tv_rel: SubType.type_var_rel) : CondType.t list =
+      if tv_rel.type_var_idx < 0 then
+        match tv_rel.subtype_list with
+        | (hd, _) :: [] -> List.map (fun x -> CondType.repl_type_var_type_exp x (tv_rel.type_var_idx, hd)) acc
+        | [] -> acc (* This case is for unused neg vars *)
+        | _ -> 
+          prog_type_error ("fix_cond_list: neg type var " ^ (string_of_int tv_rel.type_var_idx) ^ " has more than one subtype!!!")
+      else
+        acc
+    in
+    List.fold_left helper cond_list tv_rel_list
+
+  let get_cond_list_useful (cond_list: CondType.t list) : TypeExp.TypeVarSet.t =
+    let helper (acc: TypeExp.TypeVarSet.t) (cond: CondType.t) : TypeExp.TypeVarSet.t =
+      TypeExp.TypeVarSet.union acc (CondType.get_vars cond)
+    in
+    List.fold_left helper TypeExp.TypeVarSet.empty cond_list
 
   (* Solve subtype relation to generate new solution *)
   let solve_subtype
-      (tv_rel_list: SubType.t) (cond_list: CondType.t list) (iter: int) :
-      SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t =
-    SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list iter
+      (tv_rel_list: SubType.t) (cond_list: CondType.t list) (useful_var: TypeExp.TypeVarSet.t) (iter: int) :
+      SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
+    SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list useful_var iter
 
   (* Try to resolve known mem access with new solution *)
   (* Generate new memory layout (ptr-offset list) *)
@@ -204,6 +231,7 @@ module ProgType = struct
       cond_type = [];
       subtype_sol = SubType.init next_type_var_idx;
       constraint_set = MemOffset.ConstraintSet.empty;
+      useful_set = TypeExp.TypeVarSet.empty;
       ptr_set = MemKeySet.empty;
       no_ptr_set = MemKeySet.empty;
       next_type_var_idx = next_type_var_idx;
@@ -212,9 +240,15 @@ module ProgType = struct
 
   let loop (state: t) : t =
     let temp_sol = get_temp_sol state.subtype_sol in
-    let (tv_rel, cond_list, unknown_list, prop_constraint), ir_prog = 
+    let (tv_rel, cond_list, unknown_list, prop_constraint, prop_useful_var), ir_prog = 
       prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
-    let sol_tv_rel, sol_cond_list, sol_constraint = solve_subtype tv_rel cond_list 4 in
+    (* Printf.printf "!!!SubType--------------------------------------------\n";
+    SubType.pp_tv_rels 0 tv_rel;
+    Printf.printf "!!!SubType--------------------------------------------\n"; *)
+    let cond_list = fix_cond_list cond_list tv_rel in
+    let cond_list_useful = get_cond_list_useful cond_list in
+    let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
+      solve_subtype tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
@@ -235,6 +269,7 @@ module ProgType = struct
       cond_type = sol_cond_list;
       subtype_sol = new_subtype;
       constraint_set = MemOffset.constraint_union [state.constraint_set; prop_constraint; sol_constraint; update_constraint];
+      useful_set = sol_useful_var;
       ptr_set = ptr_list;
       no_ptr_set = no_ptr_list;
       next_type_var_idx = next_type_var;
@@ -251,9 +286,14 @@ module ProgType = struct
       StateType.pp_state_type (lvl + 1) x.block_type;
       Printf.printf "\n"
     ) state.prog_type;
+    Printf.printf "CondType-------------------------------------------\n";
     CondType.pp_cond_list lvl state.cond_type;
+    Printf.printf "SubType--------------------------------------------\n";
     SubType.pp_tv_rels lvl state.subtype_sol;
+    Printf.printf "MemOffset------------------------------------------\n";
     MemOffset.pp_constraint_set lvl state.constraint_set;
+    Printf.printf "UsefulVar------------------------------------------\n";
+    TypeExp.pp_type_var_set lvl state.useful_set;
     Printf.printf "\nNext type var %d\nNext single var %d\n" state.next_type_var_idx state.next_single_var_idx;
     Printf.printf "===================================================\n"
 

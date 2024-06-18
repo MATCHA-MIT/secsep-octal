@@ -131,6 +131,10 @@ module MemOffset = struct
     else begin
       Printf.printf "Offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
       mem_offset_error "check_offset failed"
+      (* Shixin: This is not always true for valid programs!!! *)
+      (* TODO: Fix this!!! *)
+      (* Printf.printf "Warning: check_offset failed on offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
+      ConstraintSet.singleton (SingleExp.eval (SingleBExp (SingleSub, right, left))) *)
     end
   (* TODO: Think about whether here should be greater than instead of greater than or equal to!!! *)
 

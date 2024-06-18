@@ -705,7 +705,18 @@ include MemRangeTypeBase
 
   let reshape_mem_key_list (mem_access_list: (Isa.imm_var_id * MemOffset.t) list) :
       (Isa.imm_var_id * (MemOffset.t list)) list =
-    let helper (acc: (Isa.imm_var_id * (MemOffset.t list)) list) (mem_access: Isa.imm_var_id * MemOffset.t) : 
+    let rec helper 
+        (old_mem: (Isa.imm_var_id * (MemOffset.t list)) list) (mem_access: Isa.imm_var_id * MemOffset.t) :
+        (Isa.imm_var_id * (MemOffset.t list)) list =
+      let id, offset = mem_access in
+      match old_mem with
+      | [] -> [(id, [offset])]
+      | (hd_id, hd_offset_list) :: tl ->
+        if hd_id < id then (hd_id, hd_offset_list) :: (helper tl mem_access)
+        else if hd_id = id then (hd_id, offset :: hd_offset_list) :: tl
+        else (id, [offset]) :: tl
+    in
+    (* let helper (acc: (Isa.imm_var_id * (MemOffset.t list)) list) (mem_access: Isa.imm_var_id * MemOffset.t) : 
         (Isa.imm_var_id * (MemOffset.t list)) list =
       let id, offset = mem_access in
       let helper0 (id_mem_key_list: Isa.imm_var_id * (MemOffset.t list)) : 
@@ -719,7 +730,7 @@ include MemRangeTypeBase
       | [] -> (id, [ offset ]) :: right_list
       | hd :: [] -> hd :: right_list
       | _ -> mem_type_error "get_mem_key_list merged with more than one key"
-    in
+    in *)
     List.fold_left helper [] mem_access_list
 
   let pp_update_list (lvl: int) (update_list: ((Isa.imm_var_id * (MemOffset.t * bool) list) list)) =

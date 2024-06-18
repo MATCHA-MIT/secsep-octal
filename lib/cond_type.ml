@@ -53,6 +53,24 @@ module CondType = struct
     | CondLq ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondLq ((e1, ee1), (e2, ee2), c)
     | CondLe ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondLe ((e1, ee1), (e2, ee2), c)
 
+  let repl_type_var_type_exp (e: t) (sol: TypeExp.type_var_id * TypeExp.t) : t =
+    match e with
+    | CondNe ((e1, ee1), (e2, ee2), c) ->
+      CondNe ((TypeExp.repl_type_var sol e1, TypeExp.repl_type_var sol ee1), (TypeExp.repl_type_var sol e2, TypeExp.repl_type_var sol ee2), c)
+    | CondEq ((e1, ee1), (e2, ee2), c) ->
+      CondEq ((TypeExp.repl_type_var sol e1, TypeExp.repl_type_var sol ee1), (TypeExp.repl_type_var sol e2, TypeExp.repl_type_var sol ee2), c)
+    | CondLq ((e1, ee1), (e2, ee2), c) ->
+      CondLq ((TypeExp.repl_type_var sol e1, TypeExp.repl_type_var sol ee1), (TypeExp.repl_type_var sol e2, TypeExp.repl_type_var sol ee2), c)
+    | CondLe ((e1, ee1), (e2, ee2), c) ->
+      CondLe ((TypeExp.repl_type_var sol e1, TypeExp.repl_type_var sol ee1), (TypeExp.repl_type_var sol e2, TypeExp.repl_type_var sol ee2), c)
+
+  let get_vars (e: t) : TypeExp.TypeVarSet.t =
+    match e with
+    | CondNe ((e1, _), (e2, _), _)
+    | CondEq ((e1, _), (e2, _), _)
+    | CondLq ((e1, _), (e2, _), _)
+    | CondLe ((e1, _), (e2, _), _) -> TypeExp.TypeVarSet.union (TypeExp.get_vars e1) (TypeExp.get_vars e2)
+
   let pp_cond (lvl: int) (cond: t) =
     let op, str1, str11, str2, str22 = match cond with
     | CondNe ((l, ll), (r, rr), _) -> ("Ne", TypeExp.to_string l, TypeExp.to_string ll, TypeExp.to_string r, TypeExp.to_string rr)

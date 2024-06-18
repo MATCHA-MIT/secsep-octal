@@ -8,6 +8,22 @@ module TypeExp = struct
   type type_var_id = int
   module TypeVarSet = Set.Make(Int)
 
+  let pp_type_var_set (lvl: int) (set: TypeVarSet.t) =
+    PP.print_lvl lvl "TypeVarSet:\n";
+    List.iteri (
+      fun i x ->
+        let rem = Int.rem i 16 in
+        (if rem = 0 then PP.print_lvl (lvl + 1) "" else ());
+        Printf.printf "%d\t\t" x;
+        (if rem = 15 then Printf.printf "\n" else ())
+    ) (TypeVarSet.elements set)
+
+  let var_union (var_set: TypeVarSet.t list) : TypeVarSet.t =
+    let helper (acc: TypeVarSet.t) (entry: TypeVarSet.t) : TypeVarSet.t =
+      TypeVarSet.union acc entry
+    in
+    List.fold_left helper TypeVarSet.empty var_set
+
   type type_bop =
     | TypeAdd
     | TypeSub
@@ -371,6 +387,13 @@ module TypeExp = struct
     | TypeBot -> true
     | _ -> false
 
+  let rec get_vars (e: t) : TypeVarSet.t =
+    match e with
+    | TypeVar x -> TypeVarSet.singleton x
+    | TypeBExp (_, e1, e2) -> TypeVarSet.union (get_vars e1) (get_vars e2)
+    | TypeUExp (_, e) -> get_vars e
+    | _ -> TypeVarSet.empty
+
   let rec repl_type_exp (sol: type_var_id * t) (e: t) : t =
     let idx, re = sol in
     match e with
@@ -384,6 +407,12 @@ module TypeExp = struct
       eval (TypeUExp (op, ee'))
     | TypePtr (ee, size) ->
       TypePtr (repl_type_exp sol ee, size)
+    | _ -> e
+
+  let repl_type_var (sol: type_var_id * t) (e: t) : t =
+    let idx, re = sol in
+    match e with
+    | TypeVar v -> if v = idx then re else e
     | _ -> e
 
   let rec to_string (t: t) : string =
