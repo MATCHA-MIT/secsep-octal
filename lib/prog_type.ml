@@ -168,7 +168,7 @@ module ProgType = struct
   (* Solve subtype relation to generate new solution *)
   let solve_subtype
       (tv_rel_list: SubType.t) (cond_list: CondType.t list) (iter: int) :
-      SubType.t =
+      SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t =
     SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list iter
 
   (* Try to resolve known mem access with new solution *)
@@ -214,7 +214,7 @@ module ProgType = struct
     let temp_sol = get_temp_sol state.subtype_sol in
     let (tv_rel, cond_list, unknown_list, prop_constraint), ir_prog = 
       prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
-    let sol_tv_rel = solve_subtype tv_rel cond_list 4 in
+    let sol_tv_rel, sol_cond_list, sol_constraint = solve_subtype tv_rel cond_list 4 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
@@ -232,9 +232,9 @@ module ProgType = struct
       prog = state.prog;
       ir_prog = ir_prog;
       prog_type = new_prog_type;
-      cond_type = cond_list;
+      cond_type = sol_cond_list;
       subtype_sol = new_subtype;
-      constraint_set = MemOffset.constraint_union [state.constraint_set; prop_constraint; update_constraint];
+      constraint_set = MemOffset.constraint_union [state.constraint_set; prop_constraint; sol_constraint; update_constraint];
       ptr_set = ptr_list;
       no_ptr_set = no_ptr_list;
       next_type_var_idx = next_type_var;

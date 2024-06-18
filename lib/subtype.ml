@@ -261,8 +261,10 @@ module SubType = struct
         let cond = CondType.get_cond_type cond_list cond_idx in
         let pure_cond_idx = cond_idx / 2 in
         begin match cond with
-        | CondNe (new_e, TypeSingle bound, _)
-        | CondNe (TypeSingle bound, new_e, _) ->
+        (* One side should keep type var to represent the relation, the other side should reduced to value to be served as a boundary!!! *)
+        (* Maybe we should update the boundary part as an optimization. *)
+        | CondNe ((new_e, _), (_, TypeSingle bound), _)
+        | CondNe ((_, TypeSingle bound), (new_e, _), _) ->
           (* let new_e, _ = simplify_one_sub tv_idx super_type_list fe in *)
           if TypeExp.cmp bound_exp new_e = 0 then 
             if inc then
@@ -274,6 +276,35 @@ module SubType = struct
                 TypeRange (base, true, bound_2, true, step),
                 TypeSingle bound_1
                 )
+            else
+              let bound_1 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound, SingleExp.SingleConst step)) in
+              let bound_2 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound_1, SingleExp.SingleConst step)) in
+              SolCond (
+                TypeRange (bound_1, true, base, true, step), 
+                pure_cond_idx, 
+                TypeRange (bound_2, true, base, true, step),
+                TypeSingle bound_1
+                )
+            (* Some (bound, false)  *)
+          else SolNone
+        | CondLq ((new_e, _), (_, TypeSingle bound), _) ->
+          if TypeExp.cmp bound_exp new_e = 0 then 
+            if inc then
+              let bound_1 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound, SingleExp.SingleConst step)) in
+              let bound_2 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound_1, SingleExp.SingleConst step)) in
+              SolCond (
+                TypeRange (base, true, bound_1, true, step), 
+                pure_cond_idx, 
+                TypeRange (base, true, bound_2, true, step),
+                TypeSingle bound_1
+                )
+            else
+              SolNone
+          else SolNone
+        | CondLq ((_, TypeSingle bound), (new_e, _), _) ->
+          if TypeExp.cmp bound_exp new_e = 0 then 
+            if inc then
+              SolNone
             else
               let bound_1 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound, SingleExp.SingleConst step)) in
               let bound_2 = SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, bound_1, SingleExp.SingleConst step)) in
@@ -306,8 +337,8 @@ module SubType = struct
       | SolNone ->
         let cond = CondType.get_cond_type cond_list cond_idx in
         begin match cond with
-        | CondNe (e, TypeSingle _, _)
-        | CondNe (TypeSingle _, e, _) ->
+        | CondNe ((e, _), (_, TypeSingle _), _)
+        | CondNe ((_, TypeSingle _), (e, _), _) ->
           begin match e with
           | TypeBExp (TypeAdd, TypeVar v, TypeSingle (SingleConst c))
           | TypeBExp (TypeAdd, TypeSingle (SingleConst c), TypeVar v) ->
@@ -347,8 +378,8 @@ module SubType = struct
     in
     List.fold_left helper SolNone (TypeFullExp.CondVarSet.to_list cond_set)
 
-  let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CondType.t list) (tv_rel_list: t) : type_var_rel =
-    let try_solve_top (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
+  let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CondType.t list) (tv_rel_list: t) : type_var_rel * MemOffset.ConstraintSet.t =
+    let try_solve_top (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol * MemOffset.ConstraintSet.t =
       let helper (found: bool) (fe: TypeFullExp.t) : bool =
         if found then true
         else begin
@@ -359,17 +390,17 @@ module SubType = struct
         end
       in
       let found = List.fold_left helper false subtype_list in
-      if found then SolSimple TypeExp.TypeTop
-      else SolNone
+      if found then (SolSimple TypeExp.TypeTop, MemOffset.ConstraintSet.empty)
+      else (SolNone, MemOffset.ConstraintSet.empty)
     in
-    let try_solve_single_sub_val (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
+    let try_solve_single_sub_val (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol * MemOffset.ConstraintSet.t =
       match subtype_list with
       | hd :: [] ->
         let exp, _  = hd in
-        if TypeExp.is_val exp then SolSimple exp else SolNone
-      | _ -> SolNone
+        if TypeExp.is_val exp then (SolSimple exp, MemOffset.ConstraintSet.empty) else (SolNone, MemOffset.ConstraintSet.empty)
+      | _ -> (SolNone, MemOffset.ConstraintSet.empty)
     in
-    let try_solve_list_single_sub_val (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
+    let try_solve_list_single_sub_val (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol * MemOffset.ConstraintSet.t =
       let helper (fe: TypeFullExp.t) : (SingleExp.t, unit) Either.t =
         let e, _ = fe in
         match e with
@@ -377,50 +408,75 @@ module SubType = struct
         | _ -> Right ()
       in
       let left_list, right_list = List.partition_map helper subtype_list in
-      if List.length right_list = 0 then SolNone
+      if List.length right_list != 0 then (SolNone, MemOffset.ConstraintSet.empty)
       else begin
-        let sorted_left = List.sort 
+        let find_bound 
+            (acc: SingleExp.t * SingleExp.t * MemOffset.ConstraintSet.t) (entry: SingleExp.t) :
+            SingleExp.t * SingleExp.t * MemOffset.ConstraintSet.t =
+          let min, max, constraint_set = acc in
+          let min_ge_entry, min_entry_cons = MemOffset.conditional_ge min entry in
+          if min_ge_entry then (entry, max, MemOffset.ConstraintSet.union constraint_set min_entry_cons)
+          else begin
+            let entry_ge_max, entry_max_cons = MemOffset.conditional_ge entry max in
+            if entry_ge_max then (min, entry, MemOffset.ConstraintSet.union constraint_set entry_max_cons)
+            else (min, max, MemOffset.constraint_union [constraint_set; min_entry_cons; entry_max_cons])
+          end
+        in
+        match left_list with
+        | hd1 :: hd2 :: tl -> 
+          let left, right, constriant_set =
+          List.fold_left find_bound (hd1, hd1, MemOffset.ConstraintSet.empty) (hd2 :: tl) in
+          (SolSimple (TypeExp.TypeRange (left, true, right, true, 1L)), constriant_set)
+        | _ -> (SolNone, MemOffset.ConstraintSet.empty)
       end
     in
-    let try_solve_loop_cond (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol =
+    let try_solve_loop_cond (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol * MemOffset.ConstraintSet.t =
       let find_base = find_loop_base subtype_list in
       let find_bound = find_loop_bound subtype_list tv_rel.type_var_idx in
       match find_base, find_bound with
       | Some base, Some ((bound_var, bound_cond), step, inc) -> 
         begin match find_cond_naive cond_list bound_cond bound_var base step inc with
-        | SolNone -> find_cond_other cond_list bound_cond base step inc tv_rel_list
-        | naive_sol -> naive_sol
+        | SolNone -> (find_cond_other cond_list bound_cond base step inc tv_rel_list, MemOffset.ConstraintSet.empty)
+        | naive_sol -> (naive_sol, MemOffset.ConstraintSet.empty)
         (* TODO: Add rule for another case, and check whether this rule only works in the second round *)
         end
-      | _ -> SolNone
+      | _ -> (SolNone, MemOffset.ConstraintSet.empty)
     in
-    let solve_rules : ((TypeFullExp.t list) -> TypeFullExp.type_sol) list = [
+    let solve_rules : ((TypeFullExp.t list) -> TypeFullExp.type_sol * MemOffset.ConstraintSet.t) list = [
       try_solve_top;
       try_solve_single_sub_val;
+      try_solve_list_single_sub_val;
       try_solve_loop_cond
     ]
     in
     let subtype_list = tv_rel.subtype_list in
-    let helper (acc: TypeFullExp.type_sol) (rule: (TypeFullExp.t list) -> TypeFullExp.type_sol) : TypeFullExp.type_sol =
-      match acc with
+    let helper 
+        (acc: TypeFullExp.type_sol * MemOffset.ConstraintSet.t) 
+        (rule: (TypeFullExp.t list) -> TypeFullExp.type_sol * MemOffset.ConstraintSet.t) : 
+        TypeFullExp.type_sol *  MemOffset.ConstraintSet.t =
+      let acc_sol, _ = acc in
+      match acc_sol with
       | SolNone -> rule subtype_list
       | _ -> acc
     in
-    { tv_rel with type_sol = List.fold_left helper tv_rel.type_sol solve_rules }
+    let sol, sol_cons = List.fold_left helper (tv_rel.type_sol, MemOffset.ConstraintSet.empty) solve_rules in
+    ({ tv_rel with type_sol = sol }, sol_cons)
     (* match try_solve_single_sub_val subtype_list with
     | Some e -> { tv_rel with type_sol = Some e }
     | None -> { tv_rel with type_sol = None }  *)
     (* TODO Add more rules *)
 
-  let try_solve_vars (tv_rel_list: t) (cond_list: CondType.t list)  : ((TypeExp.type_var_id * TypeFullExp.type_sol) list) * t =
-    let helper (acc: (TypeExp.type_var_id * TypeFullExp.type_sol) list) (tv_rel: type_var_rel) : ((TypeExp.type_var_id * TypeFullExp.type_sol) list) * type_var_rel =
+  let try_solve_vars (tv_rel_list: t) (cond_list: CondType.t list)  : (((TypeExp.type_var_id * TypeFullExp.type_sol) list) * MemOffset.ConstraintSet.t) * t =
+    let helper (acc: (TypeExp.type_var_id * TypeFullExp.type_sol) list * MemOffset.ConstraintSet.t) (tv_rel: type_var_rel) : 
+      ((TypeExp.type_var_id * TypeFullExp.type_sol) list * MemOffset.ConstraintSet.t) * type_var_rel =
       (* let new_tv_rel = try_solve_one_var (simplify_one_var tv_rel) cond_list tv_rel_list in *)
-      let new_tv_rel = try_solve_one_var tv_rel cond_list tv_rel_list in
+      let new_tv_rel, sol_cons = try_solve_one_var tv_rel cond_list tv_rel_list in
+      let acc_sol, acc_cons = acc in
       match new_tv_rel.type_sol with
       | SolNone -> (acc, tv_rel)
-      | e -> ((new_tv_rel.type_var_idx, e) :: acc, new_tv_rel)
+      | e -> (((new_tv_rel.type_var_idx, e) :: acc_sol, MemOffset.ConstraintSet.union acc_cons sol_cons), new_tv_rel)
     in
-    List.fold_left_map helper [] tv_rel_list
+    List.fold_left_map helper ([], MemOffset.ConstraintSet.empty) tv_rel_list
 
   let update_type_var_rel (tv_rel: type_var_rel) (sol: TypeExp.type_var_id * TypeFullExp.type_sol) : type_var_rel =
     (* TODO: When replace variables with their solutions, we should consider about the effects of conditions!!! *)
@@ -428,6 +484,7 @@ module SubType = struct
     | SolNone -> { tv_rel with subtype_list = List.map (TypeFullExp.repl_type_sol sol) tv_rel.subtype_list }
     | _ -> tv_rel
 
+  (* NOTE: This function is a bit weird, and we may need to improve this later *)
   let merge_sub_type (fe_list: TypeFullExp.t list) : TypeFullExp.t list =
     let helper (acc: TypeFullExp.t) (fe: TypeFullExp.t) : ((TypeFullExp.t) * TypeFullExp.t) =
       let acc_e, _ = acc in
@@ -438,7 +495,7 @@ module SubType = struct
       | TypeSingle _, TypeRange _
       | TypeRange _, TypeSingle _ ->
         begin match TypeFullExp.merge acc fe with
-        | Some new_fe -> ((TypeBot, TypeFullExp.CondVarSet.empty), new_fe)
+        | Some new_fe -> ((TypeBot, TypeFullExp.CondVarSet.empty), new_fe) (* Here is pretty weird *)
         | None -> (acc, fe)
         end
       | _ -> (acc, fe)
@@ -456,19 +513,23 @@ module SubType = struct
     | SolNone -> {tv_rel with subtype_list = merge_sub_type tv_rel.subtype_list}
     | _ -> tv_rel
 
-  let rec solve_vars (tv_rel_list: t) (cond_list: CondType.t list) (num_iter: int) : t =
-    if num_iter == 0 then tv_rel_list
+  let solve_vars (tv_rel_list: t) (cond_list: CondType.t list) (num_iter: int) : t * (CondType.t list) * MemOffset.ConstraintSet.t =
+    let rec helper (tv_rel_list: t) (cond_list: CondType.t list) (cons: MemOffset.ConstraintSet.t) (num_iter: int) : t * (CondType.t list) * MemOffset.ConstraintSet.t =
+    if num_iter == 0 then (tv_rel_list, cond_list, cons)
     else begin
-      let new_sol_list, new_tv_rel_list = try_solve_vars tv_rel_list cond_list in
+      let (new_sol_list, new_cons_list), new_tv_rel_list = try_solve_vars tv_rel_list cond_list in
+      let final_cons_list = MemOffset.ConstraintSet.union cons new_cons_list in
       match new_sol_list with
-      | [] -> new_tv_rel_list
+      | [] -> (new_tv_rel_list, cond_list, final_cons_list)
       | _ ->
         let update_tv_rel_list = List.map (fun (tv: type_var_rel) -> List.fold_left update_type_var_rel tv new_sol_list) new_tv_rel_list in
         (* TODO: It seems that for some case we need to update condition, while for other cases we should not??? *)
-        (* let cond_list = List.map (fun (cond: CondType.t) -> List.fold_left CondType.repl_type_sol cond new_sol_list) cond_list in *)
+        let cond_list = List.map (fun (cond: CondType.t) -> List.fold_left CondType.repl_type_sol cond new_sol_list) cond_list in
         let merged_tv_rel_list = List.map simplify_tv_rel_sub update_tv_rel_list in
-        solve_vars merged_tv_rel_list cond_list (num_iter - 1)
+        helper merged_tv_rel_list cond_list final_cons_list (num_iter - 1)
     end
+    in
+    helper tv_rel_list cond_list MemOffset.ConstraintSet.empty num_iter
 
   let string_of_sol (sol: TypeExp.t option) =
     match sol with

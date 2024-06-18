@@ -55,13 +55,18 @@ module MemOffset = struct
         mem_offset_error "single exp * -> not fully evaluated"
     | _ -> (1, false)
 
+  (* TODO: Double check this!!! *)
   let conditional_ge (e1: SingleExp.t) (e2: SingleExp.t) : bool * ConstraintSet.t =
     let diff = SingleExp.eval (SingleBExp (SingleSub, e1, e2)) in
     let cmp_result, cmp_determined = heuristic_cmp diff in
     if cmp_determined then
       (cmp_result >= 0, ConstraintSet.empty)
+    else if cmp_result >= 0 then
+      (true, ConstraintSet.singleton diff)
     else
-      (cmp_result >= 0, ConstraintSet.singleton diff)
+      (false, ConstraintSet.singleton (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleMul, diff, SingleExp.SingleConst (-1L)))))
+    (* else
+      (cmp_result >= 0, ConstraintSet.singleton diff) *)
     (* match diff with
     | SingleConst v ->
       if v >= 0L then (true, ConstraintSet.empty) else (false, ConstraintSet.empty)

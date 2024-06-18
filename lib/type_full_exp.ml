@@ -87,6 +87,10 @@ module TypeFullExp = struct
   let string_of_cond_status (conds: CondVarSet.t) =
     "[" ^ (CondVarSet.fold (fun x acc -> (if acc = "" then "" else acc ^ ", ") ^ (string_of_one_cond_status x)) conds "") ^ "]"
 
+  let to_string (fe: t) =
+    let e, cond = fe in
+    "(Type = " ^ (TypeExp.to_string e) ^ ", Cond = " ^ (string_of_cond_status cond) ^ ")"
+
   let pp_type_full_exp (lvl: int) (tf: t) =
     let t, cond = tf in
     PP.print_lvl lvl "(Type = %s, Cond = %s)"

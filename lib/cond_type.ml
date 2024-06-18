@@ -7,10 +7,12 @@ module CondType = struct
   let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
 
   type t =
-    | CondNe of (TypeExp.t * TypeExp.t * TypeFullExp.CondVarSet.t)
-    | CondEq of (TypeExp.t * TypeExp.t * TypeFullExp.CondVarSet.t)
-    | CondLq of (TypeExp.t * TypeExp.t * TypeFullExp.CondVarSet.t)
-    | CondLe of (TypeExp.t * TypeExp.t * TypeFullExp.CondVarSet.t)
+    | CondNe of ((TypeExp.t * TypeExp.t) * (TypeExp.t * TypeExp.t) * TypeFullExp.CondVarSet.t)
+    | CondEq of ((TypeExp.t * TypeExp.t) * (TypeExp.t * TypeExp.t) * TypeFullExp.CondVarSet.t)
+    | CondLq of ((TypeExp.t * TypeExp.t) * (TypeExp.t * TypeExp.t) * TypeFullExp.CondVarSet.t)
+    | CondLe of ((TypeExp.t * TypeExp.t) * (TypeExp.t * TypeExp.t) * TypeFullExp.CondVarSet.t)
+  (* Cond ((left, left_simp), (right, right_simp), cond_set) *)
+  (* Sometimes we need original type exp, while sometimes we need simplified ones *)
 
   let not_cond_type (cond: t) : t = 
     match cond with
@@ -46,21 +48,21 @@ module CondType = struct
       (ee1, ee2)
     in
     match e with
-    | CondNe (e1, e2, c) -> let ee1, ee2 = helper e1 e2 c in CondNe (ee1, ee2, c)
-    | CondEq (e1, e2, c) -> let ee1, ee2 = helper e1 e2 c in CondEq (ee1, ee2, c)
-    | CondLq (e1, e2, c) -> let ee1, ee2 = helper e1 e2 c in CondLq (ee1, ee2, c)
-    | CondLe (e1, e2, c) -> let ee1, ee2 = helper e1 e2 c in CondLe (ee1, ee2, c)
+    | CondNe ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondNe ((e1, ee1), (e2, ee2), c)
+    | CondEq ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondEq ((e1, ee1), (e2, ee2), c)
+    | CondLq ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondLq ((e1, ee1), (e2, ee2), c)
+    | CondLe ((e1, ee1), (e2, ee2), c) -> let ee1, ee2 = helper ee1 ee2 c in CondLe ((e1, ee1), (e2, ee2), c)
 
   let pp_cond (lvl: int) (cond: t) =
-    let op, str1, str2 = match cond with
-    | CondNe (l, r, _) -> ("Ne", TypeExp.to_string l, TypeExp.to_string r)
-    | CondEq (l, r, _) -> ("Eq", TypeExp.to_string l, TypeExp.to_string r)
-    | CondLq (l, r, _) -> ("Lq", TypeExp.to_string l, TypeExp.to_string r)
-    | CondLe (l, r, _) -> ("Le", TypeExp.to_string l, TypeExp.to_string r)
+    let op, str1, str11, str2, str22 = match cond with
+    | CondNe ((l, ll), (r, rr), _) -> ("Ne", TypeExp.to_string l, TypeExp.to_string ll, TypeExp.to_string r, TypeExp.to_string rr)
+    | CondEq ((l, ll), (r, rr), _) -> ("Eq", TypeExp.to_string l, TypeExp.to_string ll, TypeExp.to_string r, TypeExp.to_string rr)
+    | CondLq ((l, ll), (r, rr), _) -> ("Lq", TypeExp.to_string l, TypeExp.to_string ll, TypeExp.to_string r, TypeExp.to_string rr)
+    | CondLe ((l, ll), (r, rr), _) -> ("Le", TypeExp.to_string l, TypeExp.to_string ll, TypeExp.to_string r, TypeExp.to_string rr)
     in
     PP.print_lvl lvl "Cond %s between\n" op;
-    PP.print_lvl (lvl + 1) "%s\n" str1;
-    PP.print_lvl (lvl + 1) "%s\n" str2
+    PP.print_lvl (lvl + 1) "%s = %s\n" str1 str11;
+    PP.print_lvl (lvl + 1) "%s = %s\n" str2 str22
 
   let pp_cond_list (lvl: int) (cond_list: t list) =
     List.iteri (fun i x -> 

@@ -86,6 +86,8 @@ module MemType (Entry: MemEntrytype) = struct
   let pp_ptr_set (lvl: int) (ptr_set: MemKeySet.t) =
     pp_ptr_list lvl (MemKeySet.elements ptr_set)
 
+  
+  (* The following two functions are re-defined later??? *)
   let rec filter_single_var (addr: SingleExp.t) : MemKeySet.t =
     match addr with
     | SingleVar x -> MemKeySet.singleton x
@@ -649,10 +651,15 @@ include MemRangeTypeBase
       (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * Isa.imm_var_id list =
     let ptr_set_list, no_ptr_set_list = List.split (List.map (fun ((e, _), _) -> filter_type_single_var e) addr_list) in
     let no_ptr_set = List.fold_left (fun acc x -> SingleExp.SingleVarSet.union acc x) SingleExp.SingleVarSet.empty no_ptr_set_list in
-    let ptr_set_list = List.map (
-      fun x : (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t -> 
+    let ptr_set_list = List.map2 (
+      fun x (addr, size) : (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t ->
+        let out_list = SingleExp.SingleVarSet.diff x no_ptr_set in
+        (if SingleExp.SingleVarSet.cardinal out_list = 0 then
+          Printf.printf "Warning: no base candidate for addr %s %Ld\n" (TypeFullExp.to_string addr) size
+        else ());
         Left (SingleExp.SingleVarSet.diff x no_ptr_set)) 
-      ptr_set_list in
+      ptr_set_list addr_list
+    in
     solve_base (ptr_list, no_ptr_list) ptr_set_list 1
     
   let pp_base (lvl: int) (base_list: Isa.imm_var_id list) =

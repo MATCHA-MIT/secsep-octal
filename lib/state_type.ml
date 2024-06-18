@@ -303,12 +303,12 @@ module StateType = struct
       let cond_left, cond_right = curr_state.cond_type in
       let new_cond = 
         begin match branch_cond with
-        | JNe -> CondType.CondNe (cond_left, cond_right, curr_state.cond_hist)
-        | JE -> CondType.CondEq (cond_left, cond_right, curr_state.cond_hist)
-        | JL -> CondType.CondLq (cond_left, cond_right, curr_state.cond_hist)
-        | JLe -> CondType.CondLe (cond_left, cond_right, curr_state.cond_hist)
-        | JG -> CondType.CondLq (cond_right, cond_left, curr_state.cond_hist)
-        | JGe -> CondType.CondLe (cond_right, cond_left, curr_state.cond_hist)
+        | JNe -> CondType.CondNe ((cond_left, cond_left), (cond_right, cond_right), curr_state.cond_hist)
+        | JE -> CondType.CondEq ((cond_left, cond_left), (cond_right, cond_right), curr_state.cond_hist)
+        | JL -> CondType.CondLq ((cond_left, cond_left), (cond_right, cond_right), curr_state.cond_hist)
+        | JLe -> CondType.CondLe ((cond_left, cond_left), (cond_right, cond_right), curr_state.cond_hist)
+        | JG -> CondType.CondLq ((cond_right, cond_right), (cond_left, cond_left), curr_state.cond_hist)
+        | JGe -> CondType.CondLe ((cond_right, cond_right), (cond_left, cond_left), curr_state.cond_hist)
         end in
       let new_cond_list, new_cond_idx = CondType.add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list, unknown_addr_list, constraint_set,
