@@ -132,6 +132,7 @@ module ProgType = struct
       let new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, new_var_type_opt, ir_inst = 
         StateType.type_prop_inst sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint acc_useful_set acc_pc_dest_idx inst 
       in
+      let new_state_type = StateType.set_default_cond_type new_state_type inst in
       let new_tv_rel = SubType.add_type_var_rel_opt acc_tv_rel acc_pc_dest_idx new_var_type_opt in
       match inst with
       | Jcond (target_label, _) ->

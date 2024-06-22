@@ -33,8 +33,8 @@ module StateType = struct
     { 
       reg_type = r_type; 
       mem_type = m_type; 
-      cond_type = (TypeSingle (SingleConst 0L), 
-      TypeSingle (SingleConst 0L)); cond_hist = CondVarSet.empty 
+      cond_type = (TypeTop, TypeTop); 
+      cond_hist = CondVarSet.empty 
     })
     
   let update_state_type
@@ -419,6 +419,11 @@ module StateType = struct
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
         (curr_state, cond_list, unknown_addr_list, constraint_set, useful_var_set, None, Skip) (* TODO *)
     end
+
+  let set_default_cond_type (state: t) (inst: Isa.instruction) : t =
+    match inst with
+    | Cmp _ | Test _ -> state
+    | _ -> { state with cond_type = (TypeTop, TypeTop) } 
 
   let pp_state_type (lvl: int) (s: t) =
     PP.print_lvl lvl "Reg:\n";
