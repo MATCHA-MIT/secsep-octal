@@ -338,6 +338,35 @@ module MemType (Entry: MemEntrytype) = struct
     let next_var, new_mem = List.fold_left_map helper2 start_var mem_layout in
     (next_var, { ptr_list = ptr_list; mem_type = new_mem })
 
+  (* Only update ptr val in base, but type single var idx are still not correct in init_mem *)
+  let update_mem_entry_base_id (m: t) (start_idx: Isa.imm_var_id) : t =
+    let new_ptr_list = MemKeySet.of_list (List.map (fun x -> x + start_idx) (MemKeySet.elements m.ptr_list)) in
+    let rec single_const_add_base (x: SingleExp.t) : SingleExp.t =
+      match x with
+      | SingleVar v -> SingleVar (v + start_idx)
+      | SingleBExp (op, e1, e2) -> SingleBExp (op, single_const_add_base e1, single_const_add_base e2)
+      | SingleUExp (op, e) -> SingleUExp (op, single_const_add_base e)
+      | _ -> x
+    in
+    let helper (entry: MemOffset.t * entry_t) : MemOffset.t * entry_t =
+      let (l, r), t = entry in ((single_const_add_base l, single_const_add_base r), t)
+    in
+    let helper2 (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) : Isa.imm_var_id * ((MemOffset.t * entry_t) list) =
+      let ptr, entry_list = entry in (ptr + start_idx, List.map helper entry_list)
+    in
+    { ptr_list = new_ptr_list; mem_type = List.map helper2 m.mem_type }
+
+  let sort_mem_type (m: t) : t =
+    let compare 
+        (e1: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) 
+        (e2: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) : int =
+      let ptr1, _ = e1 in
+      let ptr2, _ = e2 in
+      if ptr1 < ptr2 then -1
+      else if ptr1 = ptr2 then 0
+      else 1
+    in
+    { m with mem_type = List.sort compare m.mem_type }
 
   let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * (MemOffset.t list)) list) =
     PP.print_lvl lvl "Mem key list:\n";
@@ -424,7 +453,8 @@ include MemRangeTypeBase
           let udpate_tl, rec_constraint = helper (tl, final_constraint) offset in
           ((hd_offset, hd_updated) :: udpate_tl, rec_constraint)
         | Right new_offset -> (* merge offset and hd_offset *)
-          helper (tl, final_constraint) new_offset
+          if MemOffset.cmp hd_offset new_offset = 0 then (acc_update_list, final_constraint)
+          else helper (tl, final_constraint) new_offset
         (* if SingleExp.must_ge hd_left right then (left, right, true) :: acc
         else if SingleExp.must_ge left hd_right then (hd_left, hd_right, hd_updated) :: (helper tl offset)
         else

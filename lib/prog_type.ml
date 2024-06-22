@@ -37,21 +37,25 @@ module ProgType = struct
   let init_prog_type 
       (start_type_var_idx: TypeExp.type_var_id)
       (start_single_var_idx: Isa.imm_var_id)
+      (init_mem: MemRangeType.t)
       (prog: Isa.program)  :
       (TypeExp.type_var_id * Isa.imm_var_id) * (block_type list) =
+    (* Only update ptr val in base, but type single var idx are still not correct in init_mem *)
+    let init_mem = MemRangeType.sort_mem_type init_mem in
+    let init_mem = MemRangeType.update_mem_entry_base_id init_mem start_single_var_idx in
     let helper (acc: TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) (block: Isa.basic_block) :
         (TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) * block_type =
       let type_acc, imm_acc, start_pc_dest_idx = acc in
       if Isa.is_label_function_entry block.label then begin
         (* let new_acc, state = StateType.init_state_type (Right imm_acc) in *)
-        let new_acc, state = StateType.init_state_type (TypeSingle (SingleVar imm_acc)) in
+        let new_acc, state = StateType.init_state_type_from_layout (TypeSingle (SingleVar imm_acc)) init_mem in
         match new_acc with
         (* | Left _ -> prog_type_error ("init_prog_type: return idx should be imm_idx") *)
         | TypeSingle (SingleVar new_imm_acc) -> ((type_acc, new_imm_acc, start_pc_dest_idx - List.length block.insts), { label = block.label; block_type = state; block_pc_idx = start_pc_dest_idx; }) 
         | _ -> prog_type_error ("init_prog_type: return idx should be single var imm_idx")
       end else begin
         (* let new_acc, state = StateType.init_state_type (Left type_acc) in *)
-        let new_acc, state = StateType.init_state_type (TypeVar type_acc) in
+        let new_acc, state = StateType.init_state_type_from_layout (TypeVar type_acc) init_mem in
         match new_acc with
         | TypeVar new_type_acc -> ((new_type_acc, imm_acc, start_pc_dest_idx - List.length block.insts), { label = block.label; block_type = state; block_pc_idx = start_pc_dest_idx; })
         | _ ->  prog_type_error ("init_prog_type: return idx should be type var type_idx")
@@ -222,9 +226,10 @@ module ProgType = struct
   let init
       (start_type_var_idx: TypeExp.type_var_id)
       (start_single_var_idx: Isa.imm_var_id)
+      (init_mem: MemRangeType.t)
       (prog: Isa.program) : t =
     let (next_type_var_idx, next_single_var_idx), prog_type =
-      init_prog_type start_type_var_idx start_single_var_idx prog in
+      init_prog_type start_type_var_idx start_single_var_idx init_mem prog in
     {
       prog = prog;
       ir_prog = [];
@@ -301,9 +306,10 @@ module ProgType = struct
   let gen
       (start_type_var_idx: TypeExp.type_var_id)
       (start_single_var_idx: Isa.imm_var_id)
+      (init_mem: MemRangeType.t)
       (prog: Isa.program)
       (iter: int) : t =
-    let init_prog = init start_type_var_idx start_single_var_idx prog in
+    let init_prog = init start_type_var_idx start_single_var_idx init_mem prog in
     let rec helper (prog: t) (iter: int) : t =
       (* pp_prog_type 0 prog; *)
       if iter = 0 then begin 

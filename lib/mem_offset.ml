@@ -126,7 +126,18 @@ module MemOffset = struct
 
   let check_offset (offset: t) : ConstraintSet.t =
     let left, right = offset in
-    let cond_ge, cond = conditional_ge right left in
+
+    let diff = SingleExp.eval (SingleBExp (SingleSub, right, left)) in
+    let cmp_result, cmp_determined = heuristic_cmp diff in
+    if cmp_result > 0 && cmp_determined then 
+      ConstraintSet.empty
+    else if cmp_result <= 0 && cmp_determined then begin
+      Printf.printf "Offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
+      mem_offset_error "check_offset failed"
+    end else
+      ConstraintSet.singleton diff
+
+    (* let cond_ge, cond = conditional_ge right left in
     if cond_ge then cond 
     else begin
       Printf.printf "Offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
@@ -135,7 +146,7 @@ module MemOffset = struct
       (* TODO: Fix this!!! *)
       (* Printf.printf "Warning: check_offset failed on offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
       ConstraintSet.singleton (SingleExp.eval (SingleBExp (SingleSub, right, left))) *)
-    end
+    end *)
   (* TODO: Think about whether here should be greater than instead of greater than or equal to!!! *)
 
   let cmp_or_merge (o1: t) (o2: t) : ((bool, t) Either.t) * ConstraintSet.t =
@@ -143,24 +154,26 @@ module MemOffset = struct
     let l1, r1 = o1 in
     let l2, r2 = o2 in
     let l2_ge_r1, l2_cond_r1 = conditional_ge l2 r1 in
-    if l2_ge_r1 then (Left true, l2_cond_r1)
-    else
-      let l1_ge_r2, l1_cond_r2 = conditional_ge l1 r2 in
-      if l1_ge_r2 then (Left false, l1_cond_r2)
-      else
-        let l, cond_l = get_conditional_less l1 l2 in
-        let r, cond_r = get_conditional_greater r1 r2 in
+    let l1_ge_r2, l1_cond_r2 = conditional_ge l1 r2 in
+    let l, cond_l = get_conditional_less l1 l2 in
+    let r, cond_r = get_conditional_greater r1 r2 in
+    if l2_ge_r1 && ConstraintSet.cardinal l2_cond_r1 = 0 then (Left true, ConstraintSet.empty)
+    else if l1_ge_r2 && ConstraintSet.cardinal l1_cond_r2 = 0 then (Left false, ConstraintSet.empty)
+    else if ConstraintSet.cardinal cond_l = 0 && ConstraintSet.cardinal cond_r = 0 then
+      (Right (l, r), ConstraintSet.empty)
+    else if l2_ge_r1 then (Left true, l2_cond_r1)
+    else if l1_ge_r2 then (Left false, l1_cond_r2)
+    else (Right (l, r), ConstraintSet.union cond_l cond_r)
+      (* match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
+      | Some (l, cond_l), Some (r, cond_r) -> 
         (Right (l, r), ConstraintSet.union cond_l cond_r)
-        (* match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
-        | Some (l, cond_l), Some (r, cond_r) -> 
-          (Right (l, r), ConstraintSet.union cond_l cond_r)
-        | _ ->
-          Printf.printf "Cannot merge [%s, %s] [%s, %s]\n" 
-              (SingleExp.to_string l1) 
-              (SingleExp.to_string r1) 
-              (SingleExp.to_string l2) 
-              (SingleExp.to_string r2);
-          mem_offset_error "cmp_or_merge cannot merge address offset range"  *)
+      | _ ->
+        Printf.printf "Cannot merge [%s, %s] [%s, %s]\n" 
+            (SingleExp.to_string l1) 
+            (SingleExp.to_string r1) 
+            (SingleExp.to_string l2) 
+            (SingleExp.to_string r2);
+        mem_offset_error "cmp_or_merge cannot merge address offset range"  *)
 
   let equal (o1: t) (o2: t) : bool =
     let l1, r1 = o1 in

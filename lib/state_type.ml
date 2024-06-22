@@ -36,6 +36,20 @@ module StateType = struct
       cond_type = (TypeTop, TypeTop); 
       cond_hist = CondVarSet.empty 
     })
+
+  let init_state_type_from_layout
+      (start_var: TypeExp.t)
+      (init_mem: MemRangeType.t) : 
+      TypeExp.t * t =
+    let idx0, r_type = RegRangeType.init_reg_type start_var in
+    let idx1, m_type = MemRangeType.init_mem_type_from_layout idx0 init_mem.ptr_list init_mem.mem_type in
+    (idx1, 
+    { 
+      reg_type = r_type; 
+      mem_type = m_type; 
+      cond_type = (TypeTop, TypeTop); 
+      cond_hist = CondVarSet.empty 
+    }) 
     
   let update_state_type
       (update_list: (Isa.imm_var_id * (MemOffset.t * bool) list) list)
