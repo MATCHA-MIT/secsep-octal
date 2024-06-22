@@ -108,7 +108,7 @@ module MemType (Entry: MemEntrytype) = struct
 
   let find_base (e: TypeExp.t) (ptr_list: MemKeySet.t) : Isa.imm_var_id option =
     let p_list = filter_type_single_var e in
-        match MemKeySet.to_list (MemKeySet.inter p_list ptr_list) with
+    match MemKeySet.to_list (MemKeySet.inter p_list ptr_list) with
     | [] -> None
     | hd :: [] -> Some hd
     | _ -> mem_type_error "find_base find more than one base"
