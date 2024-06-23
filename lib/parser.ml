@@ -1,5 +1,4 @@
 open Isa
-open Code_type
 
 module Parser = struct
 
@@ -269,7 +268,8 @@ module Parser = struct
               if Isa.StrM.mem name imm_var_map
               then (imm_var_map, ImmLabel (Isa.StrM.find name imm_var_map))
               else begin
-                let id = CodeType.stack_base_id + 1 + (Isa.StrM.cardinal imm_var_map) in (* id starts from stack_base_id + 1 *)
+                (* let id = CodeType.stack_base_id + 1 + (Isa.StrM.cardinal imm_var_map) in *)(* id starts from stack_base_id + 1 *)
+                let id = imm_var_unset - 1 - (Isa.StrM.cardinal imm_var_map) in (* id starts from imm_var_unset, going negative!!! *)
                 Printf.printf "new imm_var: %s %d\n" name id;
                 (Isa.StrM.add name id imm_var_map, ImmLabel id)
               end

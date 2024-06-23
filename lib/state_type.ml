@@ -13,7 +13,7 @@ module StateType = struct
   exception StateTypeError of string
   let state_type_error msg = raise (StateTypeError ("[State Type Error] " ^ msg))
 
-  let stack_base_id : Isa.imm_var_id = 1
+  (* let stack_base_id : Isa.imm_var_id = 1 *)
 
   module CondVarSet = Set.Make(Int)
   
