@@ -27,6 +27,14 @@ module Ir = struct
       end
     | _ -> true
 
+  let cmp_operand (op1: operand) (op2: operand) : bool =
+    match op1, op2 with
+    | RegOp r1, RegOp r2 -> r1 = r2
+    | MemOp (base1, off1, b1), MemOp (base2, off2, b2) ->
+      base1 = base2 && (MemOffset.cmp off1 off2 = 0) && b1 = b2
+    | UnknownOp, UnknownOp -> true
+    | _ -> false
+
   let string_of_operand (op: operand) : string =
     match op with
     | RegOp r -> Isa.string_of_reg_idx r

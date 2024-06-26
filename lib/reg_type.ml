@@ -28,6 +28,9 @@ module RegType (Entry: RegEntryType) = struct
     let reg_idx = Isa.get_reg_idx r in
     List.nth reg_type reg_idx
 
+  let set_reg_idx_type (reg_type: t) (reg_idx: int) (new_type: entry_t) : t =
+    List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
+
   let set_reg_type (reg_type: t) (r: Isa.register) (new_type: entry_t) : t =
     let reg_idx = Isa.get_reg_idx r in
     List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
