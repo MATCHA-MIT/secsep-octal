@@ -4,6 +4,7 @@ open Type_exp
 open Type_full_exp
 open Cond_type
 open Mem_offset
+open Smt_emitter
 open State_type
 open Pretty_print
 
@@ -394,7 +395,7 @@ module SubType = struct
     in
     List.fold_left helper SolNone (TypeFullExp.CondVarSet.to_list cond_set)
 
-  let try_solve_one_var (tv_rel: type_var_rel) (cond_list: CondType.t list) (tv_rel_list: t) : type_var_rel * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
+  let try_solve_one_var (smt_ctx: SmtEmitter.t) (tv_rel: type_var_rel) (cond_list: CondType.t list) (tv_rel_list: t) : type_var_rel * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     let try_solve_top (subtype_list: TypeFullExp.t list) : TypeFullExp.type_sol * MemOffset.ConstraintSet.t =
       let helper (found: bool) (fe: TypeFullExp.t) : bool =
         if found then true
@@ -430,12 +431,14 @@ module SubType = struct
             (acc: SingleExp.t * SingleExp.t * MemOffset.ConstraintSet.t) (entry: SingleExp.t) :
             SingleExp.t * SingleExp.t * MemOffset.ConstraintSet.t =
           let min, max, constraint_set = acc in
-          let min_ge_entry, min_entry_cons = MemOffset.conditional_ge min entry in
-          if min_ge_entry then (entry, max, MemOffset.ConstraintSet.union constraint_set min_entry_cons)
-          else begin
-            let entry_ge_max, entry_max_cons = MemOffset.conditional_ge entry max in
-            if entry_ge_max then (min, entry, MemOffset.ConstraintSet.union constraint_set entry_max_cons)
-            else (min, max, MemOffset.constraint_union [constraint_set; min_entry_cons; entry_max_cons])
+          match MemOffset.conditional_ge smt_ctx min entry with
+          | MemOffset.SatYes -> (entry, max, constraint_set)
+          | MemOffset.SatCond constraints -> (entry, max, MemOffset.ConstraintSet.union constraint_set constraints) (* warning: undetermine *)
+          | MemOffset.SatNo -> begin
+            match MemOffset.conditional_ge smt_ctx entry max with
+            | MemOffset.SatYes -> (min, entry, constraint_set)
+            | MemOffset.SatCond constraints -> (min, entry, MemOffset.ConstraintSet.union constraint_set constraints) (* warning: undetermine *)
+            | MemOffset.SatNo -> (min, max, constraint_set) (* the constraint set is not populated *)
           end
         in
         match left_list with
@@ -487,7 +490,8 @@ module SubType = struct
     | None -> { tv_rel with type_sol = None }  *)
     (* TODO Add more rules *)
 
-  let try_solve_vars 
+  let try_solve_vars
+      (smt_ctx: SmtEmitter.t)
       (tv_rel_list: t) 
       (cond_list: CondType.t list) 
       (useful_set: TypeExp.TypeVarSet.t) : 
@@ -501,7 +505,7 @@ module SubType = struct
       TypeExp.pp_type_var_set 0 acc_useful;
       Printf.printf "\n"; *)
       if TypeExp.TypeVarSet.find_opt tv_rel.type_var_idx acc_useful != None then
-        let new_tv_rel, sol_cons, sol_useful = try_solve_one_var tv_rel cond_list tv_rel_list in
+        let new_tv_rel, sol_cons, sol_useful = try_solve_one_var smt_ctx tv_rel cond_list tv_rel_list in
         match new_tv_rel.type_sol with
         | SolNone -> ((acc_sol, acc_cons, TypeExp.TypeVarSet.union acc_useful sol_useful), tv_rel)
         | e -> (((new_tv_rel.type_var_idx, e) :: acc_sol, MemOffset.ConstraintSet.union acc_cons sol_cons, acc_useful), new_tv_rel)
@@ -545,7 +549,7 @@ module SubType = struct
     | SolNone -> {tv_rel with subtype_list = merge_sub_type tv_rel.subtype_list}
     | _ -> tv_rel
 
-  let solve_vars (tv_rel_list: t) (cond_list: CondType.t list) (useful_var: TypeExp.TypeVarSet.t) (num_iter: int) : t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
+  let solve_vars (smt_ctx: SmtEmitter.t) (tv_rel_list: t) (cond_list: CondType.t list) (useful_var: TypeExp.TypeVarSet.t) (num_iter: int) : t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     let rec helper 
         (tv_rel_list: t) 
         (cond_list: CondType.t list) 
@@ -555,7 +559,7 @@ module SubType = struct
         t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     if num_iter == 0 then (tv_rel_list, cond_list, cons, useful_var)
     else begin
-      let (new_sol_list, new_cons_list, new_useful), new_tv_rel_list = try_solve_vars tv_rel_list cond_list useful_var in
+      let (new_sol_list, new_cons_list, new_useful), new_tv_rel_list = try_solve_vars smt_ctx tv_rel_list cond_list useful_var in
       let final_cons_list = MemOffset.ConstraintSet.union cons new_cons_list in
       match new_sol_list with
       | [] -> (new_tv_rel_list, cond_list, final_cons_list, new_useful)

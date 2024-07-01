@@ -7,6 +7,7 @@ open Cond_type
 open Reg_type
 open Mem_offset
 open Mem_type
+open Smt_emitter
 open Pretty_print
 
 module StateType = struct
@@ -123,7 +124,9 @@ module StateType = struct
     let useful_vars = TypeExp.TypeVarSet.union (TypeExp.get_vars base_type) (TypeExp.get_vars index_type) in
     (new_type, useful_vars)
 
+  (* TODO: Requires SMT solver context *)
   let get_ld_op_type 
+      (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
@@ -132,9 +135,10 @@ module StateType = struct
       ((Isa.imm_var_id * MemOffset.t * bool) * TypeExp.t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t * TypeExp.TypeVarSet.t=
     let addr_type, useful_vars = get_mem_op_type_and_useful_var curr_state disp base index scale in
     let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
-    MemRangeType.get_mem_entry_with_addr curr_state.mem_type (addr_type, size), useful_vars
+    MemRangeType.get_mem_entry_with_addr smt_ctx curr_state.mem_type (addr_type, size), useful_vars
 
   let set_st_op_type 
+      (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
@@ -144,11 +148,13 @@ module StateType = struct
       ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t * TypeExp.TypeVarSet.t =
     let addr_type, useful_vars = get_mem_op_type_and_useful_var curr_state disp base index scale in
     let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
-    match MemRangeType.set_mem_entry_with_addr curr_state.mem_type (addr_type, size) new_type with
+    match MemRangeType.set_mem_entry_with_addr smt_ctx curr_state.mem_type (addr_type, size) new_type with
     | Left (m_key, m_type, st_constraint) -> (Left (m_key, { curr_state with mem_type = m_type }, st_constraint), useful_vars)
     | Right other -> (Right other, useful_vars)
 
+  (* TODO: Requires SMT solver context *)
   let get_src_op_type 
+      (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t)
       (src: Isa.operand) : (Ir.operand list) * TypeExp.t * ((TypeExp.t * int64) option) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
@@ -158,7 +164,7 @@ module StateType = struct
     | MemOp (disp, base, index, scale) -> 
       (get_mem_op_ir_op base index,get_mem_op_type curr_state disp base index scale, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | LdOp (disp, base, index, scale, size) ->
-      begin match get_ld_op_type sol curr_state disp base index scale size with
+      begin match get_ld_op_type smt_ctx sol curr_state disp base index scale size with
       | (Left ((ptr, offset, is_single_full_slot), exp, ld_constraint), useful_vars) -> ([MemOp (ptr, offset, is_single_full_slot)], exp, None, ld_constraint, useful_vars)
       | (Right (addr, size), useful_vars) -> ([UnknownOp], TypeExp.TypePtr (addr, size), Some (addr, size), MemOffset.ConstraintSet.empty, useful_vars)
       end
@@ -166,12 +172,13 @@ module StateType = struct
     | LabelOp _ -> state_type_error ("get_src_op_type: cannot get src op type of a label op")
 
   let set_dest_op_type
+      (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t) (dest: Isa.operand) (new_type: TypeExp.t) : Ir.operand * t * ((TypeExp.t * int64) option) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     match dest with
     | RegOp r -> (RegOp (Isa.get_reg_idx r), set_reg_type curr_state r new_type, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | StOp (disp, base, index, scale, size) ->
-      begin match set_st_op_type sol curr_state disp base index scale size new_type with
+      begin match set_st_op_type smt_ctx sol curr_state disp base index scale size new_type with
       | (Left ((ptr, offset, is_single_full_slot), exp, st_constraint), useful_vars) -> (MemOp (ptr, offset, is_single_full_slot), exp, None, st_constraint, useful_vars)
       | (Right addr_exp, useful_vars) -> (UnknownOp, curr_state, Some addr_exp, MemOffset.ConstraintSet.empty, useful_vars)
       end
@@ -186,7 +193,9 @@ module StateType = struct
     | _ -> e, None
 
   (* TODO: Generate IR here!!! *)
+  (* TODO: Requires SMT solver context *)
   let type_prop_inst
+      (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (curr_state: t) 
       (cond_list: CondType.t list) 
@@ -217,10 +226,10 @@ module StateType = struct
     | MovS (dest, src)
     | MovZ (dest, src)
     | Lea (dest, src) ->
-      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type sol curr_state src in
+      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type smt_ctx sol curr_state src in
       (* LEA need this!!! *)
       let dest_type, new_var_type_opt = new_var_or_not src_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src_constraint; dest_constraint],
@@ -228,11 +237,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src_key))
     | Add (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeAdd, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -240,11 +249,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Sub (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSub, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -252,11 +261,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Sal (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSal, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -264,11 +273,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Shr (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeShr, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -276,11 +285,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Sar (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeSar, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -292,7 +301,7 @@ module StateType = struct
       begin match src1, src2 with
       | RegOp r1, RegOp r2 ->
         if r1 = r2 then 
-          let dest_key, new_state, ua, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest (TypeSingle (SingleConst 0L)) in
+          let dest_key, new_state, ua, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest (TypeSingle (SingleConst 0L)) in
           (new_state, cond_list, 
           (get_unknown_list [ua]) @ unknown_addr_list,
           MemOffset.ConstraintSet.union constraint_set dest_constraint,
@@ -300,11 +309,11 @@ module StateType = struct
           None,
           Mov (dest_key, []))
         else begin
-          let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-          let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+          let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+          let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
           let dest_type = TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)) in
           let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-          let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+          let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
           (new_state, cond_list, 
           (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
           MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -313,11 +322,11 @@ module StateType = struct
           Mov (dest_key, src1_key @ src2_key))
         end
       | _ ->
-        let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-        let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+        let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+        let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
         let dest_type = TypeExp.eval (TypeBExp (TypeXor, src1_type, src2_type)) in
         let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-        let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+        let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
         (new_state, cond_list, 
         (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
         MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -326,10 +335,10 @@ module StateType = struct
         Mov (dest_key, src1_key @ src2_key))
       end
     | Not (dest, src) ->
-      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type sol curr_state src in
+      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type smt_ctx sol curr_state src in
       let dest_type = TypeExp.eval (TypeUExp (TypeNot, src_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src_constraint; dest_constraint],
@@ -337,11 +346,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src_key))
     | And (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeAnd, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -349,11 +358,11 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Or (dest, src1, src2) ->
-      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let src1_key, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let src2_key, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let dest_type = TypeExp.eval (TypeBExp (TypeOr, src1_type, src2_type)) in
       let dest_type, new_var_type_opt = new_var_or_not dest_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type sol curr_state dest dest_type in
+      let dest_key, new_state, ua3, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol curr_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua3; ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint; dest_constraint],
@@ -361,8 +370,8 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src1_key @ src2_key))
     | Cmp (src1, src2) ->
-      let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       ({curr_state with cond_type = (src1_type, src2_type)}, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint],
@@ -371,8 +380,8 @@ module StateType = struct
       Skip)
       (* TODO: Handle the case where some other instructions set flags and some other instructions use flags!!! *)
     | Test (src1, src2) ->
-      let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type sol curr_state src1 in
-      let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type sol curr_state src2 in
+      let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
+      let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
       let src_and_type = 
         if Isa.cmp_operand src1 src2 then src1_type else TypeExp.TypeBExp (TypeAnd, src1_type, src2_type) in
       ({curr_state with cond_type = (src_and_type, TypeExp.TypeSingle (SingleConst 0L))}, cond_list, 
@@ -398,16 +407,16 @@ module StateType = struct
       Jump target)
     | Jmp target -> (curr_state, cond_list, unknown_addr_list, constraint_set, useful_var_set, None, Jump target)
     | Push src -> (* Note: We do not track mem access in push/pop*)
-      let _, old_rsp_type, _, _, _ = get_src_op_type sol curr_state (Isa.RegOp Isa.RSP) in
+      let _, old_rsp_type, _, _, _ = get_src_op_type smt_ctx sol curr_state (Isa.RegOp Isa.RSP) in
       let diff_rsp_type = TypeExp.TypeSingle (SingleConst (-8L)) in
-      (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
+      (* let src2_type, src2_cond = get_src_op_type smt_ctx curr_state src2 in *)
       let new_rsp_type = TypeExp.eval (TypeBExp (TypeAdd, old_rsp_type, diff_rsp_type)) in
-      let _, new_state, _, _ , _= set_dest_op_type sol curr_state (Isa.RegOp Isa.RSP) new_rsp_type in
-      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type sol curr_state src in
+      let _, new_state, _, _ , _= set_dest_op_type smt_ctx sol curr_state (Isa.RegOp Isa.RSP) new_rsp_type in
+      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type smt_ctx sol curr_state src in
       (* Actually here the push_type should always be type var or type vals, so we never need a new type var in this case.
          So this change could be optimized! *)
       let dest_type, new_var_type_opt = new_var_or_not src_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type sol new_state (Isa.StOp (None, Some Isa.RSP, None, None, 8L)) dest_type in
+      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol new_state (Isa.StOp (None, Some Isa.RSP, None, None, 8L)) dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src_constraint; dest_constraint],
@@ -415,14 +424,14 @@ module StateType = struct
       new_var_type_opt,
       Mov (dest_key, src_key))
     | Pop dest ->
-      let _, old_rsp_type, _, _, _ = get_src_op_type sol curr_state (Isa.RegOp Isa.RSP) in
+      let _, old_rsp_type, _, _, _ = get_src_op_type smt_ctx sol curr_state (Isa.RegOp Isa.RSP) in
       let diff_rsp_type = TypeExp.TypeSingle (SingleConst 8L) in
-      (* let src2_type, src2_cond = get_src_op_type curr_state src2 in *)
+      (* let src2_type, src2_cond = get_src_op_type smt_ctx curr_state src2 in *)
       let new_rsp_type = TypeExp.eval (TypeBExp (TypeAdd, old_rsp_type, diff_rsp_type)) in
-      let _, new_state, _, _, _ = set_dest_op_type sol curr_state (Isa.RegOp Isa.RSP) new_rsp_type in
-      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type sol curr_state (Isa.LdOp (None, Some Isa.RSP, None, None, 8L)) in
+      let _, new_state, _, _, _ = set_dest_op_type smt_ctx sol curr_state (Isa.RegOp Isa.RSP) new_rsp_type in
+      let src_key, src_type, ua1, src_constraint, src_useful = get_src_op_type smt_ctx sol curr_state (Isa.LdOp (None, Some Isa.RSP, None, None, 8L)) in
       let dest_type, new_var_type_opt = new_var_or_not src_type pc_dest_var_idx curr_state.cond_hist in
-      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type sol new_state dest dest_type in
+      let dest_key, new_state, ua2, dest_constraint, dest_useful = set_dest_op_type smt_ctx sol new_state dest dest_type in
       (new_state, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src_constraint; dest_constraint],

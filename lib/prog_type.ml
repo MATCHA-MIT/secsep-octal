@@ -7,6 +7,7 @@ open Mem_type
 open State_type
 open Cond_type
 open Subtype
+open Smt_emitter
 open Pretty_print
 
 module ProgType = struct
@@ -25,12 +26,12 @@ module ProgType = struct
     prog_type: block_type list;
     cond_type: CondType.t list;
     subtype_sol: SubType.t;
-    constraint_set: MemOffset.ConstraintSet.t;
     useful_set: TypeExp.TypeVarSet.t;
     ptr_set: MemKeySet.t;
     no_ptr_set: MemKeySet.t;
     next_type_var_idx: TypeExp.type_var_id;
     next_single_var_idx: Isa.imm_var_id;
+    smt_ctx: SmtEmitter.t
   }
 
   (* Init / update prog type with proper type var or sym var *)
@@ -116,7 +117,9 @@ module ProgType = struct
   let get_label_type (code_type: block_type list) (label: Isa.label) : StateType.t =
     (List.find (fun x -> label = x.label) code_type).block_type
 
+  (* TODO: Requires SMT solver context *)
   let prop_one_block 
+      (smt_ctx: SmtEmitter.t)
       (tv_rel: SubType.t)
       (block_type: StateType.t)
       (cond_list: CondType.t list)
@@ -134,7 +137,7 @@ module ProgType = struct
         (SubType.t * StateType.t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t * TypeExp.type_var_id) * Ir.t  =
       let acc_tv_rel, acc_state_type, acc_cond_list, acc_u_mem_list, acc_prop_constraint, acc_useful_set, acc_pc_dest_idx = acc in
       let new_state_type, new_cond_list, u_mem_list, prop_constraint, new_useful_var, new_var_type_opt, ir_inst = 
-        StateType.type_prop_inst sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint acc_useful_set acc_pc_dest_idx inst 
+        StateType.type_prop_inst smt_ctx sol acc_state_type acc_cond_list acc_u_mem_list acc_prop_constraint acc_useful_set acc_pc_dest_idx inst 
       in
       let new_state_type = StateType.set_default_cond_type new_state_type inst in
       let new_tv_rel = SubType.add_type_var_rel_opt acc_tv_rel acc_pc_dest_idx new_var_type_opt in
@@ -155,7 +158,9 @@ module ProgType = struct
     in
     ((new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint, new_prop_useful_var), new_ir_block)
 
+  (* TODO: Requires SMT solver context *)
   let prop_all_block
+      (smt_ctx: SmtEmitter.t)
       (p: Isa.program)
       (init_code_type: block_type list)
       (init_tv_rel: SubType.t)
@@ -168,7 +173,7 @@ module ProgType = struct
       if block_type.label = block_inst.label then
         let (acc_tv_rel, acc_cond_list, acc_u_mem_list, acc_constraint, acc_useful_set), old_ir_program = acc in
         let other, ir_insts =
-        prop_one_block acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint acc_useful_set block_type.block_pc_idx block_inst.insts init_code_type sol in
+        prop_one_block smt_ctx acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint acc_useful_set block_type.block_pc_idx block_inst.insts init_code_type sol in
         (other, { label = block_inst.label; insts = ir_insts } :: old_ir_program)
       else 
         prog_type_error ("prop_all_block helper: block type and block label mismatch: " ^ block_type.label ^ " != " ^ block_inst.label)
@@ -199,13 +204,15 @@ module ProgType = struct
 
   (* Solve subtype relation to generate new solution *)
   let solve_subtype
-      (tv_rel_list: SubType.t) (cond_list: CondType.t list) (useful_var: TypeExp.TypeVarSet.t) (iter: int) :
+      (smt_ctx: SmtEmitter.t) (tv_rel_list: SubType.t) (cond_list: CondType.t list) (useful_var: TypeExp.TypeVarSet.t) (iter: int) :
       SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
-    SubType.solve_vars (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list useful_var iter
+    SubType.solve_vars smt_ctx (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list useful_var iter
 
   (* Try to resolve known mem access with new solution *)
   (* Generate new memory layout (ptr-offset list) *)
+  (* TODO: Requires SMT solver context *)
   let get_update_list
+      (smt_ctx: SmtEmitter.t)
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
       (unknown_mem_list: (TypeFullExp.t * int64) list)
       (subtype_sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -220,7 +227,7 @@ module ProgType = struct
     Printf.printf "Newly resolved mem access list--------------\n";
     MemRangeType.pp_mem_key 0 mem_access_list;
     Printf.printf "Newly resolved mem access list--------------\n";
-    let udpate_list, constraint_set = MemRangeType.update_offset_all_ptr old_mem_type mem_access_list in
+    let udpate_list, constraint_set = MemRangeType.update_offset_all_ptr smt_ctx old_mem_type mem_access_list in
     (new_ptr_info, udpate_list, constraint_set)
 
   let init
@@ -236,25 +243,33 @@ module ProgType = struct
       prog_type = prog_type;
       cond_type = [];
       subtype_sol = SubType.init next_type_var_idx;
-      constraint_set = MemOffset.ConstraintSet.empty;
       useful_set = TypeExp.TypeVarSet.empty;
       ptr_set = MemKeySet.empty;
       no_ptr_set = MemKeySet.empty;
       next_type_var_idx = next_type_var_idx;
       next_single_var_idx = next_single_var_idx;
+      smt_ctx = SmtEmitter.init_smt_ctx ()
     }
 
   let loop (state: t) : t =
+    let z3_ctx, z3_solver = state.smt_ctx in
+    let result = Z3.Solver.check z3_solver [] in
+    if result = Z3.Solver.UNSATISFIABLE then begin
+      Printf.printf "FATAL: SMT Unsatisfiable\n";
+      Printf.printf "%s\n" (Z3.Solver.to_string z3_solver);
+      Printf.printf "loop quitted\n";
+      prog_type_error "FATAL error in loop"
+    end;
     let temp_sol = get_temp_sol state.subtype_sol in
     let (tv_rel, cond_list, unknown_list, prop_constraint, prop_useful_var), ir_prog = 
-      prop_all_block state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
+      prop_all_block state.smt_ctx state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
     (* Printf.printf "!!!SubType--------------------------------------------\n";
     SubType.pp_tv_rels 0 tv_rel;
     Printf.printf "!!!SubType--------------------------------------------\n"; *)
     let cond_list = fix_cond_list cond_list tv_rel in
     let cond_list_useful = get_cond_list_useful cond_list in
     let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
-      solve_subtype tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
+      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
@@ -264,22 +279,27 @@ module ProgType = struct
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
     MemRangeType.pp_mem_type 0 old_mem_type;
     Printf.printf "ggg-------------------\n";
-    let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
+    let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list state.smt_ctx old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
     let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
       update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
     let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
+    Z3.Solver.add z3_solver (
+      MemOffset.constraint_set_to_solver_exps
+        z3_ctx
+        (MemOffset.constraint_union [prop_constraint; sol_constraint; update_constraint])
+    );
     {
       prog = state.prog;
       ir_prog = ir_prog;
       prog_type = new_prog_type;
       cond_type = sol_cond_list;
       subtype_sol = new_subtype;
-      constraint_set = MemOffset.constraint_union [state.constraint_set; prop_constraint; sol_constraint; update_constraint];
       useful_set = sol_useful_var;
       ptr_set = ptr_list;
       no_ptr_set = no_ptr_list;
       next_type_var_idx = next_type_var;
       next_single_var_idx = next_imm_var;
+      smt_ctx = (z3_ctx, z3_solver);
     }
 
   let pp_prog_type (lvl: int) (state: t) =
@@ -296,8 +316,8 @@ module ProgType = struct
     CondType.pp_cond_list lvl state.cond_type;
     Printf.printf "SubType--------------------------------------------\n";
     SubType.pp_tv_rels lvl state.subtype_sol;
-    Printf.printf "MemOffset------------------------------------------\n";
-    MemOffset.pp_constraint_set lvl state.constraint_set;
+    Printf.printf "Z3 Context------------------------------------------\n";
+    Printf.printf "%s" (Z3.Solver.to_string (snd state.smt_ctx));
     Printf.printf "UsefulVar------------------------------------------\n";
     TypeExp.pp_type_var_set lvl state.useful_set;
     Printf.printf "\nNext type var %d\nNext single var %d\n" state.next_type_var_idx state.next_single_var_idx;
