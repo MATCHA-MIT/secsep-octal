@@ -84,7 +84,9 @@ module StateType = struct
     | None, Some r -> [RegOp (Isa.get_reg_idx r)]
     | None, None -> []
 
-  let get_mem_op_type_helper (curr_state: t)
+  let get_mem_op_type_helper 
+      (smt_ctx: SmtEmitter.t)
+      (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option) : TypeExp.t * TypeExp.t * TypeExp.t =
     let disp_type = match disp with
@@ -92,11 +94,36 @@ module StateType = struct
     | None -> get_imm_type (ImmNum 0L)
     in
     let base_type = match base with
-    | Some b -> get_reg_type curr_state b
+    | Some b -> begin
+        let t = get_reg_type curr_state b in
+        let _ = match t with
+          | TypeSingle se ->
+              (* If base is resolved, add the constraint that the address is above 0 *)
+            Printf.printf "heuristic assertion (>= 0): %s\n" (SingleExp.to_string se);
+              let z3_ctx, z3_solver = smt_ctx in
+              Z3.Solver.add z3_solver [Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se) (SmtEmitter.mk_numeral smt_ctx 0L)];
+          | _ -> ()
+        in
+        t
+      end
     | None -> get_imm_type (ImmNum 0L)
     in
     let index_type = match index with
-    | Some i -> get_reg_type curr_state i
+    | Some i -> begin
+        let res = get_reg_type curr_state i in
+        let _ = match res with
+        | TypeSingle se ->
+            Printf.printf "heuristic assertion (>= 0): %s\n" (SingleExp.to_string se);
+            let z3_ctx, z3_solver = smt_ctx in
+            Z3.Solver.add z3_solver [Z3.BitVector.mk_sge z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se) (SmtEmitter.mk_numeral smt_ctx 0L)];
+        | _ ->
+            Printf.printf "index not resolved yet, cannot add heuristic >=0 assertion\n";
+            TypeExp.pp_type_exp 1 res;
+            Printf.printf "\n";
+            ()
+        in
+        res
+      end
     | None -> get_imm_type (ImmNum 0L)
     in
     let scale_val = match scale with
@@ -111,20 +138,23 @@ module StateType = struct
     ) in
     (new_type, base_type, index_type)
 
-  let get_mem_op_type (curr_state: t)
+  let get_mem_op_type
+      (smt_ctx: SmtEmitter.t)
+      (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option) : TypeExp.t =
-    let new_type, _, _ = get_mem_op_type_helper curr_state disp base index scale in
+    let new_type, _, _ = get_mem_op_type_helper smt_ctx curr_state disp base index scale in
     new_type
 
-  let get_mem_op_type_and_useful_var (curr_state: t)
+  let get_mem_op_type_and_useful_var 
+      (smt_ctx: SmtEmitter.t)
+      (curr_state: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option) : TypeExp.t * TypeExp.TypeVarSet.t =
-    let new_type, base_type, index_type = get_mem_op_type_helper curr_state disp base index scale in
+    let new_type, base_type, index_type = get_mem_op_type_helper smt_ctx curr_state disp base index scale in
     let useful_vars = TypeExp.TypeVarSet.union (TypeExp.get_vars base_type) (TypeExp.get_vars index_type) in
     (new_type, useful_vars)
 
-  (* TODO: Requires SMT solver context *)
   let get_ld_op_type 
       (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -133,7 +163,7 @@ module StateType = struct
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) : 
       ((Isa.imm_var_id * MemOffset.t * bool) * TypeExp.t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t * TypeExp.TypeVarSet.t=
-    let addr_type, useful_vars = get_mem_op_type_and_useful_var curr_state disp base index scale in
+    let addr_type, useful_vars = get_mem_op_type_and_useful_var smt_ctx curr_state disp base index scale in
     let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
     MemRangeType.get_mem_entry_with_addr smt_ctx curr_state.mem_type (addr_type, size), useful_vars
 
@@ -146,13 +176,12 @@ module StateType = struct
       (size: int64)
       (new_type: TypeExp.t) : 
       ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t * TypeExp.TypeVarSet.t =
-    let addr_type, useful_vars = get_mem_op_type_and_useful_var curr_state disp base index scale in
+    let addr_type, useful_vars = get_mem_op_type_and_useful_var smt_ctx curr_state disp base index scale in
     let addr_type, _ = TypeFullExp.repl_all_sol sol (addr_type, curr_state.cond_hist) in
     match MemRangeType.set_mem_entry_with_addr smt_ctx curr_state.mem_type (addr_type, size) new_type with
     | Left (m_key, m_type, st_constraint) -> (Left (m_key, { curr_state with mem_type = m_type }, st_constraint), useful_vars)
     | Right other -> (Right other, useful_vars)
 
-  (* TODO: Requires SMT solver context *)
   let get_src_op_type 
       (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -162,7 +191,7 @@ module StateType = struct
     | ImmOp imm -> ([], get_imm_type imm, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | RegOp r -> ([RegOp (Isa.get_reg_idx r)], get_reg_type curr_state r, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | MemOp (disp, base, index, scale) -> 
-      (get_mem_op_ir_op base index,get_mem_op_type curr_state disp base index scale, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
+      (get_mem_op_ir_op base index, get_mem_op_type smt_ctx curr_state disp base index scale, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | LdOp (disp, base, index, scale, size) ->
       begin match get_ld_op_type smt_ctx sol curr_state disp base index scale size with
       | (Left ((ptr, offset, is_single_full_slot), exp, ld_constraint), useful_vars) -> ([MemOp (ptr, offset, is_single_full_slot)], exp, None, ld_constraint, useful_vars)
@@ -193,7 +222,6 @@ module StateType = struct
     | _ -> e, None
 
   (* TODO: Generate IR here!!! *)
-  (* TODO: Requires SMT solver context *)
   let type_prop_inst
       (smt_ctx: SmtEmitter.t)
       (sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
@@ -205,6 +233,7 @@ module StateType = struct
       (pc_dest_var_idx: TypeExp.type_var_id) (* We use -pc as Idx for *)
       (inst: Isa.instruction) : 
       t * (CondType.t list) * ((TypeFullExp.t * int64) list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t * (TypeFullExp.t option) * Ir.t =
+    (* Printf.printf "type_prop_inst: %s\n" (Isa.mnemonic_of_instruction inst); *)
     (* Return value:
        new state
        new cond list
@@ -372,6 +401,11 @@ module StateType = struct
     | Cmp (src1, src2) ->
       let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
       let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
+      Printf.printf "cmp cond:\n";
+      TypeExp.pp_type_exp 0 src1_type;
+      Printf.printf "\n";
+      TypeExp.pp_type_exp 0 src2_type;
+      Printf.printf "\n";
       ({curr_state with cond_type = (src1_type, src2_type)}, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint],
@@ -382,6 +416,11 @@ module StateType = struct
     | Test (src1, src2) ->
       let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
       let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
+      Printf.printf "test cond:\n";
+      TypeExp.pp_type_exp 0 src1_type;
+      Printf.printf "\n";
+      TypeExp.pp_type_exp 0 src2_type;
+      Printf.printf "\n";
       let src_and_type = 
         if Isa.cmp_operand src1 src2 then src1_type else TypeExp.TypeBExp (TypeAnd, src1_type, src2_type) in
       ({curr_state with cond_type = (src_and_type, TypeExp.TypeSingle (SingleConst 0L))}, cond_list, 

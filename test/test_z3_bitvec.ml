@@ -7,39 +7,34 @@ let ctx = mk_context [];;
 (* Create variables x and y *)
 let x = BitVector.mk_const_s ctx ("x") 64;;
 let z = BitVector.mk_numeral ctx "13" 64;;
-let zero = BitVector.mk_numeral ctx "0" 64;;
 
 (* Create the constraints *)
-let xpy = BitVector.mk_add ctx x z;;
-let constraint1 = BitVector.mk_uge ctx xpy z;;
-let constraint2 = BitVector.mk_ule ctx x zero;;
+let xpz = BitVector.mk_add ctx x z;;
+let xpz_noo = BitVector.mk_add_no_overflow ctx x z true;;
+let constraint1 = BitVector.mk_sge ctx xpz x;;
 
 (* Create a solver *)
 let solver = Solver.mk_solver ctx None;;
 
 Solver.push solver;;
-Solver.add solver [constraint1; constraint2];;
-let result1 = Solver.check solver [];;
-Printf.printf "%s\n%s\n" (Solver.string_of_status result1) (Solver.to_string solver);;
-let model1 = Solver.get_model solver;;
-if Option.is_some model1 then
-  Printf.printf "%s\n" (Model.to_string (Option.get model1));;
+Solver.add solver [constraint1; xpz_noo];;
+let result = Solver.check solver [];;
+Printf.printf "%s\n%s\n" (Solver.string_of_status result) (Solver.to_string solver);;
+let model = Solver.get_model solver;;
+if Option.is_some model then
+  Printf.printf "model:\n%s\n\n" (Model.to_string (Option.get model));;
 Solver.pop solver 1;;
 
-Solver.push solver;;
-Solver.add solver [Boolean.mk_not ctx constraint1; constraint2];;
-let result2 = Solver.check solver [];;
-Printf.printf "%s\n%s\n" (Solver.string_of_status result2) (Solver.to_string solver);;
-let model2 = Solver.get_model solver;;
-if Option.is_some model2 then
-  Printf.printf "%s\n" (Model.to_string (Option.get model2));;
-
 let foo (s: Solver.solver) =
-  Solver.add s [Boolean.mk_xor ctx constraint1 constraint2]
+  Solver.add s [Boolean.mk_not ctx constraint1; xpz_noo]
 ;;
 
 foo solver;;
-Printf.printf "%s\n" (Solver.to_string solver);;
+let result = Solver.check solver [];;
+Printf.printf "%s\n%s\n" (Solver.string_of_status result) (Solver.to_string solver);;
+let model = Solver.get_model solver;;
+if Option.is_some model then
+  Printf.printf "model:\n%s\n" (Model.to_string (Option.get model));;
 
 
 (*

@@ -24,9 +24,12 @@ let rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
 
 (* Note the type in the init_mem here are for the first block, which will be added to start_imm_var later *)
 
+(* There's no need to enter absolute offset here, for the init function will add the base *)
+
 let sha512_block_data_order_init_mem : MemRangeType.t = {
   ptr_list = MemKeySet.of_list [ rsp; rdi; rsi ];
   mem_type = [
+    (rsp, []);
     (rdi, [ ((SingleConst 0L, SingleConst 64L), TypeSingle (SingleVar 16)) ]);
     (rsi, [ ((SingleConst 0L, SingleBExp (SingleMul, SingleVar rdx, SingleConst 128L)), TypeSingle (SingleVar 17))])
   ]
@@ -35,6 +38,7 @@ let sha512_block_data_order_init_mem : MemRangeType.t = {
 let sha512_final_impl_init_mem : MemRangeType.t = {
   ptr_list = MemKeySet.of_list [ rsp; rdi; rdx ];
   mem_type = [
+    (rsp, []);
     (rdi, [ ((SingleConst 0L, SingleVar rsi), TypeSingle (SingleVar 16)) ]);
     (rdx, [
       ((SingleConst 0L, SingleConst 64L), TypeSingle (SingleVar 16));
@@ -47,3 +51,26 @@ let sha512_final_impl_init_mem : MemRangeType.t = {
   ]
 }
 
+let table_select_init_mem : MemRangeType.t = {
+  ptr_list = MemKeySet.of_list [ rsp; rdi ];
+  mem_type = [
+    (rsp, []);
+    (rdi, [
+      ((SingleConst 0L, SingleConst 8L), TypeSingle (SingleVar 16));
+      ((SingleConst 8L, SingleConst 16L), TypeSingle (SingleVar 17));
+      ((SingleConst 16L, SingleConst 24L), TypeSingle (SingleVar 18));
+      ((SingleConst 24L, SingleConst 32L), TypeSingle (SingleVar 19));
+      ((SingleConst 32L, SingleConst 40L), TypeSingle (SingleVar 20));
+      ((SingleConst 40L, SingleConst 48L), TypeSingle (SingleVar 21));
+      ((SingleConst 48L, SingleConst 56L), TypeSingle (SingleVar 22));
+      ((SingleConst 56L, SingleConst 64L), TypeSingle (SingleVar 23));
+      ((SingleConst 64L, SingleConst 72L), TypeSingle (SingleVar 24));
+      ((SingleConst 72L, SingleConst 80L), TypeSingle (SingleVar 25));
+      ((SingleConst 80L, SingleConst 88L), TypeSingle (SingleVar 26));
+      ((SingleConst 88L, SingleConst 96L), TypeSingle (SingleVar 27));
+      ((SingleConst 96L, SingleConst 104L), TypeSingle (SingleVar 28));
+      ((SingleConst 104L, SingleConst 112L), TypeSingle (SingleVar 29));
+      ((SingleConst 112L, SingleConst 120L), TypeSingle (SingleVar 30));
+    ])
+  ]
+}

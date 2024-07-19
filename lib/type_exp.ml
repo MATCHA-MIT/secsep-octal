@@ -1,3 +1,4 @@
+open Isa
 open Single_exp
 open Pretty_print
 
@@ -67,6 +68,8 @@ module TypeExp = struct
     | TypeSingle (SingleVar x) -> TypeSingle (SingleVar (x + 1))
     | TypeVar x -> TypeVar (x + 1)
     | _ -> type_exp_error "next_var cannot find next var for non type or single var"
+
+  let sym_of_rsp : Isa.imm_var_id = 4
 
   let cmp_type_bop (op1: type_bop) (op2: type_bop) : int =
     match op1, op2 with
@@ -318,6 +321,14 @@ module TypeExp = struct
         (* TODO: TypeXor TypeAnd TypeOr *)
         | _ -> default_type
         end
+      (* trivial arithmetics begin *)
+      | s, TypeSingle (SingleConst x) when x = 0L && tbop = TypeAdd -> s
+      | TypeSingle (SingleConst x), s when x = 0L && tbop = TypeAdd -> s
+      | _, TypeSingle (SingleConst x) when x = 0L && tbop = TypeMul -> TypeSingle (SingleConst 0L)
+      | TypeSingle (SingleConst x), _ when x = 0L && tbop = TypeMul -> TypeSingle (SingleConst 0L)
+      | s, TypeSingle (SingleConst x) when x = 1L && tbop = TypeMul -> s
+      | TypeSingle (SingleConst x), s when x = 1L && tbop = TypeMul -> s
+      (* trivial arithmetics end *)
       | TypeRange (s1, true, s2, true, step), TypeRange (s1', true, s2', true, step') ->
         begin match tbop with
         | TypeAdd -> 

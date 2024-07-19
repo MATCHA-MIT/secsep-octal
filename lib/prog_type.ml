@@ -8,6 +8,7 @@ open State_type
 open Cond_type
 open Subtype
 open Smt_emitter
+open Single_exp
 open Pretty_print
 
 module ProgType = struct
@@ -44,6 +45,7 @@ module ProgType = struct
     (* Only update ptr val in base, but type single var idx are still not correct in init_mem *)
     let init_mem = MemRangeType.sort_mem_type init_mem in
     let init_mem = MemRangeType.update_mem_entry_base_id init_mem start_single_var_idx in
+    let init_mem = MemRangeType.to_absolute_offset init_mem in
     let helper (acc: TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) (block: Isa.basic_block) :
         (TypeExp.type_var_id * Isa.imm_var_id * TypeExp.type_var_id) * block_type =
       let type_acc, imm_acc, start_pc_dest_idx = acc in
@@ -117,7 +119,6 @@ module ProgType = struct
   let get_label_type (code_type: block_type list) (label: Isa.label) : StateType.t =
     (List.find (fun x -> label = x.label) code_type).block_type
 
-  (* TODO: Requires SMT solver context *)
   let prop_one_block 
       (smt_ctx: SmtEmitter.t)
       (tv_rel: SubType.t)
@@ -158,7 +159,6 @@ module ProgType = struct
     in
     ((new_tv_rel, new_cond_list, new_unknown_list, new_prop_constraint, new_prop_useful_var), new_ir_block)
 
-  (* TODO: Requires SMT solver context *)
   let prop_all_block
       (smt_ctx: SmtEmitter.t)
       (p: Isa.program)
@@ -210,7 +210,6 @@ module ProgType = struct
 
   (* Try to resolve known mem access with new solution *)
   (* Generate new memory layout (ptr-offset list) *)
-  (* TODO: Requires SMT solver context *)
   let get_update_list
       (smt_ctx: SmtEmitter.t)
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
@@ -227,7 +226,10 @@ module ProgType = struct
     Printf.printf "Newly resolved mem access list--------------\n";
     MemRangeType.pp_mem_key 0 mem_access_list;
     Printf.printf "Newly resolved mem access list--------------\n";
-    let udpate_list, constraint_set = MemRangeType.update_offset_all_ptr smt_ctx old_mem_type mem_access_list in
+    let udpate_list, constraint_set, undeter_access = MemRangeType.update_offset_all_ptr smt_ctx old_mem_type mem_access_list in
+    Printf.printf "Still unresolved mem access list--------------\n";
+    MemRangeType.pp_mem_key 0 (MemRangeType.reshape_mem_key_list undeter_access);
+    Printf.printf "Still unresolved mem access list--------------\n";
     (new_ptr_info, udpate_list, constraint_set)
 
   let init
@@ -237,6 +239,12 @@ module ProgType = struct
       (prog: Isa.program) : t =
     let (next_type_var_idx, next_single_var_idx), prog_type =
       init_prog_type start_type_var_idx start_single_var_idx init_mem prog in
+    (* initial information for z3 solver about the interface *)
+    let smt_ctx = SmtEmitter.init_smt_ctx () in
+    let (z3_ctx, z3_solver) = smt_ctx in
+    Z3.Solver.add z3_solver [
+      Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 2)) (SmtEmitter.mk_numeral smt_ctx 0L)
+    ];
     {
       prog = prog;
       ir_prog = [];
@@ -248,7 +256,7 @@ module ProgType = struct
       no_ptr_set = MemKeySet.empty;
       next_type_var_idx = next_type_var_idx;
       next_single_var_idx = next_single_var_idx;
-      smt_ctx = SmtEmitter.init_smt_ctx ()
+      smt_ctx = smt_ctx;
     }
 
   let loop (state: t) : t =
@@ -283,11 +291,16 @@ module ProgType = struct
     let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
       update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
     let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
-    Z3.Solver.add z3_solver (
+    let new_smt_assertions = 
       MemOffset.constraint_set_to_solver_exps
-        z3_ctx
+        state.smt_ctx
         (MemOffset.constraint_union [prop_constraint; sol_constraint; update_constraint])
-    );
+    in
+    (* print all assertions *)
+    Printf.printf "New SMT assertions-------------------------------------\n";
+    List.iter (fun x -> Printf.printf "%s\n" (Z3.Expr.to_string x)) new_smt_assertions;
+    Printf.printf "New SMT assertions-------------------------------------\n";
+    Z3.Solver.add z3_solver new_smt_assertions;
     {
       prog = state.prog;
       ir_prog = ir_prog;
@@ -316,8 +329,6 @@ module ProgType = struct
     CondType.pp_cond_list lvl state.cond_type;
     Printf.printf "SubType--------------------------------------------\n";
     SubType.pp_tv_rels lvl state.subtype_sol;
-    Printf.printf "Z3 Context------------------------------------------\n";
-    Printf.printf "%s" (Z3.Solver.to_string (snd state.smt_ctx));
     Printf.printf "UsefulVar------------------------------------------\n";
     TypeExp.pp_type_var_set lvl state.useful_set;
     Printf.printf "\nNext type var %d\nNext single var %d\n" state.next_type_var_idx state.next_single_var_idx;

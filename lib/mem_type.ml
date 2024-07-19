@@ -40,6 +40,7 @@ module MemType (Entry: MemEntrytype) = struct
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  (* MemOffset.t represents the absolute range, rather than the relative offset to the base *)
   type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * 'a) list)) list
   type t = {
     ptr_list: MemKeySet.t;
@@ -114,57 +115,109 @@ module MemType (Entry: MemEntrytype) = struct
     | hd :: [] -> Some hd
     | _ -> mem_type_error "find_base find more than one base"
 
-  let get_idx_range (addr_exp: TypeExp.t * int64) (base: Isa.imm_var_id): MemOffset.t * bool =
+  let is_addr_single_exp (addr: TypeExp.t) : bool =
+    match addr with
+    | TypeSingle _
+    | TypeRange _ -> true
+    | _ -> false
+
+  (* Given an address, get the range of the corresponding range *)
+  let get_abs_offset (addr_exp: TypeExp.t * int64) : MemOffset.t * bool =
     let addr, size = addr_exp in
     match addr with
-    | TypeSingle s ->
-      ((SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, s, SingleExp.SingleVar base)),
-      SingleExp.eval (SingleExp.SingleBExp (
-        SingleExp.SingleAdd, 
-        SingleExp.SingleBExp (SingleExp.SingleSub, s, SingleExp.SingleVar base), 
-        SingleExp.SingleConst size))),
-      true)
-    | TypeRange (s1, true, s2, true, _) ->
-      ((SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, s1, SingleExp.SingleVar base)),
-      SingleExp.eval (SingleExp.SingleBExp (
-        SingleExp.SingleAdd,
-        SingleExp.SingleBExp (SingleExp.SingleSub, s2, SingleExp.SingleVar base),
-        SingleExp.SingleConst size))),
-      false)
+    | TypeSingle s -> (
+        (
+          s,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, s, SingleExp.SingleConst size))
+        ),
+        true
+      )
+    | TypeRange (s1, true, s2, true, _) -> (
+        (
+          s1,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, s2, SingleExp.SingleConst size))
+        ),
+        false
+      )
     | _ -> 
-      mem_type_error ("get_idx_range not implement for " ^ (TypeExp.to_string addr))
+      mem_type_error ("get_abs_offset not implement for " ^ (TypeExp.to_string addr))
 
   (* TODO: Double check this new implementation!!! *)
-  (* TODO: Requires SMT solver context *)
-  let get_mem_entry_with_addr (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64) : ((Isa.imm_var_id * MemOffset.t * bool) * entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+  let get_mem_entry_with_addr (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64)
+    : ((Isa.imm_var_id * MemOffset.t * bool) * entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
+    Printf.printf "get_mem_entry_with_addr - accessing address:\n";
     TypeExp.pp_type_exp 0 addr;
     Printf.printf "\n";
+    (* if there exists TypeVar, return *)
+    if not (is_addr_single_exp addr) then Right addr_exp else
     let base_opt = find_base addr mem.ptr_list in
+    let addr_offset, is_single_slot = get_abs_offset addr_exp in
+    let addr_constraint = MemOffset.check_offset smt_ctx addr_offset in
     match base_opt with
-    | None -> Right addr_exp
+    | None -> begin (* Try all slots and see if the new address fits in one determinedly *)
+        let addr_offset, is_single_slot = get_abs_offset addr_exp in
+        let helper (mem_of_base: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+          let base, base_mem = mem_of_base in
+          match List.filter_map (fun (offset, offset_type) -> 
+            if MemOffset.equal addr_offset offset then begin 
+              if is_single_slot then 
+                  Some ((base, offset, true), offset_type, MemOffset.ConstraintSet.empty)
+              else
+                  Some ((base, offset, false), Entry.partial_read_val offset_type, MemOffset.ConstraintSet.empty)
+            end else begin
+              match MemOffset.subset smt_ctx addr_offset offset with
+              | MemOffset.SatYes -> Some ((base, offset, false), Entry.partial_read_val offset_type, MemOffset.ConstraintSet.empty)
+              | MemOffset.SatCond constraints ->
+                Printf.printf "get_mem_entry_with_addr: new constraints of\n";
+                MemOffset.pp_offset 0 addr_offset;
+                Printf.printf " in ";
+                MemOffset.pp_offset 0 offset;
+                Printf.printf "\n";
+                MemOffset.pp_constraint_set 0 constraints;
+                Printf.printf "\n";
+                Some ((base, offset, false), Entry.partial_read_val offset_type, constraints)
+              | MemOffset.SatNo -> None
+            end
+          ) base_mem with
+          | [] -> None
+          | res -> Some res
+        in
+        match List.filter_map helper mem.mem_type with
+        | [] -> Right addr_exp
+        | [(offset_info, mem_type, match_constraint)] :: [] ->
+            Left (offset_info, mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint) (* found unique match *)
+        | _ -> mem_type_error "get_mem_entry_with_addr found more than one match"
+      end
     | Some base ->
-      Printf.printf "finding base: %d\n" base;
+      Printf.printf "base found: %d\n" base;
       let _, offset_list = List.find (fun (i, _) -> i = base) mem.mem_type in (* TODO: find_opt *)
-      let addr_range, is_single_slot = get_idx_range addr_exp base in
-      let addr_constraint = MemOffset.check_offset smt_ctx addr_range in
       let find_entry = List.find_map (
         fun (offset, mem_type) ->
-          if MemOffset.equal addr_range offset then 
+          if MemOffset.equal addr_offset offset then 
             begin if is_single_slot then 
                 Some (offset, true, mem_type, MemOffset.ConstraintSet.empty)
             else
                 Some (offset, false, Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
             end
           else
-            match MemOffset.subset smt_ctx addr_range offset with
+            match MemOffset.subset smt_ctx addr_offset offset with
             | MemOffset.SatYes -> Some (offset, false, Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
-            | MemOffset.SatCond constraints -> Some (offset, false, Entry.partial_read_val mem_type, constraints)
+            | MemOffset.SatCond constraints ->
+                Printf.printf "get_mem_entry_with_addr: new constraints (base found) of\n";
+                MemOffset.pp_offset 0 addr_offset;
+                Printf.printf " in ";
+                MemOffset.pp_offset 0 offset;
+                Printf.printf "\n";
+                MemOffset.pp_constraint_set 0 constraints;
+                Printf.printf "\n";
+                Some (offset, false, Entry.partial_read_val mem_type, constraints)
             | MemOffset.SatNo -> None
       ) offset_list in
       begin match find_entry with
       | None -> Right addr_exp
-      | Some (offset, is_single_full_slot, mem_type, match_constraint) -> Left ((base, offset, is_single_full_slot), mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
+      | Some (offset, is_single_full_slot, mem_type, match_constraint) ->
+          Left ((base, offset, is_single_full_slot), mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
       end
 
   let get_mem_type_with_addr (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64) : (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
@@ -197,36 +250,81 @@ module MemType (Entry: MemEntrytype) = struct
       | Some (mem_type, match_constraint) -> Left (mem_type, MemOffset.ConstraintSet.union addr_constraint match_constraint)
       end *)
 
-  (* TODO: Requires SMT solver context *)
   let set_mem_entry_with_addr 
-      (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t) : 
-      ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+      (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t)
+      : ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
+    Printf.printf "set_mem_entry_with_addr - writing to address:\n";
+    TypeExp.pp_type_exp 0 addr;
+    Printf.printf "\n";
+    (* if there exists TypeVar, return *)
+    if not (is_addr_single_exp addr) then Right addr_exp else
     let base_opt = find_base addr mem.ptr_list in
+    let addr_offset, is_single_slot = get_abs_offset addr_exp in
+    let addr_constraint = MemOffset.check_offset smt_ctx addr_offset in
     match base_opt with
-    | None -> Right addr_exp
+    | None -> begin
+        let addr_offset, is_single_slot = get_abs_offset addr_exp in
+        let helper acc (mem_of_base: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+          match acc with
+          | Some _ -> (acc, mem_of_base)
+          | None -> begin
+              let base, base_mem = mem_of_base in
+              let acc, new_base_mem = List.fold_left_map (fun acc entry ->
+                let offset, offset_type = entry in
+                match acc with
+                | Some _ -> acc, entry
+                | None -> begin
+                    if MemOffset.equal addr_offset offset then begin
+                      if is_single_slot then 
+                          Some (base, offset, true, MemOffset.ConstraintSet.empty), (offset, new_type)
+                      else
+                          Some (base, offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type)
+                    end else begin
+                      match MemOffset.subset smt_ctx addr_offset offset with
+                      | MemOffset.SatYes -> Some (base, offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type)
+                      | MemOffset.SatCond constraints ->
+                        Printf.printf "set_mem_entry_with_addr: new constraints\n";
+                        MemOffset.pp_constraint_set 0 constraints;
+                        Printf.printf "\n";
+                        Some (base, offset, false, constraints), (offset, Entry.partial_write_val offset_type new_type)
+                      | MemOffset.SatNo -> None, entry
+                    end
+                  end
+              ) None base_mem
+              in
+              (acc, (base, new_base_mem))
+            end
+        in
+        match List.fold_left_map helper None mem.mem_type with
+        | None, _ -> Right addr_exp
+        | Some (base, offset, is_single_full_slot, constraints), new_mem_type ->
+            Left ((base, offset, is_single_full_slot), {mem with mem_type = new_mem_type}, constraints)
+      end
     | Some base ->
       (* let _, offset_list = List.find (fun (i, _) -> i = base) mem.mem_type in *)
-      let addr_range, is_single_slot = get_idx_range addr_exp base in
-      let addr_constraint = MemOffset.check_offset smt_ctx addr_range in
       let helper0
           (acc: (MemOffset.t * bool * MemOffset.ConstraintSet.t) option) 
           (entry: MemOffset.t * entry_t) : 
           ((MemOffset.t * bool * MemOffset.ConstraintSet.t) option) * (MemOffset.t * entry_t) =
-        let offset, old_mem_type = entry in
+        let offset, offset_type = entry in
         match acc with
         | Some _ -> (acc, entry)
         | None ->
-          if MemOffset.equal addr_range offset then
+          if MemOffset.equal addr_offset offset then
             begin if is_single_slot then
               (Some (offset, true, MemOffset.ConstraintSet.empty), (offset, new_type))
             else
-              (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val old_mem_type new_type))
+              (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type))
             end
           else begin
-            match MemOffset.subset smt_ctx addr_range offset with
-            | MemOffset.SatYes -> (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val old_mem_type new_type))
-            | MemOffset.SatCond constraints -> (Some (offset, false, constraints), (offset, Entry.partial_write_val old_mem_type new_type))
+            match MemOffset.subset smt_ctx addr_offset offset with
+            | MemOffset.SatYes -> (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type))
+            | MemOffset.SatCond constraints ->
+              Printf.printf "set_mem_entry_with_addr: new constraints (base found)\n";
+              MemOffset.pp_constraint_set 0 constraints;
+              Printf.printf "\n";
+              (Some (offset, false, constraints), (offset, Entry.partial_write_val offset_type new_type))
             | MemOffset.SatNo -> (None, entry)
           end
       in
@@ -344,6 +442,18 @@ module MemType (Entry: MemEntrytype) = struct
     let next_var, new_mem = List.fold_left_map helper2 start_var mem_layout in
     (next_var, { ptr_list = ptr_list; mem_type = new_mem })
 
+  let to_absolute_offset (m: t) : t =
+    let helper (mem_of_base: Isa.imm_var_id * ((MemOffset.t * 'a) list)) =
+      let base, base_mem = mem_of_base in
+      let new_base_mem = List.map (fun ((l, r), mem_type) -> ((
+          SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)),
+          SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, r))
+        ), mem_type)
+      ) base_mem in
+      (base, new_base_mem)
+    in
+    { m with mem_type = List.map helper m.mem_type }
+
   (* Only update ptr val in base, but type single var idx are still not correct in init_mem *)
   let update_mem_entry_base_id (m: t) (start_idx: Isa.imm_var_id) : t =
     let new_ptr_list = MemKeySet.of_list (List.map (fun x -> x + start_idx) (MemKeySet.elements m.ptr_list)) in
@@ -436,33 +546,37 @@ include MemRangeTypeBase
 
   let format_convert_helper = List.map (fun (off, _) -> (off, false))
 
-  (* TODO: Requires SMT solver context *)
+  (* TODO: In mem_access_list, for address that cannot separate offset, we can consider pass in the full address *)
   let update_offset_one_ptr
       (smt_ctx: SmtEmitter.t)
       (old_mem_type: (MemOffset.t * TypeExp.t) list)
       (mem_access_list: MemOffset.t list) :
-      ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t =
+      ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t * (MemOffset.t list) = 
     let rec helper
-        (acc: ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t)
-        (offset: MemOffset.t) :
-        ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t =
+        (acc: ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t * (MemOffset.t list))
+        (range: MemOffset.t) :
+        ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t * (MemOffset.t list) =
       (* let left, right = offset in *)
-      let acc_update_list, acc_constraint = acc in
-      let range_acc_constraint = MemOffset.ConstraintSet.union (MemOffset.check_offset smt_ctx offset) acc_constraint in
+      let acc_update_list, acc_constraint, acc_undeter_access = acc in
+      let range_acc_constraint = MemOffset.ConstraintSet.union (MemOffset.check_offset smt_ctx range) acc_constraint in
       match acc_update_list with
-      | [] -> ([ (offset, true) ], range_acc_constraint)
-      | (hd_offset, hd_updated) :: tl ->
-        let cmp_result, cmp_constraint = MemOffset.cmp_or_merge smt_ctx offset hd_offset in
-        let final_constraint = MemOffset.ConstraintSet.union range_acc_constraint cmp_constraint in
-        match cmp_result with
-        | Left true -> (* offset.right <= hd_offset.left *)
-          ((offset, true) :: acc_update_list, final_constraint)
-        | Left false -> (* hd_offset.right <= offset.left *)
-          let udpate_tl, rec_constraint = helper (tl, final_constraint) offset in
-          ((hd_offset, hd_updated) :: udpate_tl, rec_constraint)
-        | Right new_offset -> (* merge offset and hd_offset *)
-          if MemOffset.cmp hd_offset new_offset = 0 then (acc_update_list, final_constraint)
-          else helper (tl, final_constraint) new_offset
+      | [] -> ([ (range, true) ], range_acc_constraint, acc_undeter_access)
+      | (hd_range, hd_updated) :: tl ->
+        let result = MemOffset.cmp_or_merge smt_ctx range hd_range in
+        match result with
+        | Some (cmp_result, cmp_constraint) -> begin
+            let final_constraint = MemOffset.ConstraintSet.union range_acc_constraint cmp_constraint in
+            match cmp_result with
+            | Left true -> (* range.right <= hd_range.left *)
+              ((range, true) :: acc_update_list, final_constraint, acc_undeter_access)
+            | Left false -> (* hd_range.right <= range.left *)
+              let udpate_tl, rec_constraint, acc_undeter_access = helper (tl, final_constraint, acc_undeter_access) range in
+              ((hd_range, hd_updated) :: udpate_tl, rec_constraint, acc_undeter_access)
+            | Right new_range -> (* merge range and hd_range *)
+              if MemOffset.cmp hd_range new_range = 0 then (acc_update_list, final_constraint, acc_undeter_access)
+              else helper (tl, final_constraint, acc_undeter_access) new_range
+          end
+        | None -> (acc_update_list, acc_constraint, range :: acc_undeter_access)
         (* if SingleExp.must_ge hd_left right then (left, right, true) :: acc
         else if SingleExp.must_ge left hd_right then (hd_left, hd_right, hd_updated) :: (helper tl offset)
         else
@@ -478,39 +592,53 @@ include MemRangeTypeBase
           end *)
     in
     let acc = format_convert_helper old_mem_type in
-    List.fold_left helper (acc, MemOffset.ConstraintSet.empty) mem_access_list
+    List.fold_left helper (acc, MemOffset.ConstraintSet.empty, []) mem_access_list
 
-  (* TODO: Requires SMT solver context *)
   let rec update_offset_all_ptr
       (smt_ctx: SmtEmitter.t)
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
       (mem_access_list: (Isa.imm_var_id * MemOffset.t list) list) :
-      ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t =
+      ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t * ((Isa.imm_var_id * MemOffset.t) list)=
     (* pp_mem_key 0 mem_access_list; *)
+    let helper_add_base_id_to_range (base_id: Isa.imm_var_id) (range_list: MemOffset.t list) =
+      List.map (fun x -> (base_id, x)) range_list
+    in
     match old_mem_type, mem_access_list with
     | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
       if id1 = id2 then
-        let hd_update, hd_constraint = update_offset_one_ptr smt_ctx mem1 mem2 in
-        let tl_update, tl_constraint = update_offset_all_ptr smt_ctx tl1 tl2 in
-        ((id1, hd_update) :: tl_update, MemOffset.ConstraintSet.union hd_constraint tl_constraint)
+        let hd_update, hd_constraint, hd_undeter_access = update_offset_one_ptr smt_ctx mem1 mem2 in
+        let tl_update, tl_constraint, tl_undeter_access = update_offset_all_ptr smt_ctx tl1 tl2 in
+        (
+          (id1, hd_update) :: tl_update,
+          MemOffset.ConstraintSet.union hd_constraint tl_constraint, 
+          (helper_add_base_id_to_range id1 hd_undeter_access) @ tl_undeter_access
+        )
         (* (id1, update_offset_one_ptr mem1 mem2) :: (update_offset_all_ptr tl1 tl2) *)
       else if id1 < id2 then
-        let tl_update, tl_constraint = update_offset_all_ptr smt_ctx tl1 mem_access_list in
-        ((id1, format_convert_helper mem1) :: tl_update, tl_constraint)
+        let tl_update, tl_constraint, tl_undeter_access = update_offset_all_ptr smt_ctx tl1 mem_access_list in
+        ((id1, format_convert_helper mem1) :: tl_update, tl_constraint, tl_undeter_access)
         (* (id1, format_convert_helper mem1) :: (update_offset_all_ptr tl1 mem_access_list) *)
       else (* id2 < id1 *)
-        let hd_update, hd_constraint = update_offset_one_ptr smt_ctx [] mem2 in
-        let tl_udpate, tl_constraint = update_offset_all_ptr smt_ctx old_mem_type tl2 in
-        ((id2, hd_update) :: tl_udpate, MemOffset.ConstraintSet.union hd_constraint tl_constraint)
+        let hd_update, hd_constraint, hd_undeter_access = update_offset_one_ptr smt_ctx [] mem2 in
+        let tl_udpate, tl_constraint, tl_undeter_access = update_offset_all_ptr smt_ctx old_mem_type tl2 in
+        (
+          (id2, hd_update) :: tl_udpate,
+          MemOffset.ConstraintSet.union hd_constraint tl_constraint,
+          (helper_add_base_id_to_range id2 hd_undeter_access) @ tl_undeter_access
+        )
         (* (id2, update_offset_one_ptr [] mem2) :: (update_offset_all_ptr old_mem_type tl2) *)
     | _ :: _, [] -> 
-      (List.map (fun (ptr, offset_list) -> (ptr, format_convert_helper offset_list)) old_mem_type, MemOffset.ConstraintSet.empty)
+      (List.map (fun (ptr, offset_list) -> (ptr, format_convert_helper offset_list)) old_mem_type, MemOffset.ConstraintSet.empty, [])
     | [], (id2, mem2) :: tl2 ->
-      let hd_update, hd_constraint = update_offset_one_ptr smt_ctx [] mem2 in
-      let tl_update, tl_constraint = update_offset_all_ptr smt_ctx [] tl2 in
-      ((id2, hd_update) :: tl_update, MemOffset.ConstraintSet.union hd_constraint tl_constraint)
+      let hd_update, hd_constraint, hd_undeter_access = update_offset_one_ptr smt_ctx [] mem2 in
+      let tl_update, tl_constraint, tl_undeter_access = update_offset_all_ptr smt_ctx [] tl2 in
+      (
+        (id2, hd_update) :: tl_update,
+        MemOffset.ConstraintSet.union hd_constraint tl_constraint,
+        (helper_add_base_id_to_range id2 hd_undeter_access) @ tl_undeter_access
+      )
       (* (id2, update_offset_one_ptr [] mem2) :: (update_offset_all_ptr [] tl2) *)
-    | [], [] -> ([], MemOffset.ConstraintSet.empty)
+    | [], [] -> ([], MemOffset.ConstraintSet.empty, [])
 
   let rec find_drop_head
       (old_mem_type: (MemOffset.t * TypeExp.t) list)
@@ -727,18 +855,20 @@ include MemRangeTypeBase
     let helper (base_id: Isa.imm_var_id) (mem_access: TypeFullExp.t * int64) : Isa.imm_var_id * MemOffset.t =
       let (addr, _), size = mem_access in
       match addr with
-      | TypeSingle x -> (base_id, 
-          (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id)),
-          SingleExp.eval (SingleExp.SingleBExp (
-            SingleExp.SingleAdd, 
-            SingleExp.SingleBExp (SingleExp.SingleSub, x, SingleExp.SingleVar base_id), 
-            SingleExp.SingleConst size))))
-      | TypeRange (l, _, r, _, _) -> (base_id,
-          (SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleSub, l, SingleExp.SingleVar base_id)),
-          SingleExp.eval (SingleExp.SingleBExp (
-            SingleExp.SingleAdd,
-            SingleExp.SingleBExp (SingleExp.SingleSub, r, SingleExp.SingleVar base_id),
-            SingleExp.SingleConst size))))
+      | TypeSingle x -> (
+          base_id,
+          (
+            x,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, x, SingleExp.SingleConst size))
+          )
+        )
+      | TypeRange (l, _, r, _, _) -> (
+          base_id,
+          (
+            l,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, r, SingleExp.SingleConst size))
+          )
+        )
       | _ -> mem_type_error "get_addr_base_range cannot handle this case"
     in
     ((new_ptr_list, new_no_ptr_list), List.map2 helper base_list addr_list)

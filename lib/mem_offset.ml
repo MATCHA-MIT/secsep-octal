@@ -37,12 +37,13 @@ module MemOffset = struct
       ))
     )
 
-  let constraint_set_to_solver_exps (z3_ctx: Z3.context) (constraints: ConstraintSet.t) : Z3.Expr.expr list =
+  let constraint_set_to_solver_exps (smt_ctx: SmtEmitter.t) (constraints: ConstraintSet.t) : Z3.Expr.expr list =
+    let z3_ctx, _ = smt_ctx in
     ConstraintSet.fold (fun (se: SingleExp.t) (acc: Z3.Expr.expr list) ->
       let e = Z3.BitVector.mk_sge z3_ctx
-        (SmtEmitter.expr_of_single_exp z3_ctx se)
+        (SmtEmitter.expr_of_single_exp smt_ctx se)
         (Z3.BitVector.mk_numeral z3_ctx "0" SmtEmitter.bv_width) in
-      Printf.printf "\n%s\n" (Z3.Expr.to_string e);
+      (* Printf.printf "\n%s\n" (Z3.Expr.to_string e); *)
       e :: acc
     ) constraints []
 
@@ -57,30 +58,32 @@ module MemOffset = struct
     ) diffs in
     let assertions = List.map (fun diff ->
       let se_l, se_r, eq = diff in
-      let e_l = SmtEmitter.expr_of_single_exp ctx se_l in
-      let e_r = SmtEmitter.expr_of_single_exp ctx se_r in
+      let e_l = SmtEmitter.expr_of_single_exp smt_ctx se_l in
+      let e_r = SmtEmitter.expr_of_single_exp smt_ctx se_r in
       if eq then
-        Z3.BitVector.mk_uge ctx e_l e_r (* unsigned comparison *)
+        Z3.BitVector.mk_sge ctx e_l e_r (* unsigned comparison *)
       else
-        Z3.BitVector.mk_ugt ctx e_l e_r (* unsigned comparison *)
+        Z3.BitVector.mk_sgt ctx e_l e_r (* unsigned comparison *)
     ) diffs in
     let negation = Z3.Boolean.mk_or ctx (
       List.map (fun diff ->
       let se_l, se_r, eq = diff in
-      let e_l = SmtEmitter.expr_of_single_exp ctx se_l in
-      let e_r = SmtEmitter.expr_of_single_exp ctx se_r in
+      let e_l = SmtEmitter.expr_of_single_exp smt_ctx se_l in
+      let e_r = SmtEmitter.expr_of_single_exp smt_ctx se_r in
       if eq then
-        Z3.BitVector.mk_ult ctx e_l e_r (* unsigned comparison *)
+        Z3.BitVector.mk_slt ctx e_l e_r (* unsigned comparison *)
       else
-        Z3.BitVector.mk_ule ctx e_l e_r (* unsigned comparison *)
+        Z3.BitVector.mk_sle ctx e_l e_r (* unsigned comparison *)
       ) diffs
     ) in
-    Printf.printf "check_compliance\n";
-    Z3.Solver.push solver;
-    Z3.Solver.add solver assertions;
-    Printf.printf "solver = \n%s\n" (Z3.Solver.to_string solver);
-    Z3.Solver.pop solver 1;
-    Printf.printf "negation = %s\n" (Z3.Expr.to_string negation);
+    (* Printf.printf "\ncheck_compliance\n\n"; *)
+    (* Printf.printf "base solver = \n%s\nbase result: %s\n\n"
+      (* Z3.Solver.to_string solver *) "" (Z3.Solver.string_of_status (Z3.Solver.check solver [])); *)
+    (* get string of all assertion and concat them *)
+    (* Printf.printf "assertion = \n%s\n\n" (
+      List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
+    ); *)
+    (* Printf.printf "negation  = \n%s\n\n" (Z3.Expr.to_string negation); *)
     let result_sat = Z3.Solver.check solver assertions in
     let result_neg = Z3.Solver.check solver [negation] in
     match result_sat, result_neg with
@@ -88,12 +91,18 @@ module MemOffset = struct
     | Z3.Solver.UNKNOWN, _
     | _, Z3.Solver.UNKNOWN -> smt_error "solver reported UNKNOWN" solver diffs
     (* definite *)
-    | Z3.Solver.SATISFIABLE, Z3.Solver.UNSATISFIABLE -> SatYes
+    | Z3.Solver.SATISFIABLE, Z3.Solver.UNSATISFIABLE ->
+        (* Printf.printf "result: Yes\n\n"; *)
+        SatYes
     (* satisfiable *)
     | Z3.Solver.SATISFIABLE, Z3.Solver.SATISFIABLE ->
+        (* Printf.printf "result: Cond\n\n";
+        Z3.Solver.get_model solver |> Option.get |> Z3.Model.to_string |> Printf.printf "%s\n"; *)
         SatCond (List.fold_left (fun set diff -> ConstraintSet.add diff set) ConstraintSet.empty ge_exps)
     (* unsatisfiable *)
-    | Z3.Solver.UNSATISFIABLE, _ -> SatNo
+    | Z3.Solver.UNSATISFIABLE, _ ->
+        (* Printf.printf "result: No\n\n"; *)
+        SatNo
 
   let constraint_union (constraint_list: ConstraintSet.t list) : ConstraintSet.t =
     let helper (acc: ConstraintSet.t) (entry: ConstraintSet.t) : ConstraintSet.t =
@@ -109,6 +118,13 @@ module MemOffset = struct
         SingleExp.pp_single_exp (lvl + 2) x;
         Printf.printf "\n" 
     ) (ConstraintSet.elements constraint_set)
+
+  let pp_offset (lvl: int) (offset: t) =
+    let l, r = offset in
+    SingleExp.pp_single_exp lvl l;
+    Printf.printf " ~ ";
+    SingleExp.pp_single_exp 0 r;
+    ()
 
   (*
   let heuristic_cmp (e: SingleExp.t) : int * bool = (* (sign, sign is determined or not) *)
@@ -193,17 +209,20 @@ module MemOffset = struct
         Some (e2, ConstraintSet.singleton diff)
     | _ -> None *)
 
-  (* TODO: add SMT-fashion judgement *)
   let check_offset (smt_ctx: SmtEmitter.t) (offset: t) : ConstraintSet.t =
     let left, right = offset in
-    Printf.printf "check_offset %s, %s\n%!" (SingleExp.to_string left) (SingleExp.to_string right);
+    (* Printf.printf "check_offset %s, %s\n%!" (SingleExp.to_string left) (SingleExp.to_string right); *)
     match check_compliance smt_ctx [(right, left, false)] with
-    | SatYes -> Printf.printf "SatYes\n"; ConstraintSet.empty
+    | SatYes ->
+        (* Printf.printf "SatYes\n"; *)
+        ConstraintSet.empty
     | SatNo -> (* Check Shixin's comment below *)
         Printf.printf "Offset [%s, %s]\n" (SingleExp.to_string left) (SingleExp.to_string right);
         mem_offset_error "check_offset failed"
     | SatCond constraints ->
-        Printf.printf "SatCond\n" ;
+        Printf.printf "SatCond: ";
+        pp_constraint_set 0 constraints;
+        Printf.printf "\n";
         constraints
     (* let cond_ge, cond = conditional_ge right left in
     if cond_ge then cond 
@@ -217,36 +236,38 @@ module MemOffset = struct
     end *)
   (* TODO: Think about whether here should be greater than instead of greater than or equal to!!! *)
 
-  (* TODO: add SMT-fashion judgement *)
-  let cmp_or_merge (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : ((bool, t) Either.t) * ConstraintSet.t =
+  let cmp_or_merge (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : (((bool, t) Either.t) * ConstraintSet.t) option =
     (* let off_cond = ConstraintSet.union (check_offset o1) (check_offset o2) in *)
     let l1, r1 = o1 in
     let l2, r2 = o2 in
+    (* Printf.printf "Entering cmp_or_merge\n"; *)
+    (* Printf.printf "  o1: %s\n" (to_string o1); *)
+    (* Printf.printf "  o2: %s\n\n%!" (to_string o1); *)
     let order12 = check_compliance smt_ctx [(l2, r1, true)] in
     let order21 = check_compliance smt_ctx [(l1, r2, true)] in
     match order12, order21 with
-    | SatYes, SatNo -> (Left true, ConstraintSet.empty)
-    | SatNo, SatYes -> (Left false, ConstraintSet.empty)
+    | SatYes, SatNo -> Some (Left true, ConstraintSet.empty)
+    | SatNo, SatYes -> Some (Left false, ConstraintSet.empty)
     | SatNo, SatNo -> begin (* intersection is guaranteed *)
         let l1min = check_compliance smt_ctx [(l2, l1, true)] in
         let r1max = check_compliance smt_ctx [(r1, r2, true)] in
         match l1min, r1max with
-        | SatYes, SatYes -> (Right (l1, r1), ConstraintSet.empty)
-        | SatYes, SatCond cr -> (Right (l1, r1), cr)
-        | SatYes, SatNo -> (Right (l1, r2), ConstraintSet.empty)
-        | SatCond cl, SatYes -> (Right (l1, r1), cl)
-        | SatCond cl, SatNo -> (Right (l1, r2), cl)
-        | SatNo, SatYes -> (Right (l2, r1), ConstraintSet.empty)
-        | SatNo, SatCond cr -> (Right (l2, r1), cr)
-        | SatNo, SatNo -> (Right (l2, r2), ConstraintSet.empty)
-        | SatCond _, SatCond _ -> mem_offset_error "cmp_or_merge failed: undertermined"
+        | SatYes, SatYes -> Some (Right (l1, r1), ConstraintSet.empty)
+        | SatYes, SatCond cr -> Some (Right (l1, r1), cr)
+        | SatYes, SatNo -> Some (Right (l1, r2), ConstraintSet.empty)
+        | SatCond cl, SatYes -> Some (Right (l1, r1), cl)
+        | SatCond cl, SatNo -> Some (Right (l1, r2), cl)
+        | SatNo, SatYes -> Some (Right (l2, r1), ConstraintSet.empty)
+        | SatNo, SatCond cr -> Some (Right (l2, r1), cr)
+        | SatNo, SatNo -> Some (Right (l2, r2), ConstraintSet.empty)
+        | SatCond _, SatCond _ -> None
       end
-    | SatCond c12, SatNo -> (Left true, c12) (* warning: undertermined*)
-    | SatNo, SatCond c21 -> (Left false, c21) (* warning: undertermined*)
-    | SatCond _, SatCond _-> mem_offset_error "cmp_or_merge failed: undetermined"
-    | SatYes, SatYes
+    | SatCond _, SatNo
+    | SatNo, SatCond _ 
+    | SatCond _, SatCond _-> None (* undertermined*)
     | SatYes, SatCond _
-    | SatCond _, SatYes -> mem_offset_error "cmp_or_merge failed: expected to be impossible"
+    | SatCond _, SatYes -> None (* still possible, given that one of the result may be undertermined due to lack of information *)
+    | SatYes, SatYes -> mem_offset_error "cmp_or_merge failed: expected to be impossible"
 
       (* match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
       | Some (l, cond_l), Some (r, cond_r) -> 
@@ -264,11 +285,11 @@ module MemOffset = struct
     let l2, r2 = o2 in
     SingleExp.cmp l1 l2 = 0 && SingleExp.cmp r1 r2 = 0
 
-  (* TODO: add SMT-fashion judgement *)
+  (* check whether o1 is a subset of o2 *)
   let subset (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : sat_result =
     let l1, r1 = o1 in
     let l2, r2 = o2 in
-    check_compliance smt_ctx [(l2, l1, true); (r1, r2, true)]
+    check_compliance smt_ctx [(l1, l2, true); (r2, r1, true)]
 
   let cmp (o1: t) (o2: t) : int =
     let l1, r1 = o1 in

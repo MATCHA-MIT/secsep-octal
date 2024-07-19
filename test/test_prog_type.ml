@@ -12,13 +12,12 @@ let read_file (filename: string) : string =
     close_in_noerr channel;
     raise e
 
-let p = Parser.parse_program (read_file "../asm/demo.s")
+(* let p = Parser.parse_program (read_file "../asm/demo.s") *)
 (* let p = Parser.parse_program (read_file "./asm/sha512_block_data_order.s") *)
-(* let p = Parser.parse_program (read_file "./asm/sha512_final_impl.s")  *)
+let p = Parser.parse_program (read_file "../asm/sha512_final_impl.s")
 (* let p = Parser.parse_program (read_file "../asm/double_layer.s")  *)
 
 (* let start_single_var_idx = StateType.stack_base_id + Isa.StrM.cardinal p.imm_var_map + 1 *)
 let start_single_var_idx = 0
 
-let _ = ProgType.gen 0 start_single_var_idx sha512_block_data_order_init_mem p 4
-(* let _ = ProgType.gen 0 start_single_var_idx sha512_final_impl_init_mem p 4 *)
+let _ = ProgType.gen 0 start_single_var_idx sha512_final_impl_init_mem p 6

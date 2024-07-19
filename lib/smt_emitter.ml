@@ -18,29 +18,49 @@ module SmtEmitter = struct
     let solver = Solver.mk_solver ctx None in
     (ctx, solver)
 
-  let rec expr_of_single_exp (ctx: ctx_t) (se: SingleExp.t) : exp_t =
+  let mk_numeral (smt_ctx: t) (value: int64) : Expr.expr =
+    let z3_ctx, _ = smt_ctx in
+    BitVector.mk_numeral z3_ctx (Int64.to_string value) bv_width
+
+  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) : exp_t =
+    let z3_ctx, z3_solver = smt_ctx in
     match se with
-    | SingleConst c -> BitVector.mk_numeral ctx (Int64.to_string c) bv_width
-    | SingleVar v -> BitVector.mk_const_s ctx ("s" ^ (Int.to_string v)) bv_width
+    | SingleConst c -> mk_numeral smt_ctx c
+    | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width
     | SingleBExp (op, se1, se2) ->
-      let e1 = expr_of_single_exp ctx se1 in
-      let e2 = expr_of_single_exp ctx se2 in
+      let e1 = expr_of_single_exp smt_ctx se1 in
+      let e2 = expr_of_single_exp smt_ctx se2 in
       begin
         match op with
-        | SingleExp.SingleAdd -> BitVector.mk_add ctx e1 e2
-        | SingleExp.SingleSub -> BitVector.mk_sub ctx e1 e2 (* should work the same on signed and unsigned entities *)
-        | SingleExp.SingleMul -> BitVector.mk_mul ctx e1 e2
-        | SingleExp.SingleSal -> BitVector.mk_shl ctx e1 e2
-        | SingleExp.SingleSar -> BitVector.mk_ashr ctx e1 e2
-        | SingleExp.SingleXor -> BitVector.mk_xor ctx e1 e2
-        | SingleExp.SingleAnd -> BitVector.mk_and ctx e1 e2
-        | SingleExp.SingleOr -> BitVector.mk_or ctx e1 e2
+        | SingleExp.SingleAdd ->
+            Solver.add z3_solver [
+              BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
+              BitVector.mk_add_no_underflow z3_ctx e1 e2;
+            ];
+            BitVector.mk_add z3_ctx e1 e2
+        | SingleExp.SingleSub ->
+            Solver.add z3_solver [
+              BitVector.mk_sub_no_overflow z3_ctx e1 e2;
+              BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
+            ];
+            BitVector.mk_sub z3_ctx e1 e2
+        | SingleExp.SingleMul ->
+            Solver.add z3_solver [
+              BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
+              BitVector.mk_mul_no_underflow z3_ctx e1 e2;
+            ];
+            BitVector.mk_mul z3_ctx e1 e2
+        | SingleExp.SingleSal -> BitVector.mk_shl z3_ctx e1 e2
+        | SingleExp.SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
+        | SingleExp.SingleXor -> BitVector.mk_xor z3_ctx e1 e2
+        | SingleExp.SingleAnd -> BitVector.mk_and z3_ctx e1 e2
+        | SingleExp.SingleOr -> BitVector.mk_or z3_ctx e1 e2
       end
     | SingleUExp (op, se) ->
-      let e = expr_of_single_exp ctx se in
+      let e = expr_of_single_exp smt_ctx se in
       begin
         match op with
-        | SingleExp.SingleNot -> BitVector.mk_not ctx e
+        | SingleExp.SingleNot -> BitVector.mk_not z3_ctx e
       end
 
 end

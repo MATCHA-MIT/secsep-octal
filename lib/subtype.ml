@@ -433,7 +433,7 @@ module SubType = struct
           let min, max, constraint_set = acc in
           match MemOffset.conditional_ge smt_ctx min entry with
           | MemOffset.SatYes -> (entry, max, constraint_set)
-          | MemOffset.SatCond constraints -> (entry, max, MemOffset.ConstraintSet.union constraint_set constraints) (* warning: undetermine *)
+          | MemOffset.SatCond constraints -> (entry, max, MemOffset.ConstraintSet.union constraint_set constraints) (* warning: undetermine, TODO: return SolNone *)
           | MemOffset.SatNo -> begin
             match MemOffset.conditional_ge smt_ctx entry max with
             | MemOffset.SatYes -> (min, entry, constraint_set)
