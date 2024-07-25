@@ -99,7 +99,6 @@ module StateType = struct
         let _ = match t with
           | TypeSingle se ->
               (* If base is resolved, add the constraint that the address is above 0 *)
-            Printf.printf "heuristic assertion (>= 0): %s\n" (SingleExp.to_string se);
               let z3_ctx, z3_solver = smt_ctx in
               Z3.Solver.add z3_solver [Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se) (SmtEmitter.mk_numeral smt_ctx 0L)];
           | _ -> ()
@@ -113,14 +112,9 @@ module StateType = struct
         let res = get_reg_type curr_state i in
         let _ = match res with
         | TypeSingle se ->
-            Printf.printf "heuristic assertion (>= 0): %s\n" (SingleExp.to_string se);
             let z3_ctx, z3_solver = smt_ctx in
             Z3.Solver.add z3_solver [Z3.BitVector.mk_sge z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se) (SmtEmitter.mk_numeral smt_ctx 0L)];
-        | _ ->
-            Printf.printf "index not resolved yet, cannot add heuristic >=0 assertion\n";
-            TypeExp.pp_type_exp 1 res;
-            Printf.printf "\n";
-            ()
+        | _ -> ()
         in
         res
       end
@@ -401,11 +395,13 @@ module StateType = struct
     | Cmp (src1, src2) ->
       let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
       let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
+      (*
       Printf.printf "cmp cond:\n";
       TypeExp.pp_type_exp 0 src1_type;
       Printf.printf "\n";
       TypeExp.pp_type_exp 0 src2_type;
       Printf.printf "\n";
+      *)
       ({curr_state with cond_type = (src1_type, src2_type)}, cond_list, 
       (get_unknown_list [ua2; ua1]) @ unknown_addr_list,
       MemOffset.constraint_union [constraint_set; src1_constraint; src2_constraint],
@@ -416,11 +412,13 @@ module StateType = struct
     | Test (src1, src2) ->
       let _, src1_type, ua1, src1_constraint, src1_useful = get_src_op_type smt_ctx sol curr_state src1 in
       let _, src2_type, ua2, src2_constraint, src2_useful = get_src_op_type smt_ctx sol curr_state src2 in
+      (*
       Printf.printf "test cond:\n";
       TypeExp.pp_type_exp 0 src1_type;
       Printf.printf "\n";
       TypeExp.pp_type_exp 0 src2_type;
       Printf.printf "\n";
+      *)
       let src_and_type = 
         if Isa.cmp_operand src1 src2 then src1_type else TypeExp.TypeBExp (TypeAnd, src1_type, src2_type) in
       ({curr_state with cond_type = (src_and_type, TypeExp.TypeSingle (SingleConst 0L))}, cond_list, 

@@ -217,20 +217,38 @@ module ProgType = struct
       (subtype_sol: (TypeExp.type_var_id * TypeFullExp.type_sol) list)
       (ptr_list: MemKeySet.t) (no_ptr_list: MemKeySet.t) :
       (MemKeySet.t * MemKeySet.t) * ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t =
+    let helper_merge (mem: (Isa.imm_var_id * (MemOffset.t list)) list) (new_rec: (Isa.imm_var_id * MemOffset.t) list) =
+      let rec helper
+          (acc: (Isa.imm_var_id * (MemOffset.t list)) list)
+          (new_rec: (Isa.imm_var_id * MemOffset.t) list)
+          : (Isa.imm_var_id * (MemOffset.t list)) list =
+        match new_rec with
+        | [] -> acc
+        | (base_id, offset) :: tl ->
+          if List.exists (fun (x, _) -> x = base_id) acc then
+            let new_acc = List.map (fun (x, y) -> if x = base_id then (x, offset :: y) else (x, y)) acc in
+            helper new_acc tl
+          else
+            prog_type_error ("get_update_list: base id " ^ (string_of_int base_id) ^ " claimed that base found, but it does not exist in mem list")
+      in
+      List.map (fun (x, y) -> (x, List.rev y)) (helper mem new_rec)
+    in
     (* MemType.pp_addr_exp 0 unknown_mem_list; *)
     let repl_mem_list = MemRangeType.repl_addr_exp unknown_mem_list subtype_sol in
-    (* MemType.pp_addr_exp 0 repl_mem_list; *)
     let new_ptr_info, addr_base_range = 
       MemRangeType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
-    let mem_access_list = (MemRangeType.reshape_mem_key_list addr_base_range) in
+    let access_with_base, access_without_base = (MemRangeType.reshape_mem_key_list addr_base_range) in
     Printf.printf "Newly resolved mem access list--------------\n";
-    MemRangeType.pp_mem_key 0 mem_access_list;
+    MemRangeType.pp_mem_key 0 (access_with_base, []);
     Printf.printf "Newly resolved mem access list--------------\n";
-    let udpate_list, constraint_set, undeter_access = MemRangeType.update_offset_all_ptr smt_ctx old_mem_type mem_access_list in
+    let ib_base_found, ib_base_not_found = MemRangeType.match_base_for_ptr_without_base smt_ctx old_mem_type access_without_base in
+    let update_list, constraint_set, undeter_access =
+      MemRangeType.update_offset_all_ptr smt_ctx old_mem_type (helper_merge access_with_base ib_base_found)
+    in
     Printf.printf "Still unresolved mem access list--------------\n";
-    MemRangeType.pp_mem_key 0 (MemRangeType.reshape_mem_key_list undeter_access);
+    MemRangeType.pp_mem_key 0 (MemRangeType.reshape_mem_key_list (ib_base_not_found @ undeter_access));
     Printf.printf "Still unresolved mem access list--------------\n";
-    (new_ptr_info, udpate_list, constraint_set)
+    (new_ptr_info, update_list, constraint_set)
 
   let init
       (start_type_var_idx: TypeExp.type_var_id)
@@ -277,7 +295,7 @@ module ProgType = struct
     let cond_list = fix_cond_list cond_list tv_rel in
     let cond_list_useful = get_cond_list_useful cond_list in
     let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
-      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
+      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 12 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";

@@ -253,13 +253,13 @@ module MemOffset = struct
         let r1max = check_compliance smt_ctx [(r1, r2, true)] in
         match l1min, r1max with
         | SatYes, SatYes -> Some (Right (l1, r1), ConstraintSet.empty)
-        | SatYes, SatCond cr -> Some (Right (l1, r1), cr)
         | SatYes, SatNo -> Some (Right (l1, r2), ConstraintSet.empty)
-        | SatCond cl, SatYes -> Some (Right (l1, r1), cl)
-        | SatCond cl, SatNo -> Some (Right (l1, r2), cl)
         | SatNo, SatYes -> Some (Right (l2, r1), ConstraintSet.empty)
-        | SatNo, SatCond cr -> Some (Right (l2, r1), cr)
         | SatNo, SatNo -> Some (Right (l2, r2), ConstraintSet.empty)
+        | SatYes, SatCond _ -> None
+        | SatCond _, SatYes -> None
+        | SatCond _, SatNo -> None
+        | SatNo, SatCond _ -> None
         | SatCond _, SatCond _ -> None
       end
     | SatCond _, SatNo
