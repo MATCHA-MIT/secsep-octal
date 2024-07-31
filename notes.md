@@ -30,5 +30,47 @@ add rax, rbx
   rbx = kb
   (+, kb, 1)
 
-1. obtain operands' type
-2. 
+
+SMT heavy part: the call of `get_update_list` in `loop`
+use existing solution to simplify the unknown address list, compare the simplified address with existing ranges in memory layout (`update_offset_all_ptr`)
+simple contraints if unknown address resolves to [a, b], generate initial contrainsts (a <? b) (base extraction problem?)
+  if found, ok
+  if not found, generate constraints by guessing it to be locating in some range (some most possible range)
+     memory layout [l1, r1] [l2, r2]
+
+TODO: pass in old constraints in here, and propagation, so that SMT can guess
+
+with OLD, compare boundaries ..., generate possible NEWs if necessary
+
+
+No address range can cross the zero
+
+Type =
+
+S-BinaryExp (
+   Add,
+   S-BinaryExp (
+      Add,
+      S-BinaryExp (
+         Add,
+         S-BinaryExp (
+            Mul,
+            S-BinaryExp (
+               And,
+               S-BinaryExp (
+                  Add,
+                  S-BinaryExp (Add, SymImm 20, SymImm 2),
+                  Const 89
+               ),
+               Const -8
+            ),
+            Const -1
+         ),
+         SymImm 20
+      ),
+      SymImm 2
+   ),
+   Const 81
+), 
+
+Cond = [16 NotTaken]

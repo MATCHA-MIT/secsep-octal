@@ -164,7 +164,9 @@ module MemType (Entry: MemEntrytype) = struct
                   Some ((base, offset, false), Entry.partial_read_val offset_type, MemOffset.ConstraintSet.empty)
             end else begin
               match MemOffset.subset smt_ctx addr_offset offset with
-              | MemOffset.SatYes -> Some ((base, offset, false), Entry.partial_read_val offset_type, MemOffset.ConstraintSet.empty)
+              | MemOffset.SatYes ->
+                Printf.printf "get_mem_entry_with_addr: %s is within %s\n" (MemOffset.to_string addr_offset) (MemOffset.to_string offset);
+                Some ((base, offset, false), Entry.partial_read_val offset_type, MemOffset.ConstraintSet.empty)
               | MemOffset.SatCond constraints ->
                 Printf.printf "get_mem_entry_with_addr: new constraints of\n";
                 MemOffset.pp_offset 0 addr_offset;
@@ -198,7 +200,9 @@ module MemType (Entry: MemEntrytype) = struct
             end
           else
             match MemOffset.subset smt_ctx addr_offset offset with
-            | MemOffset.SatYes -> Some (offset, false, Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
+            | MemOffset.SatYes ->
+                Printf.printf "get_mem_entry_with_addr: %s is within %s\n" (MemOffset.to_string addr_offset) (MemOffset.to_string offset);
+              Some (offset, false, Entry.partial_read_val mem_type, MemOffset.ConstraintSet.empty)
             | MemOffset.SatCond constraints ->
                 Printf.printf "get_mem_entry_with_addr: new constraints (base found) of\n";
                 MemOffset.pp_offset 0 addr_offset;
@@ -275,7 +279,9 @@ module MemType (Entry: MemEntrytype) = struct
                           Some (base, offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type)
                     end else begin
                       match MemOffset.subset smt_ctx addr_offset offset with
-                      | MemOffset.SatYes -> Some (base, offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type)
+                      | MemOffset.SatYes ->
+                        Printf.printf "set_mem_entry_with_addr: %s is within %s\n" (MemOffset.to_string addr_offset) (MemOffset.to_string offset);
+                        Some (base, offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type)
                       | MemOffset.SatCond constraints ->
                         Printf.printf "set_mem_entry_with_addr: new constraints\n";
                         MemOffset.pp_constraint_set 0 constraints;
@@ -312,7 +318,9 @@ module MemType (Entry: MemEntrytype) = struct
             end
           else begin
             match MemOffset.subset smt_ctx addr_offset offset with
-            | MemOffset.SatYes -> (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type))
+            | MemOffset.SatYes ->
+              Printf.printf "set_mem_entry_with_addr: %s is within %s\n" (MemOffset.to_string addr_offset) (MemOffset.to_string offset);
+              (Some (offset, false, MemOffset.ConstraintSet.empty), (offset, Entry.partial_write_val offset_type new_type))
             | MemOffset.SatCond constraints ->
               Printf.printf "set_mem_entry_with_addr: new constraints (base found)\n";
               MemOffset.pp_constraint_set 0 constraints;

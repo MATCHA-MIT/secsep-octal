@@ -78,7 +78,7 @@ module MemOffset = struct
     ) in
     (* Printf.printf "\ncheck_compliance\n\n"; *)
     (* Printf.printf "base solver = \n%s\nbase result: %s\n\n"
-      (* Z3.Solver.to_string solver *) "" (Z3.Solver.string_of_status (Z3.Solver.check solver [])); *)
+      (* Z3.Solver.to_string solver *) "..." (Z3.Solver.string_of_status (Z3.Solver.check solver [])); *)
     (* get string of all assertion and concat them *)
     (* Printf.printf "assertion = \n%s\n\n" (
       List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions

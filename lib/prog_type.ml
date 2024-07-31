@@ -8,7 +8,7 @@ open State_type
 open Cond_type
 open Subtype
 open Smt_emitter
-open Single_exp
+(* open Single_exp *)
 open Pretty_print
 
 module ProgType = struct
@@ -259,10 +259,11 @@ module ProgType = struct
       init_prog_type start_type_var_idx start_single_var_idx init_mem prog in
     (* initial information for z3 solver about the interface *)
     let smt_ctx = SmtEmitter.init_smt_ctx () in
-    let (z3_ctx, z3_solver) = smt_ctx in
+    (* TODO: acquire extra info from interface rather than this dirty assertion *)
+    (* let (z3_ctx, z3_solver) = smt_ctx in
     Z3.Solver.add z3_solver [
-      Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 2)) (SmtEmitter.mk_numeral smt_ctx 0L)
-    ];
+      Z3.BitVector.mk_slt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 6)) (SmtEmitter.mk_numeral smt_ctx 0L)
+    ]; *)
     {
       prog = prog;
       ir_prog = [];
@@ -295,7 +296,7 @@ module ProgType = struct
     let cond_list = fix_cond_list cond_list tv_rel in
     let cond_list_useful = get_cond_list_useful cond_list in
     let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
-      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 12 in
+      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
