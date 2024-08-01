@@ -76,9 +76,9 @@ module MemOffset = struct
         Z3.BitVector.mk_sle ctx e_l e_r (* unsigned comparison *)
       ) diffs
     ) in
-    (* Printf.printf "\ncheck_compliance\n\n"; *)
-    (* Printf.printf "base solver = \n%s\nbase result: %s\n\n"
-      (* Z3.Solver.to_string solver *) "..." (Z3.Solver.string_of_status (Z3.Solver.check solver [])); *)
+    Printf.printf "\ncheck_compliance\n\n";
+    Printf.printf "base solver = \n%s\nbase result: %s\n\n"
+      (Z3.Solver.to_string solver) (*"..."*) (Z3.Solver.string_of_status (Z3.Solver.check solver []));
     (* get string of all assertion and concat them *)
     (* Printf.printf "assertion = \n%s\n\n" (
       List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
@@ -236,13 +236,22 @@ module MemOffset = struct
     end *)
   (* TODO: Think about whether here should be greater than instead of greater than or equal to!!! *)
 
+  let cmp (o1: t) (o2: t) : int =
+    let l1, r1 = o1 in
+    let l2, r2 = o2 in
+    let cmp_l = SingleExp.cmp l1 l2 in
+    if cmp_l = 0 then
+      SingleExp.cmp r1 r2
+    else cmp_l
+
   let cmp_or_merge (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : (((bool, t) Either.t) * ConstraintSet.t) option =
     (* let off_cond = ConstraintSet.union (check_offset o1) (check_offset o2) in *)
     let l1, r1 = o1 in
     let l2, r2 = o2 in
-    (* Printf.printf "Entering cmp_or_merge\n"; *)
-    (* Printf.printf "  o1: %s\n" (to_string o1); *)
-    (* Printf.printf "  o2: %s\n\n%!" (to_string o1); *)
+    Printf.printf "Entering cmp_or_merge\n";
+    Printf.printf "  o1: %s\n" (to_string o1);
+    Printf.printf "  o2: %s\n\n%!" (to_string o1);
+    if cmp o1 o2 = 0 then begin Printf.printf "shortcut\n"; Some (Right (l1, r1), ConstraintSet.empty) end else
     let order12 = check_compliance smt_ctx [(l2, r1, true)] in
     let order21 = check_compliance smt_ctx [(l1, r2, true)] in
     match order12, order21 with
@@ -290,13 +299,5 @@ module MemOffset = struct
     let l1, r1 = o1 in
     let l2, r2 = o2 in
     check_compliance smt_ctx [(l1, l2, true); (r2, r1, true)]
-
-  let cmp (o1: t) (o2: t) : int =
-    let l1, r1 = o1 in
-    let l2, r2 = o2 in
-    let cmp_l = SingleExp.cmp l1 l2 in
-    if cmp_l = 0 then
-      SingleExp.cmp r1 r2
-    else cmp_l
 
 end

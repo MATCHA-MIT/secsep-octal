@@ -74,3 +74,8 @@ S-BinaryExp (
 ), 
 
 Cond = [16 NotTaken]
+
+Not all expr requires z3 check
+TODO: Check how it parse $K512+512
+TODO: Optimize the add of constraints of single expressions themselves
+TODO: Find out why big integers is involved in z3
