@@ -653,6 +653,13 @@ include MemRangeTypeBase
       (* (id2, update_offset_one_ptr [] mem2) :: (update_offset_all_ptr [] tl2) *)
     | [], [] -> ([], MemOffset.ConstraintSet.empty, [])
 
+  let flatten_mem_type
+      (mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list) =
+    List.fold_left (fun acc (base_id, offset_list) ->
+      let l = List.map (fun (offset, mem_type) -> (base_id, offset, mem_type)) offset_list in
+      l @ acc
+    ) [] mem_type
+
   (*
    * This function deals with access that has unknown (implicit) base.
    * Each access goes through all offsets of bases to find a match.
@@ -660,15 +667,9 @@ include MemRangeTypeBase
    *)
   let match_base_for_ptr_without_base
       (smt_ctx: SmtEmitter.t)
-      (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
+      (flattened_mem_type: (Isa.imm_var_id * MemOffset.t * TypeExp.t) list)
       (mem_access_list: MemOffset.t list) (* access without explicit base *)
       : ((Isa.imm_var_id * MemOffset.t) list) * ((Isa.imm_var_id option * MemOffset.t) list) =
-    let flattened_mem_type = 
-      List.fold_left (fun acc (base_id, offset_list) ->
-        let l = List.map (fun (offset, mem_type) -> (base_id, offset, mem_type)) offset_list in
-        l @ acc
-      ) [] old_mem_type
-    in
     let found, not_found = List.partition_map (fun mem_access ->
       let helper_check_def (_, offset, _) =
         match MemOffset.cmp_or_merge smt_ctx mem_access offset with

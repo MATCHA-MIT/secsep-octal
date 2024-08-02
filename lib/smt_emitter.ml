@@ -22,33 +22,39 @@ module SmtEmitter = struct
     let z3_ctx, _ = smt_ctx in
     BitVector.mk_numeral z3_ctx (Int64.to_string value) bv_width
 
-  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) : exp_t =
+  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) (add_constr: bool) : exp_t =
     let z3_ctx, z3_solver = smt_ctx in
     match se with
     | SingleConst c -> mk_numeral smt_ctx c
     | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width
     | SingleBExp (op, se1, se2) ->
-      let e1 = expr_of_single_exp smt_ctx se1 in
-      let e2 = expr_of_single_exp smt_ctx se2 in
+      let e1 = expr_of_single_exp smt_ctx se1 add_constr in
+      let e2 = expr_of_single_exp smt_ctx se2 add_constr in
       begin
         match op with
-        | SingleExp.SingleAdd ->
-            Solver.add z3_solver [
-              BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
-              BitVector.mk_add_no_underflow z3_ctx e1 e2;
-            ];
+        | SingleExp.SingleAdd ->  
+            if add_constr then begin
+              Solver.add z3_solver [
+                BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
+                BitVector.mk_add_no_underflow z3_ctx e1 e2;
+              ];
+            end;
             BitVector.mk_add z3_ctx e1 e2
         | SingleExp.SingleSub ->
-            Solver.add z3_solver [
-              BitVector.mk_sub_no_overflow z3_ctx e1 e2;
-              BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
-            ];
+            if add_constr then begin
+              Solver.add z3_solver [
+                BitVector.mk_sub_no_overflow z3_ctx e1 e2;
+                BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
+              ];
+            end;
             BitVector.mk_sub z3_ctx e1 e2
         | SingleExp.SingleMul ->
-            Solver.add z3_solver [
-              BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
-              BitVector.mk_mul_no_underflow z3_ctx e1 e2;
-            ];
+            if add_constr then begin
+              Solver.add z3_solver [
+                BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
+                BitVector.mk_mul_no_underflow z3_ctx e1 e2;
+              ];
+            end;
             BitVector.mk_mul z3_ctx e1 e2
         | SingleExp.SingleSal -> BitVector.mk_shl z3_ctx e1 e2
         | SingleExp.SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
@@ -57,7 +63,7 @@ module SmtEmitter = struct
         | SingleExp.SingleOr -> BitVector.mk_or z3_ctx e1 e2
       end
     | SingleUExp (op, se) ->
-      let e = expr_of_single_exp smt_ctx se in
+      let e = expr_of_single_exp smt_ctx se add_constr in
       begin
         match op with
         | SingleExp.SingleNot -> BitVector.mk_not z3_ctx e

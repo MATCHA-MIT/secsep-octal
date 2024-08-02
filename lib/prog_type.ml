@@ -208,6 +208,22 @@ module ProgType = struct
       SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     SubType.solve_vars smt_ctx (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list useful_var iter
 
+  let generate_offset_constraints
+      (smt_ctx: SmtEmitter.t)
+      (flattened_mem_type: (Isa.imm_var_id * MemOffset.t * TypeExp.t) list)
+      (unknown_list: (int option * MemOffset.t) list) =
+    Printf.printf "generate_offset_constraints: \n";
+    let l1 = List.map (fun (_, offset, _) -> offset) flattened_mem_type in
+    let l2 = List.map (fun (_, offset) -> offset) unknown_list in
+    List.iter (fun (l, r) ->
+      MemOffset.pp_offset 1 (l, r);
+      Printf.printf "\n";
+      let _ = SmtEmitter.expr_of_single_exp smt_ctx l true in
+      let _ = SmtEmitter.expr_of_single_exp smt_ctx r true in
+      ()
+    ) (l1 @ l2);
+    ()
+
   (* Try to resolve known mem access with new solution *)
   (* Generate new memory layout (ptr-offset list) *)
   let get_update_list
@@ -237,11 +253,13 @@ module ProgType = struct
     let repl_mem_list = MemRangeType.repl_addr_exp unknown_mem_list subtype_sol in
     let new_ptr_info, addr_base_range = 
       MemRangeType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
+    let flattened_mem_type = MemRangeType.flatten_mem_type old_mem_type in
     let access_with_base, access_without_base = (MemRangeType.reshape_mem_key_list addr_base_range) in
+    generate_offset_constraints smt_ctx flattened_mem_type addr_base_range;
     Printf.printf "Newly resolved mem access list--------------\n";
     MemRangeType.pp_mem_key 0 (access_with_base, []);
     Printf.printf "Newly resolved mem access list--------------\n";
-    let ib_base_found, ib_base_not_found = MemRangeType.match_base_for_ptr_without_base smt_ctx old_mem_type access_without_base in
+    let ib_base_found, ib_base_not_found = MemRangeType.match_base_for_ptr_without_base smt_ctx flattened_mem_type access_without_base in
     let update_list, constraint_set, undeter_access =
       MemRangeType.update_offset_all_ptr smt_ctx old_mem_type (helper_merge access_with_base ib_base_found)
     in
@@ -262,7 +280,7 @@ module ProgType = struct
     (* TODO: acquire extra info from interface rather than this dirty assertion *)
     (* let (z3_ctx, z3_solver) = smt_ctx in
     Z3.Solver.add z3_solver [
-      Z3.BitVector.mk_slt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 6)) (SmtEmitter.mk_numeral smt_ctx 0L)
+      Z3.BitVector.mk_slt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 6) false) (SmtEmitter.mk_numeral smt_ctx 0L)
     ]; *)
     {
       prog = prog;
@@ -279,7 +297,13 @@ module ProgType = struct
     }
 
   let loop (state: t) : t =
+    let stamp_start = Unix.gettimeofday () in
+    let print_stamp (msg: string) =
+      Printf.printf "\n[%f] >> %s <<\n" ((Unix.gettimeofday ()) -. stamp_start) msg;
+      ()
+    in
     let z3_ctx, z3_solver = state.smt_ctx in
+    print_stamp "Checking solver";
     let result = Z3.Solver.check z3_solver [] in
     if result = Z3.Solver.UNSATISFIABLE then begin
       Printf.printf "FATAL: SMT Unsatisfiable\n";
@@ -287,16 +311,20 @@ module ProgType = struct
       Printf.printf "loop quitted\n";
       prog_type_error "FATAL error in loop"
     end;
+    print_stamp "Getting temp solution";
     let temp_sol = get_temp_sol state.subtype_sol in
+    print_stamp "Propagating blocks";
     let (tv_rel, cond_list, unknown_list, prop_constraint, prop_useful_var), ir_prog = 
       prop_all_block state.smt_ctx state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
     (* Printf.printf "!!!SubType--------------------------------------------\n";
     SubType.pp_tv_rels 0 tv_rel;
     Printf.printf "!!!SubType--------------------------------------------\n"; *)
+    print_stamp "Getting conditions";
     let cond_list = fix_cond_list cond_list tv_rel in
     let cond_list_useful = get_cond_list_useful cond_list in
+    print_stamp "Solving subtype";
     let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
-      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 5 in
+      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 10 in
     Printf.printf "HHH-------------------\n";
     (* SubType.pp_tv_rels 0 sol_tv_rel; *)
     Printf.printf "Unknown list\n";
@@ -306,10 +334,14 @@ module ProgType = struct
     let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
     MemRangeType.pp_mem_type 0 old_mem_type;
     Printf.printf "ggg-------------------\n";
+    print_stamp "Updating memory type";
     let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list state.smt_ctx old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
+    print_stamp "Updating program type";
     let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
       update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
+    print_stamp "Updating subtype type";
     let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
+    print_stamp "Checking new assertions";
     let new_smt_assertions = 
       MemOffset.constraint_set_to_solver_exps
         state.smt_ctx
