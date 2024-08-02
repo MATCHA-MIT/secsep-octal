@@ -76,10 +76,10 @@ module MemOffset = struct
         Z3.BitVector.mk_sle ctx e_l e_r (* unsigned comparison *)
       ) diffs
     ) in
+    Printf.printf "\ncheck_compliance\n";
+    Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+      (Z3.Solver.get_num_assertions solver) (* Z3.Solver.to_string solver *) ("...") (Z3.Solver.string_of_status (Z3.Solver.check solver []));
     (*
-    Printf.printf "\ncheck_compliance\n\n";
-    Printf.printf "base solver = \n%s\nbase result: %s\n\n"
-      (* Z3.Solver.to_string solver *) ("...") (Z3.Solver.string_of_status (Z3.Solver.check solver []));
     (* get string of all assertion and concat them *)
     Printf.printf "assertion = \n%s\n\n" (
       List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions

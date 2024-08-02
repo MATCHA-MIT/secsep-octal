@@ -101,11 +101,11 @@ module StateType = struct
           | TypeSingle se ->
             (* If base is resolved, add the constraint that the address is above 0 *)
             if is_address then begin
-              let z3_ctx, z3_solver = smt_ctx in
+              let z3_ctx, _ = smt_ctx in
               Printf.printf "get_mem_op_type_helper: base resolved:\n";
               SingleExp.pp_single_exp 1 se;
               Printf.printf "\n";
-              Z3.Solver.add z3_solver [Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se true) (SmtEmitter.mk_numeral smt_ctx 0L)];
+              SmtEmitter.add_assertions smt_ctx [Z3.BitVector.mk_sgt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se true) (SmtEmitter.mk_numeral smt_ctx 0L)];
             end
           | _ -> ()
         in
@@ -119,11 +119,11 @@ module StateType = struct
         let _ = match res with
         | TypeSingle se ->
           if is_address then begin
-            let z3_ctx, z3_solver = smt_ctx in
+            let z3_ctx, _ = smt_ctx in
             Printf.printf "get_mem_op_type_helper: index resolved:\n";
             SingleExp.pp_single_exp 1 se;
             Printf.printf "\n";
-            Z3.Solver.add z3_solver [Z3.BitVector.mk_sge z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se true) (SmtEmitter.mk_numeral smt_ctx 0L)];
+            SmtEmitter.add_assertions smt_ctx [Z3.BitVector.mk_sge z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx se true) (SmtEmitter.mk_numeral smt_ctx 0L)];
           end
         | _ -> ()
         in

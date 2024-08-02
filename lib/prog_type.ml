@@ -208,22 +208,6 @@ module ProgType = struct
       SubType.t * (CondType.t list) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     SubType.solve_vars smt_ctx (SubType.remove_all_var_dummy_sub tv_rel_list) cond_list useful_var iter
 
-  let generate_offset_constraints
-      (smt_ctx: SmtEmitter.t)
-      (flattened_mem_type: (Isa.imm_var_id * MemOffset.t * TypeExp.t) list)
-      (unknown_list: (int option * MemOffset.t) list) =
-    Printf.printf "generate_offset_constraints: \n";
-    let l1 = List.map (fun (_, offset, _) -> offset) flattened_mem_type in
-    let l2 = List.map (fun (_, offset) -> offset) unknown_list in
-    List.iter (fun (l, r) ->
-      MemOffset.pp_offset 1 (l, r);
-      Printf.printf "\n";
-      let _ = SmtEmitter.expr_of_single_exp smt_ctx l true in
-      let _ = SmtEmitter.expr_of_single_exp smt_ctx r true in
-      ()
-    ) (l1 @ l2);
-    ()
-
   (* Try to resolve known mem access with new solution *)
   (* Generate new memory layout (ptr-offset list) *)
   let get_update_list
@@ -255,7 +239,6 @@ module ProgType = struct
       MemRangeType.get_addr_base_range ptr_list no_ptr_list repl_mem_list in
     let flattened_mem_type = MemRangeType.flatten_mem_type old_mem_type in
     let access_with_base, access_without_base = (MemRangeType.reshape_mem_key_list addr_base_range) in
-    generate_offset_constraints smt_ctx flattened_mem_type addr_base_range;
     Printf.printf "Newly resolved mem access list--------------\n";
     MemRangeType.pp_mem_key 0 (access_with_base, []);
     Printf.printf "Newly resolved mem access list--------------\n";
@@ -278,10 +261,6 @@ module ProgType = struct
     (* initial information for z3 solver about the interface *)
     let smt_ctx = SmtEmitter.init_smt_ctx () in
     (* TODO: acquire extra info from interface rather than this dirty assertion *)
-    (* let (z3_ctx, z3_solver) = smt_ctx in
-    Z3.Solver.add z3_solver [
-      Z3.BitVector.mk_slt z3_ctx (SmtEmitter.expr_of_single_exp smt_ctx (SingleExp.SingleVar 6) false) (SmtEmitter.mk_numeral smt_ctx 0L)
-    ]; *)
     {
       prog = prog;
       ir_prog = [];
@@ -351,7 +330,7 @@ module ProgType = struct
     Printf.printf "New SMT assertions-------------------------------------\n";
     List.iter (fun x -> Printf.printf "%s\n" (Z3.Expr.to_string x)) new_smt_assertions;
     Printf.printf "New SMT assertions-------------------------------------\n";
-    Z3.Solver.add z3_solver new_smt_assertions;
+    SmtEmitter.add_assertions (z3_ctx, z3_solver) new_smt_assertions;
     {
       prog = state.prog;
       ir_prog = ir_prog;
