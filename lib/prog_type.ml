@@ -341,6 +341,7 @@ module ProgType = struct
           (MemOffset.constraint_union [prop_constraint; sol_constraint; update_constraint])
       in
       (* print all assertions *)
+      Printf.printf "Solver size after iteration = %d\n" (Z3.Solver.get_num_assertions z3_solver);
       Printf.printf "New SMT assertions-------------------------------------\n";
       List.iter (fun x -> Printf.printf "%s\n" (Z3.Expr.to_string x)) new_smt_assertions;
       Printf.printf "New SMT assertions-------------------------------------\n";
@@ -364,7 +365,7 @@ module ProgType = struct
         next_type_var_idx = next_type_var;
         next_single_var_idx = next_imm_var;
         has_unknown_address = has_unknown_address;
-        smt_ctx = (z3_ctx, z3_solver);
+        smt_ctx = (z3_ctx, z3_solver) (* SmtEmitter.init_smt_ctx () *) (* Change here to use persistent / transient  SMT context *);
       }, iter_left - 1)
     end
 
