@@ -32,6 +32,7 @@ module ProgType = struct
     no_ptr_set: MemKeySet.t;
     next_type_var_idx: TypeExp.type_var_id;
     next_single_var_idx: Isa.imm_var_id;
+    has_unknown_address: bool;
     smt_ctx: SmtEmitter.t
   }
 
@@ -272,17 +273,20 @@ module ProgType = struct
       no_ptr_set = MemKeySet.empty;
       next_type_var_idx = next_type_var_idx;
       next_single_var_idx = next_single_var_idx;
+      has_unknown_address = true;
       smt_ctx = smt_ctx;
     }
 
-  let loop (state: t) : t =
+  let loop (state: t) (iter_left: int) (total: int) : (t * int) =
+    let iter = total - iter_left + 1 in
     let stamp_start = Unix.gettimeofday () in
     let print_stamp (msg: string) =
-      Printf.printf "\n[%f] >> %s <<\n" ((Unix.gettimeofday ()) -. stamp_start) msg;
+      Printf.printf "\n[%f] >> %s <<\n%!" ((Unix.gettimeofday ()) -. stamp_start) msg;
       ()
     in
+    print_stamp ("Loop begins (" ^ (string_of_int iter) ^ "/" ^ (string_of_int total) ^ ")");
     let z3_ctx, z3_solver = state.smt_ctx in
-    print_stamp "Checking solver";
+    print_stamp ("Checking current solver (solver size = " ^ (string_of_int (Z3.Solver.get_num_assertions z3_solver)) ^ ")");
     let result = Z3.Solver.check z3_solver [] in
     if result = Z3.Solver.UNSATISFIABLE then begin
       Printf.printf "FATAL: SMT Unsatisfiable\n";
@@ -290,60 +294,79 @@ module ProgType = struct
       Printf.printf "loop quitted\n";
       prog_type_error "FATAL error in loop"
     end;
-    print_stamp "Getting temp solution";
-    let temp_sol = get_temp_sol state.subtype_sol in
-    print_stamp "Propagating blocks";
-    let (tv_rel, cond_list, unknown_list, prop_constraint, prop_useful_var), ir_prog = 
-      prop_all_block state.smt_ctx state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
-    (* Printf.printf "!!!SubType--------------------------------------------\n";
-    SubType.pp_tv_rels 0 tv_rel;
-    Printf.printf "!!!SubType--------------------------------------------\n"; *)
-    print_stamp "Getting conditions";
-    let cond_list = fix_cond_list cond_list tv_rel in
-    let cond_list_useful = get_cond_list_useful cond_list in
-    print_stamp "Solving subtype";
-    let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
-      solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) 10 in
-    Printf.printf "HHH-------------------\n";
-    (* SubType.pp_tv_rels 0 sol_tv_rel; *)
-    Printf.printf "Unknown list\n";
-    MemRangeType.pp_addr_exp 0 unknown_list;
-    Printf.printf "hhh-------------------\n";
-    let new_sol = get_temp_sol sol_tv_rel in
-    let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
-    MemRangeType.pp_mem_type 0 old_mem_type;
-    Printf.printf "ggg-------------------\n";
-    print_stamp "Updating memory type";
-    let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list state.smt_ctx old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
-    print_stamp "Updating program type";
-    let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
-      update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
-    print_stamp "Updating subtype type";
-    let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
-    print_stamp "Checking new assertions";
-    let new_smt_assertions = 
-      MemOffset.constraint_set_to_solver_exps
-        state.smt_ctx
-        (MemOffset.constraint_union [prop_constraint; sol_constraint; update_constraint])
-    in
-    (* print all assertions *)
-    Printf.printf "New SMT assertions-------------------------------------\n";
-    List.iter (fun x -> Printf.printf "%s\n" (Z3.Expr.to_string x)) new_smt_assertions;
-    Printf.printf "New SMT assertions-------------------------------------\n";
-    SmtEmitter.add_assertions (z3_ctx, z3_solver) new_smt_assertions;
-    {
-      prog = state.prog;
-      ir_prog = ir_prog;
-      prog_type = new_prog_type;
-      cond_type = sol_cond_list;
-      subtype_sol = new_subtype;
-      useful_set = sol_useful_var;
-      ptr_set = ptr_list;
-      no_ptr_set = no_ptr_list;
-      next_type_var_idx = next_type_var;
-      next_single_var_idx = next_imm_var;
-      smt_ctx = (z3_ctx, z3_solver);
-    }
+    if state.has_unknown_address = false then begin
+      Printf.printf "Early finish solving on iteration %d, quitting...\n" iter;
+      (state, 0)
+    end else begin
+      print_stamp "Getting solution from last iteration";
+      let temp_sol = get_temp_sol state.subtype_sol in
+
+      print_stamp "Propagating all basic blocks";
+      let (tv_rel, cond_list, unknown_list, prop_constraint, prop_useful_var), ir_prog = 
+        prop_all_block state.smt_ctx state.prog state.prog_type (SubType.clear state.subtype_sol) temp_sol in
+      print_stamp "Propagation done";
+      let has_unknown_address = (List.length unknown_list) > 0 in
+      Printf.printf "------- Unknown addresses during propagation --------\n";
+      (* SubType.pp_tv_rels 0 sol_tv_rel; *)
+      MemRangeType.pp_addr_exp 0 unknown_list;
+      Printf.printf "------------------ Old memory type ------------------\n";
+      let old_mem_type = (List.hd state.prog_type).block_type.mem_type.mem_type in
+      MemRangeType.pp_mem_type 0 old_mem_type;
+      Printf.printf "-----------------------------------------------------\n";
+
+      print_stamp "Getting conditions";
+      let cond_list = fix_cond_list cond_list tv_rel in
+      let cond_list_useful = get_cond_list_useful cond_list in
+
+      let solver_iteartion = 20 in
+      print_stamp ("Solving subtype relations (iteration cnt = " ^ (string_of_int solver_iteartion) ^ ")");
+      let sol_tv_rel, sol_cond_list, sol_constraint, sol_useful_var = 
+        solve_subtype state.smt_ctx tv_rel cond_list (TypeExp.var_union [state.useful_set; prop_useful_var; cond_list_useful]) solver_iteartion in
+
+      print_stamp "Updating memory type";
+      let new_sol = get_temp_sol sol_tv_rel in
+      let (ptr_list, no_ptr_list), update_list, update_constraint = get_update_list state.smt_ctx old_mem_type unknown_list new_sol state.ptr_set state.no_ptr_set in
+
+      print_stamp "Updating program type";
+      let (next_type_var, next_imm_var, new_type_var_list, drop_type_var_list), new_prog_type =
+        update_prog_type update_list state.next_type_var_idx state.next_single_var_idx state.prog_type in
+
+      print_stamp "Updating subtype type";
+      let new_subtype = update_subtype new_type_var_list drop_type_var_list sol_tv_rel in
+
+      print_stamp "Including new assertions";
+      let new_smt_assertions = 
+        MemOffset.constraint_set_to_solver_exps
+          state.smt_ctx
+          (MemOffset.constraint_union [prop_constraint; sol_constraint; update_constraint])
+      in
+      (* print all assertions *)
+      Printf.printf "New SMT assertions-------------------------------------\n";
+      List.iter (fun x -> Printf.printf "%s\n" (Z3.Expr.to_string x)) new_smt_assertions;
+      Printf.printf "New SMT assertions-------------------------------------\n";
+      SmtEmitter.add_assertions (z3_ctx, z3_solver) new_smt_assertions;
+
+      (* warning that indicates more loops are needed *)
+      if has_unknown_address && iter_left = 1 then begin
+        Printf.printf "\nWARNING: Unknown address still exists, but no more iteration left\n";
+        Printf.printf "WARNING: Please increase the iteration count\n\n";
+      end;
+
+      ({
+        prog = state.prog;
+        ir_prog = ir_prog;
+        prog_type = new_prog_type;
+        cond_type = sol_cond_list;
+        subtype_sol = new_subtype;
+        useful_set = sol_useful_var;
+        ptr_set = ptr_list;
+        no_ptr_set = no_ptr_list;
+        next_type_var_idx = next_type_var;
+        next_single_var_idx = next_imm_var;
+        has_unknown_address = has_unknown_address;
+        smt_ctx = (z3_ctx, z3_solver);
+      }, iter_left - 1)
+    end
 
   let pp_prog_type (lvl: int) (state: t) =
     Printf.printf "===================================================\n";
@@ -371,14 +394,16 @@ module ProgType = struct
       (prog: Isa.program)
       (iter: int) : t =
     let init_prog = init start_type_var_idx start_single_var_idx init_mem prog in
-    let rec helper (prog: t) (iter: int) : t =
+    let rec helper (prog: t) (iter_left: int) (total: int) : t =
       (* pp_prog_type 0 prog; *)
-      if iter = 0 then begin 
+      if iter_left = 0 then begin 
         pp_prog_type 0 prog;
         prog 
-      end else 
-        helper (loop prog) (iter - 1)
+      end else begin
+        let prog, iter_left = loop prog iter_left total in
+        helper prog iter_left total
+      end
     in
-    helper init_prog iter
+    helper init_prog iter iter
 
 end

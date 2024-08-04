@@ -560,6 +560,13 @@ include MemRangeTypeBase
       (old_mem_type: (MemOffset.t * TypeExp.t) list)
       (mem_access_list: MemOffset.t list) :
       ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t * (MemOffset.t list) = 
+    (*
+    Printf.printf "Entering update_offset_one_ptr\n";
+    Printf.printf "\nMemtype =\n";
+    pp_mem_type 0 [(0, old_mem_type)];
+    Printf.printf "\nMem access list (%d) =\n" (List.length mem_access_list);
+    (* List.iter (fun x -> MemOffset.pp_offset 0 x; Printf.printf "\n") mem_access_list; *)
+    *)
     let rec helper
         (acc: ((MemOffset.t * bool) list) * MemOffset.ConstraintSet.t * (MemOffset.t list))
         (range: MemOffset.t) :
@@ -612,7 +619,13 @@ include MemRangeTypeBase
       (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
       (mem_access_list: (Isa.imm_var_id * MemOffset.t list) list)
       : ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t * ((Isa.imm_var_id option * MemOffset.t) list) =
-    (* pp_mem_key 0 mem_access_list; *)
+    (*
+    Printf.printf "Entering update_offset_all_ptr\n";
+    Printf.printf "\nMemtype =\n";
+    pp_mem_type 0 old_mem_type;
+    Printf.printf "\nMem access list =\n";
+    pp_mem_key 0 (mem_access_list, []);
+    *)
     let helper_add_base_id_to_range (base_id: Isa.imm_var_id) (offset_list: MemOffset.t list) =
       List.map (fun x -> (Some base_id, x)) offset_list
     in
@@ -903,9 +916,11 @@ include MemRangeTypeBase
       (addr_list: (TypeFullExp.t * int64) list) : 
       (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((Isa.imm_var_id option * MemOffset.t) list) =
     let addr_list = filter_addr_list addr_list in
+    (*
     Printf.printf "\nget_addr_base_range: input addr list:\n";
     List.iter (fun ((e, _), _) -> TypeExp.pp_type_exp 0 e; Printf.printf "\n"; ) addr_list;
     Printf.printf "\n";
+    *)
     let (new_ptr_list, new_no_ptr_list), base_list = get_base ptr_list no_ptr_list addr_list in
     let helper (base_id: Isa.imm_var_id option) (mem_access: TypeFullExp.t * int64) : Isa.imm_var_id option * MemOffset.t =
       let (addr, _), size = mem_access in

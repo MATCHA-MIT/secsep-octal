@@ -43,8 +43,12 @@ module MemOffset = struct
       let e = Z3.BitVector.mk_sge z3_ctx
         (SmtEmitter.expr_of_single_exp smt_ctx se false)
         (Z3.BitVector.mk_numeral z3_ctx "0" SmtEmitter.bv_width) in
-      (* Printf.printf "\n%s\n" (Z3.Expr.to_string e); *)
-      e :: acc
+      let e' = Z3.Expr.simplify e None in
+      (*
+      Printf.printf "new assertion: %s\n" (Z3.Expr.to_string e);
+      Printf.printf "simplified   : %s\n" (Z3.Expr.to_string e');
+      *)
+      if Z3.Boolean.is_true e' then acc else e' :: acc
     ) constraints []
 
   let check_compliance (smt_ctx: SmtEmitter.t) (diffs: diff_t list) : sat_result =
@@ -56,30 +60,48 @@ module MemOffset = struct
       else
         SingleExp.eval (SingleBExp (SingleSub, se_l, SingleBExp (SingleExp.SingleAdd, se_r, SingleExp.SingleConst 1L)))
     ) diffs in
-    let assertions = List.map (fun diff ->
+    let assertions = List.filter_map (fun diff ->
       let se_l, se_r, eq = diff in
       let e_l = SmtEmitter.expr_of_single_exp smt_ctx se_l false in
       let e_r = SmtEmitter.expr_of_single_exp smt_ctx se_r false in
-      if eq then
-        Z3.BitVector.mk_sge ctx e_l e_r (* unsigned comparison *)
-      else
-        Z3.BitVector.mk_sgt ctx e_l e_r (* unsigned comparison *)
+      let expr = if eq then
+          (* Z3.BitVector.mk_sge ctx e_l e_r *)
+          Z3.BitVector.mk_sge ctx (Z3.BitVector.mk_sub ctx e_l e_r) (Z3.BitVector.mk_numeral ctx "0" 64)
+        else
+          (* Z3.BitVector.mk_sgt ctx e_l e_r *)
+          Z3.BitVector.mk_sgt ctx (Z3.BitVector.mk_sub ctx e_l e_r) (Z3.BitVector.mk_numeral ctx "0" 64)
+      in
+      let expr' = Z3.Expr.simplify expr None in
+      (*
+      Printf.printf "assertion : %s\n" (Z3.Expr.to_string expr);
+      Printf.printf "simplified: %s\n" (Z3.Expr.to_string expr');
+      *)
+      if Z3.Boolean.is_true expr' then None else Some expr'
     ) diffs in
     let negation = Z3.Boolean.mk_or ctx (
       List.map (fun diff ->
-      let se_l, se_r, eq = diff in
-      let e_l = SmtEmitter.expr_of_single_exp smt_ctx se_l false in
-      let e_r = SmtEmitter.expr_of_single_exp smt_ctx se_r false in
-      if eq then
-        Z3.BitVector.mk_slt ctx e_l e_r (* unsigned comparison *)
-      else
-        Z3.BitVector.mk_sle ctx e_l e_r (* unsigned comparison *)
+        let se_l, se_r, eq = diff in
+        let e_l = SmtEmitter.expr_of_single_exp smt_ctx se_l false in
+        let e_r = SmtEmitter.expr_of_single_exp smt_ctx se_r false in
+        let expr = if eq then
+            (* Z3.BitVector.mk_slt ctx e_l e_r *)
+            Z3.BitVector.mk_slt ctx (Z3.BitVector.mk_sub ctx e_l e_r) (Z3.BitVector.mk_numeral ctx "0" 64)
+          else
+            (* Z3.BitVector.mk_sle ctx e_l e_r *)
+            Z3.BitVector.mk_sle ctx (Z3.BitVector.mk_sub ctx e_l e_r) (Z3.BitVector.mk_numeral ctx "0" 64)
+        in
+        let expr' = Z3.Expr.simplify expr None in
+        (*
+        Printf.printf "assertion : %s\n" (Z3.Expr.to_string expr);
+        Printf.printf "simplified: %s\n" (Z3.Expr.to_string expr');
+        *)
+        expr'
       ) diffs
     ) in
+    (*
     Printf.printf "\ncheck_compliance\n";
     Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
       (Z3.Solver.get_num_assertions solver) (* Z3.Solver.to_string solver *) ("...") (Z3.Solver.string_of_status (Z3.Solver.check solver []));
-    (*
     (* get string of all assertion and concat them *)
     Printf.printf "assertion = \n%s\n\n" (
       List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
@@ -250,11 +272,13 @@ module MemOffset = struct
     (* let off_cond = ConstraintSet.union (check_offset o1) (check_offset o2) in *)
     let l1, r1 = o1 in
     let l2, r2 = o2 in
-    Printf.printf "Entering cmp_or_merge\n";
+    (*
+    Printf.printf "Entering cmp_or_merge (solver size: %d)\n" (Z3.Solver.get_num_assertions (snd smt_ctx));
     let stamp_beg = Unix.gettimeofday () in
     Printf.printf "  o1: %s\n" (to_string o1);
     Printf.printf "  o2: %s\n" (to_string o2);
-    if cmp o1 o2 = 0 then begin Printf.printf "shortcut taken\n"; Some (Right (l1, r1), ConstraintSet.empty) end else
+    *)
+    if cmp o1 o2 = 0 then begin (* Printf.printf "shortcut taken\n"; *) Some (Right (l1, r1), ConstraintSet.empty) end else
     let order12 = check_compliance smt_ctx [(l2, r1, true)] in
     let order21 = check_compliance smt_ctx [(l1, r2, true)] in
     let res: (((bool, t) Either.t) * ConstraintSet.t) option = begin match order12, order21 with
@@ -281,7 +305,7 @@ module MemOffset = struct
       | SatCond _, SatYes -> None (* still possible, given that one of the result may be undertermined due to lack of information *)
       | SatYes, SatYes -> mem_offset_error "cmp_or_merge failed: expected to be impossible"
     end in
-    Printf.printf "time cost: %f\n" (Unix.gettimeofday () -. stamp_beg);
+    (* Printf.printf "time cost: %f\n%!" (Unix.gettimeofday () -. stamp_beg); *)
     res
 
       (* match get_conditional_less l1 l2, get_conditional_greater r1 r2 with
