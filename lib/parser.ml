@@ -12,12 +12,13 @@ module Parser = struct
     let label_name = String.sub line 0 ((String.length line) - 1) in
     label_name
 
-  let parse_register (name: string) : Isa.register =
+  let parse_register (name: string) : Isa.register option =
     match name with
-    |     "rax" -> RAX |     "rcx" -> RCX |     "rdx" -> RDX |     "rbx" -> RBX | "rsp" -> RSP  | "rbp" -> RBP  | "rsi" -> RSI  | "rdi" -> RDI  | "r8" -> R8  | "r9" -> R9  | "r10" -> R10  | "r11" -> R11  | "r12" -> R12  | "r13" -> R13  | "r14" -> R14  | "r15" -> R15
-    |     "eax" -> EAX |     "ecx" -> ECX |     "edx" -> EDX |     "ebx" -> EBX | "esp" -> ESP  | "ebp" -> EBP  | "esi" -> ESI  | "edi" -> EDI  | "r8d" -> R8D | "r9d" -> R9D | "r10d" -> R10D | "r11d" -> R11D | "r12d" -> R12D | "r13d" -> R13D | "r14d" -> R14D | "r15d" -> R15D
-    |      "ax" -> AX |      "cx" -> CX |      "dx" -> DX |      "bx" -> BX |  "sp" -> SP  |  "bp" -> BP  |  "si" -> SI  |  "di" -> DI  | "r8w" -> R8W | "r9w" -> R9W | "r10w" -> R10W | "r11w" -> R11W | "r12w" -> R12W | "r13w" -> R13W | "r14w" -> R14W | "r15w" -> R15W
-    | "ah" -> AH | "al" -> AL | "ch" -> CH | "cl" -> CL | "dh" -> DH | "dl" -> DL | "bh" -> BH | "bl" -> BL |  "spl" -> SPL |  "bpl" -> BPL |  "sil" -> SIL |  "dil" -> DIL | "r8b" -> R8B | "r9b" -> R9B | "r10b" -> R10B | "r11b" -> R11B | "r12b" -> R12B | "r13b" -> R13B | "r14b" -> R14B | "r15b" -> R15B
+    |     "rax" -> Some RAX |     "rcx" -> Some RCX |     "rdx" -> Some RDX |     "rbx" -> Some RBX | "rsp" -> Some RSP  | "rbp" -> Some RBP  | "rsi" -> Some RSI  | "rdi" -> Some RDI  | "r8" -> Some R8  | "r9" -> Some R9  | "r10" -> Some R10  | "r11" -> Some R11  | "r12" -> Some R12  | "r13" -> Some R13  | "r14" -> Some R14  | "r15" -> Some R15
+    |     "eax" -> Some EAX |     "ecx" -> Some ECX |     "edx" -> Some EDX |     "ebx" -> Some EBX | "esp" -> Some ESP  | "ebp" -> Some EBP  | "esi" -> Some ESI  | "edi" -> Some EDI  | "r8d" -> Some R8D | "r9d" -> Some R9D | "r10d" -> Some R10D | "r11d" -> Some R11D | "r12d" -> Some R12D | "r13d" -> Some R13D | "r14d" -> Some R14D | "r15d" -> Some R15D
+    |      "ax" -> Some AX |      "cx" -> Some CX |      "dx" -> Some DX |      "bx" -> Some BX |  "sp" -> Some SP  |  "bp" -> Some BP  |  "si" -> Some SI  |  "di" -> Some DI  | "r8w" -> Some R8W | "r9w" -> Some R9W | "r10w" -> Some R10W | "r11w" -> Some R11W | "r12w" -> Some R12W | "r13w" -> Some R13W | "r14w" -> Some R14W | "r15w" -> Some R15W
+    | "ah" -> Some AH | "al" -> Some AL | "ch" -> Some CH | "cl" -> Some CL | "dh" -> Some DH | "dl" -> Some DL | "bh" -> Some BH | "bl" -> Some BL |  "spl" -> Some SPL |  "bpl" -> Some BPL |  "sil" -> Some SIL |  "dil" -> Some DIL | "r8b" -> Some R8B | "r9b" -> Some R9B | "r10b" -> Some R10B | "r11b" -> Some R11B | "r12b" -> Some R12B | "r13b" -> Some R13B | "r14b" -> Some R14B | "r15b" -> Some R15B
+    | "rip" -> None (* Dirty support for rip *)
     | _ -> parse_error ("parse_register: invalid register name " ^ name)
 
   let string_of_register (r: Isa.register) : string =
@@ -31,6 +32,7 @@ module Parser = struct
   type token =
     | MneTok of string
     | RegTok of Isa.register
+    | RipTok
     | ImmTok of (Isa.immediate * (string option) list)
     | Comma
     | LParen
@@ -52,6 +54,7 @@ module Parser = struct
     match t with
     | MneTok s -> "MneTok " ^ s
     | RegTok r -> "RegTok " ^ (string_of_register r)
+    | RipTok -> "RipTok"
     (* | ImmTok (ImmNum n, _) -> "ImmTok " ^ (Int64.to_string n)
     | ImmTok (ImmLabel v, name) -> "ImmTok (var " ^ (string_of_int v) ^ ": " ^ Option.get name ^ ")"
     | ImmTok (exp, _) -> "ImmTok (" ^ (Isa.string_of_immediate exp) ^ ")"  *)
@@ -162,7 +165,11 @@ module Parser = struct
       | ')' :: cs -> go cs (RParen :: acc)
       | '%' :: cs ->
           let (name, cs) = consume_name cs in
-          go cs (RegTok (parse_register name) :: acc)
+          begin match parse_register name with
+          | Some r -> go cs (RegTok r :: acc)
+          | None -> go cs (RipTok :: acc)
+          end
+          (* go cs (RegTok (parse_register name) :: acc) *)
       | '$' :: cs ->
           go cs acc
       | _ ->
@@ -198,6 +205,8 @@ module Parser = struct
       (MemOp (Some disp, Some base, Some index, Some (imm_to_scale imm)), ts)
     | ImmTok (disp, _) :: LParen :: RegTok index :: Comma :: ImmTok (imm, _) :: RParen :: ts ->  (* disp(index, scale) *)
       (MemOp (Some disp, None, Some index, Some (imm_to_scale imm)), ts)
+    | ImmTok (disp, _) :: LParen :: RipTok :: RParen :: ts -> (* disp(rip) *)
+      (ImmOp disp, ts)
     | _ -> parse_error ("parse_memory_operand: " ^ (String.concat ", " (List.map string_of_token ts)))
 
   let parse_operand (ts: token list) : Isa.operand * token list =
@@ -313,40 +322,136 @@ module Parser = struct
       | ("movq", [opr1; opr2]) 
       | ("movabsq", [opr1; opr2]) -> Mov (dst(opr2, Some 8L), src(opr1, Some 8L))
       | ("movs", [opr1; opr2]) -> MovS (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("movsbq", [opr1; opr2]) -> MovS (dst(opr2, Some 8L), src(opr1, Some 1L))
+      | ("movswq", [opr1; opr2]) -> MovS (dst(opr2, Some 8L), src(opr1, Some 2L))
       | ("movslq", [opr1; opr2]) -> MovS (dst(opr2, Some 8L), src(opr1, Some 4L))
+      | ("cltq", []) -> MovS (dst(RegOp RAX, Some 8L), src(RegOp EAX, Some 4L))
       | ("movz", [opr1; opr2]) -> MovZ (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("movzbl", [opr1; opr2]) -> MovZ  (dst(opr2, Some 4L), src(opr1, Some 1L))
+      | ("xchg", [opr1; opr2]) -> Xchg (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("xchgb", [opr1; opr2]) -> Xchg (dst(opr2, Some 1L), src(opr1, Some 1L))
+      | ("xchgw", [opr1; opr2]) -> Xchg (dst(opr2, Some 2L), src(opr1, Some 2L))
+      | ("xchgl", [opr1; opr2]) -> Xchg (dst(opr2, Some 4L), src(opr1, Some 4L))
+      | ("xchgq", [opr1; opr2]) -> Xchg (dst(opr2, Some 8L), src(opr1, Some 8L))
       | ("lea", [opr1; opr2]) -> Lea (dst(opr2, dirty_op_size), opr1)
+      | ("leab", [opr1; opr2]) -> Lea (dst(opr2, Some 1L), opr1)
+      | ("leaw", [opr1; opr2]) -> Lea (dst(opr2, Some 2L), opr1)
       | ("leal", [opr1; opr2]) -> Lea (dst(opr2, Some 4L), opr1)
       | ("leaq", [opr1; opr2]) -> Lea (dst(opr2, Some 8L), opr1) (* the memory operand in LEA is not converted to ld/st *)
       | ("add", [opr1; opr2]) -> Add (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("addb", [opr1; opr2]) -> Add (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("addw", [opr1; opr2]) -> Add (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("addl", [opr1; opr2]) -> Add (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("addq", [opr1; opr2]) -> Add (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("adc", [opr1; opr2]) -> Adc (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("adcb", [opr1; opr2]) -> Adc (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("adcw", [opr1; opr2]) -> Adc (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("adcl", [opr1; opr2]) -> Adc (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("adcq", [opr1; opr2]) -> Adc (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
       | ("sub", [opr1; opr2]) -> Sub (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("subb", [opr1; opr2]) -> Sub (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("subw", [opr1; opr2]) -> Sub (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("subl", [opr1; opr2]) -> Sub (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("subq", [opr1; opr2]) -> Sub (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L)) (* note that the minuend is opr2 *)
+      | ("mul", [opr1]) -> Imul (dst(RegOp (Isa.fix_reg_size RAX (Option.get dirty_op_size)), dirty_op_size), src(RegOp (Isa.fix_reg_size RAX (Option.get dirty_op_size)), dirty_op_size), src(opr1, dirty_op_size))
+      | ("mulb", [opr1]) -> Imul (dst(RegOp AL, Some 1L), src(RegOp AL, Some 1L), src(opr1, Some 1L))
+      | ("mulw", [opr1]) -> Imul (dst(RegOp AX, Some 2L), src(RegOp AX, Some 2L), src(opr1, Some 2L))
+      | ("mull", [opr1]) -> Imul (dst(RegOp EAX, Some 4L), src(RegOp EAX, Some 4L), src(opr1, Some 4L))
+      | ("mulq", [opr1]) -> Imul (dst(RegOp RAX, Some 8L), src(RegOp RAX, Some 8L), src(opr1, Some 8L))
+      | ("imul", [opr1; opr2]) -> Imul (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("imulb", [opr1; opr2]) -> Imul (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("imulw", [opr1; opr2]) -> Imul (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("imull", [opr1; opr2]) -> Imul (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("imulq", [opr1; opr2]) -> Imul (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("imul", [opr0; opr1; opr2]) -> Imul (dst(opr2, dirty_op_size), src(opr1, dirty_op_size), src(opr0, dirty_op_size))
+      | ("imulb", [opr0; opr1; opr2]) -> Imul (dst(opr2, Some 1L), src(opr1, Some 1L), src(opr0, Some 1L))
+      | ("imulw", [opr0; opr1; opr2]) -> Imul (dst(opr2, Some 2L), src(opr1, Some 2L), src(opr0, Some 2L))
+      | ("imull", [opr0; opr1; opr2]) -> Imul (dst(opr2, Some 4L), src(opr1, Some 4L), src(opr0, Some 4L))
+      | ("imulq", [opr0; opr1; opr2]) -> Imul (dst(opr2, Some 8L), src(opr1, Some 8L), src(opr0, Some 8L))
       | ("sal", [opr1; opr2]) -> Sal (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("salb", [opr1; opr2]) -> Sal (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("salw", [opr1; opr2]) -> Sal (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
       | ("sall", [opr1; opr2]) -> Sal (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("salq", [opr1; opr2]) -> Sal (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("sal", [opr2]) -> Sal (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(ImmOp (ImmNum 1L), dirty_op_size))
+      | ("salb", [opr2]) -> Sal (dst(opr2, Some 1L), src(opr2, Some 1L), src(ImmOp (ImmNum 1L), Some 1L))
+      | ("salw", [opr2]) -> Sal (dst(opr2, Some 2L), src(opr2, Some 2L), src(ImmOp (ImmNum 1L), Some 2L))
+      | ("sall", [opr2]) -> Sal (dst(opr2, Some 4L), src(opr2, Some 4L), src(ImmOp (ImmNum 1L), Some 4L))
+      | ("salq", [opr2]) -> Sal (dst(opr2, Some 8L), src(opr2, Some 8L), src(ImmOp (ImmNum 1L), Some 8L))
       | ("sar", [opr1; opr2]) -> Sar (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("sarb", [opr1; opr2]) -> Sar (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("sarw", [opr1; opr2]) -> Sar (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
       | ("sarl", [opr1; opr2]) -> Sar (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("sarq", [opr1; opr2]) -> Sar (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
-      | ("shrl", [opr1; opr2])   -> Shr (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
-      | ("shrq", [opr1; opr2])   -> Shr (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("sar", [opr2]) -> Sar (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(ImmOp (ImmNum 1L), dirty_op_size))
+      | ("sarb", [opr2]) -> Sar (dst(opr2, Some 1L), src(opr2, Some 1L), src(ImmOp (ImmNum 1L), Some 1L))
+      | ("sarw", [opr2]) -> Sar (dst(opr2, Some 2L), src(opr2, Some 2L), src(ImmOp (ImmNum 1L), Some 2L))
+      | ("sarl", [opr2]) -> Sar (dst(opr2, Some 4L), src(opr2, Some 4L), src(ImmOp (ImmNum 1L), Some 4L))
+      | ("sarq", [opr2]) -> Sar (dst(opr2, Some 8L), src(opr2, Some 8L), src(ImmOp (ImmNum 1L), Some 8L))
+      | ("shr", [opr1; opr2]) -> Shr (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("shrb", [opr1; opr2]) -> Shr (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("shrw", [opr1; opr2]) -> Shr (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("shrl", [opr1; opr2]) -> Shr (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("shrq", [opr1; opr2]) -> Shr (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("shr", [opr2]) -> Shr (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(ImmOp (ImmNum 1L), dirty_op_size))
+      | ("shrb", [opr2]) -> Shr (dst(opr2, Some 1L), src(opr2, Some 1L), src(ImmOp (ImmNum 1L), Some 1L))
+      | ("shrw", [opr2]) -> Shr (dst(opr2, Some 2L), src(opr2, Some 2L), src(ImmOp (ImmNum 1L), Some 2L))
+      | ("shrl", [opr2]) -> Shr (dst(opr2, Some 4L), src(opr2, Some 4L), src(ImmOp (ImmNum 1L), Some 4L))
+      | ("shrq", [opr2]) -> Shr (dst(opr2, Some 8L), src(opr2, Some 8L), src(ImmOp (ImmNum 1L), Some 8L))
+      | ("rol", [opr1; opr2]) -> Rol (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("rolb", [opr1; opr2]) -> Rol (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("rolw", [opr1; opr2]) -> Rol (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("roll", [opr1; opr2]) -> Rol (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("rolq", [opr1; opr2]) -> Rol (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("rol", [opr2]) -> Rol (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(ImmOp (ImmNum 1L), dirty_op_size))
+      | ("rolb", [opr2]) -> Rol (dst(opr2, Some 1L), src(opr2, Some 1L), src(ImmOp (ImmNum 1L), Some 1L))
+      | ("rolw", [opr2]) -> Rol (dst(opr2, Some 2L), src(opr2, Some 2L), src(ImmOp (ImmNum 1L), Some 2L))
+      | ("roll", [opr2]) -> Rol (dst(opr2, Some 4L), src(opr2, Some 4L), src(ImmOp (ImmNum 1L), Some 4L))
+      | ("rolq", [opr2]) -> Rol (dst(opr2, Some 8L), src(opr2, Some 8L), src(ImmOp (ImmNum 1L), Some 8L))
+      | ("ror", [opr1; opr2]) -> Ror (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("rorb", [opr1; opr2]) -> Ror (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("rorw", [opr1; opr2]) -> Ror (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("rorl", [opr1; opr2]) -> Ror (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("rorq", [opr1; opr2]) -> Ror (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("ror", [opr2]) -> Ror (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(ImmOp (ImmNum 1L), dirty_op_size))
+      | ("rorb", [opr2]) -> Ror (dst(opr2, Some 1L), src(opr2, Some 1L), src(ImmOp (ImmNum 1L), Some 1L))
+      | ("rorw", [opr2]) -> Ror (dst(opr2, Some 2L), src(opr2, Some 2L), src(ImmOp (ImmNum 1L), Some 2L))
+      | ("rorl", [opr2]) -> Ror (dst(opr2, Some 4L), src(opr2, Some 4L), src(ImmOp (ImmNum 1L), Some 4L))
+      | ("rorq", [opr2]) -> Ror (dst(opr2, Some 8L), src(opr2, Some 8L), src(ImmOp (ImmNum 1L), Some 8L))
       | ("xor", [opr1; opr2]) -> Xor (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("xorb", [opr1; opr2]) -> Xor (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("xorw", [opr1; opr2]) -> Xor (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
       | ("xorl", [opr1; opr2]) -> Xor (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("xorq", [opr1; opr2]) -> Xor (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
       | ("not", [opr]) -> Not (dst(opr, dirty_op_size), src(opr, dirty_op_size))
+      | ("notb", [opr]) -> Not (dst(opr, Some 1L), src(opr, Some 1L))
+      | ("notw", [opr]) -> Not (dst(opr, Some 2L), src(opr, Some 2L))
+      | ("notl", [opr]) -> Not (dst(opr, Some 4L), src(opr, Some 4L))
       | ("notq", [opr]) -> Not (dst(opr, Some 8L), src(opr, Some 8L))
       | ("and", [opr1; opr2]) -> And (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("andb", [opr1; opr2]) -> And (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
       | ("andw", [opr1; opr2]) -> And (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
       | ("andl", [opr1; opr2]) -> And (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
       | ("andq", [opr1; opr2]) -> And (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("or", [opr1; opr2]) -> Or (dst(opr2, dirty_op_size), src(opr2, dirty_op_size), src(opr1, dirty_op_size))
+      | ("orb", [opr1; opr2]) -> Or (dst(opr2, Some 1L), src(opr2, Some 1L), src(opr1, Some 1L))
+      | ("orw", [opr1; opr2]) -> Or (dst(opr2, Some 2L), src(opr2, Some 2L), src(opr1, Some 2L))
+      | ("orl", [opr1; opr2]) -> Or (dst(opr2, Some 4L), src(opr2, Some 4L), src(opr1, Some 4L))
+      | ("orq", [opr1; opr2]) -> Or (dst(opr2, Some 8L), src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("bswap", [opr]) -> Bswap (dst(opr, Some 8L))
+      | ("rep", [LabelOp label]) ->
+          if label = "stosq" then RepStosq 
+          else if label = "movsq" then RepMovsq 
+          else begin
+            Printf.printf "rep %s\n" label;
+            parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+          end
       | ("cmp", [opr1; opr2]) -> Cmp (src(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("cmpb", [opr1; opr2]) -> Cmp (src(opr2, Some 1L), src(opr1, Some 1L))
       | ("cmpw", [opr1; opr2]) -> Cmp (src(opr2, Some 2L), src(opr1, Some 2L))
       | ("cmpl", [opr1; opr2]) -> Cmp (src(opr2, Some 4L), src(opr1, Some 4L))
       | ("cmpq", [opr1; opr2]) -> Cmp (src(opr2, Some 8L), src(opr1, Some 8L))
+      | ("test", [opr1; opr2]) -> Test (src(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("testb", [opr1; opr2]) -> Test (src(opr2, Some 1L), src(opr1, Some 1L))
       | ("testw", [opr1; opr2]) -> Test (src(opr2, Some 2L), src(opr1, Some 2L))
       | ("testl", [opr1; opr2]) -> Test (src(opr2, Some 4L), src(opr1, Some 4L))
@@ -354,13 +459,18 @@ module Parser = struct
       | ("jmp", [LabelOp lb]) -> Jmp (lb)
       | ("je", [LabelOp lb]) -> Jcond (lb, JE)
       | ("jne", [LabelOp lb]) -> Jcond (lb, JNe)
-      | ("jbe", [LabelOp lb]) -> Jcond (lb, JLe) (* TODO: Note that this is not correct, just for quick test only *)
-      | ("jb", [LabelOp lb]) -> Jcond (lb, JL) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jbe", [LabelOp lb]) -> Jcond (lb, JBe) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jb", [LabelOp lb]) -> Jcond (lb, JB) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jnb", [LabelOp lb]) -> Jcond (lb, JAe)  (* TODO: Note that this is not correct, just for quick test only *)
       | ("call", [LabelOp lb]) -> Call (lb)
       | ("ret", []) -> Jmp (Isa.ret_label)
       | ("pushq", [opr]) -> Push (src(opr, Some 8L))
       | ("popq", [opr]) -> Pop (src(opr, Some 8L))
-      | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+      | ("syscall", []) -> Syscall
+      | ("hlt", []) -> Hlt
+      | _ -> 
+        Printf.printf "%s %d\n" mnemonic (List.length operands);
+        parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
     in
     imm_var_map, inst
 
@@ -380,30 +490,79 @@ module Parser = struct
     ) imm_var_map (List.tl lines) in
     (imm_var_map, func), {
       label = label; 
-      func = Option.get func;
-      rsp_offset = 0L;
       insts = insts
     }
 
-  let parse_program (source: string) : Isa.program =
+  let filter_compiler_annotation (source: string) : bool =
+    if String.length source < 2 then true
+    else
+      let s = String.sub source 0 2 in
+      s = "\t."
+
+  let split_on_chars sep_list (s: string) : string list =
+    let helper (s: string list) sep : string list =
+      List.concat (List.map (String.split_on_char sep) s)
+    in
+    List.fold_left helper [ s ] sep_list
+
+  let parse_program (source: string) : Isa.prog =
     let lines = source
       (* Split lines *)
-      |> String.split_on_char '\n'
+      (* |> String.split_on_char '\n' *)
+      |> split_on_chars [ '\n'; ';' ]
       (* Remove empty lines and comment lines *)
       |> List.filter_map (fun line ->
-           let first_sharp = String.index_opt line '#' in
-           let line = if first_sharp <> None then
-             String.sub line 0 (Option.get first_sharp)
-           else
-             line
-           in
-           let line = String.trim line in
-           if line = "" then None
-           else Some(line)
+          if filter_compiler_annotation line then None 
+          else begin
+            let first_sharp = String.index_opt line '#' in
+            let line = if first_sharp <> None then
+              String.sub line 0 (Option.get first_sharp)
+            else
+              line
+            in
+            let line = String.trim line in
+            if line = "" then None
+            else Some(line)
+          end
          )
     in
+    (* Printf.printf "Remain len %d\n" (List.length lines);
+    List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
+    let is_label (line: string) : bool =
+      line.[(String.length line) - 1] = ':'
+    in
+    (* We assume function label does not start with "."! *)
+    let is_func_label (line: string) : bool =
+      (is_label line) && line.[0] <> '.'
+    in
+    let rec spliter_helper is_start bb acc_bb lines =
+      match lines with
+      | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
+      | line :: lines ->
+          if is_start line then
+            spliter_helper is_start [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb) lines
+          else
+            spliter_helper is_start (line :: bb) acc_bb lines
+    in
     (* Split lines into basic blocks *)
-    let rec bb_spliter lines bb acc_bb =
+    let bb_spliter = spliter_helper is_label in
+    let func_spliter lines =
+      let func_str_list = spliter_helper is_func_label [] [] lines in
+      List.map (bb_spliter [] []) func_str_list
+    in
+    let func_list = func_spliter lines in
+    let imm_var_map, func_list =
+      let helper 
+          (imm_var_map: Isa.imm_var_map) (bbs: string list list) :
+          Isa.imm_var_map * Isa.func =
+        let (imm_var_map, func_name), bbs =
+          List.fold_left_map parse_basic_block (imm_var_map, None) bbs
+        in
+        imm_var_map, { name = Option.get func_name; body = bbs }
+      in
+      List.fold_left_map helper Isa.StrM.empty func_list
+    in
+    (* let rec bb_spliter lines bb acc_bb =
       match lines with
       | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
       | line :: lines ->
@@ -412,9 +571,9 @@ module Parser = struct
           else bb_spliter lines [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
     in
     let bbs = bb_spliter lines [] [] in
-    let (imm_var_map, func), bbs = List.fold_left_map (
+    let (imm_var_map, _), bbs = List.fold_left_map (
       fun info bb -> parse_basic_block info bb
-    ) (Isa.StrM.empty, None) bbs in
+    ) (Isa.StrM.empty, None) bbs in *)
 
     (* add jmp for two adjacent basic blocks if the previous one does not end with ret *)
     let rec add_jmp_for_adj_bb (bbs: Isa.basic_block list) (acc: Isa.basic_block list) =
@@ -428,9 +587,19 @@ module Parser = struct
           in
           add_jmp_for_adj_bb (bb2 :: bbs) (bb1 :: acc)
     in
-    let bbs = add_jmp_for_adj_bb bbs [] in
+    let func_list = List.map (
+      fun (func: Isa.func) ->
+        { func with body = add_jmp_for_adj_bb func.body []}
+    ) func_list in
+    (* let bbs = add_jmp_for_adj_bb bbs [] in *)
     let get_ret_bb : Isa.basic_block =
-      { label = Isa.ret_label; func = Option.get func; rsp_offset = 0L; insts = [] } in
-    {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map}
+      { label = Isa.ret_label; insts = [] } in
+    let func_list = List.map (
+      fun (func: Isa.func) ->
+        { func with body = func.body @ [get_ret_bb] }
+    ) func_list
+    in
+    { funcs = func_list; imm_var_map = imm_var_map }
+    (* {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map} *)
 
 end

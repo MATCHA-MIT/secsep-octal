@@ -1,4 +1,5 @@
 (* ISA interface *)
+open Pretty_print
 
 module Isa = struct
   (* TODO: Other exception on isa side *)
@@ -21,6 +22,86 @@ module Isa = struct
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
     (* | R0 *)
+
+  let fix_reg_size (r: register) (s: int64) : register =
+    if s = 1L then
+      match r with
+      | RAX | EAX | AX | AL -> AL
+      | RCX | ECX | CX | CL -> CL
+      | RDX | EDX | DX | DL -> DL
+      | RBX | EBX | BX | BL -> BL
+      | RSP | ESP | SP | SPL -> SPL
+      | RBP | EBP | BP | BPL -> BPL
+      | RSI | ESI | SI | SIL -> SIL
+      | RDI | EDI | DI | DIL -> DIL
+      | R8 | R8D | R8W | R8B -> R8B
+      | R9 | R9D | R9W | R9B -> R9B
+      | R10 | R10D | R10W | R10B -> R10B
+      | R11 | R11D | R11W | R11B -> R11B
+      | R12 | R12D | R12W | R12B -> R12B
+      | R13 | R13D | R13W | R13B -> R13B
+      | R14 | R14D | R14W | R14B -> R14B
+      | R15 | R15D | R15W | R15B -> R15B
+      | _ -> isa_error "should not use high 1-byte reg"
+    else if s = 2L then
+      match r with
+      | RAX | EAX | AX | AL -> AX
+      | RCX | ECX | CX | CL -> CX
+      | RDX | EDX | DX | DL -> DX
+      | RBX | EBX | BX | BL -> BX
+      | RSP | ESP | SP | SPL -> SP
+      | RBP | EBP | BP | BPL -> BP
+      | RSI | ESI | SI | SIL -> SI
+      | RDI | EDI | DI | DIL -> DI
+      | R8 | R8D | R8W | R8B -> R8W
+      | R9 | R9D | R9W | R9B -> R9W
+      | R10 | R10D | R10W | R10B -> R10W
+      | R11 | R11D | R11W | R11B -> R11W
+      | R12 | R12D | R12W | R12B -> R12W
+      | R13 | R13D | R13W | R13B -> R13W
+      | R14 | R14D | R14W | R14B -> R14W
+      | R15 | R15D | R15W | R15B -> R15W
+      | _ -> isa_error "should not use high 1-byte reg"
+    else if s = 4L then
+      match r with
+      | RAX | EAX | AX | AL -> EAX
+      | RCX | ECX | CX | CL -> ECX
+      | RDX | EDX | DX | DL -> EDX
+      | RBX | EBX | BX | BL -> EBX
+      | RSP | ESP | SP | SPL -> ESP
+      | RBP | EBP | BP | BPL -> EBP
+      | RSI | ESI | SI | SIL -> ESI
+      | RDI | EDI | DI | DIL -> EDI
+      | R8 | R8D | R8W | R8B -> R8D
+      | R9 | R9D | R9W | R9B -> R9D
+      | R10 | R10D | R10W | R10B -> R10D
+      | R11 | R11D | R11W | R11B -> R11D
+      | R12 | R12D | R12W | R12B -> R12D
+      | R13 | R13D | R13W | R13B -> R13D
+      | R14 | R14D | R14W | R14B -> R14D
+      | R15 | R15D | R15W | R15B -> R15D
+      | _ -> isa_error "should not use high 1-byte reg"
+    else if s = 8L then
+      match r with
+      | RAX | EAX | AX | AL -> RAX
+      | RCX | ECX | CX | CL -> RCX
+      | RDX | EDX | DX | DL -> RDX
+      | RBX | EBX | BX | BL -> RBX
+      | RSP | ESP | SP | SPL -> RSP
+      | RBP | EBP | BP | BPL -> RBP
+      | RSI | ESI | SI | SIL -> RSI
+      | RDI | EDI | DI | DIL -> RDI
+      | R8 | R8D | R8W | R8B -> R8
+      | R9 | R9D | R9W | R9B -> R9
+      | R10 | R10D | R10W | R10B -> R10
+      | R11 | R11D | R11W | R11B -> R11
+      | R12 | R12D | R12W | R12B -> R12
+      | R13 | R13D | R13W | R13B -> R13
+      | R14 | R14D | R14W | R14B -> R14
+      | R15 | R15D | R15W | R15B -> R15
+      | _ -> isa_error "should not use high 1-byte reg"
+    else
+      isa_error "invalid register size"
 
   let get_reg_idx (r: register) = 
     match r with
@@ -115,21 +196,31 @@ module Isa = struct
 
   type branch_cond =
     | JNe | JE | JL | JLe | JG | JGe
+    | JB | JBe | JA | JAe
 
   type instruction =
     | Mov of operand * operand
     | MovS of operand * operand
     | MovZ of operand * operand
+    | Xchg of operand * operand
     | Lea of operand * operand
     | Add of operand * operand * operand
+    | Adc of operand * operand * operand (* Add and carry, our type checker does not calculate on this, just set dest as top *)
     | Sub of operand * operand * operand
+    | Mul of operand * operand * operand
+    | Imul of operand * operand * operand
     | Sal of operand * operand * operand
     | Sar of operand * operand * operand
     | Shr of operand * operand * operand
+    | Rol of operand * operand * operand
+    | Ror of operand * operand * operand
     | Xor of operand * operand * operand
     | Not of operand * operand
     | And of operand * operand * operand
     | Or of operand * operand * operand
+    | Bswap of operand
+    | RepStosq
+    | RepMovsq
     | Cmp of operand * operand
     | Test of operand * operand
     | Jmp of label
@@ -139,12 +230,22 @@ module Isa = struct
     | Pop of operand
     | Ret
     | Nop
+    | Syscall
+    | Hlt
 
   type basic_block = {
     label: label;
-    func: label;
-    rsp_offset: int64;
     insts: instruction list;
+  }
+
+  type func = {
+    name: label;
+    body: basic_block list;
+  }
+
+  type prog = {
+    funcs: func list;
+    imm_var_map: imm_var_map;
   }
 
   type program = {
@@ -158,7 +259,8 @@ module Isa = struct
     match m with
     | "call"
     | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge"
-    | "jbe" | "jb" -> true
+    | "jbe" | "jb" | "jnb" -> true
+    | "rep" -> true (* dirty impl *)
     | _ -> false
 
   let inst_is_uncond_jump (inst: instruction) : bool =
@@ -171,16 +273,25 @@ module Isa = struct
     | Mov _ -> "mov"
     | MovS _ -> "movs"
     | MovZ _ -> "movz"
+    | Xchg _ -> "xchg"
     | Lea _ -> "lea"
     | Add _ -> "add"
+    | Adc _ -> "adc"
     | Sub _ -> "sub"
+    | Mul _ -> "mul"
+    | Imul _ -> "imul"
     | Sal _ -> "sal"
     | Sar _ -> "sar"
     | Shr _ -> "shr"
+    | Rol _ -> "rol"
+    | Ror _ -> "ror"
     | Xor _ -> "xor"
     | Not _ -> "not"
     | And _ -> "and"
     | Or _ -> "or"
+    | Bswap _ -> "bswap"
+    | RepStosq -> "rep stosq"
+    | RepMovsq -> "rep movsq"
     | Cmp _ -> "cmp"
     | Test _ -> "test"
     | Jmp _ -> "jmp"
@@ -193,12 +304,18 @@ module Isa = struct
         | JLe -> "jle"
         | JG -> "jg"
         | JGe -> "jge"
+        | JB -> "jb"
+        | JBe -> "jbe"
+        | JA -> "ja"
+        | JAe -> "jae"
       end
     | Call _ -> "call"
     | Push _ -> "push"
     | Pop _ -> "pop"
     | Ret -> "ret"
     | Nop -> "nop"
+    | Syscall -> "syscall"
+    | Hlt -> "hlt"
 
   let get_op_list (inst: instruction) : operand list =
     match inst with
@@ -209,5 +326,19 @@ module Isa = struct
     | And (op0, op1, op2) | Or (op0, op1, op2) -> [op0; op1; op2]
     | Push op | Pop op -> [op]
     | _ -> []
+
+  let pp_prog (lvl: int) (p: prog) =
+    PP.print_lvl lvl "Prog\n";
+    List.iteri (
+      fun i func -> 
+        PP.print_lvl lvl "<Func %d %s>\n" i func.name;
+        List.iter (
+          fun bb ->
+            PP.print_lvl (lvl + 1) "%s\n" bb.label;
+            List.iter (
+              fun inst -> PP.print_lvl (lvl + 2) "%s\n" (mnemonic_of_instruction inst)
+            ) bb.insts
+        ) func.body
+    ) p.funcs
 
 end

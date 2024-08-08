@@ -450,6 +450,7 @@ module StateType = struct
         | JLe -> CondType.CondLe ((cond_left, cond_left), (cond_right, cond_right), curr_state.cond_hist)
         | JG -> CondType.CondLq ((cond_right, cond_right), (cond_left, cond_left), curr_state.cond_hist)
         | JGe -> CondType.CondLe ((cond_right, cond_right), (cond_left, cond_left), curr_state.cond_hist)
+        | _ -> state_type_error "cond not implemented"
         end in
       let new_cond_list, new_cond_idx = CondType.add_cond_type cond_list new_cond false in
       (add_state_type_cond curr_state new_cond_idx, new_cond_list, unknown_addr_list, constraint_set, useful_var_set,
