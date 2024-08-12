@@ -331,3 +331,11 @@ module MemOffset = struct
     check_compliance smt_ctx [(l1, l2, true); (r2, r1, true)]
 
 end
+
+module MemRange = struct
+  exception MemRangeError of string
+  let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
+
+  type t = MemOffset.t list
+
+end

@@ -8,8 +8,12 @@
  ; (modes byte)
  ; (deps ../asm/salsa20_annotated.s ../asm/demo.s ../asm/sha512_block_data_order.s ../asm/sha512_final_impl.s ../asm/double_layer.s)
 
- (name test_parse_multi_func)
- (libraries type)
+ ; (name test_parse_multi_func)
+ ; (libraries type)
+ ; (modes byte)
+
+ (name test_learn_z3)
+ (libraries z3)
  (modes byte)
 
  ; (name test_single_exp)
