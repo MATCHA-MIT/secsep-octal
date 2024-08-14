@@ -18,8 +18,8 @@ module CondType = struct
     match cond with
     | CondNe (l, r, c) -> CondEq (l, r, c)
     | CondEq (l, r, c) -> CondNe (l, r, c)
-    | CondLq (l, r, c) -> CondLq (r, l, c)
-    | CondLe (l, r, c) -> CondLe (r, l, c)
+    | CondLq (l, r, c) -> CondLe (r, l, c) (* !(a<b) = (a>=b)*)
+    | CondLe (l, r, c) -> CondLq (r, l, c)
 
   let get_cond_idx (idx: int) (taken: bool) : int =
     if taken then idx * 2 + 1
