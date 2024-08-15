@@ -144,7 +144,7 @@ module ProgType = struct
       let new_state_type = StateType.set_default_cond_type new_state_type inst in
       let new_tv_rel = SubType.add_type_var_rel_opt acc_tv_rel acc_pc_dest_idx new_var_type_opt in
       match inst with
-      | Jcond (target_label, _) ->
+      | Jcond (_, target_label) ->
         let taken_state_type = StateType.add_state_type_cond acc_state_type ((List.length new_cond_list) * 2 + 1) in
         let target_state_type = get_label_type code_type target_label in
         let new_tv_rel = SubType.add_sub_state_type new_tv_rel taken_state_type target_state_type in

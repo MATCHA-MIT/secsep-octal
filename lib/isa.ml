@@ -7,6 +7,19 @@ module Isa = struct
 
   let isa_error msg = raise (IsaError ("[Isa Error] " ^ msg))
 
+  let string_is_sth (map: (string * 'a) list) (m: string) : bool =
+    List.find_opt (fun (opcode, _) -> opcode = m) map != None
+
+  let string_of_sth (map: (string * 'a) list) (op: 'a) : string option =
+    List.find_map
+      (fun (str, o) -> if o = op then Some str else None)
+      map
+
+  let string_to_sth (map: (string * 'a) list) (opcode: string) : 'a option =
+    List.find_map
+      (fun (str, o) -> if str = opcode then Some o else None)
+      map
+
   type label = string
 
   let ret_label = ".Ret"
@@ -22,6 +35,28 @@ module Isa = struct
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
     (* | R0 *)
+
+  let reg_map = [
+    ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
+    ("rcx", RCX); ("ecx", ECX); ("cx", CX); ("ch", CH); ("cl", CL);
+    ("rdx", RDX); ("edx", EDX); ("dx", DX); ("dh", DH); ("dl", DL);
+    ("rbx", RBX); ("ebx", EBX); ("bx", BX); ("bh", BH); ("bl", BL);
+    ("rsp", RSP); ("esp", ESP); ("sp", SP); ("spl", SPL);
+    ("rbp", RBP); ("ebp", EBP); ("bp", BP); ("sbl", BPL);
+    ("rsi", RSI); ("esi", ESI); ("si", SI); ("sil", SIL);
+    ("rdi", RDI); ("edi", EDI); ("di", DI); ("dil", DIL);
+    ("r8", R8); ("r8d", R8D); ("r8w", R8W); ("r8b", R8B);
+    ("r9", R9); ("r9d", R9D); ("r9w", R9W); ("r9b", R9B);
+    ("r10", R10); ("r10d", R10D); ("r10w", R10W); ("r10b", R10B);
+    ("r11", R11); ("r11d", R11D); ("r11w", R11W); ("r11b", R11B);
+    ("r12", R12); ("r12d", R12D); ("r12w", R12W); ("r12b", R12B);
+    ("r13", R13); ("r13d", R13D); ("r13w", R13W); ("r13b", R13B);
+    ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
+    ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
+  ]
+
+  let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
+  let string_to_reg = string_to_sth reg_map
 
   let fix_reg_size (r: register) (s: int64) : register =
     if s = 1L then
@@ -176,6 +211,8 @@ module Isa = struct
     | Scale4 -> 4L
     | Scale8 -> 8L
 
+  let scale_to_string (s: scale) : string = Int64.to_string (scale_val s)
+
   type operand =
     | ImmOp of immediate
     | RegOp of register
@@ -183,6 +220,29 @@ module Isa = struct
     | LdOp of immediate option * register option * register option * scale option * int64
     | StOp of immediate option * register option * register option * scale option * int64
     | LabelOp of label
+
+  let string_of_option (to_string: 'a -> string) (x: 'a option) : string =
+    match x with
+    | Some x -> to_string x
+    | None -> ""
+
+  let rec string_of_operand (op: operand): string =
+    match op with
+    | ImmOp imm -> string_of_immediate imm
+    | RegOp r -> string_of_reg r
+    | MemOp (disp, base, index, scale) ->
+      let disp_str = string_of_option string_of_immediate disp in
+      let base_str = string_of_option string_of_reg base in
+      let index_str = string_of_option string_of_reg index in
+      let scale_str = string_of_option scale_to_string (scale) in
+      Printf.sprintf "%s(%s,%s,%s)" disp_str base_str index_str scale_str
+    | LdOp (disp, base, index, scale, size) ->
+      let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
+      Printf.sprintf "Ld(%s,%s)" addr_str (Int64.to_string size)
+    | StOp (disp, base, index, scale, size) ->
+      let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
+      Printf.sprintf "St(%s,%s)" addr_str (Int64.to_string size)
+    | LabelOp label -> label
 
   let get_op_size (op: operand) : int64 =
     match op with
@@ -271,30 +331,17 @@ module Isa = struct
     ("jcxz", JOther); ("jecxz", JOther);
   ]
 
-  let opcode_is_some_op (opcode_map: (string * 'a) list) (m: string) : bool =
-    List.find_opt (fun (opcode, _) -> opcode = m) opcode_map != None
-
-  let opcode_is_binst = opcode_is_some_op bop_opcode_map
-  let opcode_is_uinst = opcode_is_some_op uop_opcode_map
-  let opcode_is_cond_jump = opcode_is_some_op cond_jump_opcode_map
-
-  let opcode_of_some_op (opcode_map: (string * 'a) list) (op: 'a) : string option =
-    List.find_map
-      (fun (str, o) -> if o = op then Some str else None)
-      opcode_map
+  let opcode_is_binst = string_is_sth bop_opcode_map
+  let opcode_is_uinst = string_is_sth uop_opcode_map
+  let opcode_is_cond_jump = string_is_sth cond_jump_opcode_map
   
-  let opcode_of_binst = opcode_of_some_op bop_opcode_map
-  let opcode_of_uinst = opcode_of_some_op uop_opcode_map
-  let opcode_of_cond_jump = opcode_of_some_op cond_jump_opcode_map
-
-  let op_of_some_opcode (opcode_map: (string * 'a) list) (opcode: string) : 'a option =
-    List.find_map
-      (fun (str, o) -> if str = opcode then Some o else None)
-      opcode_map
+  let opcode_of_binst = string_of_sth bop_opcode_map
+  let opcode_of_uinst = string_of_sth uop_opcode_map
+  let opcode_of_cond_jump = string_of_sth cond_jump_opcode_map
   
-  let op_of_binst = op_of_some_opcode bop_opcode_map
-  let op_of_uinst = op_of_some_opcode uop_opcode_map
-  let op_of_cond_jump = op_of_some_opcode cond_jump_opcode_map
+  let op_of_binst = string_to_sth bop_opcode_map
+  let op_of_uinst = string_to_sth uop_opcode_map
+  let op_of_cond_jump = string_to_sth cond_jump_opcode_map
 
   type instruction =
     (* | Mov of operand * operand
@@ -303,16 +350,16 @@ module Isa = struct
     | Lea of operand * operand *)
     | BInst of bop * operand * operand * operand
     | UInst of uop * operand * operand
-    | Xchg of operand * operand
-    | RepStosq
-    | RepMovsq
+    | Xchg of operand * operand * operand * operand
     | Cmp of operand * operand
     | Test of operand * operand
+    | Push of operand
+    | Pop of operand
+    | RepStosq
+    | RepMovsq
     | Jmp of label
     | Jcond of branch_cond * label
     | Call of label
-    | Push of operand
-    | Pop of operand
     | Ret
     | Nop
     | Syscall
@@ -369,11 +416,13 @@ module Isa = struct
       | Some s -> s
       | None -> isa_error "cannot find opcode for a uop"
       end
+    | Cmp _ -> "cmp"
+    | Test _ -> "test"
+    | Push _ -> "push"
+    | Pop _ -> "pop"
     | Xchg _ -> "xchg"
     | RepStosq -> "rep stosq"
     | RepMovsq -> "rep movsq"
-    | Cmp _ -> "cmp"
-    | Test _ -> "test"
     | Jmp _ -> "jmp"
     | Jcond (cond, _) ->
       begin match opcode_of_cond_jump cond with
@@ -381,8 +430,49 @@ module Isa = struct
       | None -> isa_error "cannot find opcode for a cond jump"
       end
     | Call _ -> "call"
-    | Push _ -> "push"
-    | Pop _ -> "pop"
+    | Ret -> "ret"
+    | Nop -> "nop"
+    | Syscall -> "syscall"
+    | Hlt -> "hlt"
+
+  let string_of_instruction (inst: instruction) : string =
+    let get_tab (opcode: string): string =
+      if String.length opcode <= 3 then "\t\t" else "\t"
+    in
+    match inst with
+    | BInst (bop, dst, src2, src1) ->
+      begin match opcode_of_binst bop with
+      | Some opcode -> 
+        Printf.sprintf 
+          "%s%s%s\t<-\t%s,\t%s" 
+          opcode (get_tab opcode) (string_of_operand dst) (string_of_operand src2) (string_of_operand src1)
+      | None -> isa_error "cannot find opcode for a bop"
+      end
+    | UInst (uop, dst, src) ->
+      begin match opcode_of_uinst uop with
+      | Some opcode ->
+        Printf.sprintf 
+            "%s%s%s\t<-\t%s" 
+            opcode (get_tab opcode) (string_of_operand dst) (string_of_operand src)
+      | None -> isa_error "cannot find opcode for a uop"
+      end
+    | Cmp (src2, src1) ->
+      Printf.sprintf "cmp\t\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
+    | Test (src2, src1) ->
+      Printf.sprintf "test\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
+    | Push src -> Printf.sprintf "push\t%s" (string_of_operand src)
+    | Pop src -> Printf.sprintf "pop\t\t%s" (string_of_operand src)
+    | Xchg (dst2, dst1, _, _) -> 
+      Printf.sprintf "xchg\t%s,\t%s" (string_of_operand dst2) (string_of_operand dst1)
+    | RepStosq -> "rep stosq"
+    | RepMovsq -> "rep movsq"
+    | Jmp label -> Printf.sprintf "jmp\t\t%s" label
+    | Jcond (cond, label) ->
+      begin match opcode_of_cond_jump cond with
+      | Some opcode -> Printf.sprintf "%s\t\t%s" opcode label
+      | None -> isa_error "cannot find opcode for a cond jump"
+      end
+    | Call label -> Printf.sprintf "call\t\t%s" label
     | Ret -> "ret"
     | Nop -> "nop"
     | Syscall -> "syscall"
@@ -407,7 +497,7 @@ module Isa = struct
           fun bb ->
             PP.print_lvl (lvl + 1) "%s\n" bb.label;
             List.iter (
-              fun inst -> PP.print_lvl (lvl + 2) "%s\n" (mnemonic_of_instruction inst)
+              fun inst -> PP.print_lvl (lvl + 2) "%s\n" (string_of_instruction inst)
             ) bb.insts
         ) func.body
     ) p.funcs
