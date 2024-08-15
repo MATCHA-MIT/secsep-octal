@@ -1,9 +1,10 @@
 open Pretty_print
-(* open Smt_emitter *)
+open Smt_emitter
 open Isa
 open Single_exp
 open Entry_type
 open Mem_offset
+open Constraint
 (* open Arch_type *)
 
 module MemKeySet = struct
@@ -78,5 +79,24 @@ module MemType (Entry: EntryType) = struct
     let addr_constraint = MemOffset.check_offset smt_ctx addr_offset in
     match base_opt with
     |  *)
+
+  let get_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (mem: t)
+      (addr_offset: MemOffset.t) :
+      (MemOffset.t * MemRange.t * entry_t) option =
+    let _, _, _ = smt_ctx, mem, addr_offset in
+    None
+    (* TODO!!! *)
+
+  let set_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (mem: t)
+      (addr_offset: MemOffset.t)
+      (new_type: entry_t) :
+      (t * (Constraint.t list)) option =
+    let _, _, _, _ = smt_ctx, mem, addr_offset, new_type in
+    None
+    (* TODO!!! *)
 
 end

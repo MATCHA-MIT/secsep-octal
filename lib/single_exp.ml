@@ -320,4 +320,42 @@ module SingleExp = struct
       if diff <= 0L then Some e1 else Some e2
     | _ -> None
 
+  let rec get_vars (e: t) : SingleVarSet.t =
+    match e with
+    | SingleVar x -> SingleVarSet.singleton x
+    | SingleBExp (_, e1, e2) -> SingleVarSet.union (get_vars e1) (get_vars e2)
+    | SingleUExp (_, e) -> get_vars e
+    | _ -> SingleVarSet.empty
+
+  let rec get_imm_type (i: Isa.immediate) : t =
+    match i with
+    | ImmNum v -> SingleConst v
+    | ImmLabel v -> SingleVar v
+    | ImmBExp (i1, i2) -> SingleBExp (SingleAdd, get_imm_type i1, get_imm_type i2)
+
+  let get_mem_op_type
+      (disp: Isa.immediate option) (base: t option)
+      (index: t option) (scale: int64) : t =
+    let disp_type = 
+      match disp with
+      | Some d -> get_imm_type d
+      | None -> get_imm_type (ImmNum 0L)
+    in
+    let base_type =
+      match base with
+      | Some b -> b
+      | None -> get_imm_type (ImmNum 0L)
+    in
+    let index_type =
+      match index with
+      | Some i -> i
+      | None -> get_imm_type (ImmNum 0L)
+    in
+    eval (
+      SingleBExp (SingleAdd,
+        SingleBExp (SingleAdd, base_type, disp_type),
+        SingleBExp (SingleMul, index_type, SingleConst scale)
+      )
+    )
+
 end

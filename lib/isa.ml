@@ -123,6 +123,18 @@ module Isa = struct
     | R15 | R15D | R15W | R15B -> 15
     (* | R0 -> 16 *)
 
+  let get_reg_offset_size (r: register) : int64 * int64 =
+    match r with
+    | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> (0L, 8L)
+    | EAX | ECX | EDX | EBX | ESP | EBP | ESI | EDI | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> (0L, 4L)
+    | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> (0L, 2L)
+    | AH | CH | DH | BH -> (1L, 1L)
+    | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
+
+  let get_reg_full_size (r: register) : int64 =
+    match r with
+    | _ -> 8L (* Note: vector reg has different full sizes!!! *)
+
   let reg_name_list = [
     "rax"; "rcx"; "rdx"; "rbx";
     "rsp"; "rbp"; "rsi"; "rdi";
@@ -171,6 +183,13 @@ module Isa = struct
     | LdOp of immediate option * register option * register option * scale option * int64
     | StOp of immediate option * register option * register option * scale option * int64
     | LabelOp of label
+
+  let get_op_size (op: operand) : int64 =
+    match op with
+    | RegOp r -> get_reg_size r
+    | LdOp (_, _, _, _, size)
+    | StOp (_, _, _, _, size) -> size
+    | _ -> isa_error "cannot get size for the given op"
 
   let cmp_operand (op1: operand) (op2: operand) : bool = (* true for equal *)
     match op1, op2 with
