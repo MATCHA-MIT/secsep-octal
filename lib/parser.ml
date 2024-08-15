@@ -238,27 +238,89 @@ module Parser = struct
       end
     | _ -> parse_error "convert_imm_to_label"
 
+  let split_opcode_size (mnemonic: string) (dirty_op_size: int64 option) : string * (int64 option) =
+    let suffix_to_size (s: string) : int64 option =
+      match s with
+      | "" -> dirty_op_size
+      | "b" -> Some 1L
+      | "w" -> Some 2L
+      | "l" -> Some 4L
+      | "q" -> Some 8L
+      | _ -> parse_error ("split_opcode_size: invalid size " ^ s)
+    in
+    let helper (opcode: string) : (string * (int64 option)) option =
+      if String.starts_with mnemonic ~prefix:opcode then
+        Some (opcode, suffix_to_size (String.sub mnemonic (String.length opcode) (String.length mnemonic - String.length opcode)))
+      else None
+    in
+    match List.find_map helper Isa.common_opcode_list with
+    | Some result -> result
+    | None -> parse_error ("split_opcode_size cannot parse " ^ mnemonic)
+
+  let get_operand_size 
+      (mnemonic: string) 
+      (operands: Isa.operand list) : string * ((Isa.operand * (int64 option)) list) * (int64 option) =
+    let dirty_op_size = Isa.get_reg_op_size operands in
+    let list_merge_helper = List.map2 (fun x y -> (x, y)) in
+    match mnemonic with
+    (* Handle special cases where operand sizes are not the same first *)
+    | "movsbq" -> "movs", (list_merge_helper operands [Some 1L; Some 8L]), None
+    | "movswq" -> "movs", (list_merge_helper operands [Some 2L; Some 8L]), None
+    | "movslq" -> "movs", (list_merge_helper operands [Some 4L; Some 8L]), None
+    | "cltq" -> "movs", (list_merge_helper [RegOp EAX; RegOp RAX] [Some 4L; Some 8L]), None
+    | "movzbl" -> "movz", (list_merge_helper operands [Some 1L; Some 4L]), None
+    | _ -> 
+      let opcode, op_size = split_opcode_size mnemonic dirty_op_size in
+      opcode, (List.map (fun x -> (x, op_size)) operands), op_size
+
+  let get_default_operand (op_size: int64 option) : Isa.operand * (int64 option) =
+    match op_size with
+    | Some 1L -> RegOp AL, op_size
+    | Some 2L -> RegOp AX, op_size
+    | Some 4L -> RegOp EAX, op_size
+    | Some 8L -> RegOp RAX, op_size
+    | Some x -> parse_error ("cannot get default op with size " ^ (Int64.to_string x))
+    | None -> parse_error "cannot get default op when size is unknown"
+
+  let src (opr_size: Isa.operand * int64 option) : Isa.operand =
+    match opr_size with
+    | MemOp (disp, base, index, scale), Some size -> LdOp (disp, base, index, scale, size)
+    | MemOp _, None -> parse_error "no size for mem op"
+    | StOp _, _ -> parse_error "src"
+    | LdOp (disp, base, index, scale, _), Some size -> LdOp (disp, base, index, scale, size)
+    | LdOp _, None -> parse_error "no size for ld op"
+    (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "src reg size does not match opcode size" *)
+    | opr, _ -> opr
+
+  let dst (opr_size: Isa.operand * int64 option) : Isa.operand =
+    match opr_size with
+    | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size)
+    | MemOp _, None -> parse_error "no size for mem op"
+    | LdOp _, _ -> parse_error "dst"
+    | StOp (disp, base, index, scale, _), Some size -> StOp (disp, base, index, scale, size)
+    | StOp _, None -> parse_error "no size for st op"
+    (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
+    | opr, _ -> opr
+
+  let get_binst (op: Isa.bop) (operands: (Isa.operand * (int64 option)) list) (default_size: int64 option) : Isa.instruction =
+    match operands with
+    | [opr1] -> 
+      let default_opr = get_default_operand default_size in
+      BInst (op, dst default_opr, src default_opr, src opr1)
+    | [opr1; opr2] ->
+      BInst (op, dst opr2, src opr2, src opr1)
+    | [opr0; opr1; opr2] ->
+      BInst (op, dst opr2, src opr1, src opr0)
+    | _ -> parse_error ("get_binst: invalid number of operands " ^ (string_of_int (List.length operands)))
+
+  let get_uinst (op: Isa.uop) (operands: (Isa.operand * (int64 option)) list) : Isa.instruction =
+    match op, operands with
+    | Lea, [(opr1, _); opr2] -> UInst (op, dst opr2, opr1)
+    | _, [opr1; opr2] -> UInst (op, dst opr2, src opr1)
+    | _, [opr] -> UInst (op, dst opr, src opr)
+    | _ -> parse_error ("get_uinst: invalid number of operands " ^ (string_of_int (List.length operands)))
+
   let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * Isa.instruction =
-    let src (opr_size: Isa.operand * int64 option) : Isa.operand =
-      match opr_size with
-      | MemOp (disp, base, index, scale), Some size -> LdOp (disp, base, index, scale, size)
-      | MemOp _, None -> parse_error "no size for mem op"
-      | StOp _, _ -> parse_error "src"
-      | LdOp (disp, base, index, scale, _), Some size -> LdOp (disp, base, index, scale, size)
-      | LdOp _, None -> parse_error "no size for ld op"
-      (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "src reg size does not match opcode size" *)
-      | opr, _ -> opr
-    in
-    let dst (opr_size: Isa.operand * int64 option) : Isa.operand =
-      match opr_size with
-      | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size)
-      | MemOp _, None -> parse_error "no size for mem op"
-      | LdOp _, _ -> parse_error "dst"
-      | StOp (disp, base, index, scale, _), Some size -> StOp (disp, base, index, scale, size)
-      | StOp _, None -> parse_error "no size for st op"
-      (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
-      | opr, _ -> opr
-    in
     let (mnemonic, ts) = match ts with
     | MneTok mnemonic :: ts -> (mnemonic, ts)
     | _ -> parse_error ("parse_tokens: unexpected end of input: " ^ (String.concat ", " (List.map string_of_token ts)))
@@ -313,7 +375,37 @@ module Parser = struct
         imm_var_map, parse_operands ts
       end
     in
-    let dirty_op_size = Isa.get_reg_op_size operands in
+    let inst: Isa.instruction = 
+      match (mnemonic, operands) with
+      | ("rep", [LabelOp label]) ->
+        if label = "stosq" then RepStosq 
+        else if label = "movsq" then RepMovsq 
+        else begin
+          Printf.printf "rep %s\n" label;
+          parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+        end
+      | ("jmp", [LabelOp lb]) -> Jmp (lb)
+      | ("call", [LabelOp lb]) -> Call (lb)
+      | (_, [LabelOp lb]) ->
+        begin match Isa.op_of_cond_jump mnemonic with
+        | Some op -> Jcond (op, lb)
+        | None -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+        end
+      | ("ret", []) -> Jmp (Isa.ret_label) 
+      | ("syscall", []) -> Syscall
+      | ("hlt", []) -> Hlt
+      | _ -> let opcode, opread_size_list, op_size = get_operand_size mnemonic operands in
+        begin match Isa.op_of_binst opcode with
+        | Some op -> get_binst op opread_size_list op_size
+        | None ->
+          begin match Isa.op_of_uinst opcode with
+          | Some op -> get_uinst op opread_size_list
+          | None -> (* TODO: xchg *)
+            parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+          end
+        end
+    in
+    (* let dirty_op_size = Isa.get_reg_op_size operands in
     let inst: Isa.instruction = match (mnemonic, operands) with
       | ("mov", [opr1; opr2]) -> Mov (dst(opr2, dirty_op_size), src(opr1, dirty_op_size))
       | ("movb", [opr1; opr2]) -> Mov (dst(opr2, Some 1L), src(opr1, Some 1L))
@@ -457,11 +549,11 @@ module Parser = struct
       | ("testl", [opr1; opr2]) -> Test (src(opr2, Some 4L), src(opr1, Some 4L))
       | ("testq", [opr1; opr2]) -> Test (src(opr2, Some 8L), src(opr1, Some 8L))
       | ("jmp", [LabelOp lb]) -> Jmp (lb)
-      | ("je", [LabelOp lb]) -> Jcond (lb, JE)
-      | ("jne", [LabelOp lb]) -> Jcond (lb, JNe)
-      | ("jbe", [LabelOp lb]) -> Jcond (lb, JBe) (* TODO: Note that this is not correct, just for quick test only *)
-      | ("jb", [LabelOp lb]) -> Jcond (lb, JB) (* TODO: Note that this is not correct, just for quick test only *)
-      | ("jnb", [LabelOp lb]) -> Jcond (lb, JAe)  (* TODO: Note that this is not correct, just for quick test only *)
+      | ("je", [LabelOp lb]) -> Jcond (JE, lb)
+      | ("jne", [LabelOp lb]) -> Jcond (JNe, lb)
+      | ("jbe", [LabelOp lb]) -> Jcond (JBe, lb) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jb", [LabelOp lb]) -> Jcond (JB, lb) (* TODO: Note that this is not correct, just for quick test only *)
+      | ("jnb", [LabelOp lb]) -> Jcond (JAe, lb)  (* TODO: Note that this is not correct, just for quick test only *)
       | ("call", [LabelOp lb]) -> Call (lb)
       | ("ret", []) -> Jmp (Isa.ret_label)
       | ("pushq", [opr]) -> Push (src(opr, Some 8L))
@@ -471,7 +563,7 @@ module Parser = struct
       | _ -> 
         Printf.printf "%s %d\n" mnemonic (List.length operands);
         parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
-    in
+    in *)
     imm_var_map, inst
 
   let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : Isa.imm_var_map * Isa.instruction =

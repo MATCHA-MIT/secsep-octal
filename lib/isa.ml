@@ -213,37 +213,103 @@ module Isa = struct
     in
     List.fold_left helper None op_list
 
+  let common_opcode_list = [
+    "mov"; "movabs"; "movs"; "movz"; "lea"; 
+    "xchg";
+    "add"; "adc"; "sub"; "mul"; "imul"; 
+    "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
+    "xor"; "and"; "or"; "not"; "bswap";
+    "cmp"; "test";
+    "push"; "pop"
+  ]
+
+  type bop =
+    | Add | Adc | Sub
+    | Mul | Imul
+    | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
+    | Rol | Ror
+    | Xor | And | Or
+
+  let bop_opcode_map = [
+    ("add", Add); ("adc", Adc); ("sub", Sub);
+    ("mul", Mul); ("imul", Imul);
+    ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
+    ("rol", Rol); ("ror", Ror);
+    ("xor", Xor); ("and", And); ("or", Or)
+  ]
+  
+  type uop =
+    | Mov | MovS | MovZ
+    | Lea
+    | Not | Bswap
+
+  let uop_opcode_map = [
+    ("mov", Mov); ("movabs", Mov);
+    ("movs", MovS); ("movz", MovZ);
+    ("lea", Lea);
+    ("not", Not); ("bswap", Bswap)
+  ]
+
   type branch_cond =
     | JNe | JE | JL | JLe | JG | JGe
-    | JB | JBe | JA | JAe
+    | JB | JBe | JA | JAe | JOther
+
+  let cond_jump_opcode_map = [
+    ("jne", JNe); ("jnz", JNe);               (* != *)
+    ("je", JE); ("jz", JE);                   (* = *)
+    ("jl", JL); ("jnge", JL);                 (* < signed *)
+    ("jle", JLe); ("jng", JLe);               (* <= signed *)
+    ("jg", JG); ("jnle", JG);                 (* > signed *)
+    ("jge", JGe); ("jnl", JGe);               (* >= signed *)
+    ("jb", JB); ("jnae", JB); ("jc", JB);     (* < unsigned *)
+    ("jbe", JBe); ("jna", JBe);               (* <= unsigned*)
+    ("ja", JA); ("jnbe", JA);                 (* > unsigned *)
+    ("jae", JAe); ("jnb", JAe); ("jnc", JAe); (* >= unsigned *)
+    ("jother", JOther); (* Dirty implementation for print *)
+    ("jo", JOther); ("jno", JOther); ("js", JOther); ("jns", JOther);
+    ("jp", JOther); ("jpe", JOther); ("jnp", JOther); ("jpo", JOther);
+    ("jcxz", JOther); ("jecxz", JOther);
+  ]
+
+  let opcode_is_some_op (opcode_map: (string * 'a) list) (m: string) : bool =
+    List.find_opt (fun (opcode, _) -> opcode = m) opcode_map != None
+
+  let opcode_is_binst = opcode_is_some_op bop_opcode_map
+  let opcode_is_uinst = opcode_is_some_op uop_opcode_map
+  let opcode_is_cond_jump = opcode_is_some_op cond_jump_opcode_map
+
+  let opcode_of_some_op (opcode_map: (string * 'a) list) (op: 'a) : string option =
+    List.find_map
+      (fun (str, o) -> if o = op then Some str else None)
+      opcode_map
+  
+  let opcode_of_binst = opcode_of_some_op bop_opcode_map
+  let opcode_of_uinst = opcode_of_some_op uop_opcode_map
+  let opcode_of_cond_jump = opcode_of_some_op cond_jump_opcode_map
+
+  let op_of_some_opcode (opcode_map: (string * 'a) list) (opcode: string) : 'a option =
+    List.find_map
+      (fun (str, o) -> if str = opcode then Some o else None)
+      opcode_map
+  
+  let op_of_binst = op_of_some_opcode bop_opcode_map
+  let op_of_uinst = op_of_some_opcode uop_opcode_map
+  let op_of_cond_jump = op_of_some_opcode cond_jump_opcode_map
 
   type instruction =
-    | Mov of operand * operand
+    (* | Mov of operand * operand
     | MovS of operand * operand
     | MovZ of operand * operand
+    | Lea of operand * operand *)
+    | BInst of bop * operand * operand * operand
+    | UInst of uop * operand * operand
     | Xchg of operand * operand
-    | Lea of operand * operand
-    | Add of operand * operand * operand
-    | Adc of operand * operand * operand (* Add and carry, our type checker does not calculate on this, just set dest as top *)
-    | Sub of operand * operand * operand
-    | Mul of operand * operand * operand
-    | Imul of operand * operand * operand
-    | Sal of operand * operand * operand
-    | Sar of operand * operand * operand
-    | Shr of operand * operand * operand
-    | Rol of operand * operand * operand
-    | Ror of operand * operand * operand
-    | Xor of operand * operand * operand
-    | Not of operand * operand
-    | And of operand * operand * operand
-    | Or of operand * operand * operand
-    | Bswap of operand
     | RepStosq
     | RepMovsq
     | Cmp of operand * operand
     | Test of operand * operand
     | Jmp of label
-    | Jcond of label * branch_cond
+    | Jcond of branch_cond * label
     | Call of label
     | Push of operand
     | Pop of operand
@@ -277,10 +343,10 @@ module Isa = struct
   let inst_referring_label (m: string) : bool =
     match m with
     | "call"
-    | "jmp" | "je" | "jne" | "jl" | "jle" | "jg" | "jge"
-    | "jbe" | "jb" | "jnb" -> true
+    | "jmp" -> true
     | "rep" -> true (* dirty impl *)
-    | _ -> false
+    | _ -> (* Check if conditional branch opcode*)
+      opcode_is_cond_jump m
 
   let inst_is_uncond_jump (inst: instruction) : bool =
     match inst with
@@ -289,44 +355,30 @@ module Isa = struct
 
   let mnemonic_of_instruction (inst: instruction) : string =
     match inst with
-    | Mov _ -> "mov"
+    (* | Mov _ -> "mov"
     | MovS _ -> "movs"
     | MovZ _ -> "movz"
+    | Lea _ -> "lea" *)
+    | BInst (bop, _, _, _) ->
+      begin match opcode_of_binst bop with
+      | Some s -> s
+      | None -> isa_error "cannot find opcode for a bop"
+      end
+    | UInst (uop, _, _) ->
+      begin match opcode_of_uinst uop with
+      | Some s -> s
+      | None -> isa_error "cannot find opcode for a uop"
+      end
     | Xchg _ -> "xchg"
-    | Lea _ -> "lea"
-    | Add _ -> "add"
-    | Adc _ -> "adc"
-    | Sub _ -> "sub"
-    | Mul _ -> "mul"
-    | Imul _ -> "imul"
-    | Sal _ -> "sal"
-    | Sar _ -> "sar"
-    | Shr _ -> "shr"
-    | Rol _ -> "rol"
-    | Ror _ -> "ror"
-    | Xor _ -> "xor"
-    | Not _ -> "not"
-    | And _ -> "and"
-    | Or _ -> "or"
-    | Bswap _ -> "bswap"
     | RepStosq -> "rep stosq"
     | RepMovsq -> "rep movsq"
     | Cmp _ -> "cmp"
     | Test _ -> "test"
     | Jmp _ -> "jmp"
-    | Jcond (_, cond) ->
-      begin
-        match cond with
-        | JNe -> "jne"
-        | JE -> "je"
-        | JL -> "jl"
-        | JLe -> "jle"
-        | JG -> "jg"
-        | JGe -> "jge"
-        | JB -> "jb"
-        | JBe -> "jbe"
-        | JA -> "ja"
-        | JAe -> "jae"
+    | Jcond (cond, _) ->
+      begin match opcode_of_cond_jump cond with
+      | Some s -> s
+      | None -> isa_error "cannot find opcode for a cond jump"
       end
     | Call _ -> "call"
     | Push _ -> "push"
@@ -336,7 +388,7 @@ module Isa = struct
     | Syscall -> "syscall"
     | Hlt -> "hlt"
 
-  let get_op_list (inst: instruction) : operand list =
+  (* let get_op_list (inst: instruction) : operand list =
     match inst with
     | Mov (op0, op1) | MovS (op0, op1) | MovZ (op0, op1) 
     | Lea (op0, op1) | Not (op0, op1) | Cmp (op0, op1) | Test (op0, op1) -> [op0; op1]
@@ -344,7 +396,7 @@ module Isa = struct
     | Sar (op0, op1, op2) | Shr (op0, op1, op2) | Xor (op0, op1, op2)
     | And (op0, op1, op2) | Or (op0, op1, op2) -> [op0; op1; op2]
     | Push op | Pop op -> [op]
-    | _ -> []
+    | _ -> [] *)
 
   let pp_prog (lvl: int) (p: prog) =
     PP.print_lvl lvl "Prog\n";

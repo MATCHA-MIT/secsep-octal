@@ -160,19 +160,19 @@ module ArchType (Entry: EntryType) = struct
       (inst: Isa.instruction) :
       t * (Constraint.t list) =
     match inst with
-    | Mov (dest, src)
-    | Lea (dest, src) ->
+    | UInst (Mov, dest, src)
+    | UInst (Lea, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map src_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
       { next_type with local_var_map = new_local_var; pc = next_type.pc + 1}, src_constraint @ dest_constraint
-    | MovS (dest, src) ->
+    | UInst (MovS, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let dest_type = Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
       { next_type with local_var_map = new_local_var; pc = next_type.pc + 1}, src_constraint @ dest_constraint
-    | MovZ (dest, src) ->
+    | UInst (MovZ, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let dest_type = Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
