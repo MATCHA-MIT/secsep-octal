@@ -404,7 +404,7 @@ module Parser = struct
             begin match opcode, opread_size_list with
             | "xchg", [opr1; opr2] -> Xchg (dst opr2, dst opr1, src opr2, src opr1)
             | "push", [opr] -> Push (src opr)
-            | "pop", [opr] -> Pop (src opr)
+            | "pop", [opr] -> Pop (dst opr)
             | "cmp", [opr1; opr2] -> Cmp (src opr2, src opr1)
             | "test", [opr1; opr2] -> Test (src opr2, src opr1)
             | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)

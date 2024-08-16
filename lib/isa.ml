@@ -360,7 +360,6 @@ module Isa = struct
     | Jmp of label
     | Jcond of branch_cond * label
     | Call of label
-    | Ret
     | Nop
     | Syscall
     | Hlt
@@ -397,7 +396,7 @@ module Isa = struct
 
   let inst_is_uncond_jump (inst: instruction) : bool =
     match inst with
-    | Jmp _ | Ret -> true
+    | Jmp _ -> true
     | _ -> false
 
   let mnemonic_of_instruction (inst: instruction) : string =
@@ -430,7 +429,6 @@ module Isa = struct
       | None -> isa_error "cannot find opcode for a cond jump"
       end
     | Call _ -> "call"
-    | Ret -> "ret"
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
@@ -473,7 +471,6 @@ module Isa = struct
       | None -> isa_error "cannot find opcode for a cond jump"
       end
     | Call label -> Printf.sprintf "call\t\t%s" label
-    | Ret -> "ret"
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
