@@ -21,6 +21,7 @@ module SingleExp = struct
     | SingleNot
 
   type t =
+    | SingleTop
     | SingleConst of int64
     | SingleVar of Isa.imm_var_id
     | SingleBExp of single_bop * t * t
@@ -28,6 +29,7 @@ module SingleExp = struct
 
   let rec to_string (se: t) =
     match se with
+    | SingleTop -> "Top"
     | SingleConst v -> "Const " ^ (Int64.to_string v)
     | SingleVar v -> "SymImm " ^ (string_of_int v)
     | SingleBExp (op, l, r) -> 
@@ -98,6 +100,9 @@ module SingleExp = struct
 
   let rec cmp (e1: t) (e2: t) : int =
     match e1, e2 with
+    | SingleTop, SingleTop -> 0
+    | SingleTop, _ -> -1
+    | SingleConst _, SingleTop -> 1
     | SingleConst c1, SingleConst c2 ->
       if c1 = c2 then 0 else if c1 > c2 then 1 else -1
     | SingleConst _, _ -> -1
@@ -137,114 +142,135 @@ module SingleExp = struct
     | ee1, SingleConst _ :: ee2
     | ee1, ee2 -> cmp_list_helper ee1 ee2
 
+  let find_top (x: t list) : bool =
+    List.find_opt (fun a -> a = SingleTop) x != None
+
+  let find_top_double (x: t list list) : bool =
+    List.find_opt (fun a -> find_top a) x != None
+
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =
-      match x with
-      | [] -> SingleConst 0L
-      | hd :: [] -> hd
-      | hd :: tl -> SingleBExp (SingleMul, helper_mul tl, hd)
+      if find_top x then SingleTop
+      else
+        match x with
+        | [] -> SingleConst 0L
+        | hd :: [] -> hd
+        | hd :: tl -> SingleBExp (SingleMul, helper_mul tl, hd)
     in
     let rec helper_add (x: t list) =
-      match x with
-      | [] -> SingleConst 0L
-      | hd :: [] -> hd
-      | hd :: tl -> SingleBExp (SingleAdd, helper_add tl, hd)
+      if find_top x then SingleTop
+      else
+        match x with
+        | [] -> SingleConst 0L
+        | hd :: [] -> hd
+        | hd :: tl -> SingleBExp (SingleAdd, helper_add tl, hd)
     in
     helper_add (List.map helper_mul e)
 
   let mul_const (coeff: int64) (e: t list) : t list =
-    match e with
-    | [] -> []
-    | (SingleConst c) :: tl -> (SingleConst (Int64.mul coeff c)) :: tl
-    | tl -> SingleConst coeff :: tl
+    if find_top e then [ SingleTop ]
+    else
+      match e with
+      | [] -> []
+      | (SingleConst c) :: tl -> (SingleConst (Int64.mul coeff c)) :: tl
+      | tl -> SingleConst coeff :: tl
 
   let mul_t (e1: t list) (e2: t list) : t list =
-    let x = List.sort cmp (e1 @ e2) in
-    match x with
-    | SingleConst c1 :: SingleConst c2 :: tl ->
-      let c12 = Int64.mul c1 c2 in
-      if c12 = 0L then []
-      else if c12 = 1L then tl
-      else SingleConst c12 :: tl
-    | SingleConst c :: tl ->
-      if c = 0L then []
-      else if c = 1L then tl
-      else x
-    | _ -> x
+    if find_top e1 || find_top e2 then [ SingleTop ]
+    else
+      let x = List.sort cmp (e1 @ e2) in
+      match x with
+      | SingleConst c1 :: SingleConst c2 :: tl ->
+        let c12 = Int64.mul c1 c2 in
+        if c12 = 0L then []
+        else if c12 = 1L then tl
+        else SingleConst c12 :: tl
+      | SingleConst c :: tl ->
+        if c = 0L then []
+        else if c = 1L then tl
+        else x
+      | _ -> x
 
   let add_t (e1: t list) (e2: t list) : (t list, bool) Either.t =
     (* Printf.printf "=======================\n@@@";
     pp_split_exp 0 [e1; e2];
     Printf.printf "\n=======================\n"; *)
     (* let equal (l: t) (r: t) : bool = if cmp l r = 0 then true else false in *)
-    match e1, e2 with
-    | [], [] -> Either.left []
-    | [], hd :: tl | hd :: tl, [] -> Either.left (hd :: tl)
-    | [SingleConst 0L], e | e, [SingleConst 0L] -> Either.left e
-    | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
-      let cmp_tl = cmp_list_helper tl1 tl2 in
-      if cmp_tl = 0 then 
-        let c12 = Int64.add c1 c2 in
-        if c12 = 0L then Either.left []
-        else Either.left (SingleConst c12 :: tl1)
-      else if cmp_tl = 1 then Either.right true
-      else Either.right false
-      (* if List.equal equal tl1 tl2 
-      then Some (SingleConst (c1 + c2) :: tl1)
-      else None *)
-    | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
-      let cmp_tl = cmp_list_helper tl1 tl2 in
-      if cmp_tl = 0 then 
-        let c1 = Int64.add c 1L in
-        if c1 = 0L then Either.left []
-        else Either.left (SingleConst (Int64.add c 1L) :: tl1)
-      else if cmp_tl = 1 then Either.right true
-      else Either.right false
-      (* if List.equal equal tl1 tl2 
-      then Some (SingleConst (c + 1) :: tl1)
-      else None *)
-    | _, _ ->
-      let cmp_tl = cmp_list_helper e1 e2 in
-      if cmp_tl = 0 then Either.left (SingleConst 2L :: e1)
-      else if cmp_tl = 1 then Either.right true
-      else Either.right false
-    (* | hd1 :: tl1, hd2 :: tl2 ->
-      if List.equal equal (hd1 :: tl1) (hd2 :: tl2) 
-      then Some (SingleConst 2 :: hd1 :: tl1)
-      else None *)
+    if find_top e1 || find_top e2 then Left [ SingleTop ]
+    else
+      match e1, e2 with
+      | [], [] -> Either.left []
+      | [], hd :: tl | hd :: tl, [] -> Either.left (hd :: tl)
+      | [SingleConst 0L], e | e, [SingleConst 0L] -> Either.left e
+      | SingleConst c1 :: tl1, SingleConst c2 :: tl2 ->
+        let cmp_tl = cmp_list_helper tl1 tl2 in
+        if cmp_tl = 0 then 
+          let c12 = Int64.add c1 c2 in
+          if c12 = 0L then Either.left []
+          else Either.left (SingleConst c12 :: tl1)
+        else if cmp_tl = 1 then Either.right true
+        else Either.right false
+        (* if List.equal equal tl1 tl2 
+        then Some (SingleConst (c1 + c2) :: tl1)
+        else None *)
+      | SingleConst c :: tl1, tl2 | tl1, SingleConst c :: tl2 ->
+        let cmp_tl = cmp_list_helper tl1 tl2 in
+        if cmp_tl = 0 then 
+          let c1 = Int64.add c 1L in
+          if c1 = 0L then Either.left []
+          else Either.left (SingleConst (Int64.add c 1L) :: tl1)
+        else if cmp_tl = 1 then Either.right true
+        else Either.right false
+        (* if List.equal equal tl1 tl2 
+        then Some (SingleConst (c + 1) :: tl1)
+        else None *)
+      | _, _ ->
+        let cmp_tl = cmp_list_helper e1 e2 in
+        if cmp_tl = 0 then Either.left (SingleConst 2L :: e1)
+        else if cmp_tl = 1 then Either.right true
+        else Either.right false
+      (* | hd1 :: tl1, hd2 :: tl2 ->
+        if List.equal equal (hd1 :: tl1) (hd2 :: tl2) 
+        then Some (SingleConst 2 :: hd1 :: tl1)
+        else None *)
 
   let add_t_list (e1: t list list) (e2: t list list) : t list list =
-    let rec helper (x_list: t list list) (y: t list) : t list list =
-      match x_list with
-      | [] -> [ y ]
-      | hd :: tl ->
-        begin match add_t y hd with
-        | Left [] -> tl
-        | Left e -> e :: tl
-        | Right larger ->
-          if larger then hd :: (helper tl y)
-          else y :: hd :: tl
-        end
-    in
-    (* let helper0 (acc: (t list) option) (x: t list) : (t list) option * t list =
-      match acc with
-      | None -> (None, x)
-      | Some v ->
-        begin match add_t v x with
-        | Some e -> (None, e)
-        | None -> (acc, x)
-        end
-    in
-    let helper (acc: t list list) (y: t list) : t list list =
-      let new_y, new_x = List.fold_left_map helper0 (Some y) acc in
-      match new_y with
-      | Some v -> v :: new_x
-      | None -> new_x
-    in *)
-    List.fold_left helper e1 e2
+    if find_top_double e1 || find_top_double e2 then [[ SingleTop ]]
+    else
+      let rec helper (x_list: t list list) (y: t list) : t list list =
+        match x_list with
+        | [] -> [ y ]
+        | hd :: tl ->
+          begin match add_t y hd with
+          | Left [] -> tl
+          | Left e -> e :: tl
+          | Right larger ->
+            if larger then hd :: (helper tl y)
+            else y :: hd :: tl
+          end
+      in
+      (* let helper0 (acc: (t list) option) (x: t list) : (t list) option * t list =
+        match acc with
+        | None -> (None, x)
+        | Some v ->
+          begin match add_t v x with
+          | Some e -> (None, e)
+          | None -> (acc, x)
+          end
+      in
+      let helper (acc: t list list) (y: t list) : t list list =
+        let new_y, new_x = List.fold_left_map helper0 (Some y) acc in
+        match new_y with
+        | Some v -> v :: new_x
+        | None -> new_x
+      in *)
+      List.fold_left helper e1 e2
 
   let rec eval_t (e: t) : t list list =
     match e with
+    | SingleBExp (_, SingleTop, _)
+    | SingleBExp (_, _, SingleTop)
+    | SingleUExp (_, SingleTop) -> [[ SingleTop ]]
     | SingleBExp (SingleAdd, l, r) ->
       add_t_list (eval_t l) (eval_t r)
     | SingleBExp (SingleSub, l, r) ->

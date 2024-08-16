@@ -257,8 +257,9 @@ module StateType = struct
           | Some (addr, size) -> Some ((addr, curr_state.cond_hist), size)
       ) new_unknown_list
     in
+    let _ = smt_ctx, sol, pc_dest_var_idx, get_unknown_list in
     match inst with
-    | Mov (dest, src)
+    (* | Mov (dest, src)
     | MovS (dest, src)
     | MovZ (dest, src)
     | Lea (dest, src) ->
@@ -488,7 +489,7 @@ module StateType = struct
       MemOffset.constraint_union [constraint_set; src_constraint; dest_constraint],
       TypeExp.var_union [useful_var_set; src_useful; src_useful; dest_useful],
       new_var_type_opt,
-      Mov (dest_key, src_key))
+      Mov (dest_key, src_key)) *)
     | _ -> begin
         print_endline ("[Warning] type_prop_inst: instruction not handled: " ^ (Isa.mnemonic_of_instruction inst));
         (curr_state, cond_list, unknown_addr_list, constraint_set, useful_var_set, None, Skip) (* TODO *)

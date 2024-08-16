@@ -34,6 +34,7 @@ module SmtEmitter = struct
     let add_constr = true in
     let z3_ctx, _ = smt_ctx in
     match se with
+    | SingleTop -> smt_emitter_error "expr_of_single_exp cannot convert SingleTop!!!"
     | SingleConst c -> mk_numeral smt_ctx c
     | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width
     | SingleBExp (op, se1, se2) ->

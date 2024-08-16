@@ -61,6 +61,7 @@ module ArchType (Entry: EntryType) = struct
     pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
+    flag: entry_t * entry_t;
     branch_hist: CondType.t;
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
@@ -159,25 +160,96 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (inst: Isa.instruction) :
       t * (Constraint.t list) =
+    (* We do not update pc in this function! Should update outside!!! *)
+    let curr_type = { curr_type with flag = (Entry.get_top_type, Entry.get_top_type) } in
     match inst with
-    | UInst (Mov, dest, src)
+    | BInst (bop, dest, src0, src1) ->
+      let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
+      let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
+      let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
+      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
+      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
+      { next_type with local_var_map = new_local_var }, 
+      src0_constraint @ src1_constraint @ dest_constraint
+    (* | UInst (Mov, dest, src)
     | UInst (Lea, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map src_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var; pc = next_type.pc + 1}, src_constraint @ dest_constraint
+      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
     | UInst (MovS, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let dest_type = Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var; pc = next_type.pc + 1}, src_constraint @ dest_constraint
+      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
     | UInst (MovZ, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let dest_type = Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var; pc = next_type.pc + 1}, src_constraint @ dest_constraint
+      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint *)
+    | UInst (uop, dest, src) ->
+      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
+      let dest_type = 
+        begin match uop with
+        | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type
+        | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type
+        | _ -> Entry.exe_uop_inst uop src_type
+        end 
+      in
+      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
+      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
+      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
+    | Xchg (dest0, dest1, src0, src1) ->
+      let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
+      let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
+      let next_type, dest0_constraint = set_dest_op_type smt_ctx curr_type dest0 src1_type in
+      let next_type, dest1_constraint = set_dest_op_type smt_ctx next_type dest1 src0_type in
+      next_type, 
+      src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint
+    | Cmp (src0, src1) ->
+      let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
+      let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
+      let src0_type = Entry.repl_local_var curr_type.local_var_map src0_type in
+      let src1_type = Entry.repl_local_var curr_type.local_var_map src1_type in
+      let useful_vars = 
+        SingleExp.SingleVarSet.union 
+          (SingleExp.get_vars (Entry.get_single_exp src0_type))
+          (SingleExp.get_vars (Entry.get_single_exp src1_type))
+      in
+      { curr_type with flag = (src0_type, src1_type); useful_var = useful_vars },
+      src0_constraint @ src1_constraint
+    | Test (src0, src1) ->
+      let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
+      let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
+      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst Isa.And src0_type src1_type) in
+      let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
+      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); useful_var = useful_vars },
+      src0_constraint @ src1_constraint
+    | Push src ->
+      let size = Isa.get_op_size src in
+      let rsp_type, curr_type, _ = get_src_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) in
+      let new_rsp_type = 
+        Entry.repl_local_var curr_type.local_var_map 
+          (Entry.exe_bop_inst Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+      in
+      let curr_type, _ = set_dest_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
+      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
+      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size)) src_type in
+      next_type, src_constraint @ dest_constraint
+    | Pop dst ->
+      let size = Isa.get_op_size dst in
+      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size)) in
+      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dst src_type in
+      let rsp_type, curr_type, _ = get_src_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) in
+      let new_rsp_type = 
+        Entry.repl_local_var curr_type.local_var_map 
+          (Entry.exe_bop_inst Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+      in
+      let next_type, _ = set_dest_op_type smt_ctx next_type (Isa.RegOp Isa.RSP) new_rsp_type in
+      next_type, src_constraint @ dest_constraint
+    | Nop | Syscall | Hlt -> curr_type, []
     | _ -> arch_type_error "inst not implemented"
 
 

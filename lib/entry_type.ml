@@ -18,7 +18,12 @@ module type EntryType = sig
   val to_string : t -> string
   val read_val: int64 -> int64 -> t -> t (* off -> sz -> type: read tppe of [off, off+sz] *)
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)
+
+  val exe_bop_inst: Isa.bop -> t -> t -> t
+  val exe_uop_inst: Isa.uop -> t -> t
+
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
+  val get_const_type: Isa.immediate -> t
   val get_top_type: t
   val get_imm_type: Isa.immediate -> t
   val get_mem_op_type: Isa.immediate option -> t option -> t option -> int64 -> t
