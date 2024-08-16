@@ -36,7 +36,36 @@ module CondType (Entry: EntryType) = struct
     | Le -> "Le" | Lt -> "Lt"
     | Be -> "Be" | Bt -> "Bt"
     in
-    s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")"
+    Printf.sprintf "%s(%s,%s)" s (Entry.to_string l) (Entry.to_string r)
+    (* s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")" *)
+
+  let get_taken_type (cond: Isa.branch_cond) (flag: entry_t * entry_t) : t option =
+    let l, r = flag in
+    match cond with
+    | JNe -> Some (Ne, l, r)
+    | JE -> Some (Eq, l, r)
+    | JL -> Some (Lt, l, r)
+    | JLe -> Some (Le, l, r)
+    | JG -> Some (Lt, r, l)
+    | JGe -> Some (Le, r, l)
+    | JB -> Some (Bt, l, r)
+    | JBe -> Some (Be, l, r)
+    | JA -> Some (Bt, r, l)
+    | JAe -> Some (Be, r, l)
+    | JOther -> None
+
+  let to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+    let ctx, _ = smt_ctx in
+    let cond, l, r = cond in
+    let exp_l = Entry.to_smt_expr l in
+    let exp_r = Entry.to_smt_expr r in
+    match cond with
+    | Ne -> Z3.Boolean.mk_not ctx (Z3.Boolean.mk_eq ctx exp_l exp_r)
+    | Eq -> Z3.Boolean.mk_eq ctx exp_l exp_r
+    | Le -> Z3.BitVector.mk_sle ctx exp_l exp_r
+    | Lt -> Z3.BitVector.mk_slt ctx exp_l exp_r
+    | Be -> Z3.BitVector.mk_ule ctx exp_l exp_r
+    | Bt -> Z3.BitVector.mk_ult ctx exp_l exp_r
 
   let pp_cond (lvl: int) (cond: t) =
     PP.print_lvl lvl "%s\n" (to_string cond)
@@ -58,16 +87,46 @@ module ArchType (Entry: EntryType) = struct
   module CondType = CondType (Entry)
 
   type t = {
+    label: Isa.label;
     pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
     flag: entry_t * entry_t;
-    branch_hist: CondType.t;
+    branch_hist: CondType.t list;
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
     useful_var: SingleExp.SingleVarSet.t
     (* Maybe add constraint set here!!! *)
   }
+
+  type block_subtype = (t * (t list)) list
+
+  let init_from_layout 
+      (label: Isa.label)
+      (start_var: entry_t) (start_pc: int)
+      (mem_layout: 'a MemType.mem_content) : entry_t * t =
+    let idx0, reg_type = RegType.init_reg_type start_var in
+    let idx1, mem_type = MemType.init_mem_type_from_layout idx0 mem_layout in
+    idx1, {
+      label = label;
+      pc = start_pc;
+      reg_type = reg_type;
+      mem_type = mem_type;
+      flag = (Entry.get_top_type, Entry.get_top_type);
+      branch_hist = [];
+      local_var_map = Entry.get_empty_var_map;
+      useful_var = SingleExp.SingleVarSet.empty
+    }
+
+  let init_block_subtype_from_layout
+      (func: Isa.func) (start_var: entry_t) (start_pc: int)
+      (mem_layout: 'a MemType.mem_content) : entry_t * block_subtype =
+    let helper (acc_var: entry_t) (bb: Isa.basic_block) : entry_t * (t * (t list)) =
+      let label = bb.label in
+      let acc_var, block_type = (init_from_layout label acc_var start_pc mem_layout) in
+      acc_var, (block_type, [])
+    in
+    List.fold_left_map helper start_var func.body
 
   let get_reg_type (curr_type: t) (r: Isa.register) : entry_t =
     RegType.get_reg_type curr_type.reg_type r
@@ -91,6 +150,7 @@ module ArchType (Entry: EntryType) = struct
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t =
+    (* TODO: Add constriant: addr_type is untainted *)
     let addr_type = get_mem_op_type curr_type disp base index scale in
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
@@ -110,6 +170,7 @@ module ArchType (Entry: EntryType) = struct
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t =
+    (* TODO: Add constriant: addr_type is untainted *)
     let addr_type = get_mem_op_type curr_type disp base index scale in
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
@@ -252,6 +313,89 @@ module ArchType (Entry: EntryType) = struct
     | Nop | Syscall | Hlt -> curr_type, []
     | _ -> arch_type_error "inst not implemented"
 
+  let add_block_subtype
+      (label: Isa.label)
+      (curr_type: t) (block_subtype: block_subtype) :
+      block_subtype =
+    List.map (
+      fun (x, x_sub) ->
+        if x.label = label then x, curr_type :: x_sub
+        else x, x_sub
+    ) block_subtype
 
+  let update_useful_var
+      (curr_type: t) (block_subtype: block_subtype) :
+      block_subtype =
+    List.map (
+      fun (x, x_sub) ->
+        if x.label = curr_type.label then { x with useful_var = curr_type.useful_var}, x_sub
+        else x, x_sub
+    ) block_subtype
+
+  let update_branch_hist_get_not_taken_cond
+      (smt_ctx: SmtEmitter.t)
+      (cond: Isa.branch_cond) (curr_type: t) :
+      t * t * (SmtEmitter.exp_t list) =
+    let taken_type_option = CondType.get_taken_type cond curr_type.flag in
+    match taken_type_option with
+    | None -> curr_type, curr_type, []
+    | Some taken_type -> 
+      let not_taken_type = CondType.not_cond_type taken_type in
+      { curr_type with branch_hist = taken_type :: curr_type.branch_hist}, 
+      { curr_type with branch_hist = not_taken_type :: curr_type.branch_hist},
+      [ CondType.to_smt_expr smt_ctx not_taken_type ]
+
+  let type_prop_branch
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t)
+      (inst: Isa.instruction)
+      (block_subtype: block_subtype) :
+      t * block_subtype =
+    let _ = smt_ctx in
+    match inst with
+    | Jmp label ->
+      (* 1. Add curr_type to target block's subtype *)
+      let block_subtype = (add_block_subtype label curr_type block_subtype) in
+      (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)
+      let block_subtype = (update_useful_var curr_type block_subtype) in
+      curr_type, block_subtype
+    | Jcond (cond, label) ->
+      (* TODO: Add constraint: branch cond is untainted!!! *)
+      let taken_type, not_taken_type, not_taken_cond = 
+        update_branch_hist_get_not_taken_cond smt_ctx cond curr_type 
+      in
+      (* 1. Add curr_type + taken to target block's subtype *)
+      let block_subtype = (add_block_subtype label taken_type block_subtype) in
+      (* 2. Update ctx *)
+      SmtEmitter.add_assertions smt_ctx not_taken_cond;
+      (* 3. Update useful var and return curr_type + not taken *)
+      let l_flag, r_flag = not_taken_type.flag in
+      let useful_var = 
+        SingleExp.SingleVarSet.union 
+          (SingleExp.get_vars (Entry.get_single_exp l_flag))
+          (SingleExp.get_vars (Entry.get_single_exp r_flag))
+      in
+      {not_taken_type with useful_var = useful_var}, block_subtype
+    | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
+
+  let type_prop_inst
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t)
+      (inst: Isa.instruction)
+      (block_subtype: block_subtype) :
+      t * (Constraint.t list) * block_subtype =
+    (* Update pc here!!! *)
+    match inst with
+    | Jmp _ | Jcond _ ->
+      let next_type, block_subtype = type_prop_branch smt_ctx curr_type inst block_subtype in
+      {next_type with pc = next_type.pc + 1}, [], block_subtype
+    | Call _ ->
+      Printf.printf "Warning: haven't implemented so far!";
+      {curr_type with pc = curr_type.pc + 1}, [], block_subtype
+    | _ ->
+      let next_type, constraints = type_prop_non_branch smt_ctx curr_type inst in
+      {next_type with pc = next_type.pc + 1}, constraints, block_subtype
+
+  (* let block_subtype_to_constraints *)
 
 end

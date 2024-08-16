@@ -1,5 +1,6 @@
 open Isa
 open Single_exp
+open Smt_emitter
 
 module type EntryType = sig
   type t
@@ -9,6 +10,8 @@ module type EntryType = sig
     | OldExt of t (* Used for memory slot partial update *)
 
   type local_var_map_t
+
+  val get_empty_var_map: local_var_map_t
 
   (* TODO: Remove these two after finished updating memory type!!! *)
   val partial_read_val: t -> t
@@ -32,6 +35,8 @@ module type EntryType = sig
   val update_local_var: local_var_map_t -> t -> int -> (local_var_map_t * t)
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t
+
+  val to_smt_expr: t -> SmtEmitter.exp_t
 end
 
 

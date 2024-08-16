@@ -49,6 +49,10 @@ module MemType (Entry: EntryType) = struct
   type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) list
   type t = entry_t mem_content
 
+  let init_mem_type_from_layout
+      (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
+    let _ = mem_layout in start_var, []
+
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)
       (mem: (MemOffset.t * MemRange.t * 'a) list)
