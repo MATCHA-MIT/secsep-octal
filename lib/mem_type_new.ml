@@ -53,6 +53,31 @@ module MemType (Entry: EntryType) = struct
       (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
     let _ = mem_layout in start_var, []
 
+  let fold_left2 
+      (func: 'acc -> 'a -> 'b -> 'acc)
+      (acc: 'acc)
+      (mem1: 'a mem_content)
+      (mem2: 'b mem_content) : 'acc =
+    let helper_inner
+        (acc: 'acc)
+        (entry1: MemOffset.t * MemRange.t * 'a)
+        (entry2: MemOffset.t * MemRange.t * 'b) : 'acc =
+      let off1, _, e1 = entry1 in
+      let off2, _, e2 = entry2 in
+      if MemOffset.cmp off1 off2 = 0 then func acc e1 e2
+      else mem_type_error "[fold_left2] mem offset does not match"
+    in
+    let helper_outer
+        (acc: 'acc) 
+        (entry1: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
+        (entry2: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) : 'acc =
+      let v1, l1 = entry1 in
+      let v2, l2 = entry2 in
+      if v1 = v2 then List.fold_left2 helper_inner acc l1 l2
+      else mem_type_error "[fold_left2] ptr does not match"
+    in
+    List.fold_left2 helper_outer acc mem1 mem2
+
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)
       (mem: (MemOffset.t * MemRange.t * 'a) list)

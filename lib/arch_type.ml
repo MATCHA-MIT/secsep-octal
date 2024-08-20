@@ -57,8 +57,8 @@ module CondType (Entry: EntryType) = struct
   let to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let ctx, _ = smt_ctx in
     let cond, l, r = cond in
-    let exp_l = Entry.to_smt_expr l in
-    let exp_r = Entry.to_smt_expr r in
+    let exp_l = Entry.to_smt_expr smt_ctx l in
+    let exp_r = Entry.to_smt_expr smt_ctx r in
     match cond with
     | Ne -> Z3.Boolean.mk_not ctx (Z3.Boolean.mk_eq ctx exp_l exp_r)
     | Eq -> Z3.Boolean.mk_eq ctx exp_l exp_r
@@ -99,7 +99,7 @@ module ArchType (Entry: EntryType) = struct
     (* Maybe add constraint set here!!! *)
   }
 
-  type block_subtype = (t * (t list)) list
+  type block_subtype_t = t * (t list)
 
   let init_from_layout 
       (label: Isa.label)
@@ -120,7 +120,7 @@ module ArchType (Entry: EntryType) = struct
 
   let init_block_subtype_from_layout
       (func: Isa.func) (start_var: entry_t) (start_pc: int)
-      (mem_layout: 'a MemType.mem_content) : entry_t * block_subtype =
+      (mem_layout: 'a MemType.mem_content) : entry_t * (block_subtype_t list) =
     let helper (acc_var: entry_t) (bb: Isa.basic_block) : entry_t * (t * (t list)) =
       let label = bb.label in
       let acc_var, block_type = (init_from_layout label acc_var start_pc mem_layout) in
@@ -189,7 +189,7 @@ module ArchType (Entry: EntryType) = struct
       (src: Isa.operand) :
       entry_t * t * (Constraint.t list) =
     match src with
-    | ImmOp imm -> (Entry.get_imm_type imm, curr_type, [])
+    | ImmOp imm -> (Entry.get_const_type imm, curr_type, [])
     | RegOp r -> (get_reg_type curr_type r, curr_type, [])
     | MemOp (disp, base, index, scale) ->
       (get_mem_op_type curr_type disp base index scale, curr_type, [])
@@ -315,8 +315,8 @@ module ArchType (Entry: EntryType) = struct
 
   let add_block_subtype
       (label: Isa.label)
-      (curr_type: t) (block_subtype: block_subtype) :
-      block_subtype =
+      (curr_type: t) (block_subtype: block_subtype_t list) :
+      block_subtype_t list =
     List.map (
       fun (x, x_sub) ->
         if x.label = label then x, curr_type :: x_sub
@@ -324,8 +324,8 @@ module ArchType (Entry: EntryType) = struct
     ) block_subtype
 
   let update_useful_var
-      (curr_type: t) (block_subtype: block_subtype) :
-      block_subtype =
+      (curr_type: t) (block_subtype: block_subtype_t list) :
+      block_subtype_t list =
     List.map (
       fun (x, x_sub) ->
         if x.label = curr_type.label then { x with useful_var = curr_type.useful_var}, x_sub
@@ -349,8 +349,8 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (inst: Isa.instruction)
-      (block_subtype: block_subtype) :
-      t * block_subtype =
+      (block_subtype: block_subtype_t list) :
+      t * block_subtype_t list =
     let _ = smt_ctx in
     match inst with
     | Jmp label ->
@@ -382,8 +382,8 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (inst: Isa.instruction)
-      (block_subtype: block_subtype) :
-      t * (Constraint.t list) * block_subtype =
+      (block_subtype: block_subtype_t list) :
+      t * (Constraint.t list) * block_subtype_t list =
     (* Update pc here!!! *)
     match inst with
     | Jmp _ | Jcond _ ->

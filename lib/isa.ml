@@ -285,7 +285,7 @@ module Isa = struct
 
   type bop =
     | Add | Adc | Sub
-    | Mul | Imul
+    | Mul (* unsigned multiply *) | Imul (* signed multiply *)
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
