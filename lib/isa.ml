@@ -384,6 +384,9 @@ module Isa = struct
     imm_var_map: imm_var_map;
   }
 
+  let get_func (p: prog) (func_name: label) : func =
+    List.find (fun (x: func) -> x.name = func_name) p.funcs
+
   let is_label_function_entry (l: label) = l.[0] <> '.'
 
   let inst_referring_label (m: string) : bool =

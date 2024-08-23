@@ -1,5 +1,6 @@
 open Isa
 open Entry_type
+open Pretty_print
 
 module RegType (Entry: EntryType) = struct
   exception RegTypeError of string
@@ -7,6 +8,13 @@ module RegType (Entry: EntryType) = struct
 
   type entry_t = Entry.t
   type t = entry_t list
+
+  let pp_reg_type (lvl: int) (reg: t) =
+    PP.print_lvl lvl "<RegType>\n";
+    List.iteri (
+      fun i entry -> 
+        PP.print_lvl (lvl + 1) "<%s>\t%s\n" (Isa.string_of_reg_idx i) (Entry.to_string entry)
+    ) reg
 
   let get_reg_type (reg_type: t) (r: Isa.register) : entry_t =
     let reg_idx = Isa.get_reg_idx r in

@@ -49,9 +49,52 @@ module MemType (Entry: EntryType) = struct
   type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) list
   type t = entry_t mem_content
 
-  let init_mem_type_from_layout
-      (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
-    let _ = mem_layout in start_var, []
+  let pp_mem_type (lvl: int) (mem: t) =
+    PP.print_lvl lvl "<MemType>\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
+        List.iter (
+          fun (off, _, entry) ->
+            PP.print_lvl (lvl + 2) "%s\t%s\n" (MemOffset.to_string off) (Entry.to_string entry)
+        ) off_list
+    ) mem
+
+  let fold_left
+      (func: 'acc -> 'a -> 'acc)
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc =
+    let helper_inner
+        (acc: 'acc) (entry: MemOffset.t * MemRange.t * 'a) : 'acc =
+      let _, _, e = entry in
+      func acc e
+    in
+    let helper_outer
+        (acc: 'acc) (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 'acc =
+      let _, l = entry in
+      List.fold_left helper_inner acc l
+    in
+    List.fold_left helper_outer acc mem
+
+  let fold_left_map
+      (func: 'acc -> 'a -> ('acc * 'a))
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc * ('a mem_content) =
+    let helper_inner
+        (acc: 'acc) (entry: MemOffset.t * MemRange.t * 'a): 
+        'acc * (MemOffset.t * MemRange.t * 'a) =
+      let off, range, e = entry in
+      let acc, e = func acc e in
+      acc, (off, range, e)
+    in
+    let helper_outer
+        (acc: 'acc) (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
+        'acc * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) =
+      let id, l = entry in
+      let acc, l = List.fold_left_map helper_inner acc l in
+      acc, (id, l)
+    in
+    List.fold_left_map helper_outer acc mem
 
   let fold_left2 
       (func: 'acc -> 'a -> 'b -> 'acc)
@@ -77,6 +120,28 @@ module MemType (Entry: EntryType) = struct
       else mem_type_error "[fold_left2] ptr does not match"
     in
     List.fold_left2 helper_outer acc mem1 mem2
+
+  let add_base_to_offset (mem_layout: 'a mem_content) : 'a mem_content =
+    List.map (
+      fun (base, off_list) ->
+        (base,
+        List.map (
+          fun ((l, r), range, entry) ->
+            (SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)), 
+            SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, r))),
+            range, entry
+        ) off_list
+        )
+    ) mem_layout
+
+  let init_mem_type_from_layout
+      (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
+    let helper (acc: entry_t) (entry: 'a) : entry_t * 'a =
+      let _ = entry in
+      Entry.next_var acc, acc
+    in
+    fold_left_map helper start_var mem_layout
+    (* let _ = mem_layout in start_var, [] *)
 
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)

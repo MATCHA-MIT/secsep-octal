@@ -353,6 +353,17 @@ module SingleExp = struct
     | SingleUExp (_, e) -> get_vars e
     | _ -> SingleVarSet.empty
 
+  let is_val (global_var: SingleVarSet.t) (e: t) : bool =
+    SingleVarSet.is_empty (SingleVarSet.diff (get_vars e) global_var)
+
+  let rec repl_var_exp (e: t) (v_idx_exp: Isa.imm_var_id * t) : t =
+    let idx, v_exp = v_idx_exp in
+    match e with
+    | SingleVar v -> if v = idx then v_exp else e
+    | SingleBExp (bop, e1, e2) -> SingleBExp (bop, repl_var_exp e1 v_idx_exp, repl_var_exp e2 v_idx_exp)
+    | SingleUExp (uop, e) -> SingleUExp (uop, repl_var_exp e v_idx_exp)
+    | _ -> e
+
   let rec get_imm_type (i: Isa.immediate) : t =
     match i with
     | ImmNum v -> SingleConst v

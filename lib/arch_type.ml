@@ -92,7 +92,9 @@ module ArchType (Entry: EntryType) = struct
     reg_type: RegType.t;
     mem_type: MemType.t;
     flag: entry_t * entry_t;
-    branch_hist: CondType.t list;
+    branch_hist: (CondType.t * int) list;
+    full_not_taken_hist: (Constraint.t * int) list;
+    constraint_list: (Constraint.t * int) list;
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
     useful_var: SingleExp.SingleVarSet.t
@@ -100,6 +102,39 @@ module ArchType (Entry: EntryType) = struct
   }
 
   type block_subtype_t = t * (t list)
+
+  let pp_arch_type (lvl: int) (curr_type: t) =
+    PP.print_lvl lvl "<ArchType %s %d>\n" curr_type.label curr_type.pc;
+    RegType.pp_reg_type lvl curr_type.reg_type;
+    MemType.pp_mem_type lvl curr_type.mem_type
+
+  let pp_arch_type_list (lvl: int) (type_list: t list) =
+    List.iter (pp_arch_type lvl) type_list
+
+  let pp_arch_type_useful_var (lvl: int) (curr_type: t) =
+    let var_s = String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list curr_type.useful_var)) in
+    PP.print_lvl lvl "%s\t%s\n" curr_type.label var_s
+
+  let pp_block_subtype_useful_var_list (lvl: int) (block_subtype_list: block_subtype_t list) =
+    List.iter (
+      fun (x, _) -> pp_arch_type_useful_var lvl x
+    ) block_subtype_list
+
+  let init_func_input_from_layout
+      (label: Isa.label) (start_var: entry_t) (start_pc: int) (mem_type: MemType.t) : t =
+    let _, reg_type = RegType.init_reg_type start_var in
+    {
+      label = label;
+      pc = start_pc;
+      reg_type = reg_type;
+      mem_type = mem_type;
+      flag = (Entry.get_top_type, Entry.get_top_type);
+      branch_hist = [];
+      full_not_taken_hist = [];
+      constraint_list = [];
+      local_var_map = Entry.get_empty_var_map;
+      useful_var = SingleExp.SingleVarSet.empty
+    }
 
   let init_from_layout 
       (label: Isa.label)
@@ -114,6 +149,8 @@ module ArchType (Entry: EntryType) = struct
       mem_type = mem_type;
       flag = (Entry.get_top_type, Entry.get_top_type);
       branch_hist = [];
+      full_not_taken_hist = [];
+      constraint_list = [];
       local_var_map = Entry.get_empty_var_map;
       useful_var = SingleExp.SingleVarSet.empty
     }
@@ -127,6 +164,23 @@ module ArchType (Entry: EntryType) = struct
       acc_var, (block_type, [])
     in
     List.fold_left_map helper start_var func.body
+
+  let init_block_subtype_list_from_block_type_list
+      (func_type: t list) : block_subtype_t list =
+    List.map (fun x -> x, []) func_type
+
+  let update_with_block_subtype
+      (block_subtype: block_subtype_t list) (func_type: t list) : t list =
+    List.map2 (
+      fun (x: block_subtype_t) (y: t) ->
+        let x, _ = x in
+        if x.label = y.label then 
+          { y with 
+            useful_var = x.useful_var;
+            full_not_taken_hist = x.full_not_taken_hist
+          }
+        else arch_type_error "update_useful_var label does not match"
+    ) block_subtype func_type
 
   let get_reg_type (curr_type: t) (r: Isa.register) : entry_t =
     RegType.get_reg_type curr_type.reg_type r
@@ -216,11 +270,22 @@ module ArchType (Entry: EntryType) = struct
       ({ next_type with useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful }, dest_constraint)
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
 
+  let constriant_list_add_pc
+      (constraint_list: Constraint.t list) (pc: int) :
+      (Constraint.t * int) list =
+    List.map (fun x -> x, pc) constraint_list
+
+  let add_constraints
+      (curr_type: t) (new_constraints: Constraint.t list) : t =
+    {
+      curr_type with constraint_list = (List.map (fun x -> x, curr_type.pc) new_constraints)
+    }
+
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (inst: Isa.instruction) :
-      t * (Constraint.t list) =
+      t =
     (* We do not update pc in this function! Should update outside!!! *)
     let curr_type = { curr_type with flag = (Entry.get_top_type, Entry.get_top_type) } in
     match inst with
@@ -230,8 +295,8 @@ module ArchType (Entry: EntryType) = struct
       let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, 
-      src0_constraint @ src1_constraint @ dest_constraint
+      let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint) in
+      { next_type with local_var_map = new_local_var }
     (* | UInst (Mov, dest, src)
     | UInst (Lea, dest, src) ->
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
@@ -261,14 +326,16 @@ module ArchType (Entry: EntryType) = struct
       in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
+      let next_type = add_constraints next_type (src_constraint @ dest_constraint) in
+      { next_type with local_var_map = new_local_var }
     | Xchg (dest0, dest1, src0, src1) ->
       let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
       let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
       let next_type, dest0_constraint = set_dest_op_type smt_ctx curr_type dest0 src1_type in
       let next_type, dest1_constraint = set_dest_op_type smt_ctx next_type dest1 src0_type in
-      next_type, 
-      src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint
+      add_constraints next_type (src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint)
+      (* next_type, 
+      src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint *)
     | Cmp (src0, src1) ->
       let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
       let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
@@ -279,15 +346,15 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp src0_type))
           (SingleExp.get_vars (Entry.get_single_exp src1_type))
       in
-      { curr_type with flag = (src0_type, src1_type); useful_var = useful_vars },
-      src0_constraint @ src1_constraint
+      let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
+      { curr_type with flag = (src0_type, src1_type); useful_var = useful_vars }
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
       let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
       let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst Isa.And src0_type src1_type) in
       let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
-      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); useful_var = useful_vars },
-      src0_constraint @ src1_constraint
+      let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
+      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); useful_var = useful_vars }
     | Push src ->
       let size = Isa.get_op_size src in
       let rsp_type, curr_type, _ = get_src_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) in
@@ -298,10 +365,11 @@ module ArchType (Entry: EntryType) = struct
       let curr_type, _ = set_dest_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size)) src_type in
-      next_type, src_constraint @ dest_constraint
+      add_constraints next_type (src_constraint @ dest_constraint)
+      (* next_type, src_constraint @ dest_constraint *)
     | Pop dst ->
       let size = Isa.get_op_size dst in
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size)) in
+      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type (Isa.LdOp (None, Some Isa.RSP, None, None, size)) in
       let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dst src_type in
       let rsp_type, curr_type, _ = get_src_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
@@ -309,8 +377,9 @@ module ArchType (Entry: EntryType) = struct
           (Entry.exe_bop_inst Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
       let next_type, _ = set_dest_op_type smt_ctx next_type (Isa.RegOp Isa.RSP) new_rsp_type in
-      next_type, src_constraint @ dest_constraint
-    | Nop | Syscall | Hlt -> curr_type, []
+      add_constraints next_type (src_constraint @ dest_constraint)
+      (* next_type, src_constraint @ dest_constraint *)
+    | Nop | Syscall | Hlt -> curr_type
     | _ -> arch_type_error "inst not implemented"
 
   let add_block_subtype
@@ -323,14 +392,19 @@ module ArchType (Entry: EntryType) = struct
         else x, x_sub
     ) block_subtype
 
-  let update_useful_var
-      (curr_type: t) (block_subtype: block_subtype_t list) :
+  let update_with_end_type
+      (final_type: t) (block_subtype: block_subtype_t list) :
       block_subtype_t list =
-    List.map (
-      fun (x, x_sub) ->
-        if x.label = curr_type.label then { x with useful_var = curr_type.useful_var}, x_sub
-        else x, x_sub
-    ) block_subtype
+      List.map (
+        fun (x, x_sub) ->
+          if x.label = final_type.label then 
+            { x with 
+              useful_var = final_type.useful_var;
+              full_not_taken_hist = final_type.full_not_taken_hist
+            }, 
+            x_sub
+          else x, x_sub
+      ) block_subtype
 
   let update_branch_hist_get_not_taken_cond
       (smt_ctx: SmtEmitter.t)
@@ -341,8 +415,8 @@ module ArchType (Entry: EntryType) = struct
     | None -> curr_type, curr_type, []
     | Some taken_type -> 
       let not_taken_type = CondType.not_cond_type taken_type in
-      { curr_type with branch_hist = taken_type :: curr_type.branch_hist}, 
-      { curr_type with branch_hist = not_taken_type :: curr_type.branch_hist},
+      { curr_type with branch_hist = (taken_type, curr_type.pc) :: curr_type.branch_hist}, 
+      { curr_type with branch_hist = (not_taken_type, curr_type.pc) :: curr_type.branch_hist},
       [ CondType.to_smt_expr smt_ctx not_taken_type ]
 
   let type_prop_branch
@@ -357,7 +431,7 @@ module ArchType (Entry: EntryType) = struct
       (* 1. Add curr_type to target block's subtype *)
       let block_subtype = (add_block_subtype label curr_type block_subtype) in
       (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)
-      let block_subtype = (update_useful_var curr_type block_subtype) in
+      let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
       curr_type, block_subtype
     | Jcond (cond, label) ->
       (* TODO: Add constraint: branch cond is untainted!!! *)
@@ -383,19 +457,49 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (inst: Isa.instruction)
       (block_subtype: block_subtype_t list) :
-      t * (Constraint.t list) * block_subtype_t list =
+      t * block_subtype_t list =
     (* Update pc here!!! *)
-    match inst with
-    | Jmp _ | Jcond _ ->
-      let next_type, block_subtype = type_prop_branch smt_ctx curr_type inst block_subtype in
-      {next_type with pc = next_type.pc + 1}, [], block_subtype
-    | Call _ ->
-      Printf.printf "Warning: haven't implemented so far!";
-      {curr_type with pc = curr_type.pc + 1}, [], block_subtype
-    | _ ->
-      let next_type, constraints = type_prop_non_branch smt_ctx curr_type inst in
-      {next_type with pc = next_type.pc + 1}, constraints, block_subtype
+    let next_type, block_subtype = 
+      match inst with
+      | Jmp _ | Jcond _ ->
+        type_prop_branch smt_ctx curr_type inst block_subtype
+      | Call _ ->
+        Printf.printf "Warning: haven't implemented so far!\n";
+        curr_type, block_subtype
+      | _ ->
+        type_prop_non_branch smt_ctx curr_type inst, block_subtype
+    in
+    {next_type with pc = next_type.pc + 1}, block_subtype
 
-  (* let block_subtype_to_constraints *)
+  let type_prop_block
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t)
+      (block: Isa.instruction list)
+      (block_subtype: block_subtype_t list) :
+      t * (block_subtype_t list) =
+    List.fold_left (
+      fun (curr, b_sub) inst -> type_prop_inst smt_ctx curr inst b_sub
+    ) (curr_type, block_subtype) block
+
+  let get_branch_hist 
+      (block_subtype_list: block_subtype_t list) 
+      (target_pc: int) (branch_pc: int) : (CondType.t * int) list =
+    match List.find_opt (fun (x, _) -> x.pc = target_pc) block_subtype_list with
+    | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find target_pc %d" target_pc)
+    | Some (_, sub_list) ->
+      begin match List.find_map (fun x -> if x.pc = branch_pc then Some x.branch_hist else None) sub_list with
+      | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find branch_pc %d" branch_pc)
+      | Some branch_hist -> branch_hist
+      end
+
+  let get_pc_cond_from_branch_hist
+      (branch_hist: (CondType.t * int) list) (pc: int) : CondType.t option =
+    List.find_map (fun (cond, cond_pc) -> if pc = cond_pc then Some cond else None) branch_hist
+
+  let get_branch_cond
+      (block_subtype_list: block_subtype_t list) 
+      (target_pc: int) (branch_pc: int) : CondType.t option =
+    let branch_hist = get_branch_hist block_subtype_list target_pc branch_pc in
+    get_pc_cond_from_branch_hist branch_hist branch_pc
 
 end
