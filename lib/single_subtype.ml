@@ -1,57 +1,10 @@
 open Isa
 open Single_exp
 open Single_entry_type
+open Range_exp
 open Arch_type
 open Smt_emitter
 open Pretty_print
-
-module RangeExp = struct
-  exception RangeExpError of string
-
-  let range_exp_error msg = raise (RangeExpError ("[Range Exp Error] " ^ msg))
-
-  type t = (* TODO: Maybe need more... *)
-    | Single of SingleEntryType.t
-    | Range of SingleEntryType.t * SingleEntryType.t * int64 (* begin, end, step *)
-    | SingleSet of SingleEntryType.t list
-    | Top
-
-  let to_string (e: t) : string =
-    match e with
-    | Single e -> Printf.sprintf "{%s}" (SingleEntryType.to_string e)
-    | Range (a, b, step) -> Printf.sprintf "[%s, %s]%Ld" (SingleEntryType.to_string a) (SingleEntryType.to_string b) step
-    | SingleSet e_list ->
-      let str_list = List.map SingleEntryType.to_string e_list in
-      Printf.sprintf "{%s}" (String.concat ", " str_list)
-    | Top -> "Top"
-
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (v_idx: int) (r: t) : SmtEmitter.exp_t =
-    let ctx, _ = smt_ctx in
-    let v_exp = SingleEntryType.to_smt_expr smt_ctx (SingleVar v_idx) in
-    match r with
-    | Single e -> Z3.Boolean.mk_eq ctx v_exp (SingleEntryType.to_smt_expr smt_ctx e)
-    | Range (a, b, step) ->
-      let a_exp = SingleEntryType.to_smt_expr smt_ctx a in
-      let b_exp = SingleEntryType.to_smt_expr smt_ctx b in
-      let step = SingleEntryType.to_smt_expr smt_ctx (SingleConst step) in
-      let a_le_v = Z3.BitVector.mk_sle ctx a_exp v_exp in
-      let v_le_b = Z3.BitVector.mk_sle ctx v_exp b_exp in
-      let mod_step_eq_0 = 
-        Z3.Boolean.mk_eq ctx 
-          (Z3.BitVector.mk_smod ctx (Z3.BitVector.mk_sub ctx v_exp a_exp) step) 
-          (SingleEntryType.to_smt_expr smt_ctx (SingleConst 0L)) 
-      in
-      Z3.Boolean.mk_and ctx [a_le_v; v_le_b; mod_step_eq_0]
-    | SingleSet e_list ->
-      let eq_exp_list =
-        List.map (
-          fun x -> Z3.Boolean.mk_eq ctx v_exp (SingleEntryType.to_smt_expr smt_ctx x)
-        ) e_list
-      in
-      Z3.Boolean.mk_or ctx eq_exp_list
-    | Top -> Z3.Boolean.mk_true ctx
-
-end
 
 module SingleSol = struct
   exception SingleSolError of string
@@ -121,6 +74,12 @@ module SingleSubtype = struct
       in
       entry :: tv_rel, entry
 
+  let filter_entry (tv_rel: t) (var_set: SingleExp.SingleVarSet.t) : t =
+    List.filter (
+      fun (x: type_rel) ->
+        let v_idx, _ =  x.var_idx in
+        SingleExp.SingleVarSet.mem v_idx var_set
+    ) tv_rel
 
   let type_list_insert 
       (type_list: type_exp_t list) (ty: type_exp_t) : type_exp_t list =
@@ -353,6 +312,82 @@ module SingleSubtype = struct
           SmtEmitter.add_assertions smt_ctx [ to_smt_expr smt_ctx x ]
         else ()
     ) sol
+
+  let sub_sol_single_to_range
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (e: type_exp_t) : RangeExp.t =
+    let find_var_sol (v: Isa.imm_var_id) (v_pc: int) : RangeExp.t =
+      match List.find_opt (fun (x: type_rel) -> let id, _ =  x.var_idx in v = id) tv_rel_list with
+      | Some tv_rel ->
+        let _, block_pc = tv_rel.var_idx in
+        begin match tv_rel.sol with
+        | SolNone -> Top
+        | SolSimple s -> s
+        | SolCond (cond_pc, exp, _, exp_not_taken) ->
+          if v_pc >= block_pc && v_pc <= cond_pc then exp
+          else if v_pc > cond_pc then exp_not_taken
+          else single_subtype_error (Printf.sprintf "find_var_sol wrong exp pc var %d %d smaller than %d" v v_pc cond_pc)
+        end
+      | None -> Top
+    in
+    let e, e_pc = e in
+    let rec helper (e: SingleEntryType.t) : RangeExp.t =
+      match e with
+      | SingleTop -> Top
+      | SingleConst c -> Single (SingleConst c)
+      | SingleVar v ->
+        if SingleEntryType.SingleVarSet.mem v input_var_set then Single e
+        else begin match find_var_sol v e_pc with
+        | Single e_sub -> helper e_sub
+        | Range (l, r, step) ->
+          if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
+            Range (l, r, step)
+          else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step))))
+        | SingleSet e_list ->
+          if List.find_opt (fun x -> not (SingleExp.is_val input_var_set x)) e_list = None then
+            SingleSet e_list
+          else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (SingleSet e_list)))
+        | Top -> Top
+        end          
+      | SingleBExp (bop, e1, e2) ->
+        begin match bop, helper e1, helper e2 with
+        | op, Single e1, Single e2 -> Single (SingleEntryType.eval (SingleBExp (op, e1, e2)))
+        | SingleAdd, Single e, Range (e1, e2, s)
+        | SingleAdd, Range (e1, e2, s), Single e ->
+          Range (SingleEntryType.eval (SingleBExp (SingleAdd, e, e1)), SingleEntryType.eval (SingleBExp (SingleAdd, e, e2)), s)
+        | SingleAdd, Single e, SingleSet e_list
+        | SingleAdd, SingleSet e_list, Single e ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list)
+        | SingleSub, Single e, Range (e1, e2, s) ->
+          Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), s)
+        | SingleSub, Range (e1, e2, s), Single e ->
+          Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), s)
+        | SingleSub, Single e, SingleSet e_list ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list)
+        | SingleSub, SingleSet e_list, Single e ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, x, e))) e_list)
+        | SingleMul, Single (SingleConst 0L), _
+        | SingleMul, _, Single (SingleConst 0L) -> Single (SingleConst 0L)
+        | SingleMul, Single (SingleConst c), Range (e1, e2, s)
+        | SingleMul, Range (e1, e2, s), Single (SingleConst c) ->
+          if c = 0L then Single (SingleConst 0L)
+          else if c > 0L then
+            Range (SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e1)),
+            SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
+            Int64.mul c s)
+          else
+            Range (SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
+            SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e1)),
+            Int64.neg (Int64.mul c s))
+        | SingleMul, Single e, SingleSet e_list
+        | SingleMul, SingleSet e_list, Single e ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list)
+        | _ -> Top (* TODO: maybe need to handle more cases here *)
+        end
+      | SingleUExp _ -> Top
+    in
+    helper e
 
   let try_solve_one_var
       (* (smt_ctx: SmtEmitter.t) *) (* Maybe I need add_no_overflow later *)

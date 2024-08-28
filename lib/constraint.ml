@@ -9,4 +9,12 @@ module Constraint = struct
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
     (* TODO: Add taint constraint later *)
 
+  let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =
+    List.filter_map (
+      fun (x, pc) ->
+        match x with
+        | Unknown off -> Some (off, pc)
+        | _ -> None
+    ) constraint_list
+
 end

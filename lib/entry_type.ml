@@ -1,5 +1,6 @@
 open Isa
 open Single_exp
+open Constraint
 open Smt_emitter
 
 module type EntryType = sig
@@ -20,7 +21,10 @@ module type EntryType = sig
   val next_var : t -> t
   val to_string : t -> string
   val read_val: int64 -> int64 -> t -> t (* off -> sz -> type: read tppe of [off, off+sz] *)
+  val mem_partial_read_val: t -> t (* a lazy implementation to handle partially reading a mem entry *)
+  val mem_partial_write_val: t -> t -> t (* a lazy implementation to handle partially writing a mem entry *)
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)
+  val get_write_constraint: t -> t -> Constraint.t list
 
   val exe_bop_inst: Isa.bop -> t -> t -> t
   val exe_uop_inst: Isa.uop -> t -> t

@@ -395,4 +395,20 @@ module SingleExp = struct
       )
     )
 
+  let rec filter_single_var (addr: t) : SingleVarSet.t =
+    match addr with
+    | SingleVar x -> SingleVarSet.singleton x
+    | SingleBExp (SingleAdd, l, r) ->
+      let left_ptr = filter_single_var l in
+      let right_ptr = filter_single_var r in
+      SingleVarSet.union left_ptr right_ptr
+    | _ -> SingleVarSet.empty
+
+  let find_base (e: t) (ptr_set: SingleVarSet.t) : Isa.imm_var_id option =
+    let p_set = filter_single_var e in
+    match SingleVarSet.to_list (SingleVarSet.inter ptr_set p_set) with
+    | [] -> None
+    | hd :: [] -> Some hd
+    | _ -> single_exp_error (Printf.sprintf "find_base find more than one base for %s" (to_string e))
+
 end

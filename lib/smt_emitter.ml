@@ -30,8 +30,38 @@ module SmtEmitter = struct
       Solver.add z3_solver [a]
     ) assertions
 
-  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) (_: bool) : exp_t =
-    let add_constr = true in
+  type sat_result_t =
+  | SatYes
+  | SatNo
+  | SatUnknown
+
+  let check_compliance (smt_ctx: t) (assertions: Expr.expr list) : sat_result_t =
+    let ctx, z3_solver = smt_ctx in
+    let assertions = 
+      List.filter_map (
+        fun e -> 
+          let e = Z3.Expr.simplify e None in
+          if Z3.Boolean.is_true e then None else Some e
+      ) assertions
+    in
+    if List.length assertions = 0 then SatYes 
+    else
+      let not_assertions =
+        List.map (
+          fun x -> Z3.Expr.simplify (Z3.Boolean.mk_not ctx x) None
+        ) assertions
+      in
+      let negation = Z3.Boolean.mk_or ctx not_assertions in
+      let result_sat = Z3.Solver.check z3_solver assertions in
+      let result_neg = Z3.Solver.check z3_solver [negation] in
+      match result_sat, result_neg with
+      | Z3.Solver.UNKNOWN, _ | _, Z3.Solver.UNKNOWN
+      | Z3.Solver.SATISFIABLE, Z3.Solver.SATISFIABLE -> SatUnknown
+      | Z3.Solver.SATISFIABLE, Z3.Solver.UNSATISFIABLE -> SatYes
+      | Z3.Solver.UNSATISFIABLE, _ -> SatNo
+
+  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) (add_constr: bool) : exp_t =
+    (* let add_constr = true in *)
     let z3_ctx, _ = smt_ctx in
     match se with
     | SingleTop -> smt_emitter_error "expr_of_single_exp cannot convert SingleTop!!!"

@@ -1,80 +1,12 @@
 open Pretty_print
 open Entry_type
+open Cond_type_new
 open Reg_type_new
 open Mem_type_new
 open Smt_emitter
 open Isa
 open Single_exp
 open Constraint
-
-module CondType (Entry: EntryType) = struct
-  exception CondTypeError of string
-  let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
-
-  type entry_t = Entry.t
-
-  type cond = 
-    | Eq | Ne
-    | Le | Lt (* Signed comparison *)
-    | Be | Bt (* Unsigned comparison *)
-
-  type t = cond * entry_t * entry_t
-
-  let not_cond_type (cond: t) : t =
-    match cond with
-    | (Eq, l, r) -> (Ne, l, r)
-    | (Ne, l, r) -> (Eq, l, r)
-    | (Le, l, r) -> (Lt, r, l)
-    | (Lt, l, r) -> (Le, r, l)
-    | (Be, l, r) -> (Bt, r, l)
-    | (Bt, l, r) -> (Be, l, r)
-
-  let to_string (cond: t) =
-    let c, l, r = cond in
-    let s = match c with
-    | Eq -> "Eq" | Ne -> "Ne"
-    | Le -> "Le" | Lt -> "Lt"
-    | Be -> "Be" | Bt -> "Bt"
-    in
-    Printf.sprintf "%s(%s,%s)" s (Entry.to_string l) (Entry.to_string r)
-    (* s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")" *)
-
-  let get_taken_type (cond: Isa.branch_cond) (flag: entry_t * entry_t) : t option =
-    let l, r = flag in
-    match cond with
-    | JNe -> Some (Ne, l, r)
-    | JE -> Some (Eq, l, r)
-    | JL -> Some (Lt, l, r)
-    | JLe -> Some (Le, l, r)
-    | JG -> Some (Lt, r, l)
-    | JGe -> Some (Le, r, l)
-    | JB -> Some (Bt, l, r)
-    | JBe -> Some (Be, l, r)
-    | JA -> Some (Bt, r, l)
-    | JAe -> Some (Be, r, l)
-    | JOther -> None
-
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
-    let ctx, _ = smt_ctx in
-    let cond, l, r = cond in
-    let exp_l = Entry.to_smt_expr smt_ctx l in
-    let exp_r = Entry.to_smt_expr smt_ctx r in
-    match cond with
-    | Ne -> Z3.Boolean.mk_not ctx (Z3.Boolean.mk_eq ctx exp_l exp_r)
-    | Eq -> Z3.Boolean.mk_eq ctx exp_l exp_r
-    | Le -> Z3.BitVector.mk_sle ctx exp_l exp_r
-    | Lt -> Z3.BitVector.mk_slt ctx exp_l exp_r
-    | Be -> Z3.BitVector.mk_ule ctx exp_l exp_r
-    | Bt -> Z3.BitVector.mk_ult ctx exp_l exp_r
-
-  let pp_cond (lvl: int) (cond: t) =
-    PP.print_lvl lvl "%s\n" (to_string cond)
-
-  let pp_cond_list (lvl: int) (cond_list: t list) =
-    PP.print_lvl lvl "<Cond list>\n";
-    List.iter (fun x -> pp_cond (lvl + 1) x) (List.rev cond_list)
-
-end
 
 module ArchType (Entry: EntryType) = struct
   exception ArchTypeError of string
@@ -93,7 +25,7 @@ module ArchType (Entry: EntryType) = struct
     mem_type: MemType.t;
     flag: entry_t * entry_t;
     branch_hist: (CondType.t * int) list;
-    full_not_taken_hist: (Constraint.t * int) list;
+    full_not_taken_hist: (CondType.t * int) list;
     constraint_list: (Constraint.t * int) list;
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
@@ -155,6 +87,16 @@ module ArchType (Entry: EntryType) = struct
       useful_var = SingleExp.SingleVarSet.empty
     }
 
+  let clean_up (arch_type: t) : t =
+    { arch_type with
+      flag = (Entry.get_top_type, Entry.get_top_type);
+      branch_hist = [];
+      full_not_taken_hist = [];
+      constraint_list = [];
+      local_var_map = Entry.get_empty_var_map;
+      useful_var = SingleExp.SingleVarSet.empty
+    }
+
   let init_block_subtype_from_layout
       (func: Isa.func) (start_var: entry_t) (start_pc: int)
       (mem_layout: 'a MemType.mem_content) : entry_t * (block_subtype_t list) =
@@ -169,16 +111,25 @@ module ArchType (Entry: EntryType) = struct
       (func_type: t list) : block_subtype_t list =
     List.map (fun x -> x, []) func_type
 
+  let update_one_with_another_helper (orig: t) (update: t) : t =
+    { orig with
+      useful_var = update.useful_var;
+      full_not_taken_hist = update.full_not_taken_hist;
+      constraint_list = update.constraint_list
+    }
+
   let update_with_block_subtype
       (block_subtype: block_subtype_t list) (func_type: t list) : t list =
     List.map2 (
       fun (x: block_subtype_t) (y: t) ->
         let x, _ = x in
         if x.label = y.label then 
-          { y with 
+          update_one_with_another_helper y x
+          (* { y with 
             useful_var = x.useful_var;
-            full_not_taken_hist = x.full_not_taken_hist
-          }
+            full_not_taken_hist = x.full_not_taken_hist;
+            constraint_list = x.constraint_list;
+          } *)
         else arch_type_error "update_useful_var label does not match"
     ) block_subtype func_type
 
@@ -205,6 +156,7 @@ module ArchType (Entry: EntryType) = struct
       (size: int64) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     (* TODO: Add constriant: addr_type is untainted *)
+    (* TODO: ld/st op taint is not handled!!! *)
     let addr_type = get_mem_op_type curr_type disp base index scale in
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
@@ -215,7 +167,9 @@ module ArchType (Entry: EntryType) = struct
     in
     match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
     | Some (off_w, off_r, e_t) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
-    | None -> Entry.get_top_type, [ Unknown addr_offset ], useful_vars
+    | None -> 
+      (* Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
+      Entry.get_top_type, [ Unknown addr_offset ], useful_vars
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -225,6 +179,7 @@ module ArchType (Entry: EntryType) = struct
       (size: int64) (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     (* TODO: Add constriant: addr_type is untainted *)
+    (* TODO: ld/st op taint is not handled!!! *)
     let addr_type = get_mem_op_type curr_type disp base index scale in
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
@@ -235,7 +190,9 @@ module ArchType (Entry: EntryType) = struct
     in
     match MemType.set_mem_type smt_ctx curr_type.mem_type addr_offset new_type with
     | Some (new_mem, write_constraints) -> { curr_type with mem_type = new_mem }, write_constraints, useful_vars
-    | None -> curr_type, [ Unknown addr_offset ], useful_vars
+    | None -> 
+      (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
+      curr_type, [ Unknown addr_offset ], useful_vars
     
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
@@ -278,7 +235,7 @@ module ArchType (Entry: EntryType) = struct
   let add_constraints
       (curr_type: t) (new_constraints: Constraint.t list) : t =
     {
-      curr_type with constraint_list = (List.map (fun x -> x, curr_type.pc) new_constraints)
+      curr_type with constraint_list = (List.map (fun x -> x, curr_type.pc) new_constraints) @ curr_type.constraint_list
     }
 
   let type_prop_non_branch
@@ -398,10 +355,12 @@ module ArchType (Entry: EntryType) = struct
       List.map (
         fun (x, x_sub) ->
           if x.label = final_type.label then 
-            { x with 
+            update_one_with_another_helper x final_type,
+            (* { x with 
               useful_var = final_type.useful_var;
-              full_not_taken_hist = final_type.full_not_taken_hist
-            }, 
+              full_not_taken_hist = final_type.full_not_taken_hist;
+              constraint_list = final_type.constraint_list;
+            },  *)
             x_sub
           else x, x_sub
       ) block_subtype
@@ -501,5 +460,13 @@ module ArchType (Entry: EntryType) = struct
       (target_pc: int) (branch_pc: int) : CondType.t option =
     let branch_hist = get_branch_hist block_subtype_list target_pc branch_pc in
     get_pc_cond_from_branch_hist branch_hist branch_pc
+
+  let get_local_var_set (a_type: t) : SingleExp.SingleVarSet.t =
+    let helper (acc: SingleExp.SingleVarSet.t) (x: entry_t) =
+      SingleExp.SingleVarSet.union (SingleExp.get_vars (Entry.get_single_exp x)) acc
+    in
+    let reg_var_set = List.fold_left helper SingleExp.SingleVarSet.empty a_type.reg_type in
+    let mem_var_set = MemType.fold_left helper SingleExp.SingleVarSet.empty a_type.mem_type in
+    SingleExp.SingleVarSet.union reg_var_set mem_var_set
 
 end

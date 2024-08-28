@@ -1,6 +1,7 @@
 open Isa
 (* open Entry_type *)
 open Single_exp
+open Constraint
 open Smt_emitter
 
 module SingleEntryType = struct
@@ -32,12 +33,21 @@ include SingleExp
     let _ = sz in
     if off = 0L then e else SingleTop
 
+  let mem_partial_read_val (e: t) : t =
+    let _ = e in SingleTop
+
+  let mem_partial_write_val (e_old: t) (e_new: t) : t =
+    let _ = e_old, e_new in SingleTop
+
   let ext_val (ext_option: ext_t) (off: int64) (sz: int64) (e: t) : t =
     let _ = sz in
     match ext_option, off with
     | SignExt, 0L
     | ZeroExt, 0L -> e
     | _ -> SingleTop
+
+  let get_write_constraint (old_e: t) (new_e: t) : Constraint.t list = 
+    let _ = old_e, new_e in []
 
   let exe_bop_inst (isa_bop: Isa.bop) (e1: t) (e2: t) : t =
     match isa_bop with
