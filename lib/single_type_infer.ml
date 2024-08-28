@@ -114,7 +114,7 @@ module SingleTypeInfer = struct
             SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (r, pc)
         ) unknown_list
       in
-      let new_offset_list = List.map MemOffset.from_range unknown_range in
+      let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
       MemOffset.insert_new_offset_list infer_state.smt_ctx acc new_offset_list
     in
     let update_list = List.fold_left helper update_list infer_state.func_type in

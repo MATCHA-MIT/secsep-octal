@@ -61,15 +61,17 @@ module MemOffset = struct
     else Other
     (* TODO: Maybe need to handle Other!!! *)
 
-  let from_range (range_l_r: RangeExp.t * RangeExp.t) : t =
+  let from_range (range_l_r: RangeExp.t * RangeExp.t) : t option =
     match range_l_r with
-    | Single l, Single r -> l, r
-    | Single l, Range (_, r, _) -> l, r
-    | Range (l, _, _), Single r -> l, r
-    | Range (l, _, _), Range (_, r, _) -> l, r
+    | Single l, Single r -> Some (l, r)
+    | Single l, Range (_, r, _) -> Some (l, r)
+    | Range (l, _, _), Single r -> Some (l, r)
+    | Range (l, _, _), Range (_, r, _) -> Some (l, r)
     | l, r -> 
-      mem_offset_error 
-        (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r))
+      Printf.printf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r);
+      None
+      (* mem_offset_error 
+        (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
 
   let insert_new_offset_list
       (smt_ctx: SmtEmitter.t)
