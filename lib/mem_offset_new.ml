@@ -68,7 +68,7 @@ module MemOffset = struct
     | Range (l, _, _), Single r -> Some (l, r)
     | Range (l, _, _), Range (_, r, _) -> Some (l, r)
     | l, r -> 
-      Printf.printf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r);
+      Printf.printf "from_range cannot convert %s %s\n" (RangeExp.to_string l) (RangeExp.to_string r);
       None
       (* mem_offset_error 
         (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
