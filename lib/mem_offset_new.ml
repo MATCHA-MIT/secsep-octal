@@ -46,7 +46,7 @@ module MemOffset = struct
     let sub_helper e1 e2 = Z3.BitVector.mk_sub z3_ctx e1 e2 in 
     let eq_req = [ Z3.Boolean.mk_eq z3_ctx (sub_helper l1 l2) zero; Z3.Boolean.mk_eq z3_ctx (sub_helper r1 r2) zero ] in
     let le_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper r1 l2) zero ] in
-    let ge_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 r2) zero ] in
+    let ge_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper r2 l1) zero ] in
     let subset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r1 r2) zero ] in
     let supset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r2 r1) zero ] in
     let loverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l2 r1) zero ] in
@@ -93,9 +93,12 @@ module MemOffset = struct
           let hd_l, _ = hd_o in
           insert_one_offset tl (hd_l, new_r)
         | Other -> 
-          mem_offset_error 
+          Printf.printf "Warning insert_one_offset fail compare new offset %s with known offset %s\n" 
+              (to_string new_o) (to_string hd_o);
+          (hd_o, hd_updated) :: tl
+          (* mem_offset_error 
             (Printf.sprintf "insert_one_offset fail compare new offset %s with known offset %s" 
-              (to_string new_o) (to_string hd_o))
+              (to_string new_o) (to_string hd_o)) *)
         end
     in
     List.fold_left insert_one_offset ob_list new_o_list
