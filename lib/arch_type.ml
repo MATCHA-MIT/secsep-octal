@@ -93,8 +93,8 @@ module ArchType (Entry: EntryType) = struct
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
-      local_var_map = Entry.get_empty_var_map;
-      useful_var = SingleExp.SingleVarSet.empty
+      local_var_map = Entry.get_empty_var_map
+      (* useful_var = SingleExp.SingleVarSet.empty *)
     }
 
   let init_block_subtype_from_layout
@@ -304,14 +304,16 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp src1_type))
       in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (src0_type, src1_type); useful_var = useful_vars }
+      { curr_type with flag = (src0_type, src1_type); 
+        useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars }
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx curr_type src0 in
       let src1_type, curr_type, src1_constraint = get_src_op_type smt_ctx curr_type src1 in
       let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst Isa.And src0_type src1_type) in
       let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); useful_var = useful_vars }
+      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
+        useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars }
     | Push src ->
       let size = Isa.get_op_size src in
       let rsp_type, curr_type, _ = get_src_op_type smt_ctx curr_type (Isa.RegOp Isa.RSP) in
@@ -354,14 +356,19 @@ module ArchType (Entry: EntryType) = struct
       block_subtype_t list =
       List.map (
         fun (x, x_sub) ->
-          if x.label = final_type.label then 
-            update_one_with_another_helper x final_type,
+          if x.label = final_type.label then begin
+            let new_x = update_one_with_another_helper x final_type in
+            (* Printf.printf "update_with_end_type %s %s %s\n" 
+              new_x.label
+              (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list new_x.useful_var)))
+              (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list x.useful_var))); *)
             (* { x with 
               useful_var = final_type.useful_var;
               full_not_taken_hist = final_type.full_not_taken_hist;
               constraint_list = final_type.constraint_list;
             },  *)
-            x_sub
+            new_x, x_sub
+          end
           else x, x_sub
       ) block_subtype
 
@@ -408,7 +415,7 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp l_flag))
           (SingleExp.get_vars (Entry.get_single_exp r_flag))
       in
-      {not_taken_type with useful_var = useful_var}, block_subtype
+      {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var}, block_subtype
     | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
 
   let type_prop_inst
@@ -428,6 +435,7 @@ module ArchType (Entry: EntryType) = struct
       | _ ->
         type_prop_non_branch smt_ctx curr_type inst, block_subtype
     in
+    (* Printf.printf "type_prop_inst %s useful_vars %s\n" (Isa.string_of_instruction inst) (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list next_type.useful_var))); *)
     {next_type with pc = next_type.pc + 1}, block_subtype
 
   let type_prop_block

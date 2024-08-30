@@ -12,10 +12,6 @@ include SingleExp
   | ZeroExt
   | OldExt of t (* Used for memory slot partial update *)
 
-  type local_var_map_t = (Isa.imm_var_id * t) list
-
-  let get_empty_var_map : local_var_map_t = []
-
   let partial_read_val (e: t) : t =
     match e with
     | _ -> SingleTop
@@ -75,34 +71,6 @@ include SingleExp
   let get_const_type = get_imm_type
 
   let get_top_type : t = SingleTop
-
-  let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
-    let new_idx = -pc in
-    (new_idx, e) :: map, SingleVar new_idx
-
-  let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
-    List.find_map (fun (i, e) -> if i = idx then Some e else None) map
-
-  let repl_local_var (map: local_var_map_t) (e: t) : t =
-    let rec repl_helper (e: t) : t =
-      match e with
-      | SingleTop | SingleConst _ -> e
-      | SingleVar v ->
-        if v > 0 then e
-        else begin 
-          match find_local_var_map map v with
-          | Some e -> repl_helper e
-          | None -> e
-        end
-      | SingleBExp (bop, e1, e2) ->
-        let e1 = repl_helper e1 in
-        let e2 = repl_helper e2 in
-        eval (SingleBExp (bop, e1, e2))
-      | SingleUExp (uop, e) ->
-        let e = repl_helper e in
-        eval (SingleUExp (uop, e))
-    in
-    repl_helper e
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
     SmtEmitter.expr_of_single_exp smt_ctx e false

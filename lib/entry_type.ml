@@ -36,6 +36,9 @@ module type EntryType = sig
 
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)
   val update_local_var: local_var_map_t -> t -> int -> (local_var_map_t * t)
+  (* map, a, b: a is a var, add a->b to map *)
+  val add_local_var: local_var_map_t -> t -> t -> local_var_map_t
+
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t
 

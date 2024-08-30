@@ -27,6 +27,10 @@ module SingleExp = struct
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
 
+  type local_var_map_t = (Isa.imm_var_id * t) list
+
+  let get_empty_var_map : local_var_map_t = []
+
   let rec to_string (se: t) =
     match se with
     | SingleTop -> "Top"
@@ -327,6 +331,46 @@ module SingleExp = struct
     pp_single_exp 0 (convert_t (eval_t e));
     Printf.printf "\n====================\n"; *)
     convert_t (eval_t e)
+
+  let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
+    let new_idx = -pc in
+    (new_idx, e) :: map, SingleVar new_idx
+
+  let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
+    match e1 with
+    | SingleVar v -> 
+      begin match List.find_opt (fun (idx, _) -> idx = v) map with
+      | Some (_, e) -> 
+        if cmp e e2 = 0 then map 
+        else 
+          single_exp_error (Printf.sprintf "add_local var conflict on var %d exp %s and %s" v (to_string e) (to_string e2)) 
+      | None -> (v, e2) :: map
+      end
+    | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
+
+  let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
+    List.find_map (fun (i, e) -> if i = idx then Some e else None) map
+
+  let repl_local_var (map: local_var_map_t) (e: t) : t =
+    let rec repl_helper (e: t) : t =
+      match e with
+      | SingleTop | SingleConst _ -> e
+      | SingleVar v ->
+        if v > 0 then e
+        else begin 
+          match find_local_var_map map v with
+          | Some e -> repl_helper e
+          | None -> e
+        end
+      | SingleBExp (bop, e1, e2) ->
+        let e1 = repl_helper e1 in
+        let e2 = repl_helper e2 in
+        eval (SingleBExp (bop, e1, e2))
+      | SingleUExp (uop, e) ->
+        let e = repl_helper e in
+        eval (SingleUExp (uop, e))
+    in
+    repl_helper e
 
   let must_ge (e1: t) (e2: t) : bool =
     match eval (SingleBExp (SingleSub, e1, e2)) with

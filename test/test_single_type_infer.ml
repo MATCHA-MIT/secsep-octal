@@ -21,6 +21,6 @@ let p = Parser.parse_program (read_file "./asm/standalone_salsa20.c.s")
 (* let infer_state = SingleTypeInfer.init p "salsa20_block" salsa20_block_init_mem
 let infer_state = SingleTypeInfer.type_prop_all_blocks infer_state 10 *)
 
-let infer_state = SingleTypeInfer.infer p "salsa20_block" salsa20_block_init_mem 5 1
+let infer_state = SingleTypeInfer.infer p "salsa20_block" salsa20_block_init_mem 10 2
 
 let _ = SingleSubtype.pp_single_subtype 0 infer_state.single_subtype

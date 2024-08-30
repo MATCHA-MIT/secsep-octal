@@ -81,6 +81,7 @@ module SingleTypeInfer = struct
     let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
+      Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver);
       (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _, block_subtype = ArchType.type_prop_block (ctx, solver) block_type block.insts block_subtype in
       Z3.Solver.pop solver 1;
@@ -115,6 +116,8 @@ module SingleTypeInfer = struct
         ) unknown_list
       in
       let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
+      (* Printf.printf "update_mem\n";
+      MemOffset.pp_off_list 0 new_offset_list;  *)
       MemOffset.insert_new_offset_list infer_state.smt_ctx acc new_offset_list
     in
     let update_list = List.fold_left helper update_list infer_state.func_type in
@@ -156,11 +159,17 @@ module SingleTypeInfer = struct
       else begin
         Printf.printf "Infer iter %d type_prop_all_blocks\n" iter;
         let state = type_prop_all_blocks state solver_iter in
+        Printf.printf "After infer, single subtype\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        Printf.printf "After infer, unknown list:\n";
+        List.iter (
+          fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+        ) state.func_type;
         Printf.printf "Infer iter %d update_mem\n" iter;
         let state = update_mem state in
         Printf.printf "After update_mem\n";
         pp_func_type 0 state;
-        helper state (iter_left - 1)
+        helper (clean_up_func_type state) (iter_left - 1)
       end
     in
     helper init_infer_state iter

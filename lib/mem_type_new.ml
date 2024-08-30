@@ -60,6 +60,20 @@ module MemType (Entry: EntryType) = struct
         ) off_list
     ) mem
 
+  let map (func: 'a -> 'b) (mem: 'a mem_content) : 'b mem_content =
+    let helper_inner 
+        (entry: MemOffset.t * MemRange.t * 'a) : 
+        MemOffset.t * MemRange.t * 'b =
+      let off, range, e = entry in off, range, func e
+    in
+    let helper_outer 
+        (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
+        Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list) =
+      let ptr, part_mem = entry in
+      ptr, List.map helper_inner part_mem
+    in
+    List.map helper_outer mem
+
   let fold_left
       (func: 'acc -> 'a -> 'acc)
       (acc: 'acc)
@@ -199,6 +213,8 @@ module MemType (Entry: EntryType) = struct
       (mem: t)
       (addr_offset: MemOffset.t) :
       (MemOffset.t * MemRange.t * entry_t) option =
+    (* let _ = smt_ctx, mem, addr_offset in
+    None *)
     let ptr_set = get_ptr_set mem in
     let l, r = addr_offset in
     match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
@@ -257,6 +273,8 @@ module MemType (Entry: EntryType) = struct
       (addr_offset: MemOffset.t)
       (new_type: entry_t) :
       (t * (Constraint.t list)) option =
+    (* let _ = smt_ctx, mem, addr_offset, new_type in
+    None *)
     let _, _, _, _ = smt_ctx, mem, addr_offset, new_type in
     let ptr_set = get_ptr_set mem in
     let l, r = addr_offset in

@@ -38,6 +38,7 @@ module MemOffset = struct
 
   (* Semantically cmp*)
   let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : off_rel_t =
+    Printf.printf "offset_cmp\n%s\n%s\n\n" (to_string o1) (to_string o2);
     let z3_ctx, _ = smt_ctx in
     let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
@@ -50,14 +51,21 @@ module MemOffset = struct
     let subset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r1 r2) zero ] in
     let supset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r2 r1) zero ] in
     let loverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l2 r1) zero ] in
-    let roverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l1 r2) zero ] in
+    let goverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l1 r2) zero ] in
+    (* if (Printf.printf "check eq\n"; check eq_req = SatYes) then Eq
+    else if (Printf.printf "check le\n"; check le_req = SatYes) then Le
+    else if (Printf.printf "check ge\n"; check ge_req = SatYes) then Ge
+    else if (Printf.printf "check sub\n"; check subset_req = SatYes) then Subset
+    else if (Printf.printf "check sup\n"; check supset_req = SatYes) then Supset
+    else if (Printf.printf "check lo\n"; check loverlap_req = SatYes) then LOverlap
+    else if (Printf.printf "check go\n"; check goverlap_req = SatYes) then GOverlap *)
     if check eq_req = SatYes then Eq
     else if check le_req = SatYes then Le
     else if check ge_req = SatYes then Ge
     else if check subset_req = SatYes then Subset
     else if check supset_req = SatYes then Supset
     else if check loverlap_req = SatYes then LOverlap
-    else if check roverlap_req = SatYes then GOverlap
+    else if check goverlap_req = SatYes then GOverlap
     else Other
     (* TODO: Maybe need to handle Other!!! *)
 
@@ -104,6 +112,13 @@ module MemOffset = struct
         end
     in
     List.fold_left insert_one_offset ob_list new_o_list
+
+  let pp_off_list (lvl: int) (off_list: t list) =
+    PP.print_lvl lvl "MemOffset list\n";
+    List.iter (
+      fun off ->
+        PP.print_lvl (lvl + 1) "%s\n"(to_string off)
+    ) off_list
 
   let pp_unknown_list (lvl: int) (unknown_list: (t *  int) list) =
     PP.print_lvl lvl "Unknown list\n";
