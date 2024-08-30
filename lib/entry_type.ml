@@ -20,6 +20,7 @@ module type EntryType = sig
 
   val next_var : t -> t
   val to_string : t -> string
+  val cmp: t -> t -> int
   val read_val: int64 -> int64 -> t -> t (* off -> sz -> type: read tppe of [off, off+sz] *)
   val mem_partial_read_val: t -> t (* a lazy implementation to handle partially reading a mem entry *)
   val mem_partial_write_val: t -> t -> t (* a lazy implementation to handle partially writing a mem entry *)
@@ -41,6 +42,7 @@ module type EntryType = sig
 
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t
+  val is_val2 : SingleExp.SingleVarSet.t -> local_var_map_t -> t -> bool
 
   val to_smt_expr: SmtEmitter.t -> t -> SmtEmitter.exp_t
 end

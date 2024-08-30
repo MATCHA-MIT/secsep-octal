@@ -400,6 +400,14 @@ module SingleExp = struct
   let is_val (global_var: SingleVarSet.t) (e: t) : bool =
     SingleVarSet.is_empty (SingleVarSet.diff (get_vars e) global_var)
 
+  let is_val2 (global_var: SingleVarSet.t) (var_map: local_var_map_t) (e: t) : bool =
+    let var_set = 
+      List.fold_left (
+        fun acc (x, _) -> SingleVarSet.add x acc
+      ) global_var var_map 
+    in
+    is_val var_set e
+
   let rec repl_var_exp (e: t) (v_idx_exp: Isa.imm_var_id * t) : t =
     let idx, v_exp = v_idx_exp in
     match e with
