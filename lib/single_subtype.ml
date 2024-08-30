@@ -52,25 +52,26 @@ module SingleSubtype = struct
   module ArchType = ArchType (SingleEntryType)
 
   let pp_type_rel (lvl: int) (x: type_rel) =
-    let var_idx, _ = x.var_idx in
-    PP.print_lvl lvl "<SymImm %d>\n" var_idx;
+    let var_idx, var_pc = x.var_idx in
+    PP.print_lvl lvl "<SymImm %d> at pc %d\n" var_idx var_pc;
     PP.print_lvl (lvl + 1) "Sol: %s\n" (SingleSol.to_string x.sol);
     PP.print_lvl (lvl + 1) "Subtype: [\n";
     List.iter (fun (sub, pc) -> PP.print_lvl (lvl + 2) "%s, (%d);\n" (SingleEntryType.to_string sub) pc) x.subtype_list;
     PP.print_lvl (lvl + 1) "]\n";
     PP.print_lvl (lvl + 1) "Supertype: [%s]\n" 
-      (String.concat "; " (List.map (fun (v, _) -> string_of_int v) x.supertype_list))
+      (String.concat "; " (List.map (fun (v, pc) -> Printf.sprintf "%d,%d" v pc) x.supertype_list))
 
   let pp_single_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
 
-  let find_or_add_entry (tv_rel: t) (var_idx: var_idx_t) : t * type_rel =
-    let find_entry = List.find_opt (fun x -> x.var_idx = var_idx) tv_rel in
+  let find_or_add_entry (var_pc_map: var_idx_t list) (tv_rel: t) (var_idx: int) : t * type_rel =
+    let find_entry = List.find_opt (fun x -> let v_idx, _ = x.var_idx in v_idx = var_idx) tv_rel in
     match find_entry with
     | Some entry -> tv_rel, entry
     | None ->
       let entry = 
-        { var_idx = var_idx; sol = SingleSol.SolNone; subtype_list = []; supertype_list = [] } 
+        { var_idx = List.find (fun (v_idx, _) -> v_idx = var_idx) var_pc_map; 
+        sol = SingleSol.SolNone; subtype_list = []; supertype_list = [] } 
       in
       entry :: tv_rel, entry
 
@@ -102,30 +103,33 @@ module SingleSubtype = struct
     { tv_rel with supertype_list = type_var_list_insert tv_rel.supertype_list t_idx }
 
   (* Connect a->b *)
-  let add_one_sub_super (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: var_idx_t) : t =
+  let add_one_sub_super (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: int) : t =
     match a_exp_pc with
     | SingleVar a_idx, a_pc ->
-      if (a_idx, a_pc) = b_idx then tv_rel
+      if a_idx = b_idx then tv_rel
       else
         List.map (
           fun x ->
-            if x.var_idx = (a_idx, a_pc) then add_one_super_type x b_idx
-            else if x.var_idx = b_idx then add_one_sub_type x a_exp_pc
+            let x_idx, _ = x.var_idx in
+            if x_idx = a_idx then add_one_super_type x (b_idx, a_pc)
+            else if x_idx = b_idx then add_one_sub_type x a_exp_pc
             else x
         ) tv_rel
     | _ ->
       List.map (
         fun x ->
-          if x.var_idx = b_idx then add_one_sub_type x a_exp_pc
+          let x_idx, _ = x.var_idx in
+          if x_idx = b_idx then add_one_sub_type x a_exp_pc
           else x
       ) tv_rel
 
 
   let add_sub_sub_super
-      (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: var_idx_t) : t =
+      (var_pc_map: var_idx_t list)
+      (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: int) : t =
     match a_exp_pc with
-    | SingleVar a_idx, a_pc ->
-      let tv_rel, a_entry = find_or_add_entry tv_rel (a_idx, a_pc) in
+    | SingleVar a_idx, _ ->
+      let tv_rel, a_entry = find_or_add_entry var_pc_map tv_rel a_idx in
       let tv_rel =
         List.fold_left (
           fun acc_tv_rel sub_a ->
@@ -135,23 +139,25 @@ module SingleSubtype = struct
     | _ -> add_one_sub_super tv_rel a_exp_pc b_idx
 
   let add_sub_sub_super_super
-      (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: var_idx_t) : t =
-    let tv_rel, b_entry = find_or_add_entry tv_rel b_idx in
+      (var_pc_map: var_idx_t list)
+      (tv_rel: t) (a_exp_pc: type_exp_t) (b_idx: int) : t =
+    let tv_rel, b_entry = find_or_add_entry var_pc_map tv_rel b_idx in
     let tv_rel =
       List.fold_left (
-        fun acc_tv_rel sup_b ->
-          add_sub_sub_super acc_tv_rel a_exp_pc sup_b
+        fun acc_tv_rel (sup_b, _) ->
+          add_sub_sub_super var_pc_map acc_tv_rel a_exp_pc sup_b
       ) tv_rel b_entry.supertype_list
     in
-    add_sub_sub_super tv_rel a_exp_pc b_idx
+    add_sub_sub_super var_pc_map tv_rel a_exp_pc b_idx
     
   let add_full_subtype 
+      (var_pc_map: var_idx_t list)
       (tv_rel: t) 
       (a_exp_pc: type_exp_t) 
       (b: type_exp_t) : t =
     (* a_exp_pc -> b *)
     match b with
-    | SingleVar b_idx, b_pc -> add_sub_sub_super_super tv_rel a_exp_pc (b_idx, b_pc)
+    | SingleVar b_idx, _ -> add_sub_sub_super_super var_pc_map tv_rel a_exp_pc b_idx
     | SingleTop, _ -> tv_rel
     | b_exp, b_pc -> let a, pc = a_exp_pc in
       single_subtype_error 
@@ -169,6 +175,7 @@ module SingleSubtype = struct
     List.iter (pp_useful_var (lvl + 1)) useful_var_list
 
   let add_one_useful_var_block_subtype_helper
+      (var_pc_map: var_idx_t list)
       (block_subtype: ArchType.block_subtype_t)
       (useful_var: SingleExp.SingleVarSet.t)
       (tv_rel: t) : t * (useful_var_t list) =
@@ -185,7 +192,7 @@ module SingleSubtype = struct
         | SingleVar sup_idx ->
           if SingleEntryType.SingleVarSet.mem sup_idx useful_var then
             let sub = SingleEntryType.repl_local_var sub_local_var_map sub in
-            add_sub_sub_super_super acc_tv_rel (sub, sub_pc) (sup_idx, sup_block.pc),
+            add_sub_sub_super_super var_pc_map acc_tv_rel (sub, sub_pc) sup_idx,
             SingleEntryType.SingleVarSet.union acc_useful (SingleEntryType.get_vars sub)
           else acc
         | SingleTop -> acc
@@ -242,6 +249,7 @@ module SingleSubtype = struct
     
 
   let add_one_useful_var_block_subtype
+      (var_pc_map: var_idx_t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (useful_var: useful_var_t)
       (tv_rel: t) :
@@ -250,7 +258,7 @@ module SingleSubtype = struct
     let block_subtype = 
       List.find (fun (x: ArchType.block_subtype_t) -> let x, _ = x in x.label = sup_label) block_subtype_list 
     in
-    let tv_rel, new_useful_var_list = add_one_useful_var_block_subtype_helper block_subtype sup_useful_var tv_rel in
+    let tv_rel, new_useful_var_list = add_one_useful_var_block_subtype_helper var_pc_map block_subtype sup_useful_var tv_rel in
     let block_subtype_list, new_useful_var_list = update_block_subtype_useful_var block_subtype_list new_useful_var_list in
     tv_rel, block_subtype_list, new_useful_var_list
 
@@ -267,6 +275,7 @@ module SingleSubtype = struct
     List.fold_left insert ul1 ul2
 
   let rec add_all_useful_var_block_subtype
+      (var_pc_map: var_idx_t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (useful_var_list: useful_var_t list)
       (tv_rel: t) : t * (ArchType.block_subtype_t list) =
@@ -275,10 +284,10 @@ module SingleSubtype = struct
     | [] -> tv_rel, block_subtype_list
     | hd :: tl ->
       let tv_rel, block_subtype_list, new_useful_var_list =
-        add_one_useful_var_block_subtype block_subtype_list hd tv_rel
+        add_one_useful_var_block_subtype var_pc_map block_subtype_list hd tv_rel
       in
       let useful_var_list = merge_useful_var tl new_useful_var_list in
-      add_all_useful_var_block_subtype block_subtype_list useful_var_list tv_rel
+      add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel
       (* if count > 0 then
         add_all_useful_var_block_subtype block_subtype_list useful_var_list tv_rel (count - 1)
       else
@@ -296,10 +305,22 @@ module SingleSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
     let useful_var_list = init_useful_var_from_block_subtype block_subtype_list in
     Printf.printf "after init useful var\n";
-    add_all_useful_var_block_subtype block_subtype_list useful_var_list []
+    List.iter (
+      fun (label, var_set) -> 
+        Printf.printf "%s: %s\n" label (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list var_set)))
+    ) useful_var_list;
+    let useful_var_map_list =
+      List.map (
+        fun (block_subtype: ArchType.block_subtype_t) ->
+          let a_type, _ = block_subtype in
+          List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (ArchType.get_local_var_set a_type)) 
+      ) block_subtype_list
+    in
+    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list []
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in
+    (* Printf.printf "single_to_smt_expr SymImm %d %s\n" var_idx (SingleSol.to_string sol.sol); *)
     SingleSol.to_smt_expr smt_ctx var_idx sol.sol
 
   let update_block_smt_ctx
@@ -383,6 +404,28 @@ module SingleSubtype = struct
         | SingleMul, Single e, SingleSet e_list
         | SingleMul, SingleSet e_list, Single e ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list)
+        | SingleSar, Range (e1, e2, s), Single (SingleConst c) ->
+          (* Printf.printf "Cal sar %s %s\n" (RangeExp.to_string (Range (e1, e2, s))) (RangeExp.to_string (Single (SingleConst c))); *)
+          let s_sar = Int64.shift_right s (Int64.to_int c) in
+          if Int64.shift_left s_sar (Int64.to_int c) = s then
+            Range (SingleEntryType.eval (SingleBExp (SingleSar, e1, SingleConst c)),
+              SingleEntryType.eval (SingleBExp (SingleSar, e2, SingleConst c)),
+              Int64.shift_right s (Int64.to_int c))
+          else 
+            Range (SingleEntryType.eval (SingleBExp (SingleSar, e1, SingleConst c)),
+              SingleEntryType.eval (SingleBExp (SingleSar, e2, SingleConst c)),
+              1L)
+        | SingleSar, SingleSet e_list, Single (SingleConst c) ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSar, x, SingleConst c))) e_list)
+        | SingleSal, Range (e1, e2, s), Single (SingleConst c) ->
+          let s_sal = Int64.shift_left s (Int64.to_int c) in
+          if Int64.shift_right s_sal (Int64.to_int c) = s then
+            Range (SingleEntryType.eval (SingleBExp (SingleSal, e1, SingleConst c)),
+              SingleEntryType.eval (SingleBExp (SingleSal, e2, SingleConst c)),
+              Int64.shift_left s (Int64.to_int c))
+          else Top
+        | SingleSal, SingleSet e_list, Single (SingleConst c) ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list)
         | _ -> Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
@@ -529,11 +572,15 @@ module SingleSubtype = struct
       (exp_pc: type_exp_t)
       (idx_sol: var_idx_t * SingleSol.t) : type_exp_t =
     let exp, e_pc = exp_pc in
-    let (idx, i_pc), sol = idx_sol in
-    if e_pc != i_pc then exp_pc
-    else
+    let (idx, _), sol = idx_sol in
+    (* TODO: We should check var and exp are in the block instead of having the same pc *)
+    (* But I think if a exp has a var, then they must belong to the same block, so no need to check (maybe) *)
+    (* if e_pc != i_pc then exp_pc
+    else *)
       match sol with
-      | SolSimple (Single e) -> SingleEntryType.repl_var_exp exp (idx, e), e_pc
+      | SolSimple (Single e) -> 
+        (* Printf.printf "subsititue_one_exp_single_sol %s %d %s" (SingleExp.to_string exp) idx (SingleExp.to_string e); *)
+        SingleEntryType.repl_var_exp exp (idx, e), e_pc
       | _ -> exp_pc
 
   let subsititue_one_exp_single_sol_list
@@ -547,6 +594,8 @@ module SingleSubtype = struct
       fun (tv_rel: type_rel) ->
         if tv_rel.sol != SolNone then tv_rel
         else
+          (* let v_idx, _ = tv_rel.var_idx in
+          Printf.printf "Sub for %d sol list len %d\n" v_idx (List.length idx_sol_list); *)
           { tv_rel with subtype_list = List.map (subsititue_one_exp_single_sol_list idx_sol_list) tv_rel.subtype_list }
     ) tv_rel_list
 
@@ -564,6 +613,10 @@ module SingleSubtype = struct
           else (tv_rel.var_idx, sol) :: acc, { tv_rel with sol = sol}
     ) [] tv_rel_list
     in
+    (* Printf.printf "Update subtype_single_sol with new sol\n";
+    List.iter (
+      fun ((x, _), sol) -> Printf.printf "SymImm %d = %s\n" x (SingleSol.to_string sol)
+    ) new_sol_list; *)
     let new_subtype = update_subtype_single_sol new_subtype new_sol_list in
     (* TODO: handle/utilize other forms of solutions like range *)
     new_subtype, List.length new_sol_list > 0
