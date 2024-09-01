@@ -188,7 +188,7 @@ module ArchType (Entry: EntryType) = struct
         (addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
     in
-    match MemType.set_mem_type smt_ctx curr_type.mem_type addr_offset new_type with
+    match MemType.set_mem_type smt_ctx true curr_type.mem_type addr_offset new_type with
     | Some (new_mem, write_constraints) -> { curr_type with mem_type = new_mem }, write_constraints, useful_vars
     | None -> 
       (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)

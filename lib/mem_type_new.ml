@@ -240,6 +240,7 @@ module MemType (Entry: EntryType) = struct
 
   let set_part_mem_type
       (smt_ctx: SmtEmitter.t)
+      (update_init_range: bool)
       (ptr: Isa.imm_var_id)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (addr_offset: MemOffset.t) (new_val: entry_t) :
@@ -254,11 +255,14 @@ module MemType (Entry: EntryType) = struct
         let off, range, entry_val = entry in
         begin match MemOffset.offset_cmp smt_ctx addr_offset off with
         | Eq -> 
+          let range = if update_init_range then [ off ] else range in
           if is_shared_mem smt_ctx ptr addr_offset then
             (true, (Entry.get_write_constraint entry_val new_val) @ cons), (off, range, new_val)
           else
             (true, cons), (off, range, new_val)
         | Subset -> 
+          (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
+          let range = if update_init_range then MemRange.merge smt_ctx [ off ] range else range in
           (true, (Entry.get_write_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
         | _ -> acc, entry
         end
@@ -269,6 +273,7 @@ module MemType (Entry: EntryType) = struct
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
+      (update_init_range: bool)
       (mem: t)
       (addr_offset: MemOffset.t)
       (new_type: entry_t) :
@@ -282,7 +287,7 @@ module MemType (Entry: EntryType) = struct
     | Some b_l, Some b_r ->
       if b_l != b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
       else let part_mem = get_part_mem mem b_l in
-      begin match set_part_mem_type smt_ctx b_l part_mem addr_offset new_type with
+      begin match set_part_mem_type smt_ctx update_init_range b_l part_mem addr_offset new_type with
       | None -> None
       | Some (new_part_mem, new_cons) ->
         Some (
@@ -299,7 +304,7 @@ module MemType (Entry: EntryType) = struct
         | true, _ -> acc, entry
         | false, cons ->
           let ptr, part_mem = entry in 
-          begin match set_part_mem_type smt_ctx ptr part_mem addr_offset new_type with
+          begin match set_part_mem_type smt_ctx update_init_range ptr part_mem addr_offset new_type with
           | None -> acc, entry
           | Some (new_part_mem, new_cons) -> (true, cons @ new_cons), (ptr, new_part_mem)
           end

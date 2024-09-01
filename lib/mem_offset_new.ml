@@ -149,4 +149,8 @@ module MemRange = struct
   let repl_local_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
     List.map (MemOffset.repl_local_var local_var_map) r
 
+  let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
+    (* TODO: re-implement this later!!! *)
+    let _ = smt_ctx in r1 @ r2
+
 end

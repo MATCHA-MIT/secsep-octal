@@ -143,13 +143,19 @@ module FuncInterface (Entry: EntryType) = struct
     in
     List.map helper child_reg
 
-  (* let set_mem_type
+  let set_mem_type
       (global_var: SingleExp.SingleVarSet.t)
       (var_map: Entry.local_var_map_t)
       (write_hint: bool MemType.mem_content)
       (child_mem: MemType.t) (parent_mem: MemType.t) : MemType.t =
     let helper_inner
-        (acc: paren)
+        (acc: MemType.t * (Constraint.t list))
+        (write_hint: MemOffset.t * MemRange.t * bool)
+        (child_mem: MemOffset.t * MemRange.t * entry_t) :
+        MemType.t * (Constraint.t list) =
+      let write_addr, _, write_ready = write_hint in
+      let _, child_range, child_type = child_mem in
+      let 
 
   let get_single_var_map 
       (smt_ctx: SmtEmitter.t)
@@ -167,7 +173,7 @@ module FuncInterface (Entry: EntryType) = struct
       add_mem_single_var_map smt_ctx (single_var_map, single_var_set) child_mem parent_mem 
     in
     let var_map = add_reg_var_map child_reg parent_reg in
-    let (var_map, constriants), m_mem = add_mem_var_map smt_ctx single_var_map_set var_map child_mem parent_mem in *)
+    let (var_map, constriants), m_mem = add_mem_var_map smt_ctx single_var_map_set var_map child_mem parent_mem in
 
 
 
