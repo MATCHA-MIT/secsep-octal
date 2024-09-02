@@ -166,7 +166,7 @@ module ArchType (Entry: EntryType) = struct
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
     in
     match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
-    | Some (off_w, off_r, e_t) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
+    | Some (_, (off_w, off_r, e_t)) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
     | None -> 
       (* Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
       Entry.get_top_type, [ Unknown addr_offset ], useful_vars

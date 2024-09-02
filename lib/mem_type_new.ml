@@ -199,12 +199,12 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (addr_offset: MemOffset.t) :
-      (MemOffset.t * MemRange.t * entry_t) option =
+      (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     List.find_map (
       fun (off, range, entry) ->
         match MemOffset.offset_cmp smt_ctx addr_offset off with
-        | Eq -> Some (off, range, entry)
-        | Subset -> Some (off, range, Entry.mem_partial_read_val entry)
+        | Eq -> Some (true, (off, range, entry)) (* full read *)
+        | Subset -> Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
         | _ -> None
     ) part_mem
 
@@ -212,7 +212,7 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (mem: t)
       (addr_offset: MemOffset.t) :
-      (MemOffset.t * MemRange.t * entry_t) option =
+      (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
     let ptr_set = get_ptr_set mem in
