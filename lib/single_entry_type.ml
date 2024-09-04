@@ -68,6 +68,8 @@ include SingleExp
 
   let get_single_exp (e: t) : t = e
 
+  let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
+
   let get_const_type = get_imm_type
 
   let get_top_type : t = SingleTop

@@ -113,6 +113,10 @@ module MemOffset = struct
     in
     List.fold_left insert_one_offset ob_list new_o_list
 
+  let get_vars (o: t) : SingleExp.SingleVarSet.t =
+    let l, r = o in
+    SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
+
   let is_val (global_var: SingleExp.SingleVarSet.t) (o: t) : bool =
     let l, r = o in SingleExp.is_val global_var l && SingleExp.is_val global_var r
 
@@ -140,6 +144,12 @@ module MemRange = struct
   let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
 
   type t = MemOffset.t list
+
+  let get_vars (r: t) : SingleExp.SingleVarSet.t =
+    let var_list = List.map MemOffset.get_vars r in
+    List.fold_left 
+      (fun acc x -> SingleExp.SingleVarSet.union acc x) 
+      SingleExp.SingleVarSet.empty var_list
 
   let is_val (global_var: SingleExp.SingleVarSet.t) (r: t) : bool =
     List.fold_left (

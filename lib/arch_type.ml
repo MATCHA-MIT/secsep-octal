@@ -7,6 +7,7 @@ open Smt_emitter
 open Isa
 open Single_exp
 open Constraint
+open Func_interface
 
 module ArchType (Entry: EntryType) = struct
   exception ArchTypeError of string
@@ -17,6 +18,8 @@ module ArchType (Entry: EntryType) = struct
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
   module CondType = CondType (Entry)
+
+  module FuncInterface = FuncInterface (Entry)
 
   type t = {
     label: Isa.label;
