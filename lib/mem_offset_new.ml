@@ -38,7 +38,7 @@ module MemOffset = struct
 
   (* Semantically cmp*)
   let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : off_rel_t =
-    Printf.printf "offset_cmp\n%s\n%s\n\n" (to_string o1) (to_string o2);
+    (* Printf.printf "offset_cmp\n%s\n%s\n\n" (to_string o1) (to_string o2); *)
     let z3_ctx, _ = smt_ctx in
     let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
