@@ -117,7 +117,7 @@ include (CondType (SingleEntryType))
       if List.length exp_list = 0 then
         SatYes
       else begin
-        Printf.printf "check call smt %s\n" (String.concat "; " (List.map to_string unknown_list));
+        (* Printf.printf "check call smt %s\n" (String.concat "; " (List.map to_string unknown_list)); *)
         SmtEmitter.check_compliance smt_ctx exp_list
       end
     end

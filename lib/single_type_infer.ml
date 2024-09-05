@@ -89,7 +89,7 @@ module SingleTypeInfer = struct
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
-      Printf.printf "type_prop_block %s\n" block.label;
+      (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _ = iter_left in
       let _, block_subtype =
         (* if iter_left = 1 && block.label = ".L2" then begin
@@ -100,7 +100,7 @@ module SingleTypeInfer = struct
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set) 
           func_interface_list block_type block.insts block_subtype
       in
-      Printf.printf "After prop block %s\n" block.label;
+      (* Printf.printf "After prop block %s\n" block.label; *)
       Z3.Solver.pop solver 1;
       block_subtype
     in
@@ -178,9 +178,12 @@ module SingleTypeInfer = struct
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
         (* Directly return if unknown are all resolved. *)
-        if List.fold_left (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 0 state.func_type = 0 then
+        if List.fold_left 
+            (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 
+            0 state.func_type = 0 then begin
+          Printf.printf "Successfully resolved all memory accesses\n";
           state
-        else begin
+        end else begin
           Printf.printf "After infer, unknown list:\n";
           List.iter (
             fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
