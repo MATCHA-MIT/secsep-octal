@@ -13,6 +13,7 @@ module SingleTypeInfer = struct
   let single_type_infer_error msg = raise (SingleTypeInferError ("[Single Type Infer Error] " ^ msg))
 
   module ArchType = SingleSubtype.ArchType
+  module FuncInterface = ArchType.FuncInterface
 
   type t = {
     func: Isa.basic_block list;
@@ -31,6 +32,7 @@ module SingleTypeInfer = struct
       (func_name: string)
       (func_mem_interface: ArchType.MemType.t) : t =
     let global_var_list = List.map (fun (_, x) -> x) (Isa.StrM.to_list prog.imm_var_map) in
+    let global_var_set = SingleExp.SingleVarSet.of_list global_var_list in
     let min_global_var =
       List.fold_left (
         fun acc x -> if x < acc then x else acc
@@ -60,9 +62,11 @@ module SingleTypeInfer = struct
           let next_pc = start_pc + List.length bb.insts in
           if bb.label = func_name then 
             ((next_pc, start_var), 
-            ArchType.init_func_input_from_layout bb.label (SingleVar 0) start_pc func_mem_interface)
+            ArchType.init_func_input_from_layout bb.label (SingleVar 0) start_pc func_mem_interface global_var_set)
           else 
-            let next_var, arch_type = ArchType.init_from_layout bb.label start_var start_pc func_mem_interface in
+            let next_var, arch_type = 
+              ArchType.init_from_layout bb.label start_var start_pc func_mem_interface global_var_set 
+            in
             ((next_pc, next_var), arch_type)
       ) (start_pc, start_var) func_body
     in
@@ -76,14 +80,19 @@ module SingleTypeInfer = struct
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
-  let type_prop_all_blocks (infer_state: t) (solver_iter: int) : t =
+  let type_prop_all_blocks 
+    (func_interface_list: FuncInterface.t list)
+    (infer_state: t) : t * (ArchType.block_subtype_t list) =
     let ctx, solver = infer_state.smt_ctx in
     let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
       Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver);
       (* Printf.printf "type_prop_block %s\n" block.label; *)
-      let _, block_subtype = ArchType.type_prop_block (ctx, solver) block_type block.insts block_subtype in
+      let _, block_subtype = 
+        ArchType.type_prop_block (ctx, solver) (SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set) func_interface_list block_type block.insts block_subtype 
+      in
+      Printf.printf "After prop block %s\n" block.label;
       Z3.Solver.pop solver 1;
       block_subtype
     in
@@ -91,17 +100,15 @@ module SingleTypeInfer = struct
     Printf.printf "func len %d, type len %d\n" (List.length infer_state.func) (List.length infer_state.func_type);
     let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
     Printf.printf "block_subtype len %d\n" (List.length block_subtype);
-    (* List.iter (
-      fun (x: ArchType.block_subtype_t) ->
-        let x, _ = x in Printf.printf "Constraint len %d\n" (List.length x.constraint_list)
-    ) block_subtype; *)
-    let single_subtype, block_subtype = SingleSubtype.init block_subtype in
+    { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
+    block_subtype
+    (* let single_subtype, block_subtype = SingleSubtype.init block_subtype in
     Printf.printf "2\n";
     let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype infer_state.input_var_set solver_iter in
     { infer_state with 
       func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type; 
       single_subtype = single_subtype 
-    }
+    } *)
 
   let update_mem (infer_state: t) : t =
     let update_list = ArchType.MemType.init_stack_update_list (List.nth infer_state.func_type 0).mem_type in
@@ -146,8 +153,9 @@ module SingleTypeInfer = struct
       func_type = List.map ArchType.clean_up infer_state.func_type
     }
 
-  let infer
+  let infer_one_func
       (prog: Isa.prog)
+      (func_interface_list: FuncInterface.t list)
       (func_name: string)
       (func_mem_interface: ArchType.MemType.t)
       (iter: int)
@@ -157,10 +165,10 @@ module SingleTypeInfer = struct
       if iter_left = 0 then
         state
       else begin
+        (* 1. Prop *)
         Printf.printf "Infer iter %d type_prop_all_blocks\n" iter;
-        let state = type_prop_all_blocks state solver_iter in
-        Printf.printf "After infer, single subtype\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        let state, block_subtype = type_prop_all_blocks func_interface_list state in
+        (* 2. Insert stack addr in unknown list to mem type *)
         Printf.printf "After infer, unknown list:\n";
         List.iter (
           fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
@@ -169,6 +177,12 @@ module SingleTypeInfer = struct
         let state = update_mem state in
         Printf.printf "After update_mem\n";
         pp_func_type 0 state;
+        (* 3. Single type infer *)
+        let single_subtype, block_subtype = SingleSubtype.init block_subtype in
+        let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
+        let state = { state with single_subtype = single_subtype } in
+        Printf.printf "After infer, single subtype\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
         helper (clean_up_func_type state) (iter_left - 1)
       end
     in

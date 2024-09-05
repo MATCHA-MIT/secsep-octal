@@ -1,4 +1,5 @@
 open Single_exp
+open Cond_type_new
 open Range_exp
 open Pretty_print
 open Smt_emitter
@@ -39,8 +40,20 @@ module MemOffset = struct
   (* Semantically cmp*)
   let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : off_rel_t =
     (* Printf.printf "offset_cmp\n%s\n%s\n\n" (to_string o1) (to_string o2); *)
-    let z3_ctx, _ = smt_ctx in
-    let l1, r1 = to_smt_expr smt_ctx o1 in
+
+    let l1, r1 = o1 in
+    let l2, r2 = o2 in
+    let eq_req = [ (SingleCondType.Eq, l1, l2); (SingleCondType.Eq, r1, r2) ] in
+    let le_req = [ (SingleCondType.Le, r1, l2) ] in
+    let ge_req = [ (SingleCondType.Le, r2, l1) ] in
+    let subset_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, r1, r2) ] in
+    let supset_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, r2, r1) ] in
+    let loverlap_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, l2, r1) ] in
+    let goverlap_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, l1, r2) ] in
+
+    let check = SingleCondType.check smt_ctx in
+    (* let z3_ctx, _ = smt_ctx in *)
+    (* let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
     let check = SmtEmitter.check_compliance smt_ctx in
     let zero = Z3.BitVector.mk_numeral z3_ctx "0" SmtEmitter.bv_width in
@@ -51,7 +64,8 @@ module MemOffset = struct
     let subset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r1 r2) zero ] in
     let supset_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper r2 r1) zero ] in
     let loverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l1 l2) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l2 r1) zero ] in
-    let goverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l1 r2) zero ] in
+    let goverlap_req = [ Z3.BitVector.mk_sle z3_ctx (sub_helper l2 l1) zero; Z3.BitVector.mk_sle z3_ctx (sub_helper l1 r2) zero ] in *)
+    
     (* if (Printf.printf "check eq\n"; check eq_req = SatYes) then Eq
     else if (Printf.printf "check le\n"; check le_req = SatYes) then Le
     else if (Printf.printf "check ge\n"; check ge_req = SatYes) then Ge
@@ -59,6 +73,7 @@ module MemOffset = struct
     else if (Printf.printf "check sup\n"; check supset_req = SatYes) then Supset
     else if (Printf.printf "check lo\n"; check loverlap_req = SatYes) then LOverlap
     else if (Printf.printf "check go\n"; check goverlap_req = SatYes) then GOverlap *)
+
     if check eq_req = SatYes then Eq
     else if check le_req = SatYes then Le
     else if check ge_req = SatYes then Ge
@@ -75,9 +90,10 @@ module MemOffset = struct
     | Single l, Range (_, r, _) -> Some (l, r)
     | Range (l, _, _), Single r -> Some (l, r)
     | Range (l, _, _), Range (_, r, _) -> Some (l, r)
-    | l, r -> 
+    | _ -> None
+    (* | l, r -> 
       Printf.printf "from_range cannot convert %s %s\n" (RangeExp.to_string l) (RangeExp.to_string r);
-      None
+      None *)
       (* mem_offset_error 
         (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
 

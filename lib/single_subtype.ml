@@ -278,20 +278,30 @@ module SingleSubtype = struct
       (var_pc_map: var_idx_t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (useful_var_list: useful_var_t list)
-      (tv_rel: t) : t * (ArchType.block_subtype_t list) =
-      (* (count: int) : t * (ArchType.block_subtype_t list) = *)
+      (* (tv_rel: t) : t * (ArchType.block_subtype_t list) = *)
+      (tv_rel: t) (count: int) : t * (ArchType.block_subtype_t list) =
+    (* Printf.printf "add_all_useful_var_block_subtype %d\n" count;
+    Printf.printf "before\n";
+    pp_useful_var_list 0 useful_var_list; *)
     match useful_var_list with
     | [] -> tv_rel, block_subtype_list
     | hd :: tl ->
       let tv_rel, block_subtype_list, new_useful_var_list =
         add_one_useful_var_block_subtype var_pc_map block_subtype_list hd tv_rel
       in
+      (* Printf.printf "after\n";
+      pp_useful_var_list 0 useful_var_list; *)
       let useful_var_list = merge_useful_var tl new_useful_var_list in
-      add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel
-      (* if count > 0 then
-        add_all_useful_var_block_subtype block_subtype_list useful_var_list tv_rel (count - 1)
+      (* add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel *)
+      if count > 0 then
+        add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
+      else if List.length useful_var_list > 0 then begin
+        Printf.printf "Warning: useful vars not handled due to limited layers of recursive calls";
+        pp_useful_var_list 0 useful_var_list;
+        tv_rel, block_subtype_list
+      end
       else
-        tv_rel, block_subtype_list *)
+        tv_rel, block_subtype_list
 
   let init_useful_var_from_block_subtype
       (block_subtype_list: ArchType.block_subtype_t list) : useful_var_t list =
@@ -305,10 +315,7 @@ module SingleSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
     let useful_var_list = init_useful_var_from_block_subtype block_subtype_list in
     Printf.printf "after init useful var\n";
-    List.iter (
-      fun (label, var_set) -> 
-        Printf.printf "%s: %s\n" label (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list var_set)))
-    ) useful_var_list;
+    pp_useful_var_list 0 useful_var_list;
     let useful_var_map_list =
       List.map (
         fun (block_subtype: ArchType.block_subtype_t) ->
@@ -316,7 +323,7 @@ module SingleSubtype = struct
           List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (ArchType.get_local_var_set a_type)) 
       ) block_subtype_list
     in
-    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list []
+    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list [] 7
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in
