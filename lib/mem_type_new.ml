@@ -202,7 +202,7 @@ module MemType (Entry: EntryType) = struct
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     List.find_map (
       fun (off, range, entry) ->
-        match MemOffset.offset_cmp smt_ctx addr_offset off with
+        match MemOffset.offset_cmp smt_ctx addr_offset off 1 with
         | Eq -> Some (true, (off, range, entry)) (* full read *)
         | Subset -> Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
         | _ -> None
@@ -215,24 +215,43 @@ module MemType (Entry: EntryType) = struct
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
+    (* let stamp_beg = Unix.gettimeofday () in *)
     let ptr_set = get_ptr_set mem in
     let l, r = addr_offset in
-    match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
       if b_l != b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
       else let part_mem = get_part_mem mem b_l in
       get_part_mem_type smt_ctx part_mem addr_offset
     | _ ->
+      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r) in
+      (* heuristic priority: related vars > others; within each group, the offset list sizes are ascending *)
+      let reformed_mem = List.map (fun (x, x_mem) ->
+        (x, x_mem, SingleExp.SingleVarSet.exists (fun z -> z = x) related_vars, List.length x_mem)
+      ) mem
+      in
+      let sorted_mem = List.sort (fun (x, _, x_related, x_len) (y, _, y_related, y_len) ->
+        if x = y then 0 else
+        let len_cmp = Int.compare x_len y_len in
+        if x_related && y_related then len_cmp else
+        if x_related then -1 else
+        if y_related then 1 else
+        len_cmp
+      ) reformed_mem |> List.map (fun (x, y, _, _) -> (x, y))
+      in
       List.find_map (
         fun (_, part_mem) -> get_part_mem_type smt_ctx part_mem addr_offset
-      ) mem
+      ) sorted_mem
+    in
+    (* Printf.printf "\ntime elapsed (get_mem_type): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
+    result
 
   let is_shared_mem
       (smt_ctx: SmtEmitter.t)
       (ptr: Isa.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
     if ptr = Isa.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
-      match MemOffset.offset_cmp smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) with
+      match MemOffset.offset_cmp smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
       | Le -> false
       | Ge -> true
       | _ -> mem_type_error (Printf.sprintf "is_shared_mem cannot tell whether the mem slot %s is shared or not" (MemOffset.to_string addr_offset))
@@ -253,7 +272,7 @@ module MemType (Entry: EntryType) = struct
       | true, _ -> acc, entry
       | false, cons ->
         let off, range, entry_val = entry in
-        begin match MemOffset.offset_cmp smt_ctx addr_offset off with
+        begin match MemOffset.offset_cmp smt_ctx addr_offset off 1 with
         | Eq -> 
           let range = if update_init_range then [ off ] else range in
           if is_shared_mem smt_ctx ptr addr_offset then
@@ -280,10 +299,11 @@ module MemType (Entry: EntryType) = struct
       (t * (Constraint.t list)) option =
     (* let _ = smt_ctx, mem, addr_offset, new_type in
     None *)
+    (* let stamp_beg = Unix.gettimeofday () in *)
     let _, _, _, _ = smt_ctx, mem, addr_offset, new_type in
     let ptr_set = get_ptr_set mem in
     let l, r = addr_offset in
-    match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
       if b_l != b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
       else let part_mem = get_part_mem mem b_l in
@@ -296,23 +316,45 @@ module MemType (Entry: EntryType) = struct
         )
       end
     | _ ->
+      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r) in
+      (* heuristic priority: related vars > others; within each group, the offset list sizes are ascending *)
+      let reformed_mem = List.mapi (fun order (x, x_mem) ->
+        (x, x_mem, SingleExp.SingleVarSet.exists (fun z -> z = x) related_vars, List.length x_mem, order)
+      ) mem
+      in
+      let sorted_mem = List.sort (fun (x, _, x_related, x_len, _) (y, _, y_related, y_len, _) ->
+        if x = y then 0 else
+        let len_cmp = Int.compare x_len y_len in
+        if x_related && y_related then len_cmp else
+        if x_related then -1 else
+        if y_related then 1 else
+        len_cmp
+      ) reformed_mem |> List.map (fun (x, y, _, _, order) -> (x, y, order))
+      in
       let helper
           (acc: bool * (Constraint.t list))
-          (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list)) :
-          (bool * (Constraint.t list)) * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list)) =
+          (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) :
+          (bool * (Constraint.t list)) * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) =
         begin match acc with
         | true, _ -> acc, entry
         | false, cons ->
-          let ptr, part_mem = entry in 
+          let ptr, part_mem, orig_order = entry in 
           begin match set_part_mem_type smt_ctx update_init_range ptr part_mem addr_offset new_type with
           | None -> acc, entry
-          | Some (new_part_mem, new_cons) -> (true, cons @ new_cons), (ptr, new_part_mem)
+          | Some (new_part_mem, new_cons) -> (true, cons @ new_cons), (ptr, new_part_mem, orig_order)
           end
         end
       in
-      let (found, cons), new_mem = List.fold_left_map helper (false, []) mem in
-      if found then Some (new_mem, cons)
+      let (found, cons), new_mem = List.fold_left_map helper (false, []) sorted_mem in
+      if found then begin
+        (* recover the original order *)
+        let recovered_mem = List.sort (fun (_, _, x) (_, _, y) -> Int.compare x y) new_mem |> List.map (fun (x, y, _) -> (x, y)) in
+        Some (recovered_mem, cons)
+      end
       else None
+    in
+    (* Printf.printf "\ntime elapsed (set_mem_type): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
+    result
     (* TODO!!! *)
 
   let init_stack_update_list (mem: t) : (MemOffset.t * bool) list =

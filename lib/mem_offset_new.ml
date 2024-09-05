@@ -37,8 +37,9 @@ module MemOffset = struct
     SmtEmitter.expr_of_single_exp smt_ctx r true
 
   (* Semantically cmp*)
-  let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) : off_rel_t =
-    (* Printf.printf "offset_cmp\n%s\n%s\n\n" (to_string o1) (to_string o2); *)
+  let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int): off_rel_t =
+    (* Printf.printf "offset_cmp:\n%s\n%s\n" (to_string o1) (to_string o2); *)
+    (* let stamp_beg = Unix.gettimeofday () in *)
     let z3_ctx, _ = smt_ctx in
     let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
@@ -59,14 +60,31 @@ module MemOffset = struct
     else if (Printf.printf "check sup\n"; check supset_req = SatYes) then Supset
     else if (Printf.printf "check lo\n"; check loverlap_req = SatYes) then LOverlap
     else if (Printf.printf "check go\n"; check goverlap_req = SatYes) then GOverlap *)
-    if check eq_req = SatYes then Eq
-    else if check le_req = SatYes then Le
-    else if check ge_req = SatYes then Ge
-    else if check subset_req = SatYes then Subset
-    else if check supset_req = SatYes then Supset
-    else if check loverlap_req = SatYes then LOverlap
-    else if check goverlap_req = SatYes then GOverlap
-    else Other
+    let result = begin
+      match mode with
+      | 1 -> begin
+          if check eq_req = SatYes then Eq
+          else if check subset_req = SatYes then Subset
+          else Other
+        end
+      | 2 -> begin
+          if check le_req = SatYes then Le
+          else if check ge_req = SatYes then Ge
+          else Other
+        end
+      | _ -> begin
+          if check eq_req = SatYes then Eq
+          else if check le_req = SatYes then Le
+          else if check ge_req = SatYes then Ge
+          else if check subset_req = SatYes then Subset
+          else if check supset_req = SatYes then Supset
+          else if check loverlap_req = SatYes then LOverlap
+          else if check goverlap_req = SatYes then GOverlap
+          else Other
+        end
+    end in
+    (* Printf.printf "time elapsed (offset_cmp): %f\n\n" (Unix.gettimeofday () -. stamp_beg); *)
+    result
     (* TODO: Maybe need to handle Other!!! *)
 
   let from_range (range_l_r: RangeExp.t * RangeExp.t) : t option =
@@ -84,12 +102,19 @@ module MemOffset = struct
   let insert_new_offset_list
       (smt_ctx: SmtEmitter.t)
       (ob_list: (t * bool) list) (new_o_list: t list) : (t * bool) list =
+    (* TODO: filter new_o_list, only focus on addresses involving rsp *)
+    (* let stamp_beg = Unix.gettimeofday () in *)
+    (* Printf.printf "\ninsert_new_offset_list:\n\ninitial ob_list begin\n"; *)
+    (* List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) ob_list; *)
+    (* Printf.printf "\nnew_o_list\n"; *)
+    (* List.iter (fun o -> Printf.printf "%s\n" (to_string o)) new_o_list; *)
+    (* Printf.printf "\nend of debug output\n"; *)
     (* We assume offset in offset_list is sorted from smaller to larger *)
     let rec insert_one_offset (ob_list: (t * bool) list) (new_o: t) : (t * bool) list =
       match ob_list with
       | [] -> [ (new_o, true) ]
       | (hd_o, hd_updated) :: tl ->
-        begin match offset_cmp smt_ctx new_o hd_o with
+        begin match offset_cmp smt_ctx new_o hd_o 0 with
         | Eq | Subset -> (hd_o, hd_updated) :: tl
         | Supset -> insert_one_offset tl new_o
         | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
@@ -111,7 +136,11 @@ module MemOffset = struct
               (to_string new_o) (to_string hd_o)) *)
         end
     in
-    List.fold_left insert_one_offset ob_list new_o_list
+    let result = List.fold_left insert_one_offset ob_list new_o_list in
+    Printf.printf "\nresult:\n";
+    List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result;
+    (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
+    result
 
   let get_vars (o: t) : SingleExp.SingleVarSet.t =
     let l, r = o in

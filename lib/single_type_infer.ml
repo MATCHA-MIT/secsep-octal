@@ -157,7 +157,7 @@ module SingleTypeInfer = struct
       if iter_left = 0 then
         state
       else begin
-        Printf.printf "Infer iter %d type_prop_all_blocks\n" iter;
+        Printf.printf "Infer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
         let state = type_prop_all_blocks state solver_iter in
         Printf.printf "After infer, single subtype\n";
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
@@ -165,7 +165,7 @@ module SingleTypeInfer = struct
         List.iter (
           fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
         ) state.func_type;
-        Printf.printf "Infer iter %d update_mem\n" iter;
+        Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
         let state = update_mem state in
         Printf.printf "After update_mem\n";
         pp_func_type 0 state;
