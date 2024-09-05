@@ -439,6 +439,18 @@ module SingleSubtype = struct
     in
     helper e
 
+  let sub_sol_single_to_range_opt
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (e: type_exp_t) : RangeExp.t option =
+    let exp, _ = e in
+    let resolved_vars = 
+      List.filter_map (fun (x: type_rel) -> if x.sol != SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
+    in
+    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then
+      Some (sub_sol_single_to_range tv_rel_list input_var_set e)
+    else None
+
   let try_solve_one_var
       (* (smt_ctx: SmtEmitter.t) *) (* Maybe I need add_no_overflow later *)
       (tv_rel: type_rel)

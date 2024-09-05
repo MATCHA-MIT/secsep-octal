@@ -26,6 +26,6 @@ let infer_func_name = "salsa20_words"
 let infer_state = 
   SingleTypeInfer.infer_one_func 
     p [] infer_func_name 
-    (get_mem_interface standalone_salsa20 infer_func_name) 3 10
+    (get_mem_interface standalone_salsa20 infer_func_name) 4 10
 
 let _ = SingleSubtype.pp_single_subtype 0 infer_state.single_subtype

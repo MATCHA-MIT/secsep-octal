@@ -51,10 +51,10 @@ module MemOffset = struct
     let supset_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, r2, r1) ] in
     let loverlap_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, l2, r1) ] in
     let goverlap_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, l1, r2) ] in
-
     let check = SingleCondType.check smt_ctx in
-    (* let z3_ctx, _ = smt_ctx in *)
-    (* let l1, r1 = to_smt_expr smt_ctx o1 in
+
+    (* let z3_ctx, _ = smt_ctx in
+    let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
     let check = SmtEmitter.check_compliance smt_ctx in
     let zero = Z3.BitVector.mk_numeral z3_ctx "0" SmtEmitter.bv_width in
@@ -153,8 +153,8 @@ module MemOffset = struct
         end
     in
     let result = List.fold_left insert_one_offset ob_list new_o_list in
-    Printf.printf "\nresult:\n";
-    List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result;
+    (* Printf.printf "\nresult:\n";
+    List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result; *)
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 

@@ -114,7 +114,12 @@ include (CondType (SingleEntryType))
       SatNo (* If any no is found, then it is definitely not satisfied *)
     else begin
       let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in
-      SmtEmitter.check_compliance smt_ctx exp_list
+      if List.length exp_list = 0 then
+        SatYes
+      else begin
+        Printf.printf "check call smt %s\n" (String.concat "; " (List.map to_string unknown_list));
+        SmtEmitter.check_compliance smt_ctx exp_list
+      end
     end
 
 end

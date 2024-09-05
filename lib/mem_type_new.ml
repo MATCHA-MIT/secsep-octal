@@ -397,4 +397,12 @@ module MemType (Entry: EntryType) = struct
         else acc, (ptr, entry)
     ) start_var mem
 
+  let remove_local_mem
+      (smt_ctx: SmtEmitter.t)
+      (mem: t) : t =
+    List.map (
+      fun (ptr, part_mem) ->
+        ptr, List.filter (fun (off, _, _) -> is_shared_mem smt_ctx ptr off) part_mem
+    ) mem
+
 end

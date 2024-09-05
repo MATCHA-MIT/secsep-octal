@@ -82,15 +82,23 @@ module SingleTypeInfer = struct
 
   let type_prop_all_blocks
     (func_interface_list: FuncInterface.t list)
-    (infer_state: t) : t * (ArchType.block_subtype_t list) =
+    (* (infer_state: t) : t * (ArchType.block_subtype_t list) = *)
+    (infer_state: t) (iter_left: int) : t * (ArchType.block_subtype_t list) =
     let ctx, solver = infer_state.smt_ctx in
     let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
-      Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver);
-      (* Printf.printf "type_prop_block %s\n" block.label; *)
+      (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
+      Printf.printf "type_prop_block %s\n" block.label;
+      let _ = iter_left in
       let _, block_subtype =
-        ArchType.type_prop_block (ctx, solver) (SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set) func_interface_list block_type block.insts block_subtype
+        (* if iter_left = 1 && block.label = ".L2" then begin
+          Printf.printf "skip prop %s\n" block.label;
+          block_type, block_subtype
+        end else *)
+        ArchType.type_prop_block (ctx, solver) 
+          (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set) 
+          func_interface_list block_type block.insts block_subtype
       in
       Printf.printf "After prop block %s\n" block.label;
       Z3.Solver.pop solver 1;
@@ -156,7 +164,7 @@ module SingleTypeInfer = struct
   let infer_one_func
       (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
-      (func_name: string)
+      (func_name: Isa.label)
       (func_mem_interface: ArchType.MemType.t)
       (iter: int)
       (solver_iter: int) : t =
@@ -167,23 +175,28 @@ module SingleTypeInfer = struct
       else begin
         (* 1. Prop *)
         Printf.printf "Infer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
-        let state, block_subtype = type_prop_all_blocks func_interface_list state in
+        let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
-        Printf.printf "After infer, unknown list:\n";
-        List.iter (
-          fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
-        ) state.func_type;
-        Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
-        let state = update_mem state in
-        Printf.printf "After update_mem\n";
-        pp_func_type 0 state;
-        (* 3. Single type infer *)
-        let single_subtype, block_subtype = SingleSubtype.init block_subtype in
-        let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
-        let state = { state with single_subtype = single_subtype } in
-        Printf.printf "After infer, single subtype\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
-        helper (clean_up_func_type state) (iter_left - 1)
+        (* Directly return if unknown are all resolved. *)
+        if List.fold_left (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 0 state.func_type = 0 then
+          state
+        else begin
+          Printf.printf "After infer, unknown list:\n";
+          List.iter (
+            fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+          ) state.func_type;
+          Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
+          let state = update_mem state in
+          Printf.printf "After update_mem\n";
+          pp_func_type 0 state;
+          (* 3. Single type infer *)
+          let single_subtype, block_subtype = SingleSubtype.init block_subtype in
+          let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
+          let state = { state with single_subtype = single_subtype } in
+          Printf.printf "After infer, single subtype\n";
+          SingleSubtype.pp_single_subtype 0 state.single_subtype;
+          helper (clean_up_func_type state) (iter_left - 1)
+        end
       end
     in
     helper init_infer_state iter

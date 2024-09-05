@@ -162,7 +162,7 @@ module ArchType (Entry: EntryType) = struct
 
   let get_ld_op_type
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (curr_type: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
@@ -177,26 +177,31 @@ module ArchType (Entry: EntryType) = struct
       Entry.get_top_type, [ Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
     else
       let useful_vars = SingleExp.get_vars addr_exp in
-      let opt_offset = RangeExp.to_mem_offset (sub_sol_func (addr_exp, curr_type.pc)) size in
-      let addr_offset = 
-          (addr_exp, 
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
-      in
-      let addr_offset = (
-        match opt_offset with
-        | Some o -> o
-        | None -> addr_offset
-      ) in
-      (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-      match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
-      | Some (_, (off_w, off_r, e_t)) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
-      | None -> 
-        (* Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
-        Entry.get_top_type, [ Unknown addr_offset ], useful_vars
+      match sub_sol_func (addr_exp, curr_type.pc) with
+      | Some opt_exp ->
+        let opt_offset = RangeExp.to_mem_offset opt_exp size in
+        (* let opt_offset = None in let _ = sub_sol_func in *)
+        let addr_offset = 
+            (addr_exp, 
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
+        in
+        let addr_offset = (
+          match opt_offset with
+          | Some o -> o
+          | None -> addr_offset
+        ) in
+        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+        begin match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
+        | Some (_, (off_w, off_r, e_t)) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
+        | None -> 
+          (* Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
+          Entry.get_top_type, [ Unknown addr_offset ], useful_vars
+        end
+      | _ -> Entry.get_top_type, [ Unknown (SingleTop, SingleTop) ], useful_vars
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (curr_type: t)
       (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
@@ -211,26 +216,31 @@ module ArchType (Entry: EntryType) = struct
       curr_type, [ Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
     else
       let useful_vars = SingleExp.get_vars addr_exp in
-      let opt_offset = RangeExp.to_mem_offset (sub_sol_func (addr_exp, curr_type.pc)) size in
-      let addr_offset = 
-          (addr_exp, 
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
-      in
-      let addr_offset = (
-        match opt_offset with
-        | Some o -> o
-        | None -> addr_offset
-      ) in
-      (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-      match MemType.set_mem_type smt_ctx true curr_type.mem_type addr_offset new_type with
-      | Some (new_mem, write_constraints) -> { curr_type with mem_type = new_mem }, write_constraints, useful_vars
-      | None -> 
-        (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
-        curr_type, [ Unknown addr_offset ], useful_vars
+      match sub_sol_func (addr_exp, curr_type.pc) with
+      | Some opt_exp ->
+        let opt_offset = RangeExp.to_mem_offset opt_exp size in
+        (* let opt_offset = None in let _ = sub_sol_func in *)
+        let addr_offset = 
+            (addr_exp, 
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
+        in
+        let addr_offset = (
+          match opt_offset with
+          | Some o -> o
+          | None -> addr_offset
+        ) in
+        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+        begin match MemType.set_mem_type smt_ctx true curr_type.mem_type addr_offset new_type with
+        | Some (new_mem, write_constraints) -> { curr_type with mem_type = new_mem }, write_constraints, useful_vars
+        | None -> 
+          (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
+          curr_type, [ Unknown addr_offset ], useful_vars
+        end
+      | None -> curr_type, [ Unknown (SingleTop, SingleTop) ], useful_vars
     
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (curr_type: t)
       (src: Isa.operand) :
       entry_t * t * (Constraint.t list) =
@@ -249,7 +259,7 @@ module ArchType (Entry: EntryType) = struct
   
   let set_dest_op_type
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (curr_type: t)
       (dest: Isa.operand)
       (new_type: entry_t) :
@@ -276,7 +286,7 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (curr_type: t)
       (inst: Isa.instruction) :
       t =
@@ -479,7 +489,7 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_inst
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (inst: Isa.instruction)
@@ -504,7 +514,7 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_block
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (block: Isa.instruction list)
