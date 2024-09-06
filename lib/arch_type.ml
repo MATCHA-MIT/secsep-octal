@@ -2,6 +2,7 @@ open Pretty_print
 open Entry_type
 open Cond_type_new
 open Reg_type_new
+open Mem_offset_new
 open Mem_type_new
 open Smt_emitter
 open Isa
@@ -471,11 +472,20 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_call
       (smt_ctx: SmtEmitter.t)
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (target_func_name: Isa.label) : t =
+    Printf.printf "type_prop_call %s\n" target_func_name;
+    (* Entry.pp_local_var 0 curr_type.local_var_map;
+    pp_arch_type 0 curr_type; *)
+    let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
+      match sub_sol_func (e, curr_type.pc) with
+      | Some r -> RangeExp.to_mem_offset2 r
+      | None -> None
+    in
     let new_reg, new_mem, new_constraints, new_useful_vars =
-      FuncInterface.func_call smt_ctx func_interface_list
+      FuncInterface.func_call smt_ctx sub_sol_func func_interface_list
         curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type target_func_name
     in
     let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
@@ -502,7 +512,7 @@ module ArchType (Entry: EntryType) = struct
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype
       | Call target_func_name ->
-        type_prop_call smt_ctx func_interface_list curr_type target_func_name,
+        type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name,
         (* Printf.printf "Warning: haven't implemented so far!\n";
         curr_type,  *)
         block_subtype

@@ -59,6 +59,12 @@ module RangeExp = struct
     | Range (l, r, _) -> Some (l, SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst size)))
     | _ -> None
 
+  let to_mem_offset2 (r: t) : (SingleEntryType.t * SingleEntryType.t) option =
+    match r with
+    | Single e -> Some (e, e)
+    | Range (l, r, _) -> Some (l, r)
+    | _ -> None
+
   (* let single_exp_repl_sol (sol: (Isa.imm_var_id * t) list) (e: SingleEntryType.t) : t =
     let rec helper (e: SingleEntryType.t) : t =
       match e with

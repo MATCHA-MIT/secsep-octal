@@ -254,7 +254,10 @@ module MemType (Entry: EntryType) = struct
       match MemOffset.offset_cmp smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
       | Le -> false
       | Ge -> true
-      | _ -> mem_type_error (Printf.sprintf "is_shared_mem cannot tell whether the mem slot %s is shared or not" (MemOffset.to_string addr_offset))
+      | _ -> 
+        mem_type_error 
+        (Printf.sprintf "is_shared_mem cannot tell whether ptr %d and mem slot %s is shared or not" 
+          ptr (MemOffset.to_string addr_offset))
     else true
 
   let set_part_mem_type
@@ -400,6 +403,7 @@ module MemType (Entry: EntryType) = struct
   let remove_local_mem
       (smt_ctx: SmtEmitter.t)
       (mem: t) : t =
+    pp_mem_type 0 mem;
     List.map (
       fun (ptr, part_mem) ->
         ptr, List.filter (fun (off, _, _) -> is_shared_mem smt_ctx ptr off) part_mem

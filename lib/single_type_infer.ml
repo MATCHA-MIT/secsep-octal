@@ -70,7 +70,7 @@ module SingleTypeInfer = struct
             ((next_pc, next_var), arch_type)
       ) (start_pc, start_var) func_body
     in
-    ArchType.pp_arch_type_list 0 arch_type_list;
+    (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
       func = func_body;
       func_type = arch_type_list;
@@ -145,7 +145,8 @@ module SingleTypeInfer = struct
     in
     let local_var_set = 
       List.fold_left (
-        fun acc entry -> SingleExp.SingleVarSet.union acc (ArchType.get_local_var_set entry)
+        fun acc entry -> 
+          SingleExp.SingleVarSet.union acc (ArchType.get_local_var_set entry)
       ) SingleExp.SingleVarSet.empty func_type
     in
     let single_subtype = SingleSubtype.filter_entry infer_state.single_subtype local_var_set in
@@ -186,7 +187,9 @@ module SingleTypeInfer = struct
         end else begin
           Printf.printf "After infer, unknown list:\n";
           List.iter (
-            fun (x: ArchType.t) -> MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+            fun (x: ArchType.t) -> 
+              Printf.printf "%s\n" x.label;
+              MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
           ) state.func_type;
           Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
           let state = update_mem state in
@@ -203,5 +206,43 @@ module SingleTypeInfer = struct
       end
     in
     helper init_infer_state iter
+
+  let get_func_interface
+      (func_name: Isa.label)
+      (infer_state: t) : FuncInterface.t =
+    let in_state = List.find (fun (x: ArchType.t) -> x.label = func_name) infer_state.func_type in
+    let out_state = List.find (fun (x: ArchType.t) -> x.label = Isa.ret_label) infer_state.func_type in
+    let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
+      let r = 
+        SingleSubtype.sub_sol_single_to_range 
+          infer_state.single_subtype infer_state.input_var_set (e, pc) 
+      in
+      match r with
+      | Single exp -> exp
+      | _ -> SingleTop
+    in
+    {
+      func_name = func_name;
+      in_reg = in_state.reg_type;
+      in_mem = ArchType.MemType.remove_local_mem infer_state.smt_ctx in_state.mem_type;
+      context = [];
+      out_reg = List.map (helper out_state.pc) out_state.reg_type;
+      out_mem = ArchType.MemType.map (helper out_state.pc) (ArchType.MemType.remove_local_mem infer_state.smt_ctx out_state.mem_type)
+    }
+
+  let infer
+      (prog: Isa.prog)
+      (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
+      (iter: int)
+      (solver_iter: int) : (FuncInterface.t list) * (t list) =
+    let helper 
+        (acc: FuncInterface.t list) (entry: Isa.label * ArchType.MemType.t) :
+        (FuncInterface.t list) * t =
+      let func_name, func_mem_interface = entry in
+      let infer_state = infer_one_func prog acc func_name func_mem_interface iter solver_iter in
+      let func_interface = get_func_interface func_name infer_state in
+      func_interface :: acc, infer_state
+    in
+    List.fold_left_map helper [] func_mem_interface_list
 
 end

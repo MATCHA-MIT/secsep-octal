@@ -40,9 +40,11 @@ module type EntryType = sig
   val update_local_var: local_var_map_t -> t -> int -> (local_var_map_t * t)
   (* map, a, b: a is a var, add a->b to map *)
   val add_local_var: local_var_map_t -> t -> t -> local_var_map_t
+  val pp_local_var: int -> local_var_map_t -> unit
 
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t
+  val repl_context_var: local_var_map_t -> t -> t
   val is_val2 : SingleExp.SingleVarSet.t -> local_var_map_t -> t -> bool
 
   val to_smt_expr: SmtEmitter.t -> t -> SmtEmitter.exp_t

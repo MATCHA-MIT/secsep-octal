@@ -168,6 +168,9 @@ module MemOffset = struct
   let repl_local_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
     let l, r = o in SingleExp.repl_local_var local_var_map l, SingleExp.repl_local_var local_var_map r
 
+  let repl_context_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
+    let l, r = o in SingleExp.repl_context_var local_var_map l, SingleExp.repl_context_var local_var_map r
+
   let pp_off_list (lvl: int) (off_list: t list) =
     PP.print_lvl lvl "MemOffset list\n";
     List.iter (
@@ -203,6 +206,9 @@ module MemRange = struct
 
   let repl_local_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
     List.map (MemOffset.repl_local_var local_var_map) r
+
+  let repl_context_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
+    List.map (MemOffset.repl_context_var local_var_map) r
 
   let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
     (* TODO: re-implement this later!!! *)

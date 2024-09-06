@@ -19,17 +19,17 @@ let get_mem_interface
 
 let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "salsa20_words", [
-    rsp, [];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
     rsi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
   ];
   "salsa20_block", [
-    rsp, [];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
     rsi, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ];
   ];
   "salsa20", [
-    rsp, [];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleVar rsi), [], SingleTop) ];
     rdx, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ]
   ];
@@ -37,7 +37,7 @@ let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list =
 ]
 
 let salsa20_block_init_mem : SingleTypeInfer.ArchType.MemType.t = [
-  (rsp, []);
+  (rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ]);
   (rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ]);
   (rsi, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ]);
 ]

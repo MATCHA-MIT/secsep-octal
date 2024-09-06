@@ -346,17 +346,27 @@ module SingleExp = struct
           single_exp_error (Printf.sprintf "add_local var conflict on var %d exp %s and %s" v (to_string e) (to_string e2)) 
       | None -> (v, e2) :: map
       end
+    | SingleTop -> map (* It is OK to replace any type with Top!!! For taint, it is OK to replace any taint with Tainted!!! *)
     | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
+
+  let pp_local_var (lvl: int) (map: local_var_map_t) : unit =
+    PP.print_lvl lvl "<Var map>\n";
+    List.iter (
+      fun (x, e) -> PP.print_lvl (lvl + 1) "%d -> %s\n" x (to_string e)
+    ) map
 
   let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
     List.find_map (fun (i, e) -> if i = idx then Some e else None) map
 
   let repl_local_var (map: local_var_map_t) (e: t) : t =
+    (* Only applied to repl local var with block vars *)
+    (* Recursive repl; if not found, then just leave the var there *)
     let rec repl_helper (e: t) : t =
       match e with
       | SingleTop | SingleConst _ -> e
       | SingleVar v ->
-        if v > 0 then e
+        if v > 0 then (* input/block var *)
+           e (* Here is dirty since it will also lookup global var *)
         else begin 
           match find_local_var_map map v with
           | Some e -> repl_helper e
@@ -369,6 +379,24 @@ module SingleExp = struct
       | SingleUExp (uop, e) ->
         let e = repl_helper e in
         eval (SingleUExp (uop, e))
+    in
+    repl_helper e
+
+  let repl_context_var (map: local_var_map_t) (e: t) : t =
+    (* Only applied to repl var from one context with var from the other context *)
+    (* Non-recursive repl; if not found, return Top *)
+    let rec repl_helper (e: t) : t =
+      match e with
+      | SingleTop | SingleConst _ -> e
+      | SingleVar v ->
+        begin match find_local_var_map map v with
+        | Some e -> e
+        | None -> SingleTop
+        end
+      | SingleBExp (bop, e1, e2) ->
+        eval (SingleBExp (bop, repl_helper e1, repl_helper e2))
+      | SingleUExp (uop, e) ->
+        eval (SingleUExp (uop, repl_helper e))
     in
     repl_helper e
 
