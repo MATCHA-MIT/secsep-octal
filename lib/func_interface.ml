@@ -189,7 +189,7 @@ module FuncInterface (Entry: EntryType) = struct
         (write_mem: (MemOffset.t * MemRange.t * entry_t) list) :
         ((MemOffset.t * MemRange.t * entry_t) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
       match parent_entry, read_hint, write_mem with
-      | _, [], [] -> finished_parent_entry @ parent_entry, constraint_list, useful_vars
+      | _, [], [] -> (List.rev parent_entry) @ finished_parent_entry, constraint_list, useful_vars
       | _, (Untrans _) :: read_hint, _ :: write_mem ->
         helper finished_parent_entry ((Unknown (SingleTop, SingleTop)) :: constraint_list) useful_vars parent_entry read_hint write_mem
       | _, (Unmapped off) :: read_hint, _ :: write_mem ->
