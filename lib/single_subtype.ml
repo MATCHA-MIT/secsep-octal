@@ -293,15 +293,15 @@ module SingleSubtype = struct
       pp_useful_var_list 0 useful_var_list; *)
       let useful_var_list = merge_useful_var tl new_useful_var_list in
       (* add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel *)
-      if count > 0 then
+      (* if count > 0 then *)
         add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
-      else if List.length useful_var_list > 0 then begin
+      (* else if List.length useful_var_list > 0 then begin
         Printf.printf "Warning: useful vars not handled due to limited layers of recursive calls";
         pp_useful_var_list 0 useful_var_list;
         tv_rel, block_subtype_list
       end
       else
-        tv_rel, block_subtype_list
+        tv_rel, block_subtype_list *)
 
   let init_useful_var_from_block_subtype
       (block_subtype_list: ArchType.block_subtype_t list) : useful_var_t list =
@@ -323,7 +323,7 @@ module SingleSubtype = struct
           List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (ArchType.get_local_var_set a_type)) 
       ) block_subtype_list
     in
-    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list [] 7
+    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list [] 10
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in
