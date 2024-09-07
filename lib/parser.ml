@@ -206,7 +206,7 @@ module Parser = struct
     | ImmTok (disp, _) :: LParen :: RegTok index :: Comma :: ImmTok (imm, _) :: RParen :: ts ->  (* disp(index, scale) *)
       (MemOp (Some disp, None, Some index, Some (imm_to_scale imm)), ts)
     | ImmTok (disp, _) :: LParen :: RipTok :: RParen :: ts -> (* disp(rip) *)
-      (ImmOp disp, ts)
+      (MemOp (Some disp, None, None, None), ts)
     | _ -> parse_error ("parse_memory_operand: " ^ (String.concat ", " (List.map string_of_token ts)))
 
   let parse_operand (ts: token list) : Isa.operand * token list =
