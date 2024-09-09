@@ -142,11 +142,10 @@ module FuncInterface (Entry: EntryType) = struct
     helper (var_map_set, SingleExp.SingleVarSet.empty) child_mem_helper
 
   let set_reg_type
-      (global_var: SingleExp.SingleVarSet.t)
       (var_map: Entry.local_var_map_t)
       (child_reg: RegType.t) : RegType.t =
     let helper (reg_out: entry_t) : entry_t =
-      if Entry.is_val2 global_var var_map reg_out then
+      if Entry.is_val2 var_map reg_out then
         Entry.repl_context_var var_map reg_out
       else Entry.get_top_type
     in
@@ -178,7 +177,7 @@ module FuncInterface (Entry: EntryType) = struct
     else  *)
       begin
       let m_out_entry = 
-        if Entry.is_val2 single_var_set var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
+        if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
         else Entry.get_top_type
       in
       let write_val_constraint = Entry.get_write_constraint p_entry m_out_entry in
@@ -296,10 +295,12 @@ module FuncInterface (Entry: EntryType) = struct
         global_var_set
         (SingleExp.SingleVarSet.of_list (List.map (fun (x, _) -> x) single_var_map)) 
     in
+    let single_var_map = SingleExp.add_local_global_var single_var_map global_var_set in
+    let var_map = Entry.add_local_global_var var_map global_var_set in
     let ((single_var_map, single_var_set, var_map), read_useful_vars), mem_read_hint =
       add_mem_var_map smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) child_mem parent_mem
     in
-    let reg_type = set_reg_type global_var_set var_map child_out_reg in
+    let reg_type = set_reg_type var_map child_out_reg in
     let mem_type, constraint_list, write_useful_vars = 
       set_mem_type smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
 

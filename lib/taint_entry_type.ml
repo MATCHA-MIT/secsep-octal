@@ -3,19 +3,23 @@ open Single_exp
 open Entry_type
 open Taint_exp
 open Constraint
+open Smt_emitter
 
-module TaintEntryType (Entry: EntryType) = struct
+module TaintEntryType (Entry: EntryType) : EntryType = struct
   exception TaintEntryTypeError of string
 
   let taint_entry_type_error msg = raise (TaintEntryTypeError ("[Taint Single Type Error] " ^ msg))
 
   type t = Entry.t * TaintExp.t
 
-  type ext_t = Entry.ext_t
+  type ext_t = 
+    | SignExt
+    | ZeroExt
+    | OldExt of t (* Used for memory slot partial update *)
 
   type local_var_map_t = Entry.local_var_map_t * TaintExp.local_var_map_t
 
-  let get_empty_var_map = [], []
+  let get_empty_var_map = Entry.get_empty_var_map, []
 
   let partial_read_val (e: t) : t =
     let single, taint = e in
@@ -59,7 +63,13 @@ module TaintEntryType (Entry: EntryType) = struct
 
   let ext_val (ext: ext_t) (off: int64) (sz: int64) (e: t) : t =
     let single, taint = e in
-    Entry.ext_val ext off sz single, taint
+    let s_ext : Entry.ext_t = 
+      match ext with
+      | SignExt -> SignExt
+      | ZeroExt -> ZeroExt
+      | OldExt (s, _) -> OldExt s
+    in
+    Entry.ext_val s_ext off sz single, taint
 
   let get_write_constraint (e: t) (new_e: t) : Constraint.t list =
     let single, taint = e in
@@ -101,5 +111,47 @@ module TaintEntryType (Entry: EntryType) = struct
     Entry.get_mem_op_type disp s_base s_index scale,
     TaintExp.merge_opt t_base t_index
     
+  let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
+    let single_map, taint_map = map in
+    let single, taint = e in
+    let single_map, single = Entry.update_local_var single_map single pc in
+    let taint_map, taint = TaintExp.update_local_var taint_map taint pc in
+    (single_map, taint_map), (single, taint)
+
+  let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
+    let single_map, taint_map = map in
+    let s1, t1 = e1 in
+    let s2, t2 = e2 in
+    Entry.add_local_var single_map s1 s2, TaintExp.add_local_var taint_map t1 t2
+  
+  let add_local_global_var (map: local_var_map_t) (global_var: SingleExp.SingleVarSet.t) : local_var_map_t =
+    let single_map, taint_map = map in
+    Entry.add_local_global_var single_map global_var, taint_map
+
+  let pp_local_var (lvl: int) (map: local_var_map_t) : unit =
+    let single_map, taint_map = map in
+    Entry.pp_local_var lvl single_map;
+    TaintExp.pp_local_var lvl taint_map
+
+  let repl_local_var (map: local_var_map_t) (e: t) : t =
+    let single_map, taint_map = map in
+    let single, taint = e in
+    Entry.repl_local_var single_map single,
+    TaintExp.repl_local_var taint_map taint
+
+  let repl_context_var (map: local_var_map_t) (e: t) : t =
+    let single_map, taint_map = map in
+    let single, taint = e in
+    Entry.repl_context_var single_map single,
+    TaintExp.repl_context_var taint_map taint
+
+  let is_val2 (map: local_var_map_t) (e: t) : bool =
+    let single_map, taint_map = map in
+    let single, taint = e in
+    (Entry.is_val2 single_map single) && (TaintExp.is_val2 taint_map taint)
+
+  let to_smt_expr (smg_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t =
+    let single, _ = e in
+    Entry.to_smt_expr smg_ctx single
 
 end

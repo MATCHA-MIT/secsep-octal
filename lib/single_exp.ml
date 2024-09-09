@@ -349,8 +349,14 @@ module SingleExp = struct
     | SingleTop -> map (* It is OK to replace any type with Top!!! For taint, it is OK to replace any taint with Tainted!!! *)
     | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
 
+  let add_local_global_var (map: local_var_map_t) (global_var: SingleVarSet.t) : local_var_map_t =
+    List.fold_left (
+      fun acc var -> 
+        add_local_var acc (SingleVar var) (SingleVar var)
+    ) map (SingleVarSet.to_list global_var)
+
   let pp_local_var (lvl: int) (map: local_var_map_t) : unit =
-    PP.print_lvl lvl "<Var map>\n";
+    PP.print_lvl lvl "<Single var map>\n";
     List.iter (
       fun (x, e) -> PP.print_lvl (lvl + 1) "%d -> %s\n" x (to_string e)
     ) map
@@ -428,11 +434,11 @@ module SingleExp = struct
   let is_val (global_var: SingleVarSet.t) (e: t) : bool =
     SingleVarSet.is_empty (SingleVarSet.diff (get_vars e) global_var)
 
-  let is_val2 (global_var: SingleVarSet.t) (var_map: local_var_map_t) (e: t) : bool =
+  let is_val2 (var_map: local_var_map_t) (e: t) : bool =
     let var_set = 
       List.fold_left (
         fun acc (x, _) -> SingleVarSet.add x acc
-      ) global_var var_map 
+      ) SingleVarSet.empty var_map 
     in
     is_val var_set e
 

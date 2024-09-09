@@ -1,3 +1,5 @@
+open Pretty_print
+
 module TaintExp = struct
   exception TaintExpError of string
   let taint_exp_error msg = raise (TaintExpError ("[Taint Type Error] " ^ msg))
@@ -81,4 +83,90 @@ module TaintExp = struct
     | TaintExp s ->
       let var_str_list = List.map string_of_int (TaintVarSet.elements s) in
       "TaintVarSet (" ^ (String.concat " " var_str_list) ^ ")"
+
+  let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
+    let new_idx = -pc in
+    (new_idx, e) :: map, TaintVar new_idx
+
+  let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
+    match e1 with
+    | TaintVar v ->
+      begin match List.find_opt (fun (idx, _) -> idx = v) map with
+      | Some (_, e) ->
+        if cmp e e2 = 0 then map
+        else 
+          taint_exp_error 
+            (Printf.sprintf "add_local var conflict on var %d exp %s and %s" v (to_string e) (to_string e2))
+      | None -> (v, e2) :: map
+      end
+    | TaintConst _ ->
+      if cmp e1 e2 = 0 then map
+      else taint_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
+    | _ -> taint_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
+
+  let pp_local_var (lvl: int) (map: local_var_map_t) : unit =
+    PP.print_lvl lvl "<Taint var map>\n";
+    List.iter (
+      fun (x, e) -> PP.print_lvl (lvl + 1) "%d -> %s\n" x (to_string e)
+    ) map
+
+  let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
+    List.find_map (fun (i, e) -> if i = idx then Some e else None) map
+
+  let repl_local_var (map: local_var_map_t) (e: t) : t =
+    (* Only applied to repl local var with block vars *)
+    (* Recursive repl; if not found, then just leave the var there *)
+    let rec repl_helper (e: t) : t =
+      match e with
+      | TaintConst _ -> e
+      | TaintVar v ->
+        if v > 0 then (* input/block var *)
+          e (* Here is dirty since it will also lookup global var *)
+        else begin
+          match find_local_var_map map v with
+          | Some e -> repl_helper e
+          | None -> e
+        end
+      | TaintExp var_set ->
+        List.fold_left (
+          fun (acc: t) (entry: taint_var_id) ->
+            merge acc (repl_helper (TaintVar entry))
+        ) (TaintConst false) (TaintVarSet.to_list var_set)
+    in
+    repl_helper e
+
+  let repl_context_var (map: local_var_map_t) (e: t) : t =
+      (* Only applied to repl var from one context with var from the other context *)
+      (* Non-recursive repl; if not found, raise exception!!! *)
+    let rec repl_helper (e: t) : t =
+      match e with
+      | TaintConst _ -> e
+      | TaintVar v ->
+        begin match find_local_var_map map v with
+        | Some e -> e
+        | None -> taint_exp_error (Printf.sprintf "repl_context_var cannot find var %d in context" v)
+        end
+      | TaintExp var_set ->
+        List.fold_left (
+          fun (acc: t) (entry: taint_var_id) ->
+            merge acc (repl_helper (TaintVar entry))
+        ) (TaintConst false) (TaintVarSet.to_list var_set)
+    in
+    repl_helper e
+    
+  let is_val (var_set: TaintVarSet.t) (e: t) : bool =
+    match e with
+    | TaintConst _ -> true
+    | TaintVar v -> TaintVarSet.mem v var_set
+    | TaintExp s -> TaintVarSet.subset s var_set
+  
+  let is_val2 (map: local_var_map_t) (e: t) : bool =
+    let var_set =
+      List.fold_left (
+        fun (acc: TaintVarSet.t) (x, _) ->
+          TaintVarSet.add x acc
+      ) TaintVarSet.empty map
+    in
+    is_val var_set e
+
 end
