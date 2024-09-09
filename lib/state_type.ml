@@ -213,7 +213,7 @@ module StateType = struct
       (curr_state: t) (dest: Isa.operand) (new_type: TypeExp.t) : Ir.operand * t * ((TypeExp.t * int64) option) * MemOffset.ConstraintSet.t * TypeExp.TypeVarSet.t =
     match dest with
     | RegOp r -> (RegOp (Isa.get_reg_idx r), set_reg_type curr_state r new_type, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
-    | StOp (disp, base, index, scale, size) ->
+    | StOp (disp, base, index, scale, size, _) ->
       begin match set_st_op_type smt_ctx sol curr_state disp base index scale size new_type with
       | (Left ((ptr, offset, is_single_full_slot), exp, st_constraint), useful_vars) -> (MemOp (ptr, offset, is_single_full_slot), exp, None, st_constraint, useful_vars)
       | (Right addr_exp, useful_vars) -> (UnknownOp, curr_state, Some addr_exp, MemOffset.ConstraintSet.empty, useful_vars)

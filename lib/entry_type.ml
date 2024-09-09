@@ -1,5 +1,6 @@
 open Isa
 open Single_exp
+open Taint_exp
 open Constraint
 open Smt_emitter
 
@@ -25,7 +26,9 @@ module type EntryType = sig
   val mem_partial_read_val: t -> t (* a lazy implementation to handle partially reading a mem entry *)
   val mem_partial_write_val: t -> t -> t (* a lazy implementation to handle partially writing a mem entry *)
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)
-  val get_write_constraint: t -> t -> Constraint.t list
+  val get_eq_taint_constraint: t -> t -> Constraint.t list
+  val get_untaint_constraint: t -> Constraint.t list
+  val update_st_taint_constraint: t -> TaintExp.t -> t * Constraint.t list
 
   val exe_bop_inst: Isa.bop -> t -> t -> t
   val exe_uop_inst: Isa.uop -> t -> t

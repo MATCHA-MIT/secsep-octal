@@ -1,5 +1,6 @@
 (* ISA interface *)
 open Pretty_print
+open Taint_exp
 
 module Isa = struct
   (* TODO: Other exception on isa side *)
@@ -226,7 +227,7 @@ module Isa = struct
     | RegOp of register
     | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
     | LdOp of immediate option * register option * register option * scale option * int64
-    | StOp of immediate option * register option * register option * scale option * int64
+    | StOp of immediate option * register option * register option * scale option * int64 * TaintExp.t
     | LabelOp of label
 
   let string_of_option (to_string: 'a -> string) (x: 'a option) : string =
@@ -247,18 +248,19 @@ module Isa = struct
     | LdOp (disp, base, index, scale, size) ->
       let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
       Printf.sprintf "Ld(%s,%s)" addr_str (Int64.to_string size)
-    | StOp (disp, base, index, scale, size) ->
+    | StOp (disp, base, index, scale, size, taint) ->
       let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
-      Printf.sprintf "St(%s,%s)" addr_str (Int64.to_string size)
+      Printf.sprintf "St(%s,%s,%s)" addr_str (Int64.to_string size) (TaintExp.to_string taint)
     | LabelOp label -> label
 
   let get_op_size (op: operand) : int64 =
     match op with
     | RegOp r -> get_reg_size r
     | LdOp (_, _, _, _, size)
-    | StOp (_, _, _, _, size) -> size
+    | StOp (_, _, _, _, size, _) -> size
     | _ -> isa_error "cannot get size for the given op"
 
+  (* TODO: Remove this function *)
   let cmp_operand (op1: operand) (op2: operand) : bool = (* true for equal *)
     match op1, op2 with
     | ImmOp i1, ImmOp i2 -> i1 = i2
@@ -266,7 +268,7 @@ module Isa = struct
     | MemOp (d1, b1, i1, s1), MemOp (d2, b2, i2, s2) ->
       d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2
     | LdOp (d1, b1, i1, s1, size1), LdOp (d2, b2, i2, s2, size2)
-    | StOp (d1, b1, i1, s1, size1), StOp (d2, b2, i2, s2, size2) ->
+    | StOp (d1, b1, i1, s1, size1, _), StOp (d2, b2, i2, s2, size2, _) ->
         d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
     | LabelOp l1, LabelOp l2 -> l1 = l2
     | _ -> false

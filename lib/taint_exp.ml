@@ -14,6 +14,8 @@ module TaintExp = struct
 
   type local_var_map_t = (taint_var_id * t) list
 
+  let get_default_taint : t = TaintVar 0
+
   let cmp (e1: t) (e2: t) : int =
     match e1, e2 with
     | TaintConst b1, TaintConst b2 -> compare b1 b2

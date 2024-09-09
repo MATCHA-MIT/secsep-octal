@@ -1,6 +1,7 @@
 open Isa
 (* open Entry_type *)
 open Single_exp
+open Taint_exp
 open Constraint
 open Smt_emitter
 
@@ -42,8 +43,14 @@ include SingleExp
     | ZeroExt, 0L -> e
     | _ -> SingleTop
 
-  let get_write_constraint (old_e: t) (new_e: t) : Constraint.t list = 
+  let get_eq_taint_constraint (old_e: t) (new_e: t) : Constraint.t list = 
     let _ = old_e, new_e in []
+
+  let get_untaint_constraint (e: t) : Constraint.t list =
+  let _ = e in []
+
+  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
+    let _ = st_taint in e, []
 
   let exe_bop_inst (isa_bop: Isa.bop) (e1: t) (e2: t) : t =
     match isa_bop with

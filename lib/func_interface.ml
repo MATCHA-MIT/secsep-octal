@@ -180,7 +180,7 @@ module FuncInterface (Entry: EntryType) = struct
         if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
         else Entry.get_top_type
       in
-      let write_val_constraint = Entry.get_write_constraint p_entry m_out_entry in
+      let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
       if is_full then 
         (p_off, p_range, m_out_entry), 
         read_range_constraint @ out_range_constraint @ write_val_constraint,

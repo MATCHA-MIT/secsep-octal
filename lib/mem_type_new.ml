@@ -279,13 +279,13 @@ module MemType (Entry: EntryType) = struct
         | Eq -> 
           let range = if update_init_range then [ off ] else range in
           if is_shared_mem smt_ctx ptr addr_offset then
-            (true, (Entry.get_write_constraint entry_val new_val) @ cons), (off, range, new_val)
+            (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
           else
             (true, cons), (off, range, new_val)
         | Subset -> 
           (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
           let range = if update_init_range then MemRange.merge smt_ctx [ off ] range else range in
-          (true, (Entry.get_write_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
+          (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
         | _ -> acc, entry
         end
     in

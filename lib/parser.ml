@@ -1,4 +1,5 @@
 open Isa
+open Taint_exp
 
 module Parser = struct
 
@@ -294,10 +295,10 @@ module Parser = struct
 
   let dst (opr_size: Isa.operand * int64 option) : Isa.operand =
     match opr_size with
-    | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size)
+    | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size, TaintExp.get_default_taint)
     | MemOp _, None -> parse_error "no size for mem op"
     | LdOp _, _ -> parse_error "dst"
-    | StOp (disp, base, index, scale, _), Some size -> StOp (disp, base, index, scale, size)
+    | StOp (disp, base, index, scale, _, taint), Some size -> StOp (disp, base, index, scale, size, taint)
     | StOp _, None -> parse_error "no size for st op"
     (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
     | opr, _ -> opr

@@ -71,11 +71,19 @@ module TaintEntryType (Entry: EntryType) : EntryType = struct
     in
     Entry.ext_val s_ext off sz single, taint
 
-  let get_write_constraint (e: t) (new_e: t) : Constraint.t list =
+  let get_eq_taint_constraint (e: t) (new_e: t) : Constraint.t list =
     let single, taint = e in
     let new_single, new_taint = new_e in
-    (Entry.get_write_constraint single new_single) @
+    (Entry.get_eq_taint_constraint single new_single) @
     [ Constraint.TaintSub (taint, new_taint); Constraint.TaintSub (new_taint, taint) ]
+
+  let get_untaint_constraint (e: t) : Constraint.t list =
+    let _, taint = e in
+    [ Constraint.TaintSub (taint, TaintConst false)]
+
+  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
+    let single, taint = e in
+    (single, st_taint), [ TaintSub (taint, st_taint) ]
   
   let exe_bop_inst (isa_bop: Isa.bop) (e1: t) (e2: t) : t =
     let s1, t1 = e1 in
