@@ -178,30 +178,33 @@ module SingleTypeInfer = struct
         Printf.printf "Infer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
-        (* Directly return if unknown are all resolved. *)
-        if List.fold_left 
+        let unknown_resolved = 
+          List.fold_left 
             (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 
-            0 state.func_type = 0 then begin
-          Printf.printf "Successfully resolved all memory accesses\n";
+            0 state.func_type = 0
+        in
+        Printf.printf "After infer, unknown list:\n";
+        List.iter (
+          fun (x: ArchType.t) -> 
+            Printf.printf "%s\n" x.label;
+            MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+        ) state.func_type;
+        Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
+        let state = update_mem state in
+        Printf.printf "After update_mem\n";
+        (* pp_func_type 0 state; *)
+        (* 3. Single type infer *)
+        let single_subtype, block_subtype = SingleSubtype.init block_subtype in
+        let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
+        let state = { state with single_subtype = single_subtype } in
+        Printf.printf "After infer, single subtype\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        if unknown_resolved then begin
+          (* Directly return if unknown are all resolved. *)
+          Printf.printf "Successfully resolved all memory accesses for %s\n" func_name;
           state
         end else begin
-          Printf.printf "After infer, unknown list:\n";
-          List.iter (
-            fun (x: ArchType.t) -> 
-              Printf.printf "%s\n" x.label;
-              MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
-          ) state.func_type;
-          Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
-          let state = update_mem state in
-          Printf.printf "After update_mem\n";
-          pp_func_type 0 state;
-          (* 3. Single type infer *)
-          let single_subtype, block_subtype = SingleSubtype.init block_subtype in
-          let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
-          let state = { state with single_subtype = single_subtype } in
-          Printf.printf "After infer, single subtype\n";
-          SingleSubtype.pp_single_subtype 0 state.single_subtype;
-          helper (clean_up_func_type state) (iter_left - 1)
+        helper (clean_up_func_type state) (iter_left - 1)
         end
       end
     in
@@ -241,6 +244,9 @@ module SingleTypeInfer = struct
       let func_name, func_mem_interface = entry in
       let infer_state = infer_one_func prog acc func_name func_mem_interface iter solver_iter in
       let func_interface = get_func_interface func_name infer_state in
+      Printf.printf "Infer state of func %s\n" func_name;
+      pp_func_type 0 infer_state;
+      FuncInterface.pp_func_interface 0 func_interface;
       func_interface :: acc, infer_state
     in
     List.fold_left_map helper [] func_mem_interface_list

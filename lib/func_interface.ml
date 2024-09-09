@@ -7,6 +7,7 @@ open Constraint
 open Reg_type_new
 open Mem_type_new
 open Smt_emitter
+open Pretty_print
 
 module FuncInterface (Entry: EntryType) = struct
   exception FuncInterfaceError of string
@@ -25,6 +26,15 @@ module FuncInterface (Entry: EntryType) = struct
     out_reg: RegType.t;
     out_mem: MemType.t
   }
+
+  let pp_func_interface (lvl: int) (interface: t) =
+    PP.print_lvl lvl "Func interface of func %s\n" interface.func_name;
+    PP.print_lvl lvl "Input\n";
+    RegType.pp_reg_type 0 interface.in_reg;
+    MemType.pp_mem_type 0 interface.in_mem;
+    PP.print_lvl lvl "Output\n";
+    RegType.pp_reg_type 0 interface.out_reg;
+    MemType.pp_mem_type 0 interface.out_mem
 
   let add_reg_var_map 
       (child_reg: RegType.t) (parent_reg: RegType.t) : 
@@ -62,7 +72,9 @@ module FuncInterface (Entry: EntryType) = struct
         if MemOffset.is_val single_var_set c_off && MemRange.is_val single_var_set c_range then
           let m_off = MemOffset.repl_local_var local_var_map (MemOffset.repl_context_var single_var_map c_off) in
           let m_range = MemRange.repl_local_var local_var_map (MemRange.repl_context_var single_var_map c_range) in
+          (* Update useful vars as long as addr can be represented by parent vars *)
           let useful_vars = SingleExp.SingleVarSet.union (MemOffset.get_vars m_off) (MemRange.get_vars m_range) in
+          let acc_useful = SingleExp.SingleVarSet.union acc_useful useful_vars in
           let m_off_l, m_off_r = m_off in
           begin match sub_sol_func m_off_l, sub_sol_func m_off_r with
           | Some (m_off_l, _), Some (_, m_off_r) ->
@@ -75,15 +87,23 @@ module FuncInterface (Entry: EntryType) = struct
                 (SingleExp.add_local_var single_var_map c_exp p_exp,
                 SingleExp.SingleVarSet.union single_var_set (SingleExp.get_vars c_exp),
                 Entry.add_local_var var_map c_entry p_entry),
-                SingleExp.SingleVarSet.union acc_useful useful_vars
+                acc_useful
               ),
               Mapped (p_off, is_full, m_range, c_entry)
             | None -> 
               (* Printf.printf "Unmapped m_off %s c_off %s\n" (MemOffset.to_string m_off) (MemOffset.to_string c_off); *)
               (* SingleExp.pp_local_var 0 single_var_map; *)
-              acc, Unmapped m_off (* TODO: Maybe only keep real unmapped addresses*)
+              ( (* acc *)
+                (single_var_map, single_var_set, var_map),
+                acc_useful), 
+              Unmapped m_off (* TODO: Maybe only keep real unmapped addresses*)
             end
-          | _ -> acc, Unmapped (SingleTop, SingleTop) (* Use Top to avoid lookup unresolved addr in update_mem *)
+          | _ -> 
+            (* Printf.printf "Unresolved addr (parent ctx) %s\n" (MemOffset.to_string m_off); *)
+            ( (* acc *)
+              (single_var_map, single_var_set, var_map),
+              acc_useful), 
+            Unmapped (SingleTop, SingleTop) (* Use Top to avoid lookup unresolved addr in update_mem *)
           end
         else acc, entry
       | _ -> acc, entry

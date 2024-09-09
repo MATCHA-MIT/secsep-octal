@@ -1,5 +1,6 @@
 open Isa
 open Entry_type
+open Single_exp
 open Pretty_print
 
 module RegType (Entry: EntryType) = struct
@@ -36,5 +37,18 @@ module RegType (Entry: EntryType) = struct
     in
     let next_var, reg_type = helper start_var [] 0 in
     (next_var, List.rev reg_type)
+
+  let get_callee_useful_var (reg_type: t) : SingleExp.SingleVarSet.t =
+    let useful_var, _ = List.fold_left (
+      fun (acc: SingleExp.SingleVarSet.t * int) (entry: entry_t) ->
+        let acc_useful_var, acc_id = acc in
+        if Isa.is_reg_idx_callee_saved acc_id then
+          SingleExp.SingleVarSet.union acc_useful_var 
+            (SingleExp.get_vars (Entry.get_single_exp entry)),
+          acc_id + 1
+        else
+          acc_useful_var, acc_id + 1
+    ) (SingleExp.SingleVarSet.empty, 0) reg_type
+    in useful_var
 
 end

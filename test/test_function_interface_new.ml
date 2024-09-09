@@ -17,6 +17,12 @@ let get_mem_interface
   | Some interface -> interface
   | None -> mem_interface_error (Printf.sprintf "Cannot get mem interface of func %s" func_name)
 
+let salsa20_global : SingleTypeInfer.ArchType.MemType.t = [
+  -2, [ ((SingleConst 0L, SingleConst 32L), [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
+  -3, [ ((SingleConst 0L, SingleConst 8L), [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
+  -4, [ ((SingleConst 0L, SingleConst 64L), [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+]
+(* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
 let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "salsa20_words", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
@@ -33,7 +39,7 @@ let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list =
     rdi, [ ((SingleConst 0L, SingleVar rsi), [], SingleTop) ];
     rdx, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ]
   ];
-  "_start", [
+  "_start", salsa20_global @ [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ]
   ]
 ]

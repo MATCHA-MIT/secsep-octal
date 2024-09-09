@@ -403,10 +403,34 @@ module MemType (Entry: EntryType) = struct
   let remove_local_mem
       (smt_ctx: SmtEmitter.t)
       (mem: t) : t =
-    pp_mem_type 0 mem;
+    (* pp_mem_type 0 mem; *)
+    (* NOTE: this could also be optimized *)
     List.map (
       fun (ptr, part_mem) ->
         ptr, List.filter (fun (off, _, _) -> is_shared_mem smt_ctx ptr off) part_mem
     ) mem
+
+  let get_shared_useful_var (smt_ctx: SmtEmitter.t) (mem_type: t) : SingleExp.SingleVarSet.t =
+    (* An ugly version that avoids copying mem_type *)
+    List.fold_left (
+      fun (acc: SingleExp.SingleVarSet.t) (ptr, part_mem) ->
+        if ptr != Isa.rsp_idx then
+          List.fold_left (
+            fun (acc: SingleExp.SingleVarSet.t) (_, _, entry) -> 
+              SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
+          ) acc part_mem
+        else
+          List.fold_left (
+            fun (acc: SingleExp.SingleVarSet.t) (off, _, entry) ->
+              if is_shared_mem smt_ctx ptr off then
+                SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
+              else acc
+          ) acc part_mem
+    ) SingleExp.SingleVarSet.empty mem_type
+    (* let shared_mem = remove_local_mem smt_ctx mem_type in
+    fold_left (
+      fun (acc: SingleExp.SingleVarSet.t) (entry: entry_t) ->
+        SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
+    ) SingleExp.SingleVarSet.empty shared_mem *)
 
 end

@@ -191,6 +191,14 @@ module Isa = struct
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
 
+  let is_reg_idx_callee_saved (r_idx: int) : bool =
+    List.mem r_idx [
+      3; (* RBX *)
+      4; (* RSP *)
+      5; (* RBP *)
+      12; 13; 14; 15
+    ]
+
   type immediate =
     | ImmNum of int64
     | ImmLabel of imm_var_id

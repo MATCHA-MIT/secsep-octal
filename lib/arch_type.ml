@@ -195,10 +195,12 @@ module ArchType (Entry: EntryType) = struct
         begin match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
         | Some (_, (off_w, off_r, e_t)) -> e_t, [ Subset (addr_offset, off_r, off_w) ] , useful_vars
         | None -> 
-          (* Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
+          Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset);
           Entry.get_top_type, [ Unknown addr_offset ], useful_vars
         end
-      | _ -> Entry.get_top_type, [ Unknown (SingleTop, SingleTop) ], useful_vars
+      | _ -> 
+        Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
+        Entry.get_top_type, [ Unknown (SingleTop, SingleTop) ], useful_vars
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -506,15 +508,17 @@ module ArchType (Entry: EntryType) = struct
       (block_subtype: block_subtype_t list) :
       t * block_subtype_t list =
     (* Update pc here!!! *)
-    (* Printf.printf "Prop inst %s\n" (Isa.string_of_instruction inst); *)
+    (* Printf.printf "Prop inst %d %s\n" curr_type.pc (Isa.string_of_instruction inst); *)
     let next_type, block_subtype = 
       match inst with
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype
       | Call target_func_name ->
         type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name,
-        (* Printf.printf "Warning: haven't implemented so far!\n";
-        curr_type,  *)
+        (* let _ = func_interface_list in
+        let _ = target_func_name in
+        Printf.printf "Warning: haven't implemented so far!\n";
+        curr_type, *)
         block_subtype
       | _ ->
         type_prop_non_branch smt_ctx sub_sol_func curr_type inst, block_subtype
@@ -530,21 +534,46 @@ module ArchType (Entry: EntryType) = struct
       (block: Isa.instruction list)
       (block_subtype: block_subtype_t list) :
       t * (block_subtype_t list) =
-    List.fold_left (
-      fun (curr, b_sub) inst -> 
-        type_prop_inst smt_ctx sub_sol_func func_interface_list curr inst b_sub
-    ) (curr_type, block_subtype) block
+    let curr_type, block_subtype = 
+      List.fold_left (
+        fun (curr, b_sub) inst -> 
+          type_prop_inst smt_ctx sub_sol_func func_interface_list curr inst b_sub
+      ) (curr_type, block_subtype) block
+    in
+    if curr_type.label = Isa.ret_label then
+      let curr_type = 
+        { curr_type with 
+        useful_var = 
+          SingleExp.SingleVarSet.union
+            (RegType.get_callee_useful_var curr_type.reg_type)
+            (MemType.get_shared_useful_var smt_ctx curr_type.mem_type) 
+        } 
+      in
+      curr_type, update_with_end_type curr_type block_subtype
+    else curr_type, block_subtype
 
-  let get_branch_hist 
+  let get_branch_hist
+      (block_subtype_list: block_subtype_t list)
+      (branch_pc: int) : (CondType.t * int) list =
+    let find_branch_hist = List.find_map (
+      fun (_, sub_list) ->
+        List.find_map (fun x -> if x.pc = branch_pc then Some x.branch_hist else None) sub_list
+    ) block_subtype_list
+    in
+    match find_branch_hist with
+    | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find branch_pc %d" branch_pc)
+    | Some branch_hist -> branch_hist
+
+  (* let get_branch_hist 
       (block_subtype_list: block_subtype_t list) 
       (target_pc: int) (branch_pc: int) : (CondType.t * int) list =
     match List.find_opt (fun (x, _) -> x.pc = target_pc) block_subtype_list with
-    | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find target_pc %d" target_pc)
+    | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find target_pc %d for branch_pc %d" target_pc branch_pc)
     | Some (_, sub_list) ->
       begin match List.find_map (fun x -> if x.pc = branch_pc then Some x.branch_hist else None) sub_list with
-      | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find branch_pc %d" branch_pc)
+      | None -> arch_type_error (Printf.sprintf "get_branch_hist cannot find branch_pc %d with target_pc %d" branch_pc target_pc)
       | Some branch_hist -> branch_hist
-      end
+      end *)
 
   let get_pc_cond_from_branch_hist
       (branch_hist: (CondType.t * int) list) (pc: int) : CondType.t option =
@@ -552,8 +581,8 @@ module ArchType (Entry: EntryType) = struct
 
   let get_branch_cond
       (block_subtype_list: block_subtype_t list) 
-      (target_pc: int) (branch_pc: int) : CondType.t option =
-    let branch_hist = get_branch_hist block_subtype_list target_pc branch_pc in
+      (branch_pc: int) : CondType.t option =
+    let branch_hist = get_branch_hist block_subtype_list branch_pc in
     get_pc_cond_from_branch_hist branch_hist branch_pc
 
   let get_local_var_set (a_type: t) : SingleExp.SingleVarSet.t =
