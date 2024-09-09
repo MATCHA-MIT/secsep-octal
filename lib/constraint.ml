@@ -1,4 +1,5 @@
 open Mem_offset
+open Taint_exp
 
 module Constraint = struct
   exception ConstraintError of string
@@ -7,6 +8,7 @@ module Constraint = struct
   type t =
     | Unknown of MemOffset.t
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
+    | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
     (* TODO: Add taint constraint later *)
 
   let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =
