@@ -60,14 +60,17 @@ module SingleTypeInfer = struct
       List.fold_left_map (
         fun (start_pc, start_var) (bb: Isa.basic_block) ->
           let next_pc = start_pc + List.length bb.insts in
-          if bb.label = func_name then 
+          if bb.label = func_name then begin
+            Printf.printf "BB %s pc = %d\n" bb.label start_pc;
             ((next_pc, start_var), 
             ArchType.init_func_input_from_layout bb.label (SingleVar 0) start_pc func_mem_interface global_var_set)
-          else 
+          end else begin
+            Printf.printf "BB %s pc = %d\n" bb.label start_pc;
             let next_var, arch_type =
               ArchType.init_from_layout bb.label start_var start_pc func_mem_interface global_var_set
             in
             ((next_pc, next_var), arch_type)
+          end
       ) (start_pc, start_var) func_body
     in
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
@@ -194,7 +197,7 @@ module SingleTypeInfer = struct
         Printf.printf "After update_mem\n";
         (* pp_func_type 0 state; *)
         (* 3. Single type infer *)
-        let single_subtype, block_subtype = SingleSubtype.init block_subtype in
+        let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
         let state = { state with single_subtype = single_subtype } in
         Printf.printf "After infer, single subtype\n";

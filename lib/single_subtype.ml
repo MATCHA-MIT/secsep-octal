@@ -312,6 +312,7 @@ module SingleSubtype = struct
     ) block_subtype_list
     
   let init
+      (func_name: string)
       (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
     let useful_var_list = init_useful_var_from_block_subtype block_subtype_list in
     Printf.printf "after init useful var\n";
@@ -321,6 +322,13 @@ module SingleSubtype = struct
         fun (block_subtype: ArchType.block_subtype_t) ->
           let a_type, _ = block_subtype in
           List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (ArchType.get_local_var_set a_type)) 
+          @
+          (
+            if a_type.label = func_name then
+              List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (a_type.global_var))
+            else
+              []
+          )
       ) block_subtype_list
     in
     add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list [] 10

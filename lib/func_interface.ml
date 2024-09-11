@@ -28,6 +28,7 @@ module FuncInterface (Entry: EntryType) = struct
   }
 
   let pp_func_interface (lvl: int) (interface: t) =
+    Printf.printf "\n";
     PP.print_lvl lvl "Func interface of func %s\n" interface.func_name;
     PP.print_lvl lvl "Input\n";
     RegType.pp_reg_type 0 interface.in_reg;
