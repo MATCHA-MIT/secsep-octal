@@ -18,6 +18,17 @@ module MemOffset = struct
     | LOverlap | GOverlap
     | Other
 
+  let off_rel_t_to_string (x: off_rel_t) : string =
+    match x with
+    | Eq -> "Eq"
+    | Subset -> "Subset"
+    | Supset -> "Supset"
+    | Le -> "Le"
+    | Ge -> "Ge"
+    | LOverlap -> "LOverlap"
+    | GOverlap -> "GOverlap"
+    | Other -> "Other"
+
   let to_string (e: t) : string =
     let l, r = e in
     Printf.sprintf "[%s, %s]" (SingleExp.to_string l) (SingleExp.to_string r)
@@ -39,7 +50,7 @@ module MemOffset = struct
 
   (* Semantically cmp*)
   let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int) : off_rel_t =
-    (* Printf.printf "offset_cmp:\n%s\n%s\n" (to_string o1) (to_string o2); *)
+    (* Printf.printf "offset_cmp (mode = %d):\n%s\n%s\n" mode (to_string o1) (to_string o2); *)
     (* let stamp_beg = Unix.gettimeofday () in *)
 
     let l1, r1 = o1 in
@@ -99,6 +110,7 @@ module MemOffset = struct
         end
     end in
     (* Printf.printf "time elapsed (offset_cmp): %f\n\n" (Unix.gettimeofday () -. stamp_beg); *)
+    (* Printf.printf "result: %s\n" (off_rel_t_to_string result); *)
     result
     (* TODO: Maybe need to handle Other!!! *)
 

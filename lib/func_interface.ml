@@ -33,9 +33,12 @@ module FuncInterface (Entry: EntryType) = struct
     PP.print_lvl lvl "Input\n";
     RegType.pp_reg_type 0 interface.in_reg;
     MemType.pp_mem_type 0 interface.in_mem;
+    PP.print_lvl lvl "Context\n";
+    CondType.pp_cond_list 0 interface.context;
     PP.print_lvl lvl "Output\n";
     RegType.pp_reg_type 0 interface.out_reg;
-    MemType.pp_mem_type 0 interface.out_mem
+    MemType.pp_mem_type 0 interface.out_mem;
+    Printf.printf "\n"
 
   let add_reg_var_map 
       (child_reg: RegType.t) (parent_reg: RegType.t) : 

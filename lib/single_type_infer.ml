@@ -6,6 +6,7 @@ open Constraint
 (* open Constraint *)
 open Single_subtype
 open Smt_emitter
+open Cond_type_new
 
 module SingleTypeInfer = struct
   exception SingleTypeInferError of string
@@ -83,11 +84,45 @@ module SingleTypeInfer = struct
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
+  let gen_implicit_mem_constraints (infer_state: t) =
+    let entry_state = List.hd infer_state.func_type in 
+    let entry_mem_type = entry_state.mem_type in
+    let helper_add_constraints (acc: SmtEmitter.exp_t list) (offset: MemOffset.t) : SmtEmitter.exp_t list =
+      let l, r = offset in 
+      if SingleExp.cmp l r = 0 then begin
+          (* FIXME: a little bit dirty *)
+          Printf.printf "  skipping offset intended to be empty (l == r)\n";
+          acc
+      end else begin
+        Printf.printf "  %s\n" (MemOffset.to_string offset);
+        match SingleCondType.check_trivial (SingleCondType.Lt, l, r) with
+        | Some false ->
+            single_type_infer_error "gen_implicit_mem_constraints: memory offset is invalid (l > r)"
+        | _ -> begin
+          (* the condition should be added *)
+          let exp = SingleCondType.get_z3_mk infer_state.smt_ctx (SingleCondType.Lt, l, r) in
+          Printf.printf "  adding: %s\n" (Z3.Expr.to_string exp);
+          exp :: acc
+        end
+      end
+    in
+    let exps = List.fold_left (fun acc (ptr, mem_of_ptr) ->
+      Printf.printf "gen_implicit_mem_constraints: dealing with ptr %d\n" ptr;
+      List.fold_left (fun acc (offset, _, _) ->
+        helper_add_constraints acc offset;
+      ) acc mem_of_ptr
+    ) [] entry_mem_type
+    in
+    SmtEmitter.add_assertions infer_state.smt_ctx exps;
+    Printf.printf "current solver containing generated memory constraints:\n%s\n" (Z3.Solver.to_string (snd infer_state.smt_ctx))
+
   let type_prop_all_blocks
     (func_interface_list: FuncInterface.t list)
     (* (infer_state: t) : t * (ArchType.block_subtype_t list) = *)
     (infer_state: t) (iter_left: int) : t * (ArchType.block_subtype_t list) =
     let ctx, solver = infer_state.smt_ctx in
+    Z3.Solver.push solver;
+    gen_implicit_mem_constraints infer_state;
     let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
@@ -111,6 +146,7 @@ module SingleTypeInfer = struct
     Printf.printf "func len %d, type len %d\n" (List.length infer_state.func) (List.length infer_state.func_type);
     let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
     Printf.printf "block_subtype len %d\n" (List.length block_subtype);
+    Z3.Solver.pop solver 1;
     { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
     (* let single_subtype, block_subtype = SingleSubtype.init block_subtype in
@@ -178,7 +214,7 @@ module SingleTypeInfer = struct
         state
       else begin
         (* 1. Prop *)
-        Printf.printf "Infer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
+        Printf.printf "\nInfer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
@@ -192,7 +228,7 @@ module SingleTypeInfer = struct
             Printf.printf "%s\n" x.label;
             MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
         ) state.func_type;
-        Printf.printf "Infer iter %d update_mem\n" (iter - iter_left + 1);
+        Printf.printf "%s: Infer iter %d update_mem\n" func_name (iter - iter_left + 1);
         let state = update_mem state in
         Printf.printf "After update_mem\n";
         (* pp_func_type 0 state; *)
@@ -204,10 +240,10 @@ module SingleTypeInfer = struct
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
         if unknown_resolved then begin
           (* Directly return if unknown are all resolved. *)
-          Printf.printf "Successfully resolved all memory accesses for %s\n" func_name;
+          Printf.printf "Successfully resolved all memory accesses for %s at iter %d\n" func_name (iter - iter_left + 1);
           state
         end else begin
-        helper (clean_up_func_type state) (iter_left - 1)
+          helper (clean_up_func_type state) (iter_left - 1)
         end
       end
     in

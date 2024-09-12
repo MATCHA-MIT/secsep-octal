@@ -16,7 +16,7 @@ module RangeExp = struct
   let to_string (e: t) : string =
     match e with
     | Single e -> Printf.sprintf "{%s}" (SingleEntryType.to_string e)
-    | Range (a, b, step) -> Printf.sprintf "[%s, %s]%Ld" (SingleEntryType.to_string a) (SingleEntryType.to_string b) step
+    | Range (a, b, step) -> Printf.sprintf "[%s, %s] step=%Ld" (SingleEntryType.to_string a) (SingleEntryType.to_string b) step
     | SingleSet e_list ->
       let str_list = List.map SingleEntryType.to_string e_list in
       Printf.sprintf "{%s}" (String.concat ", " str_list)

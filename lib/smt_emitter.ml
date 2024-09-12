@@ -39,7 +39,7 @@ module SmtEmitter = struct
     let ctx, z3_solver = smt_ctx in
     let assertions = 
       List.filter_map (
-        fun e -> 
+        fun e ->
           let e = Z3.Expr.simplify e None in
           if Z3.Boolean.is_true e then None else Some e
       ) assertions
@@ -56,33 +56,31 @@ module SmtEmitter = struct
       (* 
       Printf.printf "\ncheck_compliance\n";
       Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-        (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (* *"..." *) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
-      Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-      (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
+        (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
+      (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+      (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
       (* get string of all assertion and concat them *)
       Printf.printf "assertion = \n%s\n\n" (
         List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
       );
       Printf.printf "negation  = \n%s\n\n" (Z3.Expr.to_string negation);
       *)
-      let result_sat = Z3.Solver.check z3_solver assertions in
-      let result_neg = Z3.Solver.check z3_solver [negation] in
-      match result_sat, result_neg with
-      | Z3.Solver.UNKNOWN, _ -> 
-        (* Printf.printf "assertion unknown\n"; *)
-        SatUnknown
-      | _, Z3.Solver.UNKNOWN -> 
-        (* Printf.printf "negation unknown\n"; *)
-        SatUnknown
-      | Z3.Solver.SATISFIABLE, Z3.Solver.SATISFIABLE -> 
-        (* Printf.printf "both satyes\n"; *)
-        SatUnknown
-      | Z3.Solver.SATISFIABLE, Z3.Solver.UNSATISFIABLE -> 
-        (* Printf.printf "satyes\n"; *)
-        SatYes
-      | Z3.Solver.UNSATISFIABLE, _ -> 
-        (* Printf.printf "satno\n"; *)
-        SatNo
+      match Z3.Solver.check z3_solver assertions with
+      | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
+      | Z3.Solver.SATISFIABLE -> begin
+          match Z3.Solver.check z3_solver [negation] with
+          | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
+          | Z3.Solver.SATISFIABLE ->
+            Printf.printf "both satyes\n";
+            SatUnknown
+          | Z3.Solver.UNSATISFIABLE ->
+            Printf.printf "satyes\n";
+            SatYes
+        end
+      | Z3.Solver.UNSATISFIABLE -> begin
+          Printf.printf "satno\n";
+          SatNo
+        end
 
   let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) (add_constr: bool) : exp_t =
     (* let add_constr = true in *)

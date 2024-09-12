@@ -91,9 +91,10 @@ include (CondType (SingleEntryType))
       | Ne -> Left (c != 0L)
       | Le -> Left (c <= 0L)
       | Lt -> Left (c < 0L)
-      | _ -> Right (cond, e, SingleConst 0L)
+      (* TODO: Check after using these manual heuristic rules *)
+      | _ -> Right (cond, l, r)
       end
-    | _ -> Right (cond, e, SingleConst 0L)
+    | _ -> Right (cond, l, r)
 
   let get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let z3_ctx, _ = smt_ctx in
@@ -121,5 +122,11 @@ include (CondType (SingleEntryType))
         SmtEmitter.check_compliance smt_ctx exp_list
       end
     end
+
+  let check_trivial (cond: t) : bool option =
+    match check (SmtEmitter.init_smt_ctx ()) [cond] with
+    | SatYes -> Some true
+    | SatNo -> Some false
+    | _ -> None
 
 end
