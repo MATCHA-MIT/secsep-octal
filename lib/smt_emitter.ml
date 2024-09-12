@@ -53,7 +53,7 @@ module SmtEmitter = struct
       in
       let negation = Z3.Boolean.mk_or ctx not_assertions in
       
-      (* 
+      (*
       Printf.printf "\ncheck_compliance\n";
       Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
         (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));

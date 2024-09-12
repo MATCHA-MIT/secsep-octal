@@ -96,6 +96,20 @@ include (CondType (SingleEntryType))
       end
     | _ -> Right (cond, l, r)
 
+  let naive_check_impossible (cond: t) : bool =
+    let cond, l, r = cond in
+    let e = SingleEntryType.eval (SingleBExp (SingleSub, l, r)) in
+    match e with
+    | SingleConst c ->
+      begin match cond with
+      | Eq -> c != 0L
+      | Ne -> c = 0L
+      | Le -> c > 0L
+      | Lt -> c >= 0L
+      | _ -> false
+      end
+    | _ -> false
+
   let get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let z3_ctx, _ = smt_ctx in
     let cond, l, r = cond in
@@ -110,11 +124,27 @@ include (CondType (SingleEntryType))
     | Bt -> Z3.BitVector.mk_ult z3_ctx l r
 
   let check (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
+
+    (* choose from one of two versions below *)
+
+    let res: SmtEmitter.sat_result_t = begin
+    if List.find_opt (fun x -> naive_check_impossible x) cond_list != None then
+      SatNo
+
+    (*
     let known_list, unknown_list = List.partition_map naive_check cond_list in
     if List.find_opt (fun x -> not x) known_list != None then
       SatNo (* If any no is found, then it is definitely not satisfied *)
+    *)
+
     else begin
-      let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in
+
+      (* choose from one of two versions below *)
+
+      let exp_list = List.map (get_z3_mk smt_ctx) cond_list in
+
+      (* let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in *)
+
       if List.length exp_list = 0 then
         SatYes
       else begin
@@ -122,9 +152,16 @@ include (CondType (SingleEntryType))
         SmtEmitter.check_compliance smt_ctx exp_list
       end
     end
+    end in
+    Printf.printf ">>>\n";
+    Printf.printf "check\ninputs:\n";
+    List.iter (fun x -> Printf.printf "  %s\n" (to_string x)) cond_list;
+    Printf.printf "output: %s\n" (match res with SatYes -> "SatYes" | SatNo -> "SatNo" | SatUnknown -> "SatUnknown");
+    Printf.printf "<<<\n";
+    res
 
   let check_trivial (cond: t) : bool option =
-    match check (SmtEmitter.init_smt_ctx ()) [cond] with
+    match check (SmtEmitter.init_smt_ctx ()) false [cond] with
     | SatYes -> Some true
     | SatNo -> Some false
     | _ -> None

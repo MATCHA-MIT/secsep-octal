@@ -30,4 +30,4 @@ let infer_state =
 
 let _ = SingleSubtype.pp_single_subtype 0 infer_state.single_subtype *)
 
-let _ = SingleTypeInfer.infer p standalone_salsa20 4 10
+let _ = SingleTypeInfer.infer p standalone_salsa20 5 10

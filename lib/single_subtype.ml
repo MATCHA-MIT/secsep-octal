@@ -441,7 +441,7 @@ module SingleSubtype = struct
           else Top
         | SingleSal, SingleSet e_list, Single (SingleConst c) ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list)
-        | _ -> Top (* TODO: maybe need to handle more cases here *)
+        | _ -> Printf.printf "sub_sol_single_to_range: WARNING! %s not handled\n" (SingleExp.to_string e); Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
     in
