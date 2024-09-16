@@ -74,16 +74,16 @@ module FuncInterface (Entry: EntryType) = struct
       match entry with
       | Untrans (c_off, c_range, c_entry) ->
         if MemOffset.is_val single_var_set c_off && MemRange.is_val single_var_set c_range then
-          let m_off = MemOffset.repl_local_var local_var_map (MemOffset.repl_context_var single_var_map c_off) in
+          let orig_m_off = MemOffset.repl_local_var local_var_map (MemOffset.repl_context_var single_var_map c_off) in
           let m_range = MemRange.repl_local_var local_var_map (MemRange.repl_context_var single_var_map c_range) in
           (* Update useful vars as long as addr can be represented by parent vars *)
-          let useful_vars = SingleExp.SingleVarSet.union (MemOffset.get_vars m_off) (MemRange.get_vars m_range) in
+          let useful_vars = SingleExp.SingleVarSet.union (MemOffset.get_vars orig_m_off) (MemRange.get_vars m_range) in
           let acc_useful = SingleExp.SingleVarSet.union acc_useful useful_vars in
-          let m_off_l, m_off_r = m_off in
+          let m_off_l, m_off_r = orig_m_off in
           begin match sub_sol_func m_off_l, sub_sol_func m_off_r with
           | Some (m_off_l, _), Some (_, m_off_r) ->
-            let m_off = m_off_l, m_off_r in
-            begin match MemType.get_mem_type smt_ctx parent_mem m_off with
+            let simp_m_off = m_off_l, m_off_r in
+            begin match MemType.get_mem_type smt_ctx parent_mem orig_m_off simp_m_off with
             | Some (is_full, (p_off, _, p_entry)) ->
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
@@ -100,7 +100,8 @@ module FuncInterface (Entry: EntryType) = struct
               ( (* acc *)
                 (single_var_map, single_var_set, var_map),
                 acc_useful), 
-              Unmapped m_off (* TODO: Maybe only keep real unmapped addresses*)
+              (* Use simp_m_off since we do not need to distinguish between eq and subset for resolving unknown address *)
+              Unmapped simp_m_off (* TODO: Maybe only keep real unmapped addresses*)
             end
           | _ -> 
             (* Printf.printf "Unresolved addr (parent ctx) %s\n" (MemOffset.to_string m_off); *)

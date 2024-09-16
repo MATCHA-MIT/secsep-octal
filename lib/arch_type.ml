@@ -186,21 +186,22 @@ module ArchType (Entry: EntryType) = struct
       | Some opt_exp ->
         let opt_offset = RangeExp.to_mem_offset opt_exp size in
         (* let opt_offset = None in let _ = sub_sol_func in *)
-        let addr_offset = 
+        let orig_addr_offset = 
             (addr_exp, 
             SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
         in
-        let addr_offset = (
+        let simp_addr_offset = (
           match opt_offset with
           | Some o -> o
-          | None -> addr_offset
+          | None -> orig_addr_offset
         ) in
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.get_mem_type smt_ctx curr_type.mem_type addr_offset with
-        | Some (_, (off_w, off_r, e_t)) -> e_t, Subset (addr_offset, off_r, off_w) :: addr_untaint_cons, useful_vars
+        begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
+        | Some (_, (off_w, off_r, e_t)) -> e_t, Subset (simp_addr_offset, off_r, off_w) :: addr_untaint_cons, useful_vars
         | None -> 
-          Printf.printf "get_ld_op_type unknown addr %s\n" (MemOffset.to_string addr_offset);
-          Entry.get_top_type, Unknown addr_offset :: addr_untaint_cons, useful_vars
+          Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
+          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+          Entry.get_top_type, Unknown simp_addr_offset :: addr_untaint_cons, useful_vars
         end
       | _ -> 
         Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
@@ -228,22 +229,23 @@ module ArchType (Entry: EntryType) = struct
       | Some opt_exp ->
         let opt_offset = RangeExp.to_mem_offset opt_exp size in
         (* let opt_offset = None in let _ = sub_sol_func in *)
-        let addr_offset = 
+        let orig_addr_offset = 
             (addr_exp, 
             SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
         in
-        let addr_offset = (
+        let simp_addr_offset = (
           match opt_offset with
           | Some o -> o
-          | None -> addr_offset
+          | None -> orig_addr_offset
         ) in
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.set_mem_type smt_ctx true curr_type.mem_type addr_offset new_type with
+        begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
         | Some (new_mem, write_constraints) -> 
           { curr_type with mem_type = new_mem }, write_constraints @ addr_untaint_cons, useful_vars
         | None -> 
-          (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
-          curr_type, Unknown addr_offset :: addr_untaint_cons, useful_vars
+          (* Printf.printf "set_st_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset); *)
+          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+          curr_type, Unknown simp_addr_offset :: addr_untaint_cons, useful_vars
         end
       | None -> 
         (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
@@ -564,7 +566,7 @@ module ArchType (Entry: EntryType) = struct
         useful_var = 
           SingleExp.SingleVarSet.union
             (RegType.get_callee_useful_var curr_type.reg_type)
-            (MemType.get_shared_useful_var smt_ctx curr_type.mem_type) 
+            (MemType.get_shared_useful_var_quick_cmp smt_ctx curr_type.mem_type) 
         } 
       in
       curr_type, update_with_end_type curr_type block_subtype

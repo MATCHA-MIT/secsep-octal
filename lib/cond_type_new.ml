@@ -123,25 +123,26 @@ include (CondType (SingleEntryType))
     | Be -> Z3.BitVector.mk_ule z3_ctx l r
     | Bt -> Z3.BitVector.mk_ult z3_ctx l r
 
-  let check (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
+  let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 
     (* choose from one of two versions below *)
 
     let res: SmtEmitter.sat_result_t = begin
-    if List.find_opt (fun x -> naive_check_impossible x) cond_list <> None then
-      SatNo
+    (* if List.find_opt (fun x -> naive_check_impossible x) cond_list <> None then
+      SatNo *)
 
-    (*
+    
     let known_list, unknown_list = List.partition_map naive_check cond_list in
     if List.find_opt (fun x -> not x) known_list <> None then
       SatNo (* If any no is found, then it is definitely not satisfied *)
-    *)
+   
 
     else begin
 
       (* choose from one of two versions below *)
 
-      let exp_list = List.map (get_z3_mk smt_ctx) cond_list in
+      (* is_quick = true -> accept quick check, but may ignore overflow/underflow *)
+      let exp_list = List.map (get_z3_mk smt_ctx) (if is_quick then unknown_list else cond_list) in
 
       (* let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in *)
 
@@ -161,7 +162,8 @@ include (CondType (SingleEntryType))
     res
 
   let check_trivial (cond: t) : bool option =
-    match check (SmtEmitter.init_smt_ctx ()) [cond] with
+    (* Use quick check *)
+    match check true (SmtEmitter.init_smt_ctx ()) [cond] with
     | SatYes -> Some true
     | SatNo -> Some false
     | _ -> None

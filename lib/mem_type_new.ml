@@ -198,35 +198,41 @@ module MemType (Entry: EntryType) = struct
   let get_part_mem_type
       (smt_ctx: SmtEmitter.t)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
-      (addr_offset: MemOffset.t) :
+      (orig_addr_off: MemOffset.t)
+      (simp_addr_off: MemOffset.t) :
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     List.find_map (
       fun (off, range, entry) ->
-        match MemOffset.offset_cmp smt_ctx addr_offset off 1 with
-        | Eq -> Some (true, (off, range, entry)) (* full read *)
-        | Subset -> 
-          (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
-          Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
+        match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off 1 with
+        | Eq | Subset ->
+          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off 1 with
+          | Eq -> Some (true, (off, range, entry)) (* full read *)
+          | Subset -> 
+            (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
+            Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
+          | _ -> None
+          end
         | _ -> None
     ) part_mem
 
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
       (mem: t)
-      (addr_offset: MemOffset.t) :
+      (orig_addr_off: MemOffset.t)
+      (simp_addr_off: MemOffset.t) :
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
     (* let stamp_beg = Unix.gettimeofday () in *)
     let ptr_set = get_ptr_set mem in
-    let l, r = addr_offset in
-    let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    let simp_l, simp_r = simp_addr_off in
+    let result = match SingleExp.find_base simp_l ptr_set, SingleExp.find_base simp_r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
+      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else let part_mem = get_part_mem mem b_l in
-      get_part_mem_type smt_ctx part_mem addr_offset
+      get_part_mem_type smt_ctx part_mem orig_addr_off simp_addr_off
     | _ ->
-      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r) in
+      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars simp_l) (SingleExp.get_vars simp_r) in
       (* heuristic priority: related vars > others; within each group, the offset list sizes are ascending *)
       let reformed_mem = List.map (fun (x, x_mem) ->
         (x, x_mem, SingleExp.SingleVarSet.exists (fun z -> z = x) related_vars, List.length x_mem)
@@ -242,18 +248,19 @@ module MemType (Entry: EntryType) = struct
       ) reformed_mem |> List.map (fun (x, y, _, _) -> (x, y))
       in
       List.find_map (
-        fun (_, part_mem) -> get_part_mem_type smt_ctx part_mem addr_offset
+        fun (_, part_mem) -> get_part_mem_type smt_ctx part_mem orig_addr_off simp_addr_off
       ) sorted_mem
     in
     (* Printf.printf "\ntime elapsed (get_mem_type): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 
-  let is_shared_mem
+  let is_shared_mem_helper
+      (is_quick: bool)
       (smt_ctx: SmtEmitter.t)
       (ptr: Isa.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
     if ptr = Isa.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
-      match MemOffset.offset_cmp smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
+      match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
       | Le -> false
       | Ge -> true
       | _ -> 
@@ -262,12 +269,17 @@ module MemType (Entry: EntryType) = struct
           ptr (MemOffset.to_string addr_offset))
     else true
 
+  let is_shared_mem_quick_cmp = is_shared_mem_helper true
+  let is_shared_mem_full_cmp = is_shared_mem_helper false
+
   let set_part_mem_type
       (smt_ctx: SmtEmitter.t)
       (update_init_range: bool)
       (ptr: Isa.imm_var_id)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
-      (addr_offset: MemOffset.t) (new_val: entry_t) :
+      (orig_addr_off: MemOffset.t)
+      (simp_addr_off: MemOffset.t)
+      (new_val: entry_t) :
       ((MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list)) option =
     let helper
         (acc: bool * (Constraint.t list)) 
@@ -277,17 +289,21 @@ module MemType (Entry: EntryType) = struct
       | true, _ -> acc, entry
       | false, cons ->
         let off, range, entry_val = entry in
-        begin match MemOffset.offset_cmp smt_ctx addr_offset off 1 with
-        | Eq -> 
-          let range = if update_init_range then [ off ] else range in
-          if is_shared_mem smt_ctx ptr addr_offset then
-            (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
-          else
-            (true, cons), (off, range, new_val)
-        | Subset -> 
-          (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-          let range = if update_init_range then MemRange.merge smt_ctx [ off ] range else range in
-          (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
+        begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off 1 with
+        | Eq | Subset ->
+          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off 1 with
+          | Eq -> 
+            let range = if update_init_range then [ off ] else range in
+            if is_shared_mem_full_cmp smt_ctx ptr orig_addr_off then
+              (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
+            else
+              (true, cons), (off, range, new_val)
+          | Subset -> 
+            (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
+            let range = if update_init_range then MemRange.merge smt_ctx [ off ] range else range in
+            (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
+          | _ -> acc, entry
+          end
         | _ -> acc, entry
         end
     in
@@ -299,20 +315,21 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (update_init_range: bool)
       (mem: t)
-      (addr_offset: MemOffset.t)
+      (orig_addr_off: MemOffset.t)
+      (simp_addr_off: MemOffset.t)
       (new_type: entry_t) :
       (t * (Constraint.t list)) option =
     (* let _ = smt_ctx, mem, addr_offset, new_type in
     None *)
     (* let stamp_beg = Unix.gettimeofday () in *)
-    let _, _, _, _ = smt_ctx, mem, addr_offset, new_type in
+    (* let _, _, _, _ = smt_ctx, mem, addr_offset, new_type in *)
     let ptr_set = get_ptr_set mem in
-    let l, r = addr_offset in
-    let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    let simp_l, simp_r = simp_addr_off in
+    let result = match SingleExp.find_base simp_l ptr_set, SingleExp.find_base simp_r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
+      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else let part_mem = get_part_mem mem b_l in
-      begin match set_part_mem_type smt_ctx update_init_range b_l part_mem addr_offset new_type with
+      begin match set_part_mem_type smt_ctx update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
       | None -> None
       | Some (new_part_mem, new_cons) ->
         Some (
@@ -321,7 +338,7 @@ module MemType (Entry: EntryType) = struct
         )
       end
     | _ ->
-      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r) in
+      let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars simp_l) (SingleExp.get_vars simp_r) in
       (* heuristic priority: related vars > others; within each group, the offset list sizes are ascending *)
       let reformed_mem = List.mapi (fun order (x, x_mem) ->
         (x, x_mem, SingleExp.SingleVarSet.exists (fun z -> z = x) related_vars, List.length x_mem, order)
@@ -344,7 +361,7 @@ module MemType (Entry: EntryType) = struct
         | true, _ -> acc, entry
         | false, cons ->
           let ptr, part_mem, orig_order = entry in 
-          begin match set_part_mem_type smt_ctx update_init_range ptr part_mem addr_offset new_type with
+          begin match set_part_mem_type smt_ctx update_init_range ptr part_mem orig_addr_off simp_addr_off new_type with
           | None -> acc, entry
           | Some (new_part_mem, new_cons) -> (true, cons @ new_cons), (ptr, new_part_mem, orig_order)
           end
@@ -402,17 +419,17 @@ module MemType (Entry: EntryType) = struct
         else acc, (ptr, entry)
     ) start_var mem
 
-  let remove_local_mem
+  let remove_local_mem_quick_cmp
       (smt_ctx: SmtEmitter.t)
       (mem: t) : t =
     (* pp_mem_type 0 mem; *)
     (* NOTE: this could also be optimized *)
     List.map (
       fun (ptr, part_mem) ->
-        ptr, List.filter (fun (off, _, _) -> is_shared_mem smt_ctx ptr off) part_mem
+        ptr, List.filter (fun (off, _, _) -> is_shared_mem_quick_cmp smt_ctx ptr off) part_mem
     ) mem
 
-  let get_shared_useful_var (smt_ctx: SmtEmitter.t) (mem_type: t) : SingleExp.SingleVarSet.t =
+  let get_shared_useful_var_quick_cmp (smt_ctx: SmtEmitter.t) (mem_type: t) : SingleExp.SingleVarSet.t =
     (* An ugly version that avoids copying mem_type *)
     List.fold_left (
       fun (acc: SingleExp.SingleVarSet.t) (ptr, part_mem) ->
@@ -424,12 +441,12 @@ module MemType (Entry: EntryType) = struct
         else
           List.fold_left (
             fun (acc: SingleExp.SingleVarSet.t) (off, _, entry) ->
-              if is_shared_mem smt_ctx ptr off then
+              if is_shared_mem_quick_cmp smt_ctx ptr off then
                 SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
               else acc
           ) acc part_mem
     ) SingleExp.SingleVarSet.empty mem_type
-    (* let shared_mem = remove_local_mem smt_ctx mem_type in
+    (* let shared_mem = remove_local_mem_quick_cmp smt_ctx mem_type in
     fold_left (
       fun (acc: SingleExp.SingleVarSet.t) (entry: entry_t) ->
         SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))

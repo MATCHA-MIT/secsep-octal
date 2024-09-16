@@ -276,10 +276,10 @@ module SingleTypeInfer = struct
     let res: FuncInterface.t = {
       func_name = func_name;
       in_reg = in_state.reg_type;
-      in_mem = ArchType.MemType.remove_local_mem infer_state.smt_ctx in_state.mem_type;
+      in_mem = ArchType.MemType.remove_local_mem_quick_cmp infer_state.smt_ctx in_state.mem_type;
       context = [];
       out_reg = List.map (helper out_state.pc) out_state.reg_type;
-      out_mem = ArchType.MemType.map (helper out_state.pc) (ArchType.MemType.remove_local_mem infer_state.smt_ctx out_state.mem_type)
+      out_mem = ArchType.MemType.map (helper out_state.pc) (ArchType.MemType.remove_local_mem_quick_cmp infer_state.smt_ctx out_state.mem_type)
     }
     in
     Z3.Solver.pop (snd infer_state.smt_ctx) 1;

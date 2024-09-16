@@ -48,8 +48,8 @@ module MemOffset = struct
     SmtEmitter.expr_of_single_exp smt_ctx l true,
     SmtEmitter.expr_of_single_exp smt_ctx r true
 
-  (* Semantically cmp*)
-  let offset_cmp (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int) : off_rel_t =
+  (* Semantically cmp helper*)
+  let offset_cmp_helper (is_quick: bool) (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int) : off_rel_t =
     (* Printf.printf "offset_cmp (mode = %d):\n%s\n%s\n" mode (to_string o1) (to_string o2); *)
     (* let stamp_beg = Unix.gettimeofday () in *)
 
@@ -62,7 +62,7 @@ module MemOffset = struct
     let supset_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, r2, r1) ] in
     let loverlap_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, l2, r1) ] in
     let goverlap_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, l1, r2) ] in
-    let check = SingleCondType.check smt_ctx in
+    let check = SingleCondType.check is_quick smt_ctx in
 
     (* let z3_ctx, _ = smt_ctx in
     let l1, r1 = to_smt_expr smt_ctx o1 in
@@ -114,6 +114,12 @@ module MemOffset = struct
     result
     (* TODO: Maybe need to handle Other!!! *)
 
+  
+  (* Semantically quick cmp, cmp l r -> cmp (l - r) 0, for heuristic usage only *)
+  let offset_quick_cmp = offset_cmp_helper true
+  (* Semantically cmp*)
+  let offset_full_cmp = offset_cmp_helper false
+
   let from_range (range_l_r: RangeExp.t * RangeExp.t) : t option =
     match range_l_r with
     | Single l, Single r -> Some (l, r)
@@ -128,12 +134,12 @@ module MemOffset = struct
         (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
 
   (* This function should only be used when inserting new offset*)
-  let assert_no_overflow
+  (* let assert_no_overflow
       (smt_ctx: SmtEmitter.t) (off: t) : unit =
     let l, r = off in
     let _ = SmtEmitter.expr_of_single_exp smt_ctx l true in
     let _ = SmtEmitter.expr_of_single_exp smt_ctx r true in
-    ()
+    () *)
 
   let insert_new_offset_list
       (smt_ctx: SmtEmitter.t)
@@ -150,7 +156,8 @@ module MemOffset = struct
       match ob_list with
       | [] -> [ (new_o, true) ]
       | (hd_o, hd_updated) :: tl ->
-        begin match offset_cmp smt_ctx new_o hd_o 0 with
+        (* We just need heuristic quick cmp here since we are going to assert no_overflow after inserting offsets*)
+        begin match offset_quick_cmp smt_ctx new_o hd_o 0 with
         | Eq | Subset -> (hd_o, hd_updated) :: tl
         | Supset -> insert_one_offset tl new_o
         | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
@@ -174,11 +181,11 @@ module MemOffset = struct
         end
     in
     (* We need to manually tell SMT solver that here has no overflow! *)
-    let solver = snd smt_ctx in
+    (* let solver = snd smt_ctx in
     Z3.Solver.push solver;
-    List.fold_left (fun _ x -> assert_no_overflow smt_ctx x) () new_o_list;
+    List.fold_left (fun _ x -> assert_no_overflow smt_ctx x) () new_o_list; *)
     let result = List.fold_left insert_one_offset ob_list new_o_list in
-    Z3.Solver.pop solver 1;
+    (* Z3.Solver.pop solver 1; *)
     (* Printf.printf "\nresult:\n";
     List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result; *)
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
