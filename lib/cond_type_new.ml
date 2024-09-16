@@ -88,7 +88,7 @@ include (CondType (SingleEntryType))
     | SingleConst c ->
       begin match cond with
       | Eq -> Left (c = 0L)
-      | Ne -> Left (c != 0L)
+      | Ne -> Left (c <> 0L)
       | Le -> Left (c <= 0L)
       | Lt -> Left (c < 0L)
       (* TODO: Check after using these manual heuristic rules *)
@@ -102,7 +102,7 @@ include (CondType (SingleEntryType))
     match e with
     | SingleConst c ->
       begin match cond with
-      | Eq -> c != 0L
+      | Eq -> c <> 0L
       | Ne -> c = 0L
       | Le -> c > 0L
       | Lt -> c >= 0L
@@ -128,12 +128,12 @@ include (CondType (SingleEntryType))
     (* choose from one of two versions below *)
 
     let res: SmtEmitter.sat_result_t = begin
-    if List.find_opt (fun x -> naive_check_impossible x) cond_list != None then
+    if List.find_opt (fun x -> naive_check_impossible x) cond_list <> None then
       SatNo
 
     (*
     let known_list, unknown_list = List.partition_map naive_check cond_list in
-    if List.find_opt (fun x -> not x) known_list != None then
+    if List.find_opt (fun x -> not x) known_list <> None then
       SatNo (* If any no is found, then it is definitely not satisfied *)
     *)
 
@@ -153,15 +153,15 @@ include (CondType (SingleEntryType))
       end
     end
     end in
-    Printf.printf ">>>\n";
+    (* Printf.printf ">>>\n";
     Printf.printf "check\ninputs:\n";
     List.iter (fun x -> Printf.printf "  %s\n" (to_string x)) cond_list;
     Printf.printf "output: %s\n" (match res with SatYes -> "SatYes" | SatNo -> "SatNo" | SatUnknown -> "SatUnknown");
-    Printf.printf "<<<\n";
+    Printf.printf "<<<\n"; *)
     res
 
   let check_trivial (cond: t) : bool option =
-    match check (SmtEmitter.init_smt_ctx ()) false [cond] with
+    match check (SmtEmitter.init_smt_ctx ()) [cond] with
     | SatYes -> Some true
     | SatNo -> Some false
     | _ -> None

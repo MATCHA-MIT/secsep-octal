@@ -9,7 +9,7 @@ module Isa = struct
   let isa_error msg = raise (IsaError ("[Isa Error] " ^ msg))
 
   let string_is_sth (map: (string * 'a) list) (m: string) : bool =
-    List.find_opt (fun (opcode, _) -> opcode = m) map != None
+    List.find_opt (fun (opcode, _) -> opcode = m) map <> None
 
   let string_of_sth (map: (string * 'a) list) (op: 'a) : string option =
     List.find_map
@@ -325,7 +325,7 @@ module Isa = struct
     | JB | JBe | JA | JAe | JOther
 
   let cond_jump_opcode_map = [
-    ("jne", JNe); ("jnz", JNe);               (* != *)
+    ("jne", JNe); ("jnz", JNe);               (* <> *)
     ("je", JE); ("jz", JE);                   (* = *)
     ("jl", JL); ("jnge", JL);                 (* < signed *)
     ("jle", JLe); ("jng", JLe);               (* <= signed *)

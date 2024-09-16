@@ -245,7 +245,9 @@ module ArchType (Entry: EntryType) = struct
           (* Printf.printf "set_st_op_type unknown addr %s\n" (MemOffset.to_string addr_offset); *)
           curr_type, Unknown addr_offset :: addr_untaint_cons, useful_vars
         end
-      | None -> curr_type, Unknown (SingleTop, SingleTop) :: addr_untaint_cons, useful_vars
+      | None -> 
+        (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
+        curr_type, Unknown (SingleTop, SingleTop) :: addr_untaint_cons, useful_vars
     
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
@@ -519,6 +521,7 @@ module ArchType (Entry: EntryType) = struct
       t * block_subtype_t list =
     (* Update pc here!!! *)
     (* Printf.printf "Prop inst %d %s\n" curr_type.pc (Isa.string_of_instruction inst); *)
+    (* let unknown_before = List.length (Constraint.get_unknown curr_type.constraint_list) in *)
     let next_type, block_subtype = 
       match inst with
       | Jmp _ | Jcond _ ->
@@ -533,6 +536,11 @@ module ArchType (Entry: EntryType) = struct
       | _ ->
         type_prop_non_branch smt_ctx sub_sol_func curr_type inst, block_subtype
     in
+    (* let unknown_after = List.length (Constraint.get_unknown next_type.constraint_list) in
+    (
+      if unknown_after - unknown_before = 0 then () 
+      else Printf.printf "PC %d inst %s introduces unknown addr\n" curr_type.pc (Isa.string_of_instruction inst)
+    ); *)
     (* Printf.printf "type_prop_inst %s useful_vars %s\n" (Isa.string_of_instruction inst) (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list next_type.useful_var))); *)
     {next_type with pc = next_type.pc + 1}, block_subtype
 

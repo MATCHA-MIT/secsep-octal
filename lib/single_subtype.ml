@@ -90,11 +90,11 @@ module SingleSubtype = struct
         fun (exp, pc) -> SingleEntryType.cmp t_exp exp = 0 && t_pc = pc
       ) type_list
     in
-    if find_type != None then type_list else ty :: type_list
+    if find_type <> None then type_list else ty :: type_list
 
   let type_var_list_insert
       (type_var_list: var_idx_t list) (var_idx: var_idx_t) : var_idx_t list =
-    if List.find_opt (fun x -> x = var_idx) type_var_list != None then type_var_list else var_idx :: type_var_list
+    if List.find_opt (fun x -> x = var_idx) type_var_list <> None then type_var_list else var_idx :: type_var_list
 
   let add_one_sub_type (tv_rel: type_rel) (ty: type_exp_t) : type_rel =
     { tv_rel with subtype_list = type_list_insert tv_rel.subtype_list ty }
@@ -453,7 +453,7 @@ module SingleSubtype = struct
       (e: type_exp_t) : RangeExp.t option =
     let exp, _ = e in
     let resolved_vars = 
-      List.filter_map (fun (x: type_rel) -> if x.sol != SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
+      List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
     in
     if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then
       Some (sub_sol_single_to_range tv_rel_list input_var_set e)
@@ -489,8 +489,8 @@ module SingleSubtype = struct
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (sub_sol_single_to_range_opt tv_rel_list input_var_set) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
-        if List.length sub_range_opt_list != List.length sub_range_list then SolNone
-        else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list != None then SolSimple (Top)
+        if List.length sub_range_opt_list <> List.length sub_range_list then SolNone
+        else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then SolSimple (Top)
         else begin
           let rec helper 
               (range_list: RangeExp.t list) : 
@@ -548,17 +548,17 @@ module SingleSubtype = struct
     let bound_match (on_left: bool) (inc: bool) (cond: ArchType.CondType.cond) : bool * bool =
       (* match, if match include bound or not *)
       match on_left, inc, cond with
-      (* x+step != / < / <= bound *)
+      (* x+step <> / < / <= bound *)
       | true, true, Ne
       | true, true, Lt -> true, false
       | true, true, Le -> true, true
-      (* bound != / < / <= x-step *)
+      (* bound <> / < / <= x-step *)
       | false, false, Ne
       | false, false, Lt -> true, false
       | false, false, Le -> true, true
-      (* x-step != bound *)
+      (* x-step <> bound *)
       | true, false, Ne -> true, false
-      (* bound != x+step *)
+      (* bound <> x+step *)
       | false, true, Ne -> true, false
       (* does not match *)
       | _ -> false, false
@@ -587,7 +587,7 @@ module SingleSubtype = struct
               | None -> SingleTop
               end
             ) in
-            if bound != SingleTop && SingleEntryType.is_val input_var_set bound then
+            if bound <> SingleTop && SingleEntryType.is_val input_var_set bound then
               let bound_1 = SingleEntryType.eval (SingleBExp (SingleSub, bound, SingleConst step)) in
               let bound_2 = SingleEntryType.eval (SingleBExp (SingleSub, bound_1, SingleConst step)) in
               begin match bound_match on_left inc cond, inc with
@@ -616,7 +616,7 @@ module SingleSubtype = struct
               List.find_map (
                 fun (tv: type_rel) ->
                   let v_idx, v_pc = tv.var_idx in
-                  if v_pc != target_pc then None
+                  if v_pc <> target_pc then None
                   else begin
                     match find_base_step tv.subtype_list v_idx with
                     | Some (_, _, 0L) -> None
@@ -667,7 +667,7 @@ module SingleSubtype = struct
     let (idx, _), sol = idx_sol in
     (* TODO: We should check var and exp are in the block instead of having the same pc *)
     (* But I think if a exp has a var, then they must belong to the same block, so no need to check (maybe) *)
-    (* if e_pc != i_pc then exp_pc
+    (* if e_pc <> i_pc then exp_pc
     else *)
       match sol with
       | SolSimple (Single e) -> 
@@ -684,7 +684,7 @@ module SingleSubtype = struct
       (tv_rel_list: t) (idx_sol_list: (var_idx_t * SingleSol.t) list) : t =
     List.map (
       fun (tv_rel: type_rel) ->
-        if tv_rel.sol != SolNone then tv_rel
+        if tv_rel.sol <> SolNone then tv_rel
         else
           (* let v_idx, _ = tv_rel.var_idx in
           Printf.printf "Sub for %d sol list len %d\n" v_idx (List.length idx_sol_list); *)
@@ -698,7 +698,7 @@ module SingleSubtype = struct
       (input_var_set: SingleEntryType.SingleVarSet.t) : t * bool =
     let new_sol_list, new_subtype = List.fold_left_map (
       fun acc tv_rel ->
-        if tv_rel.sol != SolNone then acc, tv_rel
+        if tv_rel.sol <> SolNone then acc, tv_rel
         else
           (* Merge same subtype exp, keep the smaller pc which means fewer constraints from cond branch *)
           let rec merge (last_entry: SingleEntryType.t option) (sub_list: type_exp_t list) : type_exp_t list =

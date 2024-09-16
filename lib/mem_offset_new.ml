@@ -127,6 +127,14 @@ module MemOffset = struct
       (* mem_offset_error 
         (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
 
+  (* This function should only be used when inserting new offset*)
+  let assert_no_overflow
+      (smt_ctx: SmtEmitter.t) (off: t) : unit =
+    let l, r = off in
+    let _ = SmtEmitter.expr_of_single_exp smt_ctx l true in
+    let _ = SmtEmitter.expr_of_single_exp smt_ctx r true in
+    ()
+
   let insert_new_offset_list
       (smt_ctx: SmtEmitter.t)
       (ob_list: (t * bool) list) (new_o_list: t list) : (t * bool) list =
@@ -158,13 +166,19 @@ module MemOffset = struct
         | Other -> 
           Printf.printf "Warning insert_one_offset fail compare new offset %s with known offset %s\n" 
               (to_string new_o) (to_string hd_o);
+          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
           (hd_o, hd_updated) :: tl
           (* mem_offset_error 
             (Printf.sprintf "insert_one_offset fail compare new offset %s with known offset %s" 
               (to_string new_o) (to_string hd_o)) *)
         end
     in
+    (* We need to manually tell SMT solver that here has no overflow! *)
+    let solver = snd smt_ctx in
+    Z3.Solver.push solver;
+    List.fold_left (fun _ x -> assert_no_overflow smt_ctx x) () new_o_list;
     let result = List.fold_left insert_one_offset ob_list new_o_list in
+    Z3.Solver.pop solver 1;
     (* Printf.printf "\nresult:\n";
     List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result; *)
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)

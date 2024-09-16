@@ -61,7 +61,7 @@ module TaintDepState = struct
     let new_dest_dep, full_st_opt = 
       match dest with
       | MemOp (full_st_base, full_st_offset, true) (* full store *) ->
-        if List.find_opt (Ir.cmp_operand dest) src_list != None then (MemDepExp.merge curr_pc_dep dest_dep, Some (full_st_base, full_st_offset))
+        if List.find_opt (Ir.cmp_operand dest) src_list <> None then (MemDepExp.merge curr_pc_dep dest_dep, Some (full_st_base, full_st_offset))
         else (curr_pc_dep, Some (full_st_base, full_st_offset))
       | _ -> (curr_pc_dep, None)
     in

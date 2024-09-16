@@ -1,5 +1,6 @@
 open Z3
 open Single_exp
+open Pretty_print
 
 module SmtEmitter = struct
   exception SmtEmitterError of string
@@ -13,6 +14,13 @@ module SmtEmitter = struct
   type t = ctx_t * Solver.solver
 
   let bv_width = 64
+  
+  let to_string (smt_ctx: t) : string =
+    Printf.sprintf "Current smt_ctx:\n%s\n" (Z3.Solver.to_string (snd smt_ctx))
+
+  let pp_smt_ctx (lvl: int) (smt_ctx: t) : unit =
+    PP.print_lvl lvl "%s" (to_string smt_ctx)
+  
   let init_smt_ctx () : t =
     let ctx = mk_context [] in
     let solver = Solver.mk_solver ctx None in
@@ -71,14 +79,14 @@ module SmtEmitter = struct
           match Z3.Solver.check z3_solver [negation] with
           | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
           | Z3.Solver.SATISFIABLE ->
-            Printf.printf "both satyes\n";
+            (* Printf.printf "both satyes\n"; *)
             SatUnknown
           | Z3.Solver.UNSATISFIABLE ->
-            Printf.printf "satyes\n";
+            (* Printf.printf "satyes\n"; *)
             SatYes
         end
       | Z3.Solver.UNSATISFIABLE -> begin
-          Printf.printf "satno\n";
+          (* Printf.printf "satno\n"; *)
           SatNo
         end
 

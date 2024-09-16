@@ -87,37 +87,38 @@ module SingleTypeInfer = struct
   let gen_implicit_mem_constraints (infer_state: t) =
     let entry_state = List.hd infer_state.func_type in 
     let entry_mem_type = entry_state.mem_type in
-    Printf.printf "gen_implicit_mem_constraints: current memory layout:\n";
+    (* Printf.printf "gen_implicit_mem_constraints: current memory layout:\n"; *)
     ArchType.MemType.pp_mem_type 0 entry_mem_type;
     Printf.printf "\n";
     let helper_add_constraints (acc: SmtEmitter.exp_t list) (offset: MemOffset.t) : SmtEmitter.exp_t list =
       let l, r = offset in 
       if SingleExp.cmp l r = 0 then begin
           (* FIXME: a little bit dirty *)
-          Printf.printf "  skipping offset intended to be empty (l == r)\n";
+          (* Printf.printf "  skipping offset intended to be empty (l == r)\n"; *)
           acc
       end else begin
-        Printf.printf "  %s\n" (MemOffset.to_string offset);
+        (* Printf.printf "  %s\n" (MemOffset.to_string offset); *)
         match SingleCondType.check_trivial (SingleCondType.Lt, l, r) with
         | Some false ->
             single_type_infer_error "gen_implicit_mem_constraints: memory offset is invalid (l > r)"
         | _ -> begin
           (* the condition should be added *)
           let exp = SingleCondType.get_z3_mk infer_state.smt_ctx (SingleCondType.Lt, l, r) in
-          Printf.printf "  adding: %s\n" (Z3.Expr.to_string exp);
+          (* Printf.printf "  adding: %s\n" (Z3.Expr.to_string exp); *)
           exp :: acc
         end
       end
     in
     let exps = List.fold_left (fun acc (ptr, mem_of_ptr) ->
-      Printf.printf "gen_implicit_mem_constraints: dealing with ptr %d\n" ptr;
+      (* Printf.printf "gen_implicit_mem_constraints: dealing with ptr %d\n" ptr; *)
+      let _ = ptr in
       List.fold_left (fun acc (offset, _, _) ->
         helper_add_constraints acc offset;
       ) acc mem_of_ptr
     ) [] entry_mem_type
     in
-    SmtEmitter.add_assertions infer_state.smt_ctx exps;
-    Printf.printf "current solver containing generated memory constraints:\n%s\n" (Z3.Solver.to_string (snd infer_state.smt_ctx))
+    SmtEmitter.add_assertions infer_state.smt_ctx exps
+    (* Printf.printf "current solver containing generated memory constraints:\n%s\n" (Z3.Solver.to_string (snd infer_state.smt_ctx)) *)
 
   let type_prop_all_blocks
     (func_interface_list: FuncInterface.t list)

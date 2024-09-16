@@ -204,7 +204,9 @@ module MemType (Entry: EntryType) = struct
       fun (off, range, entry) ->
         match MemOffset.offset_cmp smt_ctx addr_offset off 1 with
         | Eq -> Some (true, (off, range, entry)) (* full read *)
-        | Subset -> Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
+        | Subset -> 
+          (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
+          Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
         | _ -> None
     ) part_mem
 
@@ -220,7 +222,7 @@ module MemType (Entry: EntryType) = struct
     let l, r = addr_offset in
     let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l != b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
+      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
       else let part_mem = get_part_mem mem b_l in
       get_part_mem_type smt_ctx part_mem addr_offset
     | _ ->
@@ -308,7 +310,7 @@ module MemType (Entry: EntryType) = struct
     let l, r = addr_offset in
     let result = match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l != b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
+      if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string addr_offset))
       else let part_mem = get_part_mem mem b_l in
       begin match set_part_mem_type smt_ctx update_init_range b_l part_mem addr_offset new_type with
       | None -> None
@@ -414,7 +416,7 @@ module MemType (Entry: EntryType) = struct
     (* An ugly version that avoids copying mem_type *)
     List.fold_left (
       fun (acc: SingleExp.SingleVarSet.t) (ptr, part_mem) ->
-        if ptr != Isa.rsp_idx then
+        if ptr <> Isa.rsp_idx then
           List.fold_left (
             fun (acc: SingleExp.SingleVarSet.t) (_, _, entry) -> 
               SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))

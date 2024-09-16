@@ -112,7 +112,7 @@ module ProgType = struct
       (tv_rel_list: SubType.t) : (TypeExp.type_var_id * TypeFullExp.type_sol) list =
     List.filter_map
       (fun (tv_rel: SubType.type_var_rel) -> 
-        if tv_rel.type_sol != TypeFullExp.SolNone then 
+        if tv_rel.type_sol <> TypeFullExp.SolNone then 
           Some (tv_rel.type_var_idx, tv_rel.type_sol)
         else None) 
       tv_rel_list
@@ -177,7 +177,7 @@ module ProgType = struct
         prop_one_block smt_ctx acc_tv_rel block_type.block_type acc_cond_list acc_u_mem_list acc_constraint acc_useful_set block_type.block_pc_idx block_inst.insts init_code_type sol in
         (other, { label = block_inst.label; insts = ir_insts } :: old_ir_program)
       else 
-        prog_type_error ("prop_all_block helper: block type and block label mismatch: " ^ block_type.label ^ " != " ^ block_inst.label)
+        prog_type_error ("prop_all_block helper: block type and block label mismatch: " ^ block_type.label ^ " <> " ^ block_inst.label)
     in
     let other, ir_program = List.fold_left2 helper ((init_tv_rel, [], [], MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty), []) init_code_type p.bbs in
     (other, List.rev ir_program)

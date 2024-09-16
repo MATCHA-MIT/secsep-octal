@@ -425,7 +425,7 @@ module SubType = struct
         | _ -> Right ()
       in
       let left_list, right_list = List.partition_map helper subtype_list in
-      if List.length right_list != 0 then (SolNone, MemOffset.ConstraintSet.empty)
+      if List.length right_list <> 0 then (SolNone, MemOffset.ConstraintSet.empty)
       else begin
         let find_bound 
             (acc: SingleExp.t * SingleExp.t * MemOffset.ConstraintSet.t) (entry: SingleExp.t) :
@@ -504,7 +504,7 @@ module SubType = struct
       (* Printf.printf "!!!Useful vars\n";
       TypeExp.pp_type_var_set 0 acc_useful;
       Printf.printf "\n"; *)
-      if TypeExp.TypeVarSet.find_opt tv_rel.type_var_idx acc_useful != None then
+      if TypeExp.TypeVarSet.find_opt tv_rel.type_var_idx acc_useful <> None then
         let new_tv_rel, sol_cons, sol_useful = try_solve_one_var smt_ctx tv_rel cond_list tv_rel_list in
         match new_tv_rel.type_sol with
         | SolNone -> ((acc_sol, acc_cons, TypeExp.TypeVarSet.union acc_useful sol_useful), tv_rel)

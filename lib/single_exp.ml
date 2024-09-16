@@ -147,10 +147,10 @@ module SingleExp = struct
     | ee1, ee2 -> cmp_list_helper ee1 ee2
 
   let find_top (x: t list) : bool =
-    List.find_opt (fun a -> a = SingleTop) x != None
+    List.find_opt (fun a -> a = SingleTop) x <> None
 
   let find_top_double (x: t list list) : bool =
-    List.find_opt (fun a -> find_top a) x != None
+    List.find_opt (fun a -> find_top a) x <> None
 
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =

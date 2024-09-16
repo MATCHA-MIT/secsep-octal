@@ -175,7 +175,7 @@ module FuncInterface (Entry: EntryType) = struct
       else p_range, [ Constraint.Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
     in
     (* Question: do we need this optimization? *)
-    (* if Entry.cmp c_in_entry c_out_entry = 0 && Entry.cmp c_in_entry Entry.get_top_type != 0 then 
+    (* if Entry.cmp c_in_entry c_out_entry = 0 && Entry.cmp c_in_entry Entry.get_top_type <> 0 then 
       (* NOTE: if not top and unchanged, then is not overwritten *)
       (p_off, p_range, p_entry), read_range_constraint @ out_range_constraint
     else  *)
