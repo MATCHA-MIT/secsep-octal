@@ -91,19 +91,19 @@ module MemType (Entry: EntryType) = struct
     List.fold_left helper_outer acc mem
 
   let fold_left_map
-      (func: 'acc -> 'a -> ('acc * 'a))
+      (func: 'acc -> 'a -> ('acc * 'b))
       (acc: 'acc)
-      (mem: 'a mem_content) : 'acc * ('a mem_content) =
+      (mem: 'a mem_content) : 'acc * ('b mem_content) =
     let helper_inner
         (acc: 'acc) (entry: MemOffset.t * MemRange.t * 'a): 
-        'acc * (MemOffset.t * MemRange.t * 'a) =
+        'acc * (MemOffset.t * MemRange.t * 'b) =
       let off, range, e = entry in
       let acc, e = func acc e in
       acc, (off, range, e)
     in
     let helper_outer
         (acc: 'acc) (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
-        'acc * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) =
+        'acc * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
       let id, l = entry in
       let acc, l = List.fold_left_map helper_inner acc l in
       acc, (id, l)

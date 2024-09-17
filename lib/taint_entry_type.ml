@@ -5,7 +5,7 @@ open Taint_exp
 open Constraint
 open Smt_emitter
 
-module TaintEntryType (Entry: EntryType) : EntryType = struct
+module TaintEntryType (Entry: EntryType) = struct
   exception TaintEntryTypeError of string
 
   let taint_entry_type_error msg = raise (TaintEntryTypeError ("[Taint Single Type Error] " ^ msg))
