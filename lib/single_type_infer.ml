@@ -90,7 +90,25 @@ module SingleTypeInfer = struct
     (* Printf.printf "gen_implicit_mem_constraints: current memory layout:\n"; *)
     ArchType.MemType.pp_mem_type 0 entry_mem_type;
     Printf.printf "\n";
-    let helper_add_constraints (acc: SmtEmitter.exp_t list) (offset: MemOffset.t) : SmtEmitter.exp_t list =
+    let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
+      match offset_list with
+      | [] -> []
+      | ((l, r), _, _) :: [] ->
+        if SingleExp.cmp l r = 0 then [] 
+        else [ SingleCondType.get_z3_mk infer_state.smt_ctx (SingleCondType.Lt, l, r) ]
+      | ((l, _), _, _) :: tl ->
+        let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        [ SingleCondType.get_z3_mk infer_state.smt_ctx (SingleCondType.Lt, l, r) ]
+    in
+    let exps =
+      List.fold_left (
+        fun (acc: SmtEmitter.exp_t list) (_, part_mem) ->
+          (helper part_mem) @ acc
+      ) [] entry_mem_type
+    in
+    SmtEmitter.add_assertions infer_state.smt_ctx exps
+    
+    (* let helper_add_constraints (acc: SmtEmitter.exp_t list) (offset: MemOffset.t) : SmtEmitter.exp_t list =
       let l, r = offset in 
       if SingleExp.cmp l r = 0 then begin
           (* FIXME: a little bit dirty *)
@@ -117,7 +135,7 @@ module SingleTypeInfer = struct
       ) acc mem_of_ptr
     ) [] entry_mem_type
     in
-    SmtEmitter.add_assertions infer_state.smt_ctx exps
+    SmtEmitter.add_assertions infer_state.smt_ctx exps *)
     (* Printf.printf "current solver containing generated memory constraints:\n%s\n" (Z3.Solver.to_string (snd infer_state.smt_ctx)) *)
 
   let type_prop_all_blocks
