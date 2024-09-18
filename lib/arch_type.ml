@@ -153,6 +153,7 @@ module ArchType (Entry: EntryType) = struct
 
   let update_one_with_another_helper (orig: t) (update: t) : t =
     { orig with
+      local_var_map = update.local_var_map;
       useful_var = update.useful_var;
       full_not_taken_hist = update.full_not_taken_hist;
       constraint_list = update.constraint_list

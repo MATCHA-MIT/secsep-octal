@@ -9,14 +9,14 @@ module TaintSubtype = struct
 
   let taint_subtype_error msg = raise (TaintSubtypeError ("[Taint Subtype Error] " ^ msg))
 
-  (* type type_rel = {
+  type type_rel = {
     var_idx: TaintExp.taint_var_id;
     sol: TaintExp.t;
     subtype: TaintExp.t;
-    suptype: TaintExp.t
-  } *)
+    suptype: TaintExp.TaintVarSet.t;
+  }
 
-  type t = (TaintExp.taint_var_id * TaintExp.t) list
+  type t = type_rel list
 
   module TaintEntryType = TaintEntryType (SingleEntryType)
   module ArchType = ArchType (TaintEntryType)
@@ -28,6 +28,12 @@ module TaintSubtype = struct
       (block_subtype: ArchType.block_subtype_t) : sub_t list =
     let sup_block, sub_block_list = block_subtype in
     let subtype_list = Constraint.get_taint_sub sup_block.constraint_list @ subtype_list in
+    let subtype_list =
+      List.fold_left (
+        fun acc (idx, te) ->
+          (TaintExp.TaintVar idx, te) :: (te, TaintExp.TaintVar idx) :: acc
+      ) subtype_list (snd sup_block.local_var_map)
+    in
     let helper_entry 
         (subtype_list: sub_t list) 
         (sub_entry: TaintEntryType.t) (sup_entry: TaintEntryType.t) : sub_t list =
@@ -50,7 +56,13 @@ module TaintSubtype = struct
       sub_t list =
     List.fold_left get_one_block_subtype [] block_subtype_list
 
-  let solve_subtype_list (subtype_list: sub_t list) : t =
+  let add_one_sub_type (tv_rel: type_rel) (sub: TaintExp.t) : type_rel =
+    { tv_rel with subtype = TaintExp.merge sub tv_rel.subtype }
+    
+  let add_one_super_type (tv_rel: type_rel) (sup_idx: TaintExp.taint_var_id) : type_rel =
+    { tv_rel with suptype = TaintExp.TaintVarSet.add sup_idx tv_rel.suptype}
+
+  let solve_subtype_list (subtype_list: sub_t list) : (TaintExp.taint_var_id * TaintExp.t) list =
     let add_untaint (* for sub -> false *)
         (untaint_var: TaintExp.TaintVarSet.t)
         (sub: TaintExp.t) : TaintExp.TaintVarSet.t =
