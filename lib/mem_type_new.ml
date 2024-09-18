@@ -4,6 +4,7 @@ open Isa
 open Single_exp
 open Entry_type
 open Mem_offset_new
+open Cond_type_new
 open Constraint
 (* open Arch_type *)
 
@@ -467,5 +468,24 @@ module MemType (Entry: EntryType) = struct
       fun (acc: SingleExp.SingleVarSet.t) (entry: entry_t) ->
         SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
     ) SingleExp.SingleVarSet.empty shared_mem *)
+
+  let gen_implicit_mem_constraints (smt_ctx: SmtEmitter.t) (mem_type: t) : unit =
+    let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
+      match offset_list with
+      | [] -> []
+      | ((l, r), _, _) :: [] ->
+        if SingleExp.cmp l r = 0 then [] 
+        else [ SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r) ]
+      | ((l, _), _, _) :: tl ->
+        let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        [ SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r) ]
+    in
+    let exps =
+      List.fold_left (
+        fun (acc: SmtEmitter.exp_t list) (_, part_mem) ->
+          (helper part_mem) @ acc
+      ) [] mem_type
+    in
+    SmtEmitter.add_assertions smt_ctx exps
 
 end

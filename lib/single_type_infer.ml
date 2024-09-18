@@ -101,7 +101,8 @@ module SingleTypeInfer = struct
     (* Printf.printf "gen_implicit_mem_constraints: current memory layout:\n"; *)
     ArchType.MemType.pp_mem_type 0 entry_mem_type;
     Printf.printf "\n";
-    let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
+    ArchType.MemType.gen_implicit_mem_constraints infer_state.smt_ctx entry_mem_type
+    (* let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
       match offset_list with
       | [] -> []
       | ((l, r), _, _) :: [] ->
@@ -117,7 +118,7 @@ module SingleTypeInfer = struct
           (helper part_mem) @ acc
       ) [] entry_mem_type
     in
-    SmtEmitter.add_assertions infer_state.smt_ctx exps
+    SmtEmitter.add_assertions infer_state.smt_ctx exps *)
     
     (* let helper_add_constraints (acc: SmtEmitter.exp_t list) (offset: MemOffset.t) : SmtEmitter.exp_t list =
       let l, r = offset in 
