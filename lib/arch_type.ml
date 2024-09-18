@@ -57,7 +57,7 @@ module ArchType (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "full_not_taken_hist = [];\n";
     PP.bprint_lvl (lvl + 1) buf "constraint_list = [];\n";
     PP.bprint_lvl (lvl + 1) buf "local_var_map = %s;\n" Entry.empty_var_map_to_ocaml_string;
-    PP.bprint_lvl (lvl + 1) buf "useful_var = SingleExp.SingleVarSet.empty;\n";
+    PP.bprint_lvl (lvl + 1) buf "useful_var = %s;\n" (SingleExp.var_set_to_ocaml_string curr_type.useful_var);
     PP.bprint_lvl (lvl + 1) buf "global_var = %s;\n" (SingleExp.var_set_to_ocaml_string curr_type.global_var);
     PP.bprint_lvl lvl buf "}\n"
 

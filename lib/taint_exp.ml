@@ -70,6 +70,26 @@ module TaintExp = struct
         let remove_s = TaintVarSet.remove sol_id s in
         eval (merge sol_v (TaintExp remove_s))
 
+  let repl_untaint (untaint_var: TaintVarSet.t) (e: t) : t =
+    match e with
+    | TaintVar v ->
+      if TaintVarSet.mem v untaint_var then TaintConst false
+      else e
+    | TaintExp s ->
+      let new_e = TaintVarSet.diff s untaint_var in
+      eval (TaintExp new_e)
+    | _ -> e
+
+  let repl_taint (taint_var: TaintVarSet.t) (e: t) : t =
+    match e with
+    | TaintVar v ->
+      if TaintVarSet.mem v taint_var then TaintConst true
+      else e
+    | TaintExp s ->
+      if TaintVarSet.is_empty (TaintVarSet.inter s taint_var) then e
+      else TaintConst true
+    | _ -> e
+
   let partial_read_val (e: t) : t = e
   let partial_write_val (orig_e: t) (write_e: t) : t = merge orig_e write_e
   let next_var (e: t) : t =

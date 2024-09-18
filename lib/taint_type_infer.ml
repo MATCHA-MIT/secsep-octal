@@ -1,5 +1,6 @@
 open Isa
 open Taint_exp
+open Single_entry_type
 open Single_subtype
 open Taint_subtype
 open Single_type_infer
@@ -18,6 +19,7 @@ module TaintTypeInfer = struct
     func: Isa.basic_block list;
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
+    input_single_var_set: SingleEntryType.SingleVarSet.t;
     taint_subtype: TaintSubtype.t;
     smt_ctx: SmtEmitter.t;
   }
@@ -28,8 +30,7 @@ module TaintTypeInfer = struct
   let init
       (prog: Isa.prog)
       (func_name: string)
-      (func_single_type: SingleTypeInfer.ArchType.t list)
-      (single_sol: SingleSubtype.t) : t =
+      (single_infer_state: SingleTypeInfer.t) : t =
     let start_var = TaintExp.TaintVar 1 in
     let helper_code
         (acc: TaintExp.t) (block: Isa.basic_block) :
@@ -67,13 +68,58 @@ module TaintTypeInfer = struct
       }
     in
     let next_var, func = List.fold_left_map helper_code start_var ((Isa.get_func prog func_name).body) in
-    let _, func_type = List.fold_left_map helper_arch next_var func_single_type in
+    let _, func_type = List.fold_left_map helper_arch next_var single_infer_state.func_type in
     {
       func = func;
       func_type = func_type;
-      single_sol = single_sol;
+      single_sol = single_infer_state.single_subtype;
+      input_single_var_set = single_infer_state.input_var_set;
       taint_subtype = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
+
+  let type_prop_all_blocks
+      (func_interface_list: FuncInterface.t list)
+      (infer_state: t) : t * (ArchType.block_subtype_t list) =
+    let ctx, solver = infer_state.smt_ctx in
+    let helper 
+        (block_subtype: ArchType.block_subtype_t list) 
+        (block: Isa.basic_block) 
+        (block_type: ArchType.t) : ArchType.block_subtype_t list =
+      (* Prepare SMT context for the current block *)
+      Z3.Solver.push solver;
+      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_sol block_type.useful_var;
+      let _, block_subtype =
+        ArchType.type_prop_block (ctx, solver) 
+          (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
+          func_interface_list block_type block.insts block_subtype
+      in
+      (* Printf.printf "After prop block %s\n" block.label; *)
+      Z3.Solver.pop solver 1;
+      block_subtype
+    in
+    let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
+    let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
+    { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
+    block_subtype
+
+  let infer_one_func
+      (prog: Isa.prog)
+      (func_interface_list: FuncInterface.t list)
+      (func_name: Isa.label)
+      (single_infer_state: SingleTypeInfer.t) : t =
+    let state = init prog func_name single_infer_state in
+    let _ = func_interface_list in
+    (* Prepare SMT context *)
+    let solver = snd state.smt_ctx in
+    Z3.Solver.push solver;
+    ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
+
+    (* 1. Type prop *)
+    let state, block_subtype = type_prop_all_blocks func_interface_list state in
+    (* 3. Taint type infer *)
+
+    Z3.Solver.pop solver 1;
+    state
 
 end

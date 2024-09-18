@@ -19,4 +19,12 @@ module Constraint = struct
         | _ -> None
     ) constraint_list
 
+  let get_taint_sub (constraint_list: (t * int) list) : (TaintExp.t * TaintExp.t) list =
+    List.filter_map (
+      fun (x, _) ->
+        match x with
+        | TaintSub (l, r) -> Some (l, r)
+        | _ -> None
+    ) constraint_list
+
 end

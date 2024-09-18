@@ -359,11 +359,11 @@ module SingleSubtype = struct
 
   let update_block_smt_ctx
       (smt_ctx: SmtEmitter.t)
-      (sol: t) (curr_type: ArchType.t) : unit =
+      (sol: t) (useful_single_var: SingleExp.SingleVarSet.t) : unit =
     List.iter (
       fun (x: type_rel) ->
         let var_idx, _ = x.var_idx in
-        if SingleExp.SingleVarSet.mem var_idx curr_type.useful_var then
+        if SingleExp.SingleVarSet.mem var_idx useful_single_var then
           SmtEmitter.add_assertions smt_ctx [ to_smt_expr smt_ctx x ]
         else ()
     ) sol

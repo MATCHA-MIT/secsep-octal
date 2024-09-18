@@ -6,7 +6,6 @@ open Constraint
 (* open Constraint *)
 open Single_subtype
 open Smt_emitter
-open Cond_type_new
 open Pretty_print
 
 module SingleTypeInfer = struct
@@ -157,7 +156,7 @@ module SingleTypeInfer = struct
     let ctx, solver = infer_state.smt_ctx in
     let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
       Z3.Solver.push solver;
-      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type;
+      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type.useful_var;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _ = iter_left in
@@ -320,6 +319,8 @@ module SingleTypeInfer = struct
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
       (iter: int)
       (solver_iter: int) : (FuncInterface.t list) * (t list) =
+    (* TODO: The correct order is for each function, infer its single type, then taint type, then next function.
+      So this function should be moved to a upper-level model that infer all types. *)
     let helper 
         (acc: FuncInterface.t list) (entry: Isa.label * ArchType.MemType.t) :
         (FuncInterface.t list) * t =
