@@ -31,7 +31,18 @@ module TaintTypeInfer = struct
       (func_single_type: SingleTypeInfer.ArchType.t list)
       (single_sol: SingleSubtype.t) : t =
     let start_var = TaintExp.TaintVar 1 in
-    let helper 
+    let helper_code
+        (acc: TaintExp.t) (block: Isa.basic_block) :
+        TaintExp.t * Isa.basic_block =
+      let inner_helper
+          (acc: TaintExp.t) (inst: Isa.instruction) :
+          TaintExp.t * Isa.instruction =
+        TaintExp.next_var acc, Isa.update_inst_taint acc inst
+      in
+      let acc, new_insts = List.fold_left_map inner_helper acc block.insts in
+      acc, { block with insts = new_insts }
+    in
+    let helper_arch
         (acc: TaintExp.t) (block_single_type: SingleTypeInfer.ArchType.t) :
         TaintExp.t * ArchType.t =
       let inner_helper = fun acc single_entry -> TaintExp.next_var acc, (single_entry, acc) in
@@ -55,9 +66,10 @@ module TaintTypeInfer = struct
         global_var = block_single_type.global_var
       }
     in
-    let _, func_type = List.fold_left_map helper start_var func_single_type in
+    let next_var, func = List.fold_left_map helper_code start_var ((Isa.get_func prog func_name).body) in
+    let _, func_type = List.fold_left_map helper_arch next_var func_single_type in
     {
-      func = (Isa.get_func prog func_name).body;
+      func = func;
       func_type = func_type;
       single_sol = single_sol;
       taint_subtype = [];

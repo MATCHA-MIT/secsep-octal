@@ -54,6 +54,35 @@ module SingleExp = struct
       in
       "S-UnaryExp (" ^ op_str ^ ", " ^ (to_string e) ^ ")"
 
+  let rec to_ocaml_string (se: t) =
+    match se with
+    | SingleTop -> "SingleTop"
+    | SingleConst v -> Printf.sprintf "SingleConst (%LdL)" v
+    | SingleVar v -> Printf.sprintf "SingleVar (%d)" v
+    | SingleBExp (op, l, r) -> 
+      let op_str = match op with
+      | SingleAdd -> "SingleAdd"
+      | SingleSub -> "SingleSub"
+      | SingleMul -> "SingleMul"
+      | SingleSal -> "SingleSal"
+      | SingleSar -> "SingleSar"
+      | SingleXor -> "SingleXor"
+      | SingleAnd -> "SingleAnd"
+      | SingleOr -> "SingleOr"
+      in
+      Printf.sprintf "SingleBExp (%s, %s, %s)" op_str (to_ocaml_string l) (to_ocaml_string r)
+    | SingleUExp (op, e) ->
+      let op_str = match op with
+      | SingleNot -> "SingleNot"
+      in
+      Printf.sprintf "SingleUExp (%s, %s)" op_str (to_ocaml_string e)
+
+  let empty_var_map_to_ocaml_string = "[]"
+
+  let var_set_to_ocaml_string (var_set: SingleVarSet.t) : string =
+    Printf.sprintf "SingleExp.SingleVarSet.of_list [%s]"
+      (String.concat "; " (List.map string_of_int (SingleVarSet.elements var_set)))
+
   let pp_single_exp (lvl: int) (s: t) =
     PP.print_lvl lvl "%s" (to_string s)
 

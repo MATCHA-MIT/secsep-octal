@@ -7,6 +7,7 @@ open Constraint
 open Single_subtype
 open Smt_emitter
 open Cond_type_new
+open Pretty_print
 
 module SingleTypeInfer = struct
   exception SingleTypeInferError of string
@@ -27,6 +28,16 @@ module SingleTypeInfer = struct
 
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
+
+  let pp_ocaml_state (lvl: int) (buf: Buffer.t) (infer_state: t) =
+    PP.bprint_lvl lvl buf "{\n";
+    PP.bprint_lvl (lvl + 1) buf "func = [];\n";
+    PP.bprint_lvl (lvl + 1) buf "func_type =\n"; ArchType.pp_ocaml_arch_type_list (lvl + 2) buf infer_state.func_type; PP.bprint_lvl (lvl + 2) buf ";\n";
+    PP.bprint_lvl (lvl + 1) buf "single_subtype =\n"; SingleSubtype.pp_ocaml_single_subtype (lvl + 2) buf infer_state.single_subtype; PP.bprint_lvl (lvl + 2) buf ";\n";
+    PP.bprint_lvl (lvl + 1) buf "next_var = SingleTop;\n";
+    PP.bprint_lvl (lvl + 1) buf "input_var_set = %s;\n" (SingleExp.var_set_to_ocaml_string infer_state.input_var_set);
+    PP.bprint_lvl (lvl + 1) buf "smt_ctx = SmtEmitter.init_smt_ctx ();\n";
+    PP.bprint_lvl lvl buf "}\n"
 
   let init
       (prog: Isa.prog)
@@ -317,6 +328,9 @@ module SingleTypeInfer = struct
       Printf.printf "Infer state of func %s\n" func_name;
       pp_func_type 0 infer_state;
       FuncInterface.pp_func_interface 0 func_interface;
+      let buf = Buffer.create 1000 in
+      pp_ocaml_state 0 buf infer_state;
+      Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
       func_interface :: acc, infer_state
     in
     List.fold_left_map helper [] func_mem_interface_list

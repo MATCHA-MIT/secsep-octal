@@ -33,6 +33,10 @@ module MemOffset = struct
     let l, r = e in
     Printf.sprintf "[%s, %s]" (SingleExp.to_string l) (SingleExp.to_string r)
 
+  let to_ocaml_string (e: t) : string =
+    let l, r = e in
+    Printf.sprintf "(%s, %s)" (SingleExp.to_ocaml_string l) (SingleExp.to_ocaml_string r)
+
   (* Syntatically cmp *)
   let cmp (o1: t) (o2: t) : int =
     let l1, r1 = o1 in
@@ -225,6 +229,9 @@ module MemRange = struct
   let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
 
   type t = MemOffset.t list
+
+  let to_ocaml_string (r: t) : string =
+    Printf.sprintf "[%s]" (String.concat "; " (List.map MemOffset.to_ocaml_string r))
 
   let get_vars (r: t) : SingleExp.SingleVarSet.t =
     let var_list = List.map MemOffset.get_vars r in

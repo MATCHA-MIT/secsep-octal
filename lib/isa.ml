@@ -512,4 +512,25 @@ module Isa = struct
         ) func.body
     ) p.funcs
 
+  let update_op_taint (new_taint: TaintExp.t) (op: operand) : operand =
+    match op with
+    | StOp (disp, base, index, scale, size, _) ->
+      StOp (disp, base, index, scale, size, new_taint)
+    | _ -> op
+  
+  let update_inst_taint (new_taint: TaintExp.t) (inst: instruction) : instruction =
+    let update_helper = update_op_taint new_taint in
+    match inst with
+    | BInst (bop, op1, op2, op3) ->
+      BInst (bop, update_helper op1, update_helper op2, update_helper op3)
+    | UInst (uop, op1, op2) ->
+      UInst (uop, update_helper op1, update_helper op2)
+    | Xchg (op1, op2, op3, op4) ->
+      Xchg (update_helper op1, update_helper op2, update_helper op3, update_helper op4)
+    | Cmp (op1, op2) ->
+      Cmp (update_helper op1, update_helper op2)
+    | Test (op1, op2) ->
+      Test (update_helper op1, update_helper op2)
+    | _ -> inst
+
 end

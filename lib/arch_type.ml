@@ -46,8 +46,32 @@ module ArchType (Entry: EntryType) = struct
     RegType.pp_reg_type lvl curr_type.reg_type;
     MemType.pp_mem_type lvl curr_type.mem_type
 
+  let pp_ocaml_arch_type (lvl: int) (buf: Buffer.t) (curr_type: t) =
+    PP.bprint_lvl lvl buf "{\n";
+    PP.bprint_lvl (lvl + 1) buf "label = \"%s\";\n" curr_type.label;
+    PP.bprint_lvl (lvl + 1) buf "pc = %d;\n" curr_type.pc;
+    PP.bprint_lvl (lvl + 1) buf "reg_type = \n"; RegType.pp_ocaml_reg_type (lvl + 2) buf curr_type.reg_type; PP.bprint_lvl (lvl + 1) buf ";\n";
+    PP.bprint_lvl (lvl + 1) buf "mem_type = \n"; MemType.pp_ocaml_mem_type (lvl + 2) buf curr_type.mem_type; PP.bprint_lvl (lvl + 1) buf ";\n";
+    PP.bprint_lvl (lvl + 1) buf "flag = (%s, %s);\n" (Entry.to_ocaml_string (fst curr_type.flag)) (Entry.to_ocaml_string (snd curr_type.flag));
+    PP.bprint_lvl (lvl + 1) buf "branch_hist = [];\n"; (* We do not need branch hist, so I omit it *)
+    PP.bprint_lvl (lvl + 1) buf "full_not_taken_hist = [];\n";
+    PP.bprint_lvl (lvl + 1) buf "constraint_list = [];\n";
+    PP.bprint_lvl (lvl + 1) buf "local_var_map = %s;\n" Entry.empty_var_map_to_ocaml_string;
+    PP.bprint_lvl (lvl + 1) buf "useful_var = SingleExp.SingleVarSet.empty;\n";
+    PP.bprint_lvl (lvl + 1) buf "global_var = %s;\n" (SingleExp.var_set_to_ocaml_string curr_type.global_var);
+    PP.bprint_lvl lvl buf "}\n"
+
   let pp_arch_type_list (lvl: int) (type_list: t list) =
     List.iter (pp_arch_type lvl) type_list
+
+  let pp_ocaml_arch_type_list (lvl: int) (buf: Buffer.t) (type_list: t list) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun arch_type ->
+        pp_ocaml_arch_type (lvl + 1) buf arch_type;
+        PP.bprint_lvl (lvl + 1) buf ";\n"
+    ) type_list;
+    PP.bprint_lvl lvl buf "]\n"
 
   let pp_arch_type_useful_var (lvl: int) (curr_type: t) =
     let var_s = String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list curr_type.useful_var)) in

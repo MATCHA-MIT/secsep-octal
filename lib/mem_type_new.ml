@@ -60,6 +60,22 @@ module MemType (Entry: EntryType) = struct
         ) off_list
     ) mem
 
+  let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.bprint_lvl (lvl + 1) buf "(%d, [\n" ptr;
+        List.iter (
+          fun (off, range, entry) ->
+            PP.bprint_lvl (lvl + 2) buf "(%s, %s, %s);\n" 
+              (MemOffset.to_ocaml_string off) 
+              (MemRange.to_ocaml_string range) 
+              (Entry.to_ocaml_string entry)
+        ) off_list;
+        PP.bprint_lvl (lvl + 1) buf "]);\n"
+    ) mem;
+    PP.bprint_lvl lvl buf "]\n"
+
   let map (func: 'a -> 'b) (mem: 'a mem_content) : 'b mem_content =
     let helper_inner 
         (entry: MemOffset.t * MemRange.t * 'a) : 

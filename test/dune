@@ -16,7 +16,11 @@
  ; (libraries z3)
  ; (modes byte)
 
- (name test_single_type_infer)
+ ; (name test_single_type_infer)
+ ; (libraries type)
+ ; (modes byte)
+
+ (name test_taint_type_infer)
  (libraries type)
  (modes byte)
 

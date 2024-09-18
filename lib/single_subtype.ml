@@ -24,6 +24,13 @@ module SingleSol = struct
     | SolSimple e -> Printf.sprintf "SolSimple(%s)" (RangeExp.to_string e)
     | SolCond (pc, e1, e2, e3) -> Printf.sprintf "SolCond(%d)(%s, %s, %s)" pc (RangeExp.to_string e1) (RangeExp.to_string e2) (RangeExp.to_string e3)
 
+  let to_ocaml_string (e: t) : string =
+    match e with
+    | SolNone -> "SolNone"
+    | SolSimple e -> Printf.sprintf "SolSimple (%s)" (RangeExp.to_ocaml_string e)
+    | SolCond (pc, e1, e2, e3) -> 
+      Printf.sprintf "SolCond (%d, %s, %s, %s)" pc (RangeExp.to_ocaml_string e1) (RangeExp.to_ocaml_string e2) (RangeExp.to_ocaml_string e3)
+
   let to_smt_expr (smt_ctx: SmtEmitter.t) (v_idx: int) (s: t) : SmtEmitter.exp_t =
     match s with
     | SolNone -> RangeExp.to_smt_expr smt_ctx v_idx RangeExp.Top
@@ -63,6 +70,18 @@ module SingleSubtype = struct
 
   let pp_single_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
+
+  let to_ocaml_string (x: type_rel) : string =
+    let v_idx, v_pc = x.var_idx in
+    Printf.sprintf "{ var_idx = (%d, %d); sol = %s; subtype_list = []; supertype_list = [] }"
+      v_idx v_pc (SingleSol.to_ocaml_string x.sol)
+
+  let pp_ocaml_single_subtype (lvl: int) (buf: Buffer.t) (x: t) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun x -> PP.bprint_lvl (lvl + 1) buf "%s;\n" (to_ocaml_string x)
+    ) x;
+    PP.bprint_lvl lvl buf "]\n"
 
   let find_or_add_entry (var_pc_map: var_idx_t list) (tv_rel: t) (var_idx: int) : t * type_rel =
     let find_entry = List.find_opt (fun x -> let v_idx, _ = x.var_idx in v_idx = var_idx) tv_rel in

@@ -86,6 +86,15 @@ module TaintExp = struct
       let var_str_list = List.map string_of_int (TaintVarSet.elements s) in
       "TaintVarSet (" ^ (String.concat " " var_str_list) ^ ")"
 
+  let to_ocaml_string (e: t) : string =
+    match e with
+    | TaintConst true -> "TaintConst true"
+    | TaintConst false -> "TaintConst false"
+    | TaintVar x -> Printf.sprintf "TaintVar (%d)" x
+    | TaintExp s -> 
+      let var_str_list = List.map string_of_int (TaintVarSet.elements s) in
+      Printf.sprintf "TaintExp (TaintVarSet.of_list [ %s ])" (String.concat "; " var_str_list)
+
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     let new_idx = -pc in
     (new_idx, e) :: map, TaintVar new_idx

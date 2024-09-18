@@ -21,6 +21,8 @@ module type EntryType = sig
 
   val next_var : t -> t
   val to_string : t -> string
+  val to_ocaml_string: t -> string
+  val empty_var_map_to_ocaml_string: string
   val cmp: t -> t -> int
   val read_val: int64 -> int64 -> t -> t (* off -> sz -> type: read tppe of [off, off+sz] *)
   val mem_partial_read_val: t -> t (* a lazy implementation to handle partially reading a mem entry *)

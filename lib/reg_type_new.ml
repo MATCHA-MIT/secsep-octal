@@ -17,6 +17,14 @@ module RegType (Entry: EntryType) = struct
         PP.print_lvl (lvl + 1) "<%s>\t%s\n" (Isa.string_of_reg_idx i) (Entry.to_string entry)
     ) reg
 
+  let pp_ocaml_reg_type (lvl: int) (buf: Buffer.t) (reg: t) : unit =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun entry ->
+        PP.bprint_lvl (lvl + 1) buf "%s;\n" (Entry.to_ocaml_string entry)
+    ) reg;
+    PP.bprint_lvl lvl buf "]\n"
+
   let get_reg_type (reg_type: t) (r: Isa.register) : entry_t =
     let reg_idx = Isa.get_reg_idx r in
     let off, size = Isa.get_reg_offset_size r in

@@ -22,6 +22,15 @@ module RangeExp = struct
       Printf.sprintf "{%s}" (String.concat ", " str_list)
     | Top -> "Top"
 
+  let to_ocaml_string (e: t) : string = 
+    match e with
+    | Single e -> Printf.sprintf "Single (%s)" (SingleEntryType.to_ocaml_string e)
+    | Range (a, b, step) -> Printf.sprintf "Range (%s, %s, %Ld)" (SingleEntryType.to_ocaml_string a) (SingleEntryType.to_ocaml_string b) step
+    | SingleSet e_list ->
+      let str_list = List.map SingleEntryType.to_ocaml_string e_list in
+      Printf.sprintf "SingleSet [%s]" (String.concat "; " str_list)
+    | Top -> "Top"
+
   let to_smt_expr (smt_ctx: SmtEmitter.t) (v_idx: int) (r: t) : SmtEmitter.exp_t =
     let ctx, _ = smt_ctx in
     let v_exp = SingleEntryType.to_smt_expr smt_ctx (SingleVar v_idx) in

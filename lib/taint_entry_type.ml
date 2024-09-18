@@ -41,6 +41,12 @@ module TaintEntryType (Entry: EntryType) = struct
       (Entry.to_string single)
       (TaintExp.to_string taint)
 
+  let to_ocaml_string (e: t) : string =
+    let single, taint = e in
+    Printf.sprintf "(%s, %s)" (Entry.to_string single) (TaintExp.to_string taint)
+
+  let empty_var_map_to_ocaml_string = "([], [])"
+
   let cmp (e1: t) (e2: t) : int =
      let s1, t1 = e1 in
      let s2, t2 = e2 in
