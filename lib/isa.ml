@@ -498,28 +498,31 @@ module Isa = struct
     | Push op | Pop op -> [op]
     | _ -> [] *)
 
+  let pp_block (lvl: int) (bb: basic_block) =
+    PP.print_lvl lvl "%s\n" bb.label;
+    List.iter (
+      fun inst -> PP.print_lvl (lvl + 1) "%s\n" (string_of_instruction inst)
+    ) bb.insts
+
+  let pp_block_list (lvl: int) (block_list: basic_block list) =
+    List.iter (pp_block lvl) block_list
+
   let pp_prog (lvl: int) (p: prog) =
     PP.print_lvl lvl "Prog\n";
     List.iteri (
       fun i func -> 
         PP.print_lvl lvl "<Func %d %s>\n" i func.name;
-        List.iter (
-          fun bb ->
-            PP.print_lvl (lvl + 1) "%s\n" bb.label;
-            List.iter (
-              fun inst -> PP.print_lvl (lvl + 2) "%s\n" (string_of_instruction inst)
-            ) bb.insts
-        ) func.body
+        pp_block_list (lvl + 1) func.body
     ) p.funcs
 
-  let update_op_taint (new_taint: TaintExp.t) (op: operand) : operand =
+  let update_op_taint (update_func: TaintExp.t -> TaintExp.t) (op: operand) : operand =
     match op with
-    | StOp (disp, base, index, scale, size, _) ->
-      StOp (disp, base, index, scale, size, new_taint)
+    | StOp (disp, base, index, scale, size, old_taint) ->
+      StOp (disp, base, index, scale, size, update_func old_taint)
     | _ -> op
   
-  let update_inst_taint (new_taint: TaintExp.t) (inst: instruction) : instruction =
-    let update_helper = update_op_taint new_taint in
+  let update_inst_taint (update_func: TaintExp.t -> TaintExp.t) (inst: instruction) : instruction =
+    let update_helper = update_op_taint update_func in
     match inst with
     | BInst (bop, op1, op2, op3) ->
       BInst (bop, update_helper op1, update_helper op2, update_helper op3)
@@ -532,5 +535,12 @@ module Isa = struct
     | Test (op1, op2) ->
       Test (update_helper op1, update_helper op2)
     | _ -> inst
+
+  let update_block_taint (update_func: TaintExp.t -> TaintExp.t) (block: basic_block) : basic_block =
+    { block with insts = List.map (update_inst_taint update_func) block.insts }
+
+  let update_block_list_taint 
+      (update_func: TaintExp.t -> TaintExp.t) (block_list: basic_block list) : basic_block list =
+    List.map (update_block_taint update_func) block_list
 
 end

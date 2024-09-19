@@ -184,6 +184,25 @@ module TaintExp = struct
         ) (TaintConst false) (TaintVarSet.to_list var_set)
     in
     repl_helper e
+
+  let repl_context_var_no_error (map: local_var_map_t) (e: t) : t =
+      (* Only applied to repl var from one context with var from the other context *)
+      (* Non-recursive repl; if not found, raise exception!!! *)
+    let rec repl_helper (e: t) : t =
+      match e with
+      | TaintConst _ -> e
+      | TaintVar v ->
+        begin match find_local_var_map map v with
+        | Some e -> e
+        | None -> TaintVar v
+        end
+      | TaintExp var_set ->
+        List.fold_left (
+          fun (acc: t) (entry: taint_var_id) ->
+            merge acc (repl_helper (TaintVar entry))
+        ) (TaintConst false) (TaintVarSet.to_list var_set)
+    in
+    repl_helper e
     
   let is_val (var_set: TaintVarSet.t) (e: t) : bool =
     match e with

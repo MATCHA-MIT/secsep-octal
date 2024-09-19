@@ -639,4 +639,9 @@ module ArchType (Entry: EntryType) = struct
     let mem_var_set = MemType.fold_left helper SingleExp.SingleVarSet.empty a_type.mem_type in
     SingleExp.SingleVarSet.union reg_var_set mem_var_set
 
+  let update_reg_mem_type (update_func: entry_t -> entry_t) (a_type: t) : t =
+    { a_type with
+      reg_type = List.map update_func a_type.reg_type;
+      mem_type = MemType.map update_func a_type.mem_type }
+
 end
