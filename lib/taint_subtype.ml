@@ -28,7 +28,8 @@ module TaintSubtype = struct
     PP.print_lvl lvl "<Subtype list>\n";
     List.iter (
       fun (x, y) -> PP.print_lvl (lvl + 1) "%s -> %s\n" (TaintExp.to_string x) (TaintExp.to_string y)
-    ) subtype_list
+    ) subtype_list;
+    Printf.printf "\n"
 
   let sol_to_string (sol: TaintExp.t option) : string =
     match sol with
@@ -55,7 +56,14 @@ module TaintSubtype = struct
           (TaintExp.TaintVar idx, te) :: (te, TaintExp.TaintVar idx) :: acc
       ) subtype_list (snd sup_block.local_var_map)
     in
-    let helper_entry 
+    let reg_helper_entry 
+        (subtype_list: sub_t list) 
+        (sub_entry: TaintEntryType.t) (sup_entry: TaintEntryType.t) : sub_t list =
+      let _, sub_taint = sub_entry in
+      let _, sup_taint = sup_entry in
+      (sub_taint, sup_taint) :: subtype_list
+    in
+    let mem_helper_entry 
         (subtype_list: sub_t list) 
         (sub_entry: TaintEntryType.t) (sup_entry: TaintEntryType.t) : sub_t list =
       let _, sub_taint = sub_entry in
@@ -66,8 +74,8 @@ module TaintSubtype = struct
         (sup_block: ArchType.t)
         (subtype_list: sub_t list)
         (sub_block: ArchType.t) : sub_t list =
-      let subtype_list = List.fold_left2 helper_entry subtype_list sub_block.reg_type sup_block.reg_type in
-      ArchType.MemType.fold_left2 helper_entry subtype_list sub_block.mem_type sup_block.mem_type
+      let subtype_list = List.fold_left2 reg_helper_entry subtype_list sub_block.reg_type sup_block.reg_type in
+      ArchType.MemType.fold_left2 mem_helper_entry subtype_list sub_block.mem_type sup_block.mem_type
     in
     List.fold_left (helper sup_block) subtype_list sub_block_list    
 
@@ -102,13 +110,16 @@ module TaintSubtype = struct
     let sub, sup = subtype in
     match sup with
     | TaintConst false -> 
+      Printf.printf "Add untaint %s\n" (TaintExp.to_string sub);
       add_untaint untaint_var sub, None
     | TaintConst true -> untaint_var, None (* This subtype relation implies nothing, so remove *)
     | _ ->
       if TaintExp.TaintVarSet.is_empty (TaintExp.TaintVarSet.inter untaint_var (TaintExp.get_var_set sup)) then
         untaint_var, remove_untaint untaint_var subtype
-      else
+      else begin
+        Printf.printf "Add untaint %s -> %s\n" (TaintExp.to_string sub) (TaintExp.to_string sup);
         add_untaint untaint_var sub, None
+      end
       
   
   let add_taint (* for true -> sup *)
