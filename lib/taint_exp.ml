@@ -200,4 +200,10 @@ module TaintExp = struct
     in
     is_val var_set e
 
+  let get_var_set (e: t) : TaintVarSet.t =
+    match e with
+    | TaintConst _ -> TaintVarSet.empty
+    | TaintVar v -> TaintVarSet.singleton v
+    | TaintExp s -> s
+
 end

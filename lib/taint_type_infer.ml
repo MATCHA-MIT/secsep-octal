@@ -1,6 +1,8 @@
 open Isa
 open Taint_exp
 open Single_entry_type
+open Mem_offset_new
+open Constraint
 open Single_subtype
 open Taint_subtype
 open Single_type_infer
@@ -20,7 +22,7 @@ module TaintTypeInfer = struct
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    taint_subtype: TaintSubtype.t;
+    taint_sol: TaintExp.local_var_map_t;
     smt_ctx: SmtEmitter.t;
   }
 
@@ -58,7 +60,7 @@ module TaintTypeInfer = struct
         pc = block_single_type.pc;
         reg_type = new_reg_type;
         mem_type = new_mem_type;
-        flag = (TaintEntryType.get_top_type, TaintEntryType.get_top_type);
+        flag = (TaintEntryType.get_top_untaint_type (), TaintEntryType.get_top_untaint_type ());
         branch_hist = [];
         full_not_taken_hist = [];
         constraint_list = [];
@@ -67,14 +69,14 @@ module TaintTypeInfer = struct
         global_var = block_single_type.global_var
       }
     in
-    let next_var, func = List.fold_left_map helper_code start_var ((Isa.get_func prog func_name).body) in
-    let _, func_type = List.fold_left_map helper_arch next_var single_infer_state.func_type in
+    let next_var, func_type = List.fold_left_map helper_arch start_var single_infer_state.func_type in
+    let _, func = List.fold_left_map helper_code next_var ((Isa.get_func prog func_name).body) in
     {
       func = func;
       func_type = func_type;
       single_sol = single_infer_state.single_subtype;
       input_single_var_set = single_infer_state.input_var_set;
-      taint_subtype = [];
+      taint_sol = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
@@ -110,16 +112,24 @@ module TaintTypeInfer = struct
       (single_infer_state: SingleTypeInfer.t) : t =
     let state = init prog func_name single_infer_state in
     let _ = func_interface_list in
+    (* 1. Type prop *)
     (* Prepare SMT context *)
     let solver = snd state.smt_ctx in
     Z3.Solver.push solver;
     ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
-
-    (* 1. Type prop *)
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
-    (* 3. Taint type infer *)
-
     Z3.Solver.pop solver 1;
-    state
+
+    Printf.printf "After infer, unknown list:\n";
+    List.iter (
+      fun (x: ArchType.t) -> 
+        Printf.printf "%s\n" x.label;
+        MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+    ) state.func_type;
+
+    (* 2. Taint type infer *)
+    let subtype_list = TaintSubtype.get_taint_constraint block_subtype in
+    let taint_sol = TaintSubtype.solve_subtype_list subtype_list in
+    { state with taint_sol = taint_sol }
 
 end

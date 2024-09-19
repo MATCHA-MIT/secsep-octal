@@ -79,7 +79,8 @@ include SingleExp
 
   let get_const_type = get_imm_type
 
-  let get_top_type : t = SingleTop
+  let get_top_type () : t = SingleTop
+  let get_top_untaint_type () : t = SingleTop
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
     SmtEmitter.expr_of_single_exp smt_ctx e false

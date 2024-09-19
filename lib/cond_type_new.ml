@@ -66,7 +66,8 @@ module CondType (Entry: EntryType) = struct
 
   let has_top (cond: t) : bool =
     let _, l, r = cond in
-    if Entry.cmp l Entry.get_top_type = 0 || Entry.cmp r Entry.get_top_type = 0 then
+    if SingleEntryType.cmp (Entry.get_single_exp l) SingleTop = 0 || 
+      SingleEntryType.cmp (Entry.get_single_exp r) SingleTop = 0 then
       true
     else false
 

@@ -38,7 +38,8 @@ module type EntryType = sig
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
   val get_single_local_var_map: local_var_map_t -> SingleExp.local_var_map_t
   val get_const_type: Isa.immediate -> t
-  val get_top_type: t
+  val get_top_type: unit -> t
+  val get_top_untaint_type: unit -> t
   val get_mem_op_type: Isa.immediate option -> t option -> t option -> int64 -> t
 
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)

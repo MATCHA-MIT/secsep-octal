@@ -152,7 +152,7 @@ module FuncInterface (Entry: EntryType) = struct
     let helper (reg_out: entry_t) : entry_t =
       if Entry.is_val2 var_map reg_out then
         Entry.repl_context_var var_map reg_out
-      else Entry.get_top_type
+      else Entry.get_top_type ()
     in
     List.map helper child_reg
 
@@ -183,7 +183,7 @@ module FuncInterface (Entry: EntryType) = struct
       begin
       let m_out_entry = 
         if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
-        else Entry.get_top_type
+        else Entry.get_top_type ()
       in
       let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
       if is_full then 

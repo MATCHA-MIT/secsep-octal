@@ -94,7 +94,7 @@ module ArchType (Entry: EntryType) = struct
       pc = start_pc;
       reg_type = reg_type;
       mem_type = mem_type;
-      flag = (Entry.get_top_type, Entry.get_top_type);
+      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -117,7 +117,7 @@ module ArchType (Entry: EntryType) = struct
       pc = start_pc;
       reg_type = reg_type;
       mem_type = mem_type;
-      flag = (Entry.get_top_type, Entry.get_top_type);
+      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -128,7 +128,7 @@ module ArchType (Entry: EntryType) = struct
 
   let clean_up (arch_type: t) : t =
     { arch_type with
-      flag = (Entry.get_top_type, Entry.get_top_type);
+      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -203,9 +203,10 @@ module ArchType (Entry: EntryType) = struct
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
     let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-    if addr_exp = SingleTop then
-      Entry.get_top_type, Unknown (SingleTop, SingleTop) :: addr_untaint_cons, SingleExp.SingleVarSet.empty
-    else
+    if addr_exp = SingleTop then begin
+      Printf.printf "addr_exp = SingleTop\n";
+      Entry.get_top_type (), Unknown (SingleTop, SingleTop) :: addr_untaint_cons, SingleExp.SingleVarSet.empty
+    end else
       let useful_vars = SingleExp.get_vars addr_exp in
       match sub_sol_func (addr_exp, curr_type.pc) with
       | Some opt_exp ->
@@ -226,11 +227,11 @@ module ArchType (Entry: EntryType) = struct
         | None -> 
           Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
           (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
-          Entry.get_top_type, Unknown simp_addr_offset :: addr_untaint_cons, useful_vars
+          Entry.get_top_type (), Unknown simp_addr_offset :: addr_untaint_cons, useful_vars
         end
       | _ -> 
         Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
-        Entry.get_top_type, Unknown (SingleTop, SingleTop) :: addr_untaint_cons, useful_vars
+        Entry.get_top_type (), Unknown (SingleTop, SingleTop) :: addr_untaint_cons, useful_vars
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -331,7 +332,7 @@ module ArchType (Entry: EntryType) = struct
       (inst: Isa.instruction) :
       t =
     (* We do not update pc in this function! Should update outside!!! *)
-    let curr_type = { curr_type with flag = (Entry.get_top_type, Entry.get_top_type) } in
+    let curr_type = { curr_type with flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ()) } in
     match inst with
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint = get_src_op_type smt_ctx sub_sol_func curr_type src0 in
@@ -533,7 +534,7 @@ module ArchType (Entry: EntryType) = struct
     { curr_type with
       reg_type = new_reg;
       mem_type = new_mem;
-      flag = (Entry.get_top_type, Entry.get_top_type);
+      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       constraint_list = new_constraints @ curr_type.constraint_list;
       useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
     }
