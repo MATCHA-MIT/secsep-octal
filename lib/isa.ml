@@ -284,7 +284,7 @@ module Isa = struct
     List.fold_left helper None op_list
 
   let common_opcode_list = [
-    "mov"; "movabs"; "movs"; "movz"; "lea"; 
+    "movabs"; "mov"; "movs"; "movz"; "lea";
     "xchg";
     "add"; "adc"; "sub"; "mul"; "imul"; 
     "sal"; "sar"; "shl"; "shr"; "rol"; "ror";

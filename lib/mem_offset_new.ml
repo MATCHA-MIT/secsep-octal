@@ -54,7 +54,7 @@ module MemOffset = struct
 
   (* Semantically cmp helper*)
   let offset_cmp_helper (is_quick: bool) (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int) : off_rel_t =
-    (* Printf.printf "offset_cmp (mode = %d):\n%s\n%s\n" mode (to_string o1) (to_string o2); *)
+    (* Printf.printf "offset_cmp (quick = %b) (mode = %d):\n%s\n%s\n" is_quick mode (to_string o1) (to_string o2); *)
     (* let stamp_beg = Unix.gettimeofday () in *)
 
     let l1, r1 = o1 in
@@ -114,7 +114,7 @@ module MemOffset = struct
         end
     end in
     (* Printf.printf "time elapsed (offset_cmp): %f\n\n" (Unix.gettimeofday () -. stamp_beg); *)
-    (* Printf.printf "result: %s\n" (off_rel_t_to_string result); *)
+    (* Printf.printf "result: %s\n\n" (off_rel_t_to_string result); *)
     result
     (* TODO: Maybe need to handle Other!!! *)
 

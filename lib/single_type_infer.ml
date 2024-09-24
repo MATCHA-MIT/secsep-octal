@@ -243,12 +243,13 @@ module SingleTypeInfer = struct
       if iter_left = 0 then
         state
       else begin
+        let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
         let solver = snd state.smt_ctx in
         Z3.Solver.push solver;
         gen_implicit_mem_constraints state;
         (* 1. Prop *)
-        Printf.printf "\nInfer iter %d type_prop_all_blocks\n" (iter - iter_left + 1);
+        Printf.printf "\n\nInfer iter %d type_prop_all_blocks\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
@@ -262,10 +263,10 @@ module SingleTypeInfer = struct
             Printf.printf "%s\n" x.label;
             MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
         ) state.func_type;
-        Printf.printf "%s: Infer iter %d update_mem\n" func_name (iter - iter_left + 1);
+        Printf.printf "\n\n%s: Infer iter %d update_mem\n\n" func_name curr_iter;
         let state = update_mem state in
-        Printf.printf "After update_mem\n";
-        (* pp_func_type 0 state; *)
+        Printf.printf "\n\nInfer iter %d after update_mem\n\n" curr_iter;
+        pp_func_type 0 state;
         (* 3. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
@@ -277,7 +278,7 @@ module SingleTypeInfer = struct
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
         if unknown_resolved then begin
           (* Directly return if unknown are all resolved. *)
-          Printf.printf "Successfully resolved all memory accesses for %s at iter %d\n" func_name (iter - iter_left + 1);
+          Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d\n\n" func_name curr_iter;
           state
         end else begin
           helper (clean_up_func_type state) (iter_left - 1)

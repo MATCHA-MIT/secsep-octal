@@ -10,3 +10,18 @@
 * `code_type.ml` and `gen_type.ml` are old implementation
 * I plan to write a new version called `block_type.ml` and `program_type.ml` to replace them.
 
+# Instruction to Support
+
+```asm
+rep stosq
+bswap	
+movq	%rdx, %xmm1
+punpcklqdq	%xmm1, %xmm0
+movups	%xmm0, 192(%rbx)
+bswap	%rax
+andb	$2, %cl
+cmpb	%cl, $0
+rorq	$14, %rcx
+rolq	$23, %rax
+```
+

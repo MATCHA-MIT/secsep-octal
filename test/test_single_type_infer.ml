@@ -14,7 +14,8 @@ let read_file (filename: string) : string =
     close_in_noerr channel;
     raise e
 
-let p = Parser.parse_program (read_file "./asm/standalone_salsa20.c.s")
+(* let p = Parser.parse_program (read_file "./asm/standalone_salsa20.c.s") *)
+let p = Parser.parse_program (read_file "./asm/sha512_block_data_order.s")
 
 (* let _ = Isa.pp_prog 0 p *)
 
@@ -30,4 +31,4 @@ let infer_state =
 
 let _ = SingleSubtype.pp_single_subtype 0 infer_state.single_subtype *)
 
-let _ = SingleTypeInfer.infer p standalone_salsa20 5 10
+let _ = SingleTypeInfer.infer p sha512_final_impl 5 10

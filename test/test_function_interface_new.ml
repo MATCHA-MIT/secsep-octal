@@ -29,7 +29,7 @@ let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list =
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
     rsi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
   ];
-  (* "salsa20_block", [
+  "salsa20_block", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
     rsi, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ];
@@ -41,6 +41,21 @@ let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list =
   ];
   "_start", salsa20_global @ [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ]
+  ]
+]
+
+let sha512_final_impl : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list = [
+  "sha512_block_data_order", [
+    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar rdx)), [], SingleTop) ];
+    -2,  [ ((SingleConst 0L, SingleConst 640L), [], SingleTop) ];
+  ];
+  (* "sha512_final_impl", [
+    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleVar rsi), [], SingleTop) ];
+    rdx, [ ((SingleConst 0L, SingleConst 216L), [], SingleTop) ];
+    -2,  [ ((SingleConst 0L, SingleConst 640L), [], SingleTop) ];
   ] *)
 ]
 

@@ -373,15 +373,31 @@ module SingleSubtype = struct
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_exp_t) : RangeExp.t =
     let find_var_sol (v: Isa.imm_var_id) (v_pc: int) : RangeExp.t =
+      (* Printf.printf "find_var_sol: %d at %d\n" v v_pc; *)
       match List.find_opt (fun (x: type_rel) -> let id, _ =  x.var_idx in v = id) tv_rel_list with
       | Some tv_rel ->
         let _, block_pc = tv_rel.var_idx in
         begin match tv_rel.sol with
         | SolNone -> Top
         | SolSimple s -> s
-        | SolCond (cond_pc, exp, _, exp_not_taken) ->
-          if v_pc >= block_pc && v_pc <= cond_pc then exp
-          else if v_pc > cond_pc then exp_not_taken
+        | SolCond (cond_pc, exp, exp_taken, exp_not_taken) ->
+          (* Printf.printf "v_pc = %d, block_pc = %d, cond_pc = %d, exp_taken = %s, exp_not_taken = %s\n" v_pc block_pc cond_pc (RangeExp.to_string exp_taken) (RangeExp.to_string exp_not_taken); *)
+          if v_pc >= block_pc && v_pc < cond_pc then
+            begin
+              (* Printf.printf "Using %s\n" (RangeExp.to_string exp); *)
+              exp
+            end
+          else if v_pc == cond_pc then
+            begin
+              (* Printf.printf "Using %s\n" (RangeExp.to_string exp_taken); *)
+              Printf.printf "find_var_sol: WARNING, v_pc = cond_pc = %d\n" v_pc;
+              exp_taken
+            end
+          else if v_pc > cond_pc then
+            begin
+              (* Printf.printf "Using %s\n" (RangeExp.to_string exp_not_taken); *)
+              exp_not_taken
+            end
           else single_subtype_error (Printf.sprintf "find_var_sol wrong exp pc var %d %d smaller than %d" v v_pc cond_pc)
         end
       | None -> Top
