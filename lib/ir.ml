@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Mem_offset
 open Pretty_print
 
@@ -8,7 +8,7 @@ module Ir = struct
 
   type operand =
     | RegOp of int
-    | MemOp of Isa.imm_var_id * MemOffset.t * bool (* Addr range & access full slot with single inst or not *)
+    | MemOp of IsaBasic.imm_var_id * MemOffset.t * bool (* Addr range & access full slot with single inst or not *)
     | UnknownOp
 
   type label = string
@@ -37,7 +37,7 @@ module Ir = struct
 
   let string_of_operand (op: operand) : string =
     match op with
-    | RegOp r -> Isa.string_of_reg_idx r
+    | RegOp r -> IsaBasic.string_of_reg_idx r
     | MemOp (ptr, offset, is_single_full_slot) -> 
       "Mem (" ^ (string_of_int ptr) ^ ", " ^ (MemOffset.to_string offset) ^ ", " ^ (string_of_bool is_single_full_slot) ^ ")"
     | UnknownOp -> "Unknown"

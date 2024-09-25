@@ -1,10 +1,14 @@
+open Isa_basic
 open Isa
-open Taint_exp
+open Full_mem_anno
 
 module Parser = struct
 
   exception LexicalError of string
   exception ParseError of string
+
+  module MemAnno = FullMemAnno
+  module Isa = Isa (MemAnno)
 
   let lexical_error msg = raise (LexicalError ("[Lexical Error] " ^ msg))
   let parse_error msg = raise (ParseError ("[Parse Error] " ^ msg))
@@ -34,15 +38,15 @@ module Parser = struct
     | MneTok of string
     | RegTok of Isa.register
     | RipTok
-    | ImmTok of (Isa.immediate * (string option) list)
+    | ImmTok of (IsaBasic.immediate * (string option) list)
     | Comma
     | LParen
     | RParen
 
-  let imm_var_unset : Isa.imm_var_id = -1
+  let imm_var_unset : IsaBasic.imm_var_id = -1
 
 
-  let rec string_of_imm_token (i: Isa.immediate) (name_list: (string option) list) : string =
+  let rec string_of_imm_token (i: IsaBasic.immediate) (name_list: (string option) list) : string =
     match i, name_list with
     | ImmNum n, None :: [] -> Int64.to_string n
     | ImmLabel v, Some name :: [] -> "(var " ^ (string_of_int v) ^ ": " ^  name ^ ")"
@@ -111,7 +115,7 @@ module Parser = struct
     else
       go cs []
 
-  let rec consume_immediate (cs: char list) : Isa.immediate * (string option) list * char list =
+  let rec consume_immediate (cs: char list) : IsaBasic.immediate * (string option) list * char list =
     let exp, name_list, remained_cs =
     begin if cs = [] then
       lexical_error "consume_immediate: unexpected end of input"
@@ -182,7 +186,7 @@ module Parser = struct
     let (mne_str, cs) = consume_name cs in 
     go cs [MneTok mne_str]
 
-  let imm_to_scale (imm: Isa.immediate) : Isa.scale =
+  let imm_to_scale (imm: IsaBasic.immediate) : Isa.scale =
     match imm with
     | ImmNum 1L -> Scale1
     | ImmNum 2L -> Scale2
@@ -285,21 +289,23 @@ module Parser = struct
 
   let src (opr_size: Isa.operand * int64 option) : Isa.operand =
     match opr_size with
-    | MemOp (disp, base, index, scale), Some size -> LdOp (disp, base, index, scale, size)
+    | MemOp (disp, base, index, scale), Some size -> LdOp (disp, base, index, scale, size, MemAnno.make_empty ())
     | MemOp _, None -> parse_error "no size for mem op"
     | StOp _, _ -> parse_error "src"
-    | LdOp (disp, base, index, scale, _), Some size -> LdOp (disp, base, index, scale, size)
-    | LdOp _, None -> parse_error "no size for ld op"
+    | LdOp _, _ -> parse_error "LdOp not expected"
+    (* | LdOp (disp, base, index, scale, _, mem_anno), Some size -> LdOp (disp, base, index, scale, size, mem_anno) *)
+    (* | LdOp _, None -> parse_error "no size for ld op" *)
     (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "src reg size does not match opcode size" *)
     | opr, _ -> opr
 
   let dst (opr_size: Isa.operand * int64 option) : Isa.operand =
     match opr_size with
-    | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size, TaintExp.get_default_taint)
+    | MemOp (disp, base, index, scale), Some size -> StOp (disp, base, index, scale, size, MemAnno.make_empty ())
     | MemOp _, None -> parse_error "no size for mem op"
     | LdOp _, _ -> parse_error "dst"
-    | StOp (disp, base, index, scale, _, taint), Some size -> StOp (disp, base, index, scale, size, taint)
-    | StOp _, None -> parse_error "no size for st op"
+    | StOp _, _ -> parse_error "StOp not expected"
+    (* | StOp (disp, base, index, scale, _, taint), Some size -> StOp (disp, base, index, scale, size, taint) *)
+    (* | StOp _, None -> parse_error "no size for st op" *)
     (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
     | opr, _ -> opr
 
@@ -330,8 +336,8 @@ module Parser = struct
       then imm_var_map, [convert_imm_to_label ts]
       else begin 
         let rec fill_id_helper 
-            (imm_var_map: Isa.imm_var_map) (imm_name: Isa.immediate * (string option) list) :
-            Isa.imm_var_map * Isa.immediate =
+            (imm_var_map: Isa.imm_var_map) (imm_name: IsaBasic.immediate * (string option) list) :
+            Isa.imm_var_map * IsaBasic.immediate =
           match imm_name with
           | ImmNum n, None :: [] -> (imm_var_map, ImmNum n)
           | ImmLabel v, (Some name) :: [] ->
@@ -404,8 +410,8 @@ module Parser = struct
           | None -> (* TODO: xchg *)
             begin match opcode, opread_size_list with
             | "xchg", [opr1; opr2] -> Xchg (dst opr2, dst opr1, src opr2, src opr1)
-            | "push", [opr] -> Push (src opr)
-            | "pop", [opr] -> Pop (dst opr)
+            | "push", [opr] -> Push ((src opr), (MemAnno.make_empty ()))
+            | "pop", [opr] -> Pop ((dst opr), (MemAnno.make_empty ()))
             | "cmp", [opr1; opr2] -> Cmp (src opr2, src opr1)
             | "test", [opr1; opr2] -> Test (src opr2, src opr1)
             | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)

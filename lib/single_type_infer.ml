@@ -7,9 +7,12 @@ open Constraint
 open Single_subtype
 open Smt_emitter
 open Pretty_print
+open Full_mem_anno
 
 module SingleTypeInfer = struct
   exception SingleTypeInferError of string
+
+  module Isa = Isa (FullMemAnno)
 
   let single_type_infer_error msg = raise (SingleTypeInferError ("[Single Type Infer Error] " ^ msg))
 
@@ -30,7 +33,7 @@ module SingleTypeInfer = struct
 
   let pp_ocaml_state (lvl: int) (buf: Buffer.t) (infer_state: t) =
     PP.bprint_lvl lvl buf "{\n";
-    PP.bprint_lvl (lvl + 1) buf "func = [];\n";
+    PP.bprint_lvl (lvl + 1) buf "func =\n"; Isa.pp_ocaml_block_list (lvl + 2) buf infer_state.func; PP.bprint_lvl (lvl + 2) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "func_type =\n"; ArchType.pp_ocaml_arch_type_list (lvl + 2) buf infer_state.func_type; PP.bprint_lvl (lvl + 2) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "single_subtype =\n"; SingleSubtype.pp_ocaml_single_subtype (lvl + 2) buf infer_state.single_subtype; PP.bprint_lvl (lvl + 2) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "next_var = SingleTop;\n";

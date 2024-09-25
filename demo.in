@@ -1,0 +1,170 @@
+let input_data : TaintTypeInfer.t = {
+  func =
+    [
+      {
+        label = "sha512_block_data_order"
+        insts = [
+           Jmp ".LFB47";
+        ];
+      };
+      {
+        label = ".LFB47"
+        insts = [
+          (* push r15 # slot: [rsp - 240, rsp - 232] taint = false *)
+          Push (
+            RegOp R15,
+            {
+              slot = Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true);
+              taint = Some (TaintConst false)
+            }
+          );
+          BInst (Sub, RegOp Sub, RegOp RSP, ImmOp (SingleConst 72L));
+          Jmp ".L8";
+        ];
+      };
+      {
+        label = ".L8"
+        insts = [
+          (* mov    rdi  <-  Ld(32(rsp,,),8,anno={slot: [rsp - 200, rsp - 192]; taint: true}) *)
+          UInst (
+            Mov,
+            RegOp RDI,
+            LdOp (
+              Some (ImmNum 32L),
+              Some (RegOp RSP),
+              None,
+              None
+              8L,
+              {
+                slot = Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true);
+                taint = Some (TaintConst true)
+              }
+            )
+          );
+          Jmp ".L7";
+        ];
+      };
+      {
+        label = ".L7"
+        insts = [
+          Jmp  ".Ret";
+        ];
+      };
+      {
+        label = ".Ret"
+        insts = [
+        ];
+      };
+    ]
+    ;
+  func_type =
+    [
+      {
+        label = "sha512_block_data_order";
+        pc = 3;
+        reg_type = 
+          [
+            (SingleVar (0), TaintConst false);
+            (SingleVar (1), TaintConst false);
+            (SingleVar (2), TaintConst false);
+            (SingleVar (3), TaintConst false);
+            (SingleVar (4), TaintConst false);
+            (SingleVar (5), TaintConst false);
+            (SingleVar (6), TaintConst false);
+            (SingleVar (7), TaintConst false);
+            (SingleVar (8), TaintConst false);
+            (SingleVar (9), TaintConst false);
+            (SingleVar (10), TaintConst false);
+            (SingleVar (11), TaintConst false);
+            (SingleVar (12), TaintConst false);
+            (SingleVar (13), TaintConst false);
+            (SingleVar (14), TaintConst false);
+            (SingleVar (15), TaintConst false);
+          ]
+        ;
+        mem_type = 
+          [
+            (4, [
+              ((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], (SingleVar (97), TaintConst false));
+              ((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], (SingleVar (98), TaintConst false));
+              ((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], (SingleVar (99), TaintConst false));
+            ]);
+          ]
+        ;
+        flag = (SingleTop, SingleTop);
+        branch_hist = [];
+        full_not_taken_hist = [];
+        constraint_list = [];
+        local_var_map = [];
+        useful_var = SingleExp.SingleVarSet.of_list [];
+        global_var = SingleExp.SingleVarSet.of_list [-2];
+      }
+      ;
+    ]
+    ;
+  single_subtype =
+    [
+      { var_idx = (15, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (14, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (13, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (12, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (5, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (3, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (36, 4); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (35, 4); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (32, 4); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+      { var_idx = (31, 4); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+      { var_idx = (30, 4); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+      { var_idx = (29, 4); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+      { var_idx = (22, 4); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+      { var_idx = (20, 4); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+      { var_idx = (2, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (19, 4); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+      { var_idx = (56, 32); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (55, 32); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (186, 32); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+      { var_idx = (185, 32); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+      { var_idx = (184, 32); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+      { var_idx = (183, 32); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+      { var_idx = (182, 32); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+      { var_idx = (181, 32); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+      { var_idx = (6, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (76, 566); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (96, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (75, 566); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (95, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (94, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+      { var_idx = (216, 566); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+      { var_idx = (92, 1421); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+      { var_idx = (215, 566); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+      { var_idx = (91, 1421); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+      { var_idx = (214, 566); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+      { var_idx = (90, 1421); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+      { var_idx = (213, 566); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+      { var_idx = (89, 1421); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+      { var_idx = (212, 566); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+      { var_idx = (82, 1421); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+      { var_idx = (81, 1421); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+      { var_idx = (211, 566); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+      { var_idx = (80, 1421); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+      { var_idx = (180, 32); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+      { var_idx = (179, 32); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))))); subtype_list = []; supertype_list = [] };
+      { var_idx = (-2, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (210, 566); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+      { var_idx = (209, 566); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))))); subtype_list = []; supertype_list = [] };
+      { var_idx = (207, 566); sol = SolCond (1412, Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)), 128L), Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-256L)), 128L), Single (SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)))); subtype_list = []; supertype_list = [] };
+      { var_idx = (67, 566); sol = SolCond (1380, Range (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (384L)), 128L), Range (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (256L)), 128L), Single (SingleBExp (SingleAdd, SingleVar (-2), SingleConst (384L)))); subtype_list = []; supertype_list = [] };
+      { var_idx = (23, 4); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+      { var_idx = (49, 32); sol = SolSimple (Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)), 128L)); subtype_list = []; supertype_list = [] };
+      { var_idx = (61, 566); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+      { var_idx = (41, 32); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+      { var_idx = (7, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (24, 4); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+      { var_idx = (4, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
+      { var_idx = (21, 4); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+    ]
+    ;
+  next_var = SingleTop;
+  input_var_set = SingleExp.SingleVarSet.of_list [-2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+  smt_ctx = SmtEmitter.init_smt_ctx ();
+}

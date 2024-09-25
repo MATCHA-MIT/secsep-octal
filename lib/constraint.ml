@@ -9,7 +9,6 @@ module Constraint = struct
     | Unknown of MemOffset.t
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
-    | TaintEq of TaintExp.t * TaintExp.t 
     (* TODO: Add taint constraint later *)
 
   let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =

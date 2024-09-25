@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_entry_type
 open Smt_emitter
 
@@ -25,7 +25,7 @@ module RangeExp = struct
   let to_ocaml_string (e: t) : string = 
     match e with
     | Single e -> Printf.sprintf "Single (%s)" (SingleEntryType.to_ocaml_string e)
-    | Range (a, b, step) -> Printf.sprintf "Range (%s, %s, %Ld)" (SingleEntryType.to_ocaml_string a) (SingleEntryType.to_ocaml_string b) step
+    | Range (a, b, step) -> Printf.sprintf "Range (%s, %s, %LdL)" (SingleEntryType.to_ocaml_string a) (SingleEntryType.to_ocaml_string b) step
     | SingleSet e_list ->
       let str_list = List.map SingleEntryType.to_ocaml_string e_list in
       Printf.sprintf "SingleSet [%s]" (String.concat "; " str_list)
@@ -57,7 +57,7 @@ module RangeExp = struct
       Z3.Boolean.mk_or ctx eq_exp_list
     | Top -> Z3.Boolean.mk_true ctx
 
-  let find_var_sol (sol: (Isa.imm_var_id * t) list) (v_idx: Isa.imm_var_id) : t =
+  let find_var_sol (sol: (IsaBasic.imm_var_id * t) list) (v_idx: IsaBasic.imm_var_id) : t =
     match List.find_opt (fun (v, _) -> v = v_idx) sol with
     | Some (_, s) -> s
     | None -> Top
@@ -74,7 +74,7 @@ module RangeExp = struct
     | Range (l, r, _) -> Some (l, r)
     | _ -> None
 
-  (* let single_exp_repl_sol (sol: (Isa.imm_var_id * t) list) (e: SingleEntryType.t) : t =
+  (* let single_exp_repl_sol (sol: (IsaBasic.imm_var_id * t) list) (e: SingleEntryType.t) : t =
     let rec helper (e: SingleEntryType.t) : t =
       match e with
       | SingleTop -> Top

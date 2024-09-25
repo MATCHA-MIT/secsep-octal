@@ -2,7 +2,7 @@ open Mem_offset
 open Taint_dep_exp
 open Reg_type
 open Mem_type
-open Isa
+open Isa_basic
 open Ir
 
 
@@ -50,7 +50,7 @@ module TaintDepState = struct
       {curr_state with mem_type = new_m_type}
     | UnknownOp -> taint_dep_state_error "canont set unknown type entry"
 
-  let update (curr_state: t) (pc: MemDepExp.pc) (dest: Ir.operand) (src_list: Ir.operand list) : t * ((Isa.imm_var_id * MemOffset.t * MemDepExp.t) option) =
+  let update (curr_state: t) (pc: MemDepExp.pc) (dest: Ir.operand) (src_list: Ir.operand list) : t * ((IsaBasic.imm_var_id * MemOffset.t * MemDepExp.t) option) =
     let src_taint_dep_list = List.map (get_op_type curr_state) src_list in
     let src_taint_list, src_dep_list = List.split src_taint_dep_list in
     let _, dest_dep = get_op_type curr_state dest in

@@ -1,239 +1,19 @@
 (* ISA interface *)
+open Isa_basic
 open Pretty_print
-open Taint_exp
+open Mem_anno_type
 
-module Isa = struct
-  (* TODO: Other exception on isa side *)
-  exception IsaError of string
+module Isa (MemAnno: MemAnnoType) = struct
 
-  let isa_error msg = raise (IsaError ("[Isa Error] " ^ msg))
-
-  let string_is_sth (map: (string * 'a) list) (m: string) : bool =
-    List.find_opt (fun (opcode, _) -> opcode = m) map <> None
-
-  let string_of_sth (map: (string * 'a) list) (op: 'a) : string option =
-    List.find_map
-      (fun (str, o) -> if o = op then Some str else None)
-      map
-
-  let string_to_sth (map: (string * 'a) list) (opcode: string) : 'a option =
-    List.find_map
-      (fun (str, o) -> if str = opcode then Some o else None)
-      map
-
-  type label = string
-
-  let ret_label = ".Ret"
-
-  type imm_var_id = int
-
-  module StrM = Map.Make(String)
-  type imm_var_map = imm_var_id StrM.t
-
-  type register =
-    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
-    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
-    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
-    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
-    (* | R0 *)
-
-  let reg_map = [
-    ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
-    ("rcx", RCX); ("ecx", ECX); ("cx", CX); ("ch", CH); ("cl", CL);
-    ("rdx", RDX); ("edx", EDX); ("dx", DX); ("dh", DH); ("dl", DL);
-    ("rbx", RBX); ("ebx", EBX); ("bx", BX); ("bh", BH); ("bl", BL);
-    ("rsp", RSP); ("esp", ESP); ("sp", SP); ("spl", SPL);
-    ("rbp", RBP); ("ebp", EBP); ("bp", BP); ("sbl", BPL);
-    ("rsi", RSI); ("esi", ESI); ("si", SI); ("sil", SIL);
-    ("rdi", RDI); ("edi", EDI); ("di", DI); ("dil", DIL);
-    ("r8", R8); ("r8d", R8D); ("r8w", R8W); ("r8b", R8B);
-    ("r9", R9); ("r9d", R9D); ("r9w", R9W); ("r9b", R9B);
-    ("r10", R10); ("r10d", R10D); ("r10w", R10W); ("r10b", R10B);
-    ("r11", R11); ("r11d", R11D); ("r11w", R11W); ("r11b", R11B);
-    ("r12", R12); ("r12d", R12D); ("r12w", R12W); ("r12b", R12B);
-    ("r13", R13); ("r13d", R13D); ("r13w", R13W); ("r13b", R13B);
-    ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
-    ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
-  ]
-
-  let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
-  let string_to_reg = string_to_sth reg_map
-
-  let fix_reg_size (r: register) (s: int64) : register =
-    if s = 1L then
-      match r with
-      | RAX | EAX | AX | AL -> AL
-      | RCX | ECX | CX | CL -> CL
-      | RDX | EDX | DX | DL -> DL
-      | RBX | EBX | BX | BL -> BL
-      | RSP | ESP | SP | SPL -> SPL
-      | RBP | EBP | BP | BPL -> BPL
-      | RSI | ESI | SI | SIL -> SIL
-      | RDI | EDI | DI | DIL -> DIL
-      | R8 | R8D | R8W | R8B -> R8B
-      | R9 | R9D | R9W | R9B -> R9B
-      | R10 | R10D | R10W | R10B -> R10B
-      | R11 | R11D | R11W | R11B -> R11B
-      | R12 | R12D | R12W | R12B -> R12B
-      | R13 | R13D | R13W | R13B -> R13B
-      | R14 | R14D | R14W | R14B -> R14B
-      | R15 | R15D | R15W | R15B -> R15B
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 2L then
-      match r with
-      | RAX | EAX | AX | AL -> AX
-      | RCX | ECX | CX | CL -> CX
-      | RDX | EDX | DX | DL -> DX
-      | RBX | EBX | BX | BL -> BX
-      | RSP | ESP | SP | SPL -> SP
-      | RBP | EBP | BP | BPL -> BP
-      | RSI | ESI | SI | SIL -> SI
-      | RDI | EDI | DI | DIL -> DI
-      | R8 | R8D | R8W | R8B -> R8W
-      | R9 | R9D | R9W | R9B -> R9W
-      | R10 | R10D | R10W | R10B -> R10W
-      | R11 | R11D | R11W | R11B -> R11W
-      | R12 | R12D | R12W | R12B -> R12W
-      | R13 | R13D | R13W | R13B -> R13W
-      | R14 | R14D | R14W | R14B -> R14W
-      | R15 | R15D | R15W | R15B -> R15W
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 4L then
-      match r with
-      | RAX | EAX | AX | AL -> EAX
-      | RCX | ECX | CX | CL -> ECX
-      | RDX | EDX | DX | DL -> EDX
-      | RBX | EBX | BX | BL -> EBX
-      | RSP | ESP | SP | SPL -> ESP
-      | RBP | EBP | BP | BPL -> EBP
-      | RSI | ESI | SI | SIL -> ESI
-      | RDI | EDI | DI | DIL -> EDI
-      | R8 | R8D | R8W | R8B -> R8D
-      | R9 | R9D | R9W | R9B -> R9D
-      | R10 | R10D | R10W | R10B -> R10D
-      | R11 | R11D | R11W | R11B -> R11D
-      | R12 | R12D | R12W | R12B -> R12D
-      | R13 | R13D | R13W | R13B -> R13D
-      | R14 | R14D | R14W | R14B -> R14D
-      | R15 | R15D | R15W | R15B -> R15D
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 8L then
-      match r with
-      | RAX | EAX | AX | AL -> RAX
-      | RCX | ECX | CX | CL -> RCX
-      | RDX | EDX | DX | DL -> RDX
-      | RBX | EBX | BX | BL -> RBX
-      | RSP | ESP | SP | SPL -> RSP
-      | RBP | EBP | BP | BPL -> RBP
-      | RSI | ESI | SI | SIL -> RSI
-      | RDI | EDI | DI | DIL -> RDI
-      | R8 | R8D | R8W | R8B -> R8
-      | R9 | R9D | R9W | R9B -> R9
-      | R10 | R10D | R10W | R10B -> R10
-      | R11 | R11D | R11W | R11B -> R11
-      | R12 | R12D | R12W | R12B -> R12
-      | R13 | R13D | R13W | R13B -> R13
-      | R14 | R14D | R14W | R14B -> R14
-      | R15 | R15D | R15W | R15B -> R15
-      | _ -> isa_error "should not use high 1-byte reg"
-    else
-      isa_error "invalid register size"
-
-  let get_reg_idx (r: register) = 
-    match r with
-    | RAX | EAX | AX | AH | AL -> 0
-    | RCX | ECX | CX | CH | CL -> 1
-    | RDX | EDX | DX | DH | DL -> 2
-    | RBX | EBX | BX | BH | BL -> 3
-    | RSP | ESP | SP | SPL -> 4
-    | RBP | EBP | BP | BPL -> 5
-    | RSI | ESI | SI | SIL -> 6
-    | RDI | EDI | DI | DIL -> 7
-    | R8 | R8D | R8W | R8B -> 8
-    | R9 | R9D | R9W | R9B -> 9
-    | R10 | R10D | R10W | R10B -> 10
-    | R11 | R11D | R11W | R11B -> 11
-    | R12 | R12D | R12W | R12B -> 12
-    | R13 | R13D | R13W | R13B -> 13
-    | R14 | R14D | R14W | R14B -> 14
-    | R15 | R15D | R15W | R15B -> 15
-    (* | R0 -> 16 *)
-
-  let get_reg_offset_size (r: register) : int64 * int64 =
-    match r with
-    | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> (0L, 8L)
-    | EAX | ECX | EDX | EBX | ESP | EBP | ESI | EDI | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> (0L, 4L)
-    | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> (0L, 2L)
-    | AH | CH | DH | BH -> (1L, 1L)
-    | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
-
-  let get_reg_full_size (r: register) : int64 =
-    match r with
-    | _ -> 8L (* Note: vector reg has different full sizes!!! *)
-
-  let reg_name_list = [
-    "rax"; "rcx"; "rdx"; "rbx";
-    "rsp"; "rbp"; "rsi"; "rdi";
-    "r8"; "r9"; "r10"; "r11";
-    "r12"; "r13"; "r14"; "r15"
-  ]
-
-  let string_of_reg_idx (idx: int) : string =
-    List.nth reg_name_list idx
-
-  let rsp_idx = get_reg_idx RSP
-
-  let total_reg_num : int = 16
-
-  let get_reg_size (r: register) : int64 =
-    match r with
-    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15  -> 8L
-    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4L
-    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
-    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
-
-  let is_reg_idx_callee_saved (r_idx: int) : bool =
-    List.mem r_idx [
-      3; (* RBX *)
-      4; (* RSP *)
-      5; (* RBP *)
-      12; 13; 14; 15
-    ]
-
-  type immediate =
-    | ImmNum of int64
-    | ImmLabel of imm_var_id
-    | ImmBExp of immediate * immediate
-
-  let rec string_of_immediate (i: immediate) : string =
-    match i with
-    | ImmNum x -> Int64.to_string x
-    | ImmLabel x -> "var " ^ (string_of_int x)
-    | ImmBExp (i1, i2) -> "(" ^ (string_of_immediate i1) ^ ") + (" ^ (string_of_immediate i2) ^ ")"
-
-  type scale = Scale1 | Scale2 | Scale4 | Scale8
-
-  let scale_val (s: scale) : int64 =
-    match s with
-    | Scale1 -> 1L
-    | Scale2 -> 2L
-    | Scale4 -> 4L
-    | Scale8 -> 8L
-
-  let scale_to_string (s: scale) : string = Int64.to_string (scale_val s)
+  include IsaBasic
 
   type operand =
     | ImmOp of immediate
     | RegOp of register
     | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
-    | LdOp of immediate option * register option * register option * scale option * int64
-    | StOp of immediate option * register option * register option * scale option * int64 * TaintExp.t
+    | LdOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
+    | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | LabelOp of label
-
-  let string_of_option (to_string: 'a -> string) (x: 'a option) : string =
-    match x with
-    | Some x -> to_string x
-    | None -> ""
 
   let rec string_of_operand (op: operand): string =
     match op with
@@ -245,18 +25,18 @@ module Isa = struct
       let index_str = string_of_option string_of_reg index in
       let scale_str = string_of_option scale_to_string (scale) in
       Printf.sprintf "%s(%s,%s,%s)" disp_str base_str index_str scale_str
-    | LdOp (disp, base, index, scale, size) ->
+    | LdOp (disp, base, index, scale, size, mem_anno) ->
       let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
-      Printf.sprintf "Ld(%s,%s)" addr_str (Int64.to_string size)
-    | StOp (disp, base, index, scale, size, taint) ->
+      Printf.sprintf "Ld(%s,%s,anno={%s})" addr_str (Int64.to_string size) (MemAnno.to_string mem_anno)
+    | StOp (disp, base, index, scale, size, mem_anno) ->
       let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
-      Printf.sprintf "St(%s,%s,%s)" addr_str (Int64.to_string size) (TaintExp.to_string taint)
+      Printf.sprintf "St(%s,%s,anno={%s})" addr_str (Int64.to_string size) (MemAnno.to_string mem_anno)
     | LabelOp label -> label
 
   let get_op_size (op: operand) : int64 =
     match op with
     | RegOp r -> get_reg_size r
-    | LdOp (_, _, _, _, size)
+    | LdOp (_, _, _, _, size, _)
     | StOp (_, _, _, _, size, _) -> size
     | _ -> isa_error "cannot get size for the given op"
 
@@ -267,7 +47,7 @@ module Isa = struct
     | RegOp r1, RegOp r2 -> r1 = r2
     | MemOp (d1, b1, i1, s1), MemOp (d2, b2, i2, s2) ->
       d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2
-    | LdOp (d1, b1, i1, s1, size1), LdOp (d2, b2, i2, s2, size2)
+    | LdOp (d1, b1, i1, s1, size1, _), LdOp (d2, b2, i2, s2, size2, _)
     | StOp (d1, b1, i1, s1, size1, _), StOp (d2, b2, i2, s2, size2, _) ->
         d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
     | LabelOp l1, LabelOp l2 -> l1 = l2
@@ -283,76 +63,6 @@ module Isa = struct
     in
     List.fold_left helper None op_list
 
-  let common_opcode_list = [
-    "movabs"; "mov"; "movs"; "movz"; "lea";
-    "xchg";
-    "add"; "adc"; "sub"; "mul"; "imul"; 
-    "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
-    "xor"; "and"; "or"; "not"; "bswap";
-    "cmp"; "test";
-    "push"; "pop"
-  ]
-
-  type bop =
-    | Add | Adc | Sub
-    | Mul (* unsigned multiply *) | Imul (* signed multiply *)
-    | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
-    | Rol | Ror
-    | Xor | And | Or
-
-  let bop_opcode_map = [
-    ("add", Add); ("adc", Adc); ("sub", Sub);
-    ("mul", Mul); ("imul", Imul);
-    ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
-    ("rol", Rol); ("ror", Ror);
-    ("xor", Xor); ("and", And); ("or", Or)
-  ]
-  
-  type uop =
-    | Mov | MovS | MovZ
-    | Lea
-    | Not | Bswap
-
-  let uop_opcode_map = [
-    ("mov", Mov); ("movabs", Mov);
-    ("movs", MovS); ("movz", MovZ);
-    ("lea", Lea);
-    ("not", Not); ("bswap", Bswap)
-  ]
-
-  type branch_cond =
-    | JNe | JE | JL | JLe | JG | JGe
-    | JB | JBe | JA | JAe | JOther
-
-  let cond_jump_opcode_map = [
-    ("jne", JNe); ("jnz", JNe);               (* <> *)
-    ("je", JE); ("jz", JE);                   (* = *)
-    ("jl", JL); ("jnge", JL);                 (* < signed *)
-    ("jle", JLe); ("jng", JLe);               (* <= signed *)
-    ("jg", JG); ("jnle", JG);                 (* > signed *)
-    ("jge", JGe); ("jnl", JGe);               (* >= signed *)
-    ("jb", JB); ("jnae", JB); ("jc", JB);     (* < unsigned *)
-    ("jbe", JBe); ("jna", JBe);               (* <= unsigned*)
-    ("ja", JA); ("jnbe", JA);                 (* > unsigned *)
-    ("jae", JAe); ("jnb", JAe); ("jnc", JAe); (* >= unsigned *)
-    ("jother", JOther); (* Dirty implementation for print *)
-    ("jo", JOther); ("jno", JOther); ("js", JOther); ("jns", JOther);
-    ("jp", JOther); ("jpe", JOther); ("jnp", JOther); ("jpo", JOther);
-    ("jcxz", JOther); ("jecxz", JOther);
-  ]
-
-  let opcode_is_binst = string_is_sth bop_opcode_map
-  let opcode_is_uinst = string_is_sth uop_opcode_map
-  let opcode_is_cond_jump = string_is_sth cond_jump_opcode_map
-  
-  let opcode_of_binst = string_of_sth bop_opcode_map
-  let opcode_of_uinst = string_of_sth uop_opcode_map
-  let opcode_of_cond_jump = string_of_sth cond_jump_opcode_map
-  
-  let op_of_binst = string_to_sth bop_opcode_map
-  let op_of_uinst = string_to_sth uop_opcode_map
-  let op_of_cond_jump = string_to_sth cond_jump_opcode_map
-
   type instruction =
     (* | Mov of operand * operand
     | MovS of operand * operand
@@ -363,8 +73,8 @@ module Isa = struct
     | Xchg of operand * operand * operand * operand
     | Cmp of operand * operand
     | Test of operand * operand
-    | Push of operand
-    | Pop of operand
+    | Push of operand * MemAnno.t
+    | Pop of operand * MemAnno.t
     | RepStosq
     | RepMovsq
     | Jmp of label
@@ -396,16 +106,6 @@ module Isa = struct
 
   let get_func (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
-
-  let is_label_function_entry (l: label) = l.[0] <> '.'
-
-  let inst_referring_label (m: string) : bool =
-    match m with
-    | "call"
-    | "jmp" -> true
-    | "rep" -> true (* dirty impl *)
-    | _ -> (* Check if conditional branch opcode*)
-      opcode_is_cond_jump m
 
   let inst_is_uncond_jump (inst: instruction) : bool =
     match inst with
@@ -471,8 +171,8 @@ module Isa = struct
       Printf.sprintf "cmp\t\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
     | Test (src2, src1) ->
       Printf.sprintf "test\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
-    | Push src -> Printf.sprintf "push\t%s" (string_of_operand src)
-    | Pop src -> Printf.sprintf "pop\t\t%s" (string_of_operand src)
+    | Push (src, mem_anno) -> Printf.sprintf "push\t%s # %s" (string_of_operand src) (MemAnno.to_string mem_anno)
+    | Pop (src, mem_anno) -> Printf.sprintf "pop\t\t%s # %s" (string_of_operand src) (MemAnno.to_string mem_anno)
     | Xchg (dst2, dst1, _, _) -> 
       Printf.sprintf "xchg\t%s,\t%s" (string_of_operand dst2) (string_of_operand dst1)
     | RepStosq -> "rep stosq"
@@ -507,6 +207,19 @@ module Isa = struct
   let pp_block_list (lvl: int) (block_list: basic_block list) =
     List.iter (pp_block lvl) block_list
 
+  let pp_ocaml_block_list (lvl: int) (buf: Buffer.t) (block_list: basic_block list) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun bb -> 
+        PP.bprint_lvl (lvl + 1) buf "label = %s\n" bb.label;
+        PP.bprint_lvl (lvl + 1) buf "insts = [\n";
+        List.iter (
+          fun inst -> PP.bprint_lvl (lvl + 2) buf "%s;\n" (string_of_instruction inst)
+        ) bb.insts;
+        PP.bprint_lvl (lvl + 1) buf "];\n";
+    ) block_list;
+    PP.bprint_lvl lvl buf "]\n"
+
   let pp_prog (lvl: int) (p: prog) =
     PP.print_lvl lvl "Prog\n";
     List.iteri (
@@ -515,13 +228,16 @@ module Isa = struct
         pp_block_list (lvl + 1) func.body
     ) p.funcs
 
-  let update_op_taint (update_func: TaintExp.t -> TaintExp.t) (op: operand) : operand =
+
+  let update_op_taint (update_func: MemAnno.t -> MemAnno.t) (op: operand) : operand =
     match op with
-    | StOp (disp, base, index, scale, size, old_taint) ->
-      StOp (disp, base, index, scale, size, update_func old_taint)
+    | LdOp (disp, base, index, scale, size, old_mem_anno) ->
+      LdOp (disp, base, index, scale, size, update_func old_mem_anno)
+    | StOp (disp, base, index, scale, size, old_mem_anno) ->
+      StOp (disp, base, index, scale, size, update_func old_mem_anno)
     | _ -> op
   
-  let update_inst_taint (update_func: TaintExp.t -> TaintExp.t) (inst: instruction) : instruction =
+  let update_inst_taint (update_func: MemAnno.t -> MemAnno.t) (inst: instruction) : instruction =
     let update_helper = update_op_taint update_func in
     match inst with
     | BInst (bop, op1, op2, op3) ->
@@ -536,11 +252,11 @@ module Isa = struct
       Test (update_helper op1, update_helper op2)
     | _ -> inst
 
-  let update_block_taint (update_func: TaintExp.t -> TaintExp.t) (block: basic_block) : basic_block =
+  let update_block_taint (update_func: MemAnno.t -> MemAnno.t) (block: basic_block) : basic_block =
     { block with insts = List.map (update_inst_taint update_func) block.insts }
 
   let update_block_list_taint 
-      (update_func: TaintExp.t -> TaintExp.t) (block_list: basic_block list) : basic_block list =
+      (update_func: MemAnno.t -> MemAnno.t) (block_list: basic_block list) : basic_block list =
     List.map (update_block_taint update_func) block_list
 
 end

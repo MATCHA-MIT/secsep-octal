@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Single_entry_type
 open Range_exp
@@ -44,7 +44,7 @@ module SingleSubtype = struct
 
   let single_subtype_error msg = raise (SingleSubtypeError ("[Single Subtype Error] " ^ msg))
 
-  type var_idx_t = Isa.imm_var_id * int
+  type var_idx_t = IsaBasic.imm_var_id * int
   type type_exp_t = SingleEntryType.t * int
 
   type type_rel = {
@@ -183,7 +183,7 @@ module SingleSubtype = struct
         (Printf.sprintf "add_full_subtype: incorrect sub/super types (%s,%d)->(%s,%d)"
           (SingleEntryType.to_string a) pc (SingleEntryType.to_string b_exp) b_pc)
 
-  type useful_var_t = Isa.label * SingleExp.SingleVarSet.t
+  type useful_var_t = IsaBasic.label * SingleExp.SingleVarSet.t
 
   let pp_useful_var (lvl: int) (useful_var: useful_var_t) =
     let label, vars = useful_var in
@@ -372,7 +372,7 @@ module SingleSubtype = struct
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_exp_t) : RangeExp.t =
-    let find_var_sol (v: Isa.imm_var_id) (v_pc: int) : RangeExp.t =
+    let find_var_sol (v: IsaBasic.imm_var_id) (v_pc: int) : RangeExp.t =
       (* Printf.printf "find_var_sol: %d at %d\n" v v_pc; *)
       match List.find_opt (fun (x: type_rel) -> let id, _ =  x.var_idx in v = id) tv_rel_list with
       | Some tv_rel ->
@@ -554,7 +554,7 @@ module SingleSubtype = struct
       end
     in
     let find_base_step 
-        (subtype_list: type_exp_t list) (v_idx: Isa.imm_var_id) : 
+        (subtype_list: type_exp_t list) (v_idx: IsaBasic.imm_var_id) : 
         (SingleEntryType.t * type_exp_t * int64) option =
       let find_base = 
         List.find_opt (

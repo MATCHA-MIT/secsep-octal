@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Entry_type
 open Taint_exp
@@ -87,17 +87,22 @@ module TaintEntryType (Entry: EntryType) = struct
     let _, taint = e in
     [ Constraint.TaintSub (taint, TaintConst false)]
 
+  let update_ld_taint_constraint (e: t) (ld_taint: TaintExp.t) : (Constraint.t list) =
+    let _, taint = e in
+    (* TaintEq (taint, ld_taint) *)
+    [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint) ]
+
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
     let single, taint = e in
     (single, st_taint), [ TaintSub (taint, st_taint) ]
   
-  let exe_bop_inst (isa_bop: Isa.bop) (e1: t) (e2: t) : t =
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
     let s1, t1 = e1 in
     let s2, t2 = e2 in
     Entry.exe_bop_inst isa_bop s1 s2,
     TaintExp.merge t1 t2
 
-  let exe_uop_inst (isa_uop: Isa.uop) (e: t) : t =
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     let single, taint = e in
     Entry.exe_uop_inst isa_uop single, taint
 
@@ -107,7 +112,7 @@ module TaintEntryType (Entry: EntryType) = struct
   let get_single_local_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
     let single_map, _ = map in Entry.get_single_local_var_map single_map
 
-  let get_const_type (imm: Isa.immediate) : t =
+  let get_const_type (imm: IsaBasic.immediate) : t =
     Entry.get_const_type imm, TaintConst false
   
   let get_top_type () : t = taint_entry_type_error "Maybe we should not get_top_type for taint"
@@ -119,7 +124,7 @@ module TaintEntryType (Entry: EntryType) = struct
     | None -> None, None
 
   let get_mem_op_type
-      (disp: Isa.immediate option) (base: t option)
+      (disp: IsaBasic.immediate option) (base: t option)
       (index: t option) (scale: int64) : t =
     let s_base, t_base = split_option base in
     let s_index, t_index = split_option index in

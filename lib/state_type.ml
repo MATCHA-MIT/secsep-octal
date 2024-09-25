@@ -9,6 +9,7 @@ open Mem_offset
 open Mem_type
 open Smt_emitter
 open Pretty_print
+open Full_mem_anno
 
 module StateType = struct
   exception StateTypeError of string
@@ -16,6 +17,7 @@ module StateType = struct
 
   (* let stack_base_id : Isa.imm_var_id = 1 *)
 
+  module Isa = Isa (FullMemAnno)
   module CondVarSet = Set.Make(Int)
   
   type t = {
@@ -199,7 +201,7 @@ module StateType = struct
     | RegOp r -> ([RegOp (Isa.get_reg_idx r)], get_reg_type curr_state r, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | MemOp (disp, base, index, scale) -> 
       (get_mem_op_ir_op base index, get_mem_op_type smt_ctx curr_state false disp base index scale, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
-    | LdOp (disp, base, index, scale, size) ->
+    | LdOp (disp, base, index, scale, size, _) ->
       begin match get_ld_op_type smt_ctx sol curr_state disp base index scale size with
       | (Left ((ptr, offset, is_single_full_slot), exp, ld_constraint), useful_vars) -> ([MemOp (ptr, offset, is_single_full_slot)], exp, None, ld_constraint, useful_vars)
       | (Right (addr, size), useful_vars) -> ([UnknownOp], TypeExp.TypePtr (addr, size), Some (addr, size), MemOffset.ConstraintSet.empty, useful_vars)

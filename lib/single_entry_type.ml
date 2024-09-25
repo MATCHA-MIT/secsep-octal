@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 (* open Entry_type *)
 open Single_exp
 open Taint_exp
@@ -49,10 +49,12 @@ include SingleExp
   let get_untaint_constraint (e: t) : Constraint.t list =
   let _ = e in []
 
+  let update_ld_taint_constraint (_: t) (_: TaintExp.t) : Constraint.t list = []
+
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
     let _ = st_taint in e, []
 
-  let exe_bop_inst (isa_bop: Isa.bop) (e1: t) (e2: t) : t =
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
     match isa_bop with
     | Add -> eval (SingleBExp (SingleAdd, e1, e2))
     | Adc -> SingleTop
@@ -67,7 +69,7 @@ include SingleExp
     | And -> eval (SingleBExp (SingleAnd, e1, e2))
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
 
-  let exe_uop_inst (isa_uop: Isa.uop) (e: t) : t =
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     match isa_uop with
     | Mov | MovS | MovZ | Lea -> e
     | Not -> eval (SingleUExp (SingleNot, e))

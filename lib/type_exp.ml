@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Pretty_print
 
@@ -69,7 +69,7 @@ module TypeExp = struct
     | TypeVar x -> TypeVar (x + 1)
     | _ -> type_exp_error "next_var cannot find next var for non type or single var"
 
-  let sym_of_rsp : Isa.imm_var_id = 4
+  let sym_of_rsp : IsaBasic.imm_var_id = 4
 
   let cmp_type_bop (op1: type_bop) (op2: type_bop) : int =
     match op1, op2 with

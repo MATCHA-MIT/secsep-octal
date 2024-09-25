@@ -1,6 +1,6 @@
 open Pretty_print
 open Smt_emitter
-open Isa
+open Isa_basic
 open Single_exp
 open Entry_type
 open Mem_offset_new
@@ -14,7 +14,7 @@ include Set.Make(Int)
   exception MemKeySetError of string
   let mem_key_set_error msg = raise (MemKeySetError ("[Mem Key Set Error] " ^ msg))
 
-  let pp_list (lvl: int) (ptr_list: Isa.imm_var_id list) =
+  let pp_list (lvl: int) (ptr_list: IsaBasic.imm_var_id list) =
     PP.print_lvl lvl "Ptr list: ";
     List.iter (
       fun x -> Printf.printf "%d " x
@@ -33,7 +33,7 @@ include Set.Make(Int)
       union left_ptr right_ptr
     | _ -> empty
   
-  let find_base (e: SingleExp.t) (ptr_list: t) : Isa.imm_var_id option =
+  let find_base (e: SingleExp.t) (ptr_list: t) : IsaBasic.imm_var_id option =
     let p_list = filter_single_var e in
     match to_list (inter p_list ptr_list) with
     | [] -> None
@@ -47,7 +47,7 @@ module MemType (Entry: EntryType) = struct
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
   type entry_t = Entry.t
-  type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) list
+  type 'a mem_content = (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) list
   type t = entry_t mem_content
 
   let pp_mem_type (lvl: int) (mem: t) =
@@ -84,8 +84,8 @@ module MemType (Entry: EntryType) = struct
       let off, range, e = entry in off, range, func e
     in
     let helper_outer 
-        (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
-        Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list) =
+        (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
+        IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list) =
       let ptr, part_mem = entry in
       ptr, List.map helper_inner part_mem
     in
@@ -101,7 +101,7 @@ module MemType (Entry: EntryType) = struct
       func acc e
     in
     let helper_outer
-        (acc: 'acc) (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 'acc =
+        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 'acc =
       let _, l = entry in
       List.fold_left helper_inner acc l
     in
@@ -119,8 +119,8 @@ module MemType (Entry: EntryType) = struct
       acc, (off, range, e)
     in
     let helper_outer
-        (acc: 'acc) (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
-        'acc * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
+        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
+        'acc * (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
       let id, l = entry in
       let acc, l = List.fold_left_map helper_inner acc l in
       acc, (id, l)
@@ -143,8 +143,8 @@ module MemType (Entry: EntryType) = struct
     in
     let helper_outer
         (acc: 'acc) 
-        (entry1: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
-        (entry2: Isa.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) : 'acc =
+        (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
+        (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) : 'acc =
       let v1, l1 = entry1 in
       let v2, l2 = entry2 in
       if v1 = v2 then List.fold_left2 helper_inner acc l1 l2
@@ -196,7 +196,7 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t) 
       (mem: t) (ptr_list: MemKeySet.t) 
       (addr_offset: MemOffset.t) :
-      ((Isa.imm_var_id * MemOffset.t * MemRange.t * entry_t) * MemOffset.ConstraintSet.t) option =
+      ((IsaBasic.imm_var_id * MemOffset.t * MemRange.t * entry_t) * MemOffset.ConstraintSet.t) option =
     let addr_l, addr_r = addr_offset in
     let base_opt = MemKeySet.find_base addr_l ptr_list in
     (* The accessed address range [l, r] must satisfy l < r *)
@@ -209,7 +209,7 @@ module MemType (Entry: EntryType) = struct
     let ptr_list = List.map (fun (x, _) -> x) mem in
     SingleExp.SingleVarSet.of_list ptr_list
 
-  let get_part_mem (mem: 'a mem_content) (ptr: Isa.imm_var_id) : (MemOffset.t * MemRange.t * 'a) list =
+  let get_part_mem (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : (MemOffset.t * MemRange.t * 'a) list =
     let _, part_mem = List.find (fun (x, _) -> x = ptr) mem in part_mem
 
   let get_part_mem_type
@@ -274,9 +274,9 @@ module MemType (Entry: EntryType) = struct
   let is_shared_mem_helper
       (is_quick: bool)
       (smt_ctx: SmtEmitter.t)
-      (ptr: Isa.imm_var_id)
+      (ptr: IsaBasic.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
-    if ptr = Isa.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
+    if ptr = IsaBasic.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
       match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
       | Le -> false
       | Ge -> true
@@ -292,7 +292,7 @@ module MemType (Entry: EntryType) = struct
   let set_part_mem_type
       (smt_ctx: SmtEmitter.t)
       (update_init_range: bool)
-      (ptr: Isa.imm_var_id)
+      (ptr: IsaBasic.imm_var_id)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (orig_addr_off: MemOffset.t)
       (simp_addr_off: MemOffset.t)
@@ -372,8 +372,8 @@ module MemType (Entry: EntryType) = struct
       in
       let helper
           (acc: bool * (Constraint.t list))
-          (entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) :
-          (bool * (Constraint.t list)) * (Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) =
+          (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) :
+          (bool * (Constraint.t list)) * (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list) * int) =
         begin match acc with
         | true, _ -> acc, entry
         | false, cons ->
@@ -400,7 +400,7 @@ module MemType (Entry: EntryType) = struct
     let find_stack = 
       List.find_map (
         fun (ptr, part_mem) ->
-          if ptr = Isa.rsp_idx then Some (List.map (fun (off, _, _) -> off, false) part_mem)
+          if ptr = IsaBasic.rsp_idx then Some (List.map (fun (off, _, _) -> off, false) part_mem)
           else None
       ) mem
     in
@@ -430,7 +430,7 @@ module MemType (Entry: EntryType) = struct
       entry_t * t =
     List.fold_left_map (
       fun acc (ptr, entry) ->
-        if ptr = Isa.rsp_idx then
+        if ptr = IsaBasic.rsp_idx then
           let acc, entry = update_stack_mem acc entry update_list in
           acc, (ptr, entry)
         else acc, (ptr, entry)
@@ -450,7 +450,7 @@ module MemType (Entry: EntryType) = struct
     (* An ugly version that avoids copying mem_type *)
     List.fold_left (
       fun (acc: SingleExp.SingleVarSet.t) (ptr, part_mem) ->
-        if ptr <> Isa.rsp_idx then
+        if ptr <> IsaBasic.rsp_idx then
           List.fold_left (
             fun (acc: SingleExp.SingleVarSet.t) (_, _, entry) -> 
               SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))

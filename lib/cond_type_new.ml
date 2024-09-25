@@ -2,7 +2,7 @@ open Pretty_print
 open Entry_type
 open Single_entry_type
 open Smt_emitter
-open Isa
+open Isa_basic
 
 module CondType (Entry: EntryType) = struct
   exception CondTypeError of string
@@ -36,7 +36,7 @@ module CondType (Entry: EntryType) = struct
     Printf.sprintf "%s(%s,%s)" s (Entry.to_string l) (Entry.to_string r)
     (* s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")" *)
 
-  let get_taken_type (cond: Isa.branch_cond) (flag: entry_t * entry_t) : t option =
+  let get_taken_type (cond: IsaBasic.branch_cond) (flag: entry_t * entry_t) : t option =
     let l, r = flag in
     match cond with
     | JNe -> Some (Ne, l, r)

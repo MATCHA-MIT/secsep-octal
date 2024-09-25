@@ -1,4 +1,4 @@
-open Type.Isa
+open Type.Isa_basic
 open Type.Single_type_infer
 
 let rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 = 
@@ -8,8 +8,8 @@ exception MemInterfaceError of string
 let mem_interface_error msg = raise (MemInterfaceError ("[Mem Interface Error] " ^ msg))
 
 let get_mem_interface 
-    (interface_list: (Isa.label * 'a) list)
-    (func_name: Isa.label) : 'a =
+    (interface_list: (IsaBasic.label * 'a) list)
+    (func_name: IsaBasic.label) : 'a =
   let find_interface = 
     List.find_map (fun (name, interface) -> if name = func_name then Some interface else None) interface_list
   in
@@ -23,7 +23,7 @@ let salsa20_global : SingleTypeInfer.ArchType.MemType.t = [
   -4, [ ((SingleConst 0L, SingleConst 64L), [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
 ]
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
-let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list = [
+let standalone_salsa20 : (IsaBasic.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "salsa20_words", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
@@ -44,7 +44,7 @@ let standalone_salsa20 : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list =
   ]
 ]
 
-let sha512_final_impl : (Isa.label * SingleTypeInfer.ArchType.MemType.t) list = [
+let sha512_final_impl : (IsaBasic.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "sha512_block_data_order", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];

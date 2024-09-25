@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Type_exp
 open Type_full_exp
@@ -23,16 +23,16 @@ module MemKeySet = Set.Make(Int)
   val mem_type_error : string -> 'a
   type entry_t
   type t
-  val get_mem_type_with_key : t -> Isa.imm_var_id * MemOffset.t -> bool -> entry_t
-  val set_mem_type_with_key : t -> Isa.imm_var_id * MemOffset.t -> bool -> entry_t -> t
+  val get_mem_type_with_key : t -> IsaBasic.imm_var_id * MemOffset.t -> bool -> entry_t
+  val set_mem_type_with_key : t -> IsaBasic.imm_var_id * MemOffset.t -> bool -> entry_t -> t
   val get_mem_type_with_addr : t -> TypeExp.t * int64 -> (entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t
   val set_mem_type_with_addr : t -> TypeExp.t * int64 -> entry_t -> (t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t
   val init_mem_type : t
-  val pp_ptr_list : int -> Isa.imm_var_id list -> unit
+  val pp_ptr_list : int -> IsaBasic.imm_var_id list -> unit
   val pp_ptr_set : int-> MemKeySet.t -> unit
-  val pp_mem_key : int -> (Isa.imm_var_id * (MemOffset.t list)) list -> unit
-  val pp_base_range : int -> (Isa.imm_var_id * MemOffset.t) list -> unit
-  val pp_mem_type : int -> (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list -> unit
+  val pp_mem_key : int -> (IsaBasic.imm_var_id * (MemOffset.t list)) list -> unit
+  val pp_base_range : int -> (IsaBasic.imm_var_id * MemOffset.t) list -> unit
+  val pp_mem_type : int -> (IsaBasic.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list -> unit
 end *)
 
 module MemType (Entry: MemEntrytype) = struct
@@ -41,20 +41,20 @@ module MemType (Entry: MemEntrytype) = struct
 
   type entry_t = Entry.t
   (* MemOffset.t represents the absolute range, rather than the relative offset to the base *)
-  type 'a mem_content = (Isa.imm_var_id * ((MemOffset.t * 'a) list)) list
+  type 'a mem_content = (IsaBasic.imm_var_id * ((MemOffset.t * 'a) list)) list
   type t = {
     ptr_list: MemKeySet.t;
     mem_type: entry_t mem_content
   }
 
-  let get_mem_type_with_key (mem: t) (mem_key: Isa.imm_var_id * MemOffset.t) (full_entry: bool) : entry_t =
+  let get_mem_type_with_key (mem: t) (mem_key: IsaBasic.imm_var_id * MemOffset.t) (full_entry: bool) : entry_t =
     let ptr, offset = mem_key in
     let _, ptr_mem = List.find (fun (x, _) -> x = ptr) mem.mem_type in
     let _, mem_type = List.find (fun (x, _) -> MemOffset.cmp offset x = 0) ptr_mem in
     if full_entry then mem_type else Entry.partial_read_val mem_type
 
   let set_mem_type_with_key 
-      (mem: t) (mem_key: Isa.imm_var_id * MemOffset.t) (full_entry: bool) (new_type: entry_t) : t =
+      (mem: t) (mem_key: IsaBasic.imm_var_id * MemOffset.t) (full_entry: bool) (new_type: entry_t) : t =
     let ptr, offset = mem_key in
     let helper (acc: bool) (entry: MemOffset.t * entry_t) : bool * (MemOffset.t * entry_t) =
       let entry_offset, old_type = entry in
@@ -65,8 +65,8 @@ module MemType (Entry: MemEntrytype) = struct
         if full_entry then (true, (offset, new_type)) else (true, (offset, Entry.partial_write_val old_type new_type))
       | false, false -> (false, entry)
     in
-    let helper2 (acc: bool) (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
-        bool * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+    let helper2 (acc: bool) (entry: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) :
+        bool * (IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
       let entry_ptr, entry_mem = entry in
       if ptr == entry_ptr then
         let found, new_entry_mem = List.fold_left_map helper false entry_mem in
@@ -78,7 +78,7 @@ module MemType (Entry: MemEntrytype) = struct
     if found then {mem with mem_type = new_mem_type}
     else mem_type_error "set_mem_type_with_key ptr not found"
 
-  let pp_ptr_list (lvl: int) (ptr_list: Isa.imm_var_id list) =
+  let pp_ptr_list (lvl: int) (ptr_list: IsaBasic.imm_var_id list) =
     PP.print_lvl lvl "Ptr list: ";
     List.iter (
       fun x -> Printf.printf "%d " x
@@ -108,7 +108,7 @@ module MemType (Entry: MemEntrytype) = struct
       MemKeySet.inter left_ptr right_ptr
     | _ -> MemKeySet.empty
 
-  let find_base (e: TypeExp.t) (ptr_list: MemKeySet.t) : Isa.imm_var_id option =
+  let find_base (e: TypeExp.t) (ptr_list: MemKeySet.t) : IsaBasic.imm_var_id option =
     let p_list = filter_type_single_var e in
     match MemKeySet.to_list (MemKeySet.inter p_list ptr_list) with
     | [] -> None
@@ -144,7 +144,7 @@ module MemType (Entry: MemEntrytype) = struct
 
   (* TODO: Double check this new implementation!!! *)
   let get_mem_entry_with_addr (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64)
-    : ((Isa.imm_var_id * MemOffset.t * bool) * entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+    : ((IsaBasic.imm_var_id * MemOffset.t * bool) * entry_t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
     (* if there exists TypeVar, return *)
     if not (is_addr_single_exp addr) then Right addr_exp else
@@ -154,7 +154,7 @@ module MemType (Entry: MemEntrytype) = struct
     match base_opt with
     | None -> begin (* Try all slots and see if the new address fits in one determinedly *)
         let addr_offset, is_single_slot = get_abs_offset addr_exp in
-        let helper (mem_of_base: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+        let helper (mem_of_base: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
           let base, base_mem = mem_of_base in
           match List.filter_map (fun (offset, offset_type) -> 
             if MemOffset.equal addr_offset offset then begin 
@@ -252,7 +252,7 @@ module MemType (Entry: MemEntrytype) = struct
 
   let set_mem_entry_with_addr 
       (smt_ctx: SmtEmitter.t) (mem: t) (addr_exp: TypeExp.t * int64) (new_type: entry_t)
-      : ((Isa.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
+      : ((IsaBasic.imm_var_id * MemOffset.t * bool) * t * MemOffset.ConstraintSet.t, TypeExp.t * int64) Either.t =
     let addr, _ = addr_exp in
     (* if there exists TypeVar, return *)
     if not (is_addr_single_exp addr) then Right addr_exp else
@@ -262,7 +262,7 @@ module MemType (Entry: MemEntrytype) = struct
     match base_opt with
     | None -> begin
         let addr_offset, is_single_slot = get_abs_offset addr_exp in
-        let helper acc (mem_of_base: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+        let helper acc (mem_of_base: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
           match acc with
           | Some _ -> (acc, mem_of_base)
           | None -> begin
@@ -330,9 +330,9 @@ module MemType (Entry: MemEntrytype) = struct
           end
       in
       let helper
-          (acc: (Isa.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option)
-          (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
-          ((Isa.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option) * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+          (acc: (IsaBasic.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option)
+          (entry: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) :
+          ((IsaBasic.imm_var_id * MemOffset.t * bool * MemOffset.ConstraintSet.t) option) * (IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
         let k, o_list = entry in
         match acc with
         | Some acc -> (Some acc, entry)
@@ -399,8 +399,8 @@ module MemType (Entry: MemEntrytype) = struct
       in
       let helper
           (acc: MemOffset.ConstraintSet.t option)
-          (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) :
-          (MemOffset.ConstraintSet.t option) * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+          (entry: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) :
+          (MemOffset.ConstraintSet.t option) * (IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
         let k, o_list = entry in
         match acc with
         | Some acc -> (Some acc, entry)
@@ -434,8 +434,8 @@ module MemType (Entry: MemEntrytype) = struct
       let offset, _ = entry in (Entry.next_var acc, (offset, acc))
     in
     let helper2 
-        (acc: entry_t) (entry: Isa.imm_var_id * ((MemOffset.t * 'a) list)) :
-        entry_t * (Isa.imm_var_id * ((MemOffset.t * entry_t) list)) =
+        (acc: entry_t) (entry: IsaBasic.imm_var_id * ((MemOffset.t * 'a) list)) :
+        entry_t * (IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) =
       let ptr, offset_list = entry in
       let new_acc, new_offset_list = List.fold_left_map helper acc offset_list in
       (new_acc, (ptr, new_offset_list))
@@ -444,7 +444,7 @@ module MemType (Entry: MemEntrytype) = struct
     (next_var, { ptr_list = ptr_list; mem_type = new_mem })
 
   let to_absolute_offset (m: t) : t =
-    let helper (mem_of_base: Isa.imm_var_id * ((MemOffset.t * 'a) list)) =
+    let helper (mem_of_base: IsaBasic.imm_var_id * ((MemOffset.t * 'a) list)) =
       let base, base_mem = mem_of_base in
       let new_base_mem = List.map (fun ((l, r), mem_type) -> ((
           SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)),
@@ -456,7 +456,7 @@ module MemType (Entry: MemEntrytype) = struct
     { m with mem_type = List.map helper m.mem_type }
 
   (* Only update ptr val in base, but type single var idx are still not correct in init_mem *)
-  let update_mem_entry_base_id (m: t) (start_idx: Isa.imm_var_id) : t =
+  let update_mem_entry_base_id (m: t) (start_idx: IsaBasic.imm_var_id) : t =
     let new_ptr_list = MemKeySet.of_list (List.map (fun x -> x + start_idx) (MemKeySet.elements m.ptr_list)) in
     let rec single_const_add_base (x: SingleExp.t) : SingleExp.t =
       match x with
@@ -468,15 +468,15 @@ module MemType (Entry: MemEntrytype) = struct
     let helper (entry: MemOffset.t * entry_t) : MemOffset.t * entry_t =
       let (l, r), t = entry in ((single_const_add_base l, single_const_add_base r), t)
     in
-    let helper2 (entry: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) : Isa.imm_var_id * ((MemOffset.t * entry_t) list) =
+    let helper2 (entry: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) : IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list) =
       let ptr, entry_list = entry in (ptr + start_idx, List.map helper entry_list)
     in
     { ptr_list = new_ptr_list; mem_type = List.map helper2 m.mem_type }
 
   let sort_mem_type (m: t) : t =
     let compare 
-        (e1: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) 
-        (e2: Isa.imm_var_id * ((MemOffset.t * entry_t) list)) : int =
+        (e1: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) 
+        (e2: IsaBasic.imm_var_id * ((MemOffset.t * entry_t) list)) : int =
       let ptr1, _ = e1 in
       let ptr2, _ = e2 in
       if ptr1 < ptr2 then -1
@@ -485,7 +485,7 @@ module MemType (Entry: MemEntrytype) = struct
     in
     { m with mem_type = List.sort compare m.mem_type }
 
-  let pp_mem_key (lvl: int) (mem_key_list: (Isa.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list)) =
+  let pp_mem_key (lvl: int) (mem_key_list: (IsaBasic.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list)) =
     PP.print_lvl lvl "Mem key list:\n";
     List.iter (
       fun (id, key_list) ->
@@ -517,7 +517,7 @@ module MemType (Entry: MemEntrytype) = struct
         Printf.printf "\n"
     ) addr_exp
 
-  let pp_base_range (lvl: int) (base_range_list: (Isa.imm_var_id * MemOffset.t) list) =
+  let pp_base_range (lvl: int) (base_range_list: (IsaBasic.imm_var_id * MemOffset.t) list) =
     PP.print_lvl lvl "Base range list:\n";
     List.iteri (
       fun i x ->
@@ -528,7 +528,7 @@ module MemType (Entry: MemEntrytype) = struct
         Printf.printf "\n"
     ) base_range_list
 
-  let pp_mem_type (lvl: int) (mem_key_list: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) =
+  let pp_mem_type (lvl: int) (mem_key_list: (IsaBasic.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) =
     PP.print_lvl lvl "Mem type:\n";
     List.iter (
       fun (id, key_list) ->
@@ -616,9 +616,9 @@ include MemRangeTypeBase
    *)
   let rec update_offset_all_ptr
       (smt_ctx: SmtEmitter.t)
-      (old_mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
-      (mem_access_list: (Isa.imm_var_id * MemOffset.t list) list)
-      : ((Isa.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t * ((Isa.imm_var_id option * MemOffset.t) list) =
+      (old_mem_type: (IsaBasic.imm_var_id * (MemOffset.t * TypeExp.t) list) list)
+      (mem_access_list: (IsaBasic.imm_var_id * MemOffset.t list) list)
+      : ((IsaBasic.imm_var_id * (MemOffset.t * bool) list) list) * MemOffset.ConstraintSet.t * ((IsaBasic.imm_var_id option * MemOffset.t) list) =
     (*
     Printf.printf "Entering update_offset_all_ptr\n";
     Printf.printf "\nMemtype =\n";
@@ -626,7 +626,7 @@ include MemRangeTypeBase
     Printf.printf "\nMem access list =\n";
     pp_mem_key 0 (mem_access_list, []);
     *)
-    let helper_add_base_id_to_range (base_id: Isa.imm_var_id) (offset_list: MemOffset.t list) =
+    let helper_add_base_id_to_range (base_id: IsaBasic.imm_var_id) (offset_list: MemOffset.t list) =
       List.map (fun x -> (Some base_id, x)) offset_list
     in
     match old_mem_type, mem_access_list with
@@ -667,7 +667,7 @@ include MemRangeTypeBase
     | [], [] -> ([], MemOffset.ConstraintSet.empty, [])
 
   let flatten_mem_type
-      (mem_type: (Isa.imm_var_id * (MemOffset.t * TypeExp.t) list) list) =
+      (mem_type: (IsaBasic.imm_var_id * (MemOffset.t * TypeExp.t) list) list) =
     List.fold_left (fun acc (base_id, offset_list) ->
       let l = List.map (fun (offset, mem_type) -> (base_id, offset, mem_type)) offset_list in
       l @ acc
@@ -680,9 +680,9 @@ include MemRangeTypeBase
    *)
   let match_base_for_ptr_without_base
       (smt_ctx: SmtEmitter.t)
-      (flattened_mem_type: (Isa.imm_var_id * MemOffset.t * TypeExp.t) list)
+      (flattened_mem_type: (IsaBasic.imm_var_id * MemOffset.t * TypeExp.t) list)
       (mem_access_list: MemOffset.t list) (* access without explicit base *)
-      : ((Isa.imm_var_id * MemOffset.t) list) * ((Isa.imm_var_id option * MemOffset.t) list) =
+      : ((IsaBasic.imm_var_id * MemOffset.t) list) * ((IsaBasic.imm_var_id option * MemOffset.t) list) =
     let found, not_found = List.partition_map (fun mem_access ->
       let helper_check_def (_, offset, _) =
         match MemOffset.cmp_or_merge smt_ctx mem_access offset with
@@ -738,10 +738,10 @@ include MemRangeTypeBase
 
   let rec update_type_one_ptr
       (old_mem_type: (MemOffset.t * TypeExp.t) list)
-      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
+      (start_var_idx: (TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t)
       (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
       (update_list: (MemOffset.t * bool) list) :
-      ((MemOffset.t * TypeExp.t) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
+      ((MemOffset.t * TypeExp.t) list) * ((TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
     match update_list with
     | [] -> 
       let d_set = drop_all old_mem_type drop_var_set in
@@ -761,11 +761,11 @@ include MemRangeTypeBase
       end
     
   let rec update_type_all_ptr
-      (old_t: (Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list)
-      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
+      (old_t: (IsaBasic.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list)
+      (start_var_idx: (TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t)
       (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
-      (update_list: (Isa.imm_var_id * (MemOffset.t * bool) list) list) :
-      ((Isa.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
+      (update_list: (IsaBasic.imm_var_id * (MemOffset.t * bool) list) list) :
+      ((IsaBasic.imm_var_id * ((MemOffset.t * TypeExp.t) list)) list) * ((TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
     match old_t, update_list with
     | (id1, mem1) :: tl1, (id2, mem2) :: tl2 ->
       if id1 = id2 then
@@ -791,7 +791,7 @@ include MemRangeTypeBase
 
   let update_ptr_list
       (ptr_set: MemKeySet.t)
-      (update_list: (Isa.imm_var_id * (MemOffset.t * bool) list) list) :
+      (update_list: (IsaBasic.imm_var_id * (MemOffset.t * bool) list) list) :
       MemKeySet.t =
     List.fold_left (
       fun acc (x, _) -> MemKeySet.add x acc
@@ -799,10 +799,10 @@ include MemRangeTypeBase
 
   let update_mem_type
       (old_t: t)
-      (start_var_idx: (TypeExp.type_var_id, Isa.imm_var_id) Either.t)
+      (start_var_idx: (TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t)
       (new_var_set: TypeExp.TypeVarSet.t) (drop_var_set: TypeExp.TypeVarSet.t)
-      (update_list: (Isa.imm_var_id * (MemOffset.t * bool) list) list) :
-      t * ((TypeExp.type_var_id, Isa.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
+      (update_list: (IsaBasic.imm_var_id * (MemOffset.t * bool) list) list) :
+      t * ((TypeExp.type_var_id, IsaBasic.imm_var_id) Either.t) * TypeExp.TypeVarSet.t * TypeExp.TypeVarSet.t =
     let new_mem_type, x, y, z = update_type_all_ptr old_t.mem_type start_var_idx new_var_set drop_var_set update_list in
     ({
       ptr_list = update_ptr_list old_t.ptr_list update_list;
@@ -844,8 +844,8 @@ include MemRangeTypeBase
 
   let try_solve_base 
       (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
-      (candidate: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : 
-      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) =
+      (candidate: (SingleExp.SingleVarSet.t, IsaBasic.imm_var_id) Either.t) : 
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((SingleExp.SingleVarSet.t, IsaBasic.imm_var_id) Either.t) =
     let ptr_list, no_ptr_list = acc in
     match candidate with
     | Left base_list ->
@@ -863,10 +863,10 @@ include MemRangeTypeBase
   
   let rec solve_base 
       (acc: SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t)
-      (base_list: ((SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) list)
+      (base_list: ((SingleExp.SingleVarSet.t, IsaBasic.imm_var_id) Either.t) list)
       (iter: int) : 
-      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * Isa.imm_var_id option list =
-    let to_id (x: (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t) : Isa.imm_var_id option =
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * IsaBasic.imm_var_id option list =
+    let to_id (x: (SingleExp.SingleVarSet.t, IsaBasic.imm_var_id) Either.t) : IsaBasic.imm_var_id option =
       match x with
       | Left s ->
           if MemKeySet.cardinal s = 0 then None (* expect to be implicit base case, e.g. logical-and is involved *)
@@ -882,11 +882,11 @@ include MemRangeTypeBase
       (ptr_list: SingleExp.SingleVarSet.t) 
       (no_ptr_list: SingleExp.SingleVarSet.t) 
       (addr_list: (TypeFullExp.t * int64) list) : 
-      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * Isa.imm_var_id option list =
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * IsaBasic.imm_var_id option list =
     let ptr_set_list, no_ptr_set_list = List.split (List.map (fun ((e, _), _) -> filter_type_single_var e) addr_list) in
     let no_ptr_set = List.fold_left (fun acc x -> SingleExp.SingleVarSet.union acc x) SingleExp.SingleVarSet.empty no_ptr_set_list in
     let ptr_set_list = List.map2 (
-      fun x (addr, size) : (SingleExp.SingleVarSet.t, Isa.imm_var_id) Either.t ->
+      fun x (addr, size) : (SingleExp.SingleVarSet.t, IsaBasic.imm_var_id) Either.t ->
         let out_list = SingleExp.SingleVarSet.diff x no_ptr_set in
         if SingleExp.SingleVarSet.cardinal out_list = 0 then
           Printf.printf "Warning: no base candidate for addr %s %Ld\n" (TypeFullExp.to_string addr) size;
@@ -895,7 +895,7 @@ include MemRangeTypeBase
     in
     solve_base (ptr_list, no_ptr_list) ptr_set_list 1
     
-  let pp_base (lvl: int) (base_list: Isa.imm_var_id list) =
+  let pp_base (lvl: int) (base_list: IsaBasic.imm_var_id list) =
     PP.print_lvl lvl "Base list:\n";
     List.iteri (
       fun i x ->
@@ -914,7 +914,7 @@ include MemRangeTypeBase
       (ptr_list: SingleExp.SingleVarSet.t)
       (no_ptr_list: SingleExp.SingleVarSet.t)
       (addr_list: (TypeFullExp.t * int64) list) : 
-      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((Isa.imm_var_id option * MemOffset.t) list) =
+      (SingleExp.SingleVarSet.t * SingleExp.SingleVarSet.t) * ((IsaBasic.imm_var_id option * MemOffset.t) list) =
     let addr_list = filter_addr_list addr_list in
     (*
     Printf.printf "\nget_addr_base_range: input addr list:\n";
@@ -922,7 +922,7 @@ include MemRangeTypeBase
     Printf.printf "\n";
     *)
     let (new_ptr_list, new_no_ptr_list), base_list = get_base ptr_list no_ptr_list addr_list in
-    let helper (base_id: Isa.imm_var_id option) (mem_access: TypeFullExp.t * int64) : Isa.imm_var_id option * MemOffset.t =
+    let helper (base_id: IsaBasic.imm_var_id option) (mem_access: TypeFullExp.t * int64) : IsaBasic.imm_var_id option * MemOffset.t =
       let (addr, _), size = mem_access in
       match addr with
       | TypeSingle x -> (
@@ -944,11 +944,11 @@ include MemRangeTypeBase
     ((new_ptr_list, new_no_ptr_list), List.map2 helper base_list addr_list)
 
   let reshape_mem_key_list
-      (mem_access_list: (Isa.imm_var_id option * MemOffset.t) list)
-      : (Isa.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list) =
+      (mem_access_list: (IsaBasic.imm_var_id option * MemOffset.t) list)
+      : (IsaBasic.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list) =
     let rec helper_insert
-        (l: (Isa.imm_var_id * (MemOffset.t list)) list)
-        (mem_access: Isa.imm_var_id * MemOffset.t) =
+        (l: (IsaBasic.imm_var_id * (MemOffset.t list)) list)
+        (mem_access: IsaBasic.imm_var_id * MemOffset.t) =
       let id, offset = mem_access in
       match l with
       | [] -> [(id, [offset])]
@@ -958,19 +958,19 @@ include MemRangeTypeBase
         else (id, [offset]) :: tl
     in
     let helper
-        (acc: (Isa.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list))
-        (mem_access: Isa.imm_var_id option * MemOffset.t) =
+        (acc: (IsaBasic.imm_var_id * (MemOffset.t list)) list * (MemOffset.t list))
+        (mem_access: IsaBasic.imm_var_id option * MemOffset.t) =
       let acc_mem, acc_no_base = acc in
       let id_o, offset = mem_access in
       match id_o with
       | None -> acc_mem, offset :: acc_no_base
       | Some id -> (helper_insert acc_mem (id, offset)), acc_no_base
     in
-    (* let helper (acc: (Isa.imm_var_id * (MemOffset.t list)) list) (mem_access: Isa.imm_var_id * MemOffset.t) : 
-        (Isa.imm_var_id * (MemOffset.t list)) list =
+    (* let helper (acc: (IsaBasic.imm_var_id * (MemOffset.t list)) list) (mem_access: IsaBasic.imm_var_id * MemOffset.t) : 
+        (IsaBasic.imm_var_id * (MemOffset.t list)) list =
       let id, offset = mem_access in
-      let helper0 (id_mem_key_list: Isa.imm_var_id * (MemOffset.t list)) : 
-            (Isa.imm_var_id * (MemOffset.t list), Isa.imm_var_id * (MemOffset.t list)) Either.t =
+      let helper0 (id_mem_key_list: IsaBasic.imm_var_id * (MemOffset.t list)) : 
+            (IsaBasic.imm_var_id * (MemOffset.t list), IsaBasic.imm_var_id * (MemOffset.t list)) Either.t =
         let curr_id, mem_key_list = id_mem_key_list in
         if curr_id = id then Either.left (curr_id, offset :: mem_key_list)
         else Either.right id_mem_key_list
@@ -983,7 +983,7 @@ include MemRangeTypeBase
     in *)
     List.fold_left helper ([], []) mem_access_list
 
-  let pp_update_list (lvl: int) (update_list: ((Isa.imm_var_id * (MemOffset.t * bool) list) list)) =
+  let pp_update_list (lvl: int) (update_list: ((IsaBasic.imm_var_id * (MemOffset.t * bool) list) list)) =
     PP.print_lvl lvl "Update list:\n";
     List.iter (
       fun (id, key_list) ->

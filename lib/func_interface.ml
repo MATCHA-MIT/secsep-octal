@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Entry_type
 open Mem_offset_new
@@ -19,7 +19,7 @@ module FuncInterface (Entry: EntryType) = struct
   module CondType = CondType (Entry)
 
   type t = {
-    func_name: Isa.label;
+    func_name: IsaBasic.label;
     in_reg: RegType.t;
     in_mem: MemType.t;
     context: CondType.t list;
@@ -65,7 +65,7 @@ module FuncInterface (Entry: EntryType) = struct
          single_var_set: child global single var and mapped single var
          var_map: child var -> parent exp (not only for single var/exp) *)
       (child_mem: MemType.t) (parent_mem: MemType.t) :
-      (var_map_set_t * SingleExp.SingleVarSet.t) * ((Isa.imm_var_id * (read_hint_t list)) list) =
+      (var_map_set_t * SingleExp.SingleVarSet.t) * ((IsaBasic.imm_var_id * (read_hint_t list)) list) =
     let helper_inner
         (acc: var_map_set_t * SingleExp.SingleVarSet.t)
         (entry: read_hint_t) :
@@ -115,8 +115,8 @@ module FuncInterface (Entry: EntryType) = struct
     in
     let helper_outer
         (acc: var_map_set_t * SingleExp.SingleVarSet.t)
-        (entry: Isa.imm_var_id * (read_hint_t list)) :
-        (var_map_set_t * SingleExp.SingleVarSet.t) * (Isa.imm_var_id * (read_hint_t list)) =
+        (entry: IsaBasic.imm_var_id * (read_hint_t list)) :
+        (var_map_set_t * SingleExp.SingleVarSet.t) * (IsaBasic.imm_var_id * (read_hint_t list)) =
       let (_, single_var_set, _), _ = acc in
       let c_ptr, c_part_mem = entry in
       if SingleExp.SingleVarSet.mem c_ptr single_var_set then
@@ -126,8 +126,8 @@ module FuncInterface (Entry: EntryType) = struct
         acc, (c_ptr, c_part_mem)
     in
     let rec helper
-        (acc: var_map_set_t * SingleExp.SingleVarSet.t) (child_mem: (Isa.imm_var_id * (read_hint_t list)) list) :
-        (var_map_set_t * SingleExp.SingleVarSet.t) * ((Isa.imm_var_id * (read_hint_t list)) list) =
+        (acc: var_map_set_t * SingleExp.SingleVarSet.t) (child_mem: (IsaBasic.imm_var_id * (read_hint_t list)) list) :
+        (var_map_set_t * SingleExp.SingleVarSet.t) * ((IsaBasic.imm_var_id * (read_hint_t list)) list) =
       let (single_var_map, _, _), _ = acc in
       let l = List.length single_var_map in
       let ((single_var_map, single_var_set, var_map), useful_vars), child_mem =
@@ -239,14 +239,14 @@ module FuncInterface (Entry: EntryType) = struct
       (local_var_map: SingleExp.local_var_map_t)
       (var_map_set: var_map_set_t)
       (parent_mem: MemType.t)
-      (read_hint: (Isa.imm_var_id * (read_hint_t list)) list)
+      (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
       (write_mem: MemType.t) :
       MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     let single_var_map, single_var_set, _ = var_map_set in
     let helper
         (acc: MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t)
-        (read_hint_entry: Isa.imm_var_id * (read_hint_t list))
-        (write_mem_entry: Isa.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list)) :
+        (read_hint_entry: IsaBasic.imm_var_id * (read_hint_t list))
+        (write_mem_entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list)) :
         MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
       let p_mem, constraint_list, acc_useful_vars = acc in
       let ptr, read_hint = read_hint_entry in
@@ -319,7 +319,7 @@ module FuncInterface (Entry: EntryType) = struct
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: Entry.local_var_map_t)
       (reg_type: RegType.t) (mem_type: MemType.t)
-      (func_name: Isa.label) :
+      (func_name: IsaBasic.label) :
       RegType.t * MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)

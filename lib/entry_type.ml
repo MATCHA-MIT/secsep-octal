@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Single_exp
 open Taint_exp
 open Constraint
@@ -30,17 +30,18 @@ module type EntryType = sig
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)
   val get_eq_taint_constraint: t -> t -> Constraint.t list
   val get_untaint_constraint: t -> Constraint.t list
+  val update_ld_taint_constraint: t -> TaintExp.t -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t -> t * Constraint.t list
 
-  val exe_bop_inst: Isa.bop -> t -> t -> t
-  val exe_uop_inst: Isa.uop -> t -> t
+  val exe_bop_inst: IsaBasic.bop -> t -> t -> t
+  val exe_uop_inst: IsaBasic.uop -> t -> t
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
   val get_single_local_var_map: local_var_map_t -> SingleExp.local_var_map_t
-  val get_const_type: Isa.immediate -> t
+  val get_const_type: IsaBasic.immediate -> t
   val get_top_type: unit -> t
   val get_top_untaint_type: unit -> t
-  val get_mem_op_type: Isa.immediate option -> t option -> t option -> int64 -> t
+  val get_mem_op_type: IsaBasic.immediate option -> t option -> t option -> int64 -> t
 
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)
   val update_local_var: local_var_map_t -> t -> int -> (local_var_map_t * t)
@@ -77,7 +78,7 @@ module DepType = struct
 
   (* type t =
     | Const of int * int
-    | Var of Isa.imm_var_id * int
+    | Var of IsaBasic.immediate * int
     | BExp of bop * t * t  *)
 
   type dep_size =

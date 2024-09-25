@@ -1,4 +1,4 @@
-open Isa
+open Isa_basic
 open Pretty_print
 
 module SingleExp = struct
@@ -23,11 +23,11 @@ module SingleExp = struct
   type t =
     | SingleTop
     | SingleConst of int64
-    | SingleVar of Isa.imm_var_id
+    | SingleVar of IsaBasic.imm_var_id
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
 
-  type local_var_map_t = (Isa.imm_var_id * t) list
+  type local_var_map_t = (IsaBasic.imm_var_id * t) list
 
   let get_empty_var_map : local_var_map_t = []
 
@@ -471,7 +471,7 @@ module SingleExp = struct
     in
     is_val var_set e
 
-  let rec repl_var_exp (e: t) (v_idx_exp: Isa.imm_var_id * t) : t =
+  let rec repl_var_exp (e: t) (v_idx_exp: IsaBasic.imm_var_id * t) : t =
     let idx, v_exp = v_idx_exp in
     match e with
     | SingleVar v -> if v = idx then v_exp else e
@@ -479,14 +479,14 @@ module SingleExp = struct
     | SingleUExp (uop, e) -> SingleUExp (uop, repl_var_exp e v_idx_exp)
     | _ -> e
 
-  let rec get_imm_type (i: Isa.immediate) : t =
+  let rec get_imm_type (i: IsaBasic.immediate) : t =
     match i with
     | ImmNum v -> SingleConst v
     | ImmLabel v -> SingleVar v
     | ImmBExp (i1, i2) -> SingleBExp (SingleAdd, get_imm_type i1, get_imm_type i2)
 
   let get_mem_op_type
-      (disp: Isa.immediate option) (base: t option)
+      (disp: IsaBasic.immediate option) (base: t option)
       (index: t option) (scale: int64) : t =
     let disp_type = 
       match disp with
@@ -519,7 +519,7 @@ module SingleExp = struct
       SingleVarSet.union left_ptr right_ptr
     | _ -> SingleVarSet.empty
 
-  let find_base (e: t) (ptr_set: SingleVarSet.t) : Isa.imm_var_id option =
+  let find_base (e: t) (ptr_set: SingleVarSet.t) : IsaBasic.imm_var_id option =
     let p_set = filter_single_var e in
     match SingleVarSet.to_list (SingleVarSet.inter ptr_set p_set) with
     | [] -> None

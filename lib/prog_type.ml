@@ -10,10 +10,13 @@ open Subtype
 open Smt_emitter
 (* open Single_exp *)
 open Pretty_print
+open Full_mem_anno
 
 module ProgType = struct
   exception ProgTypeError of string
   let prog_type_error msg = raise (ProgTypeError ("[Prog Type Error] " ^ msg))
+
+  module Isa = Isa (FullMemAnno)
 
   type block_type = {
     label: Isa.label;

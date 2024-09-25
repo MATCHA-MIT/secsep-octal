@@ -10,13 +10,16 @@ open Single_exp
 open Range_exp
 open Constraint
 open Func_interface
+open Full_mem_anno
 
 module ArchType (Entry: EntryType) = struct
   exception ArchTypeError of string
   let arch_type_error msg = raise (ArchTypeError ("[Arch Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  module MemAnno = FullMemAnno
 
+  module Isa = Isa (MemAnno)
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
   module CondType = CondType (Entry)
@@ -288,11 +291,15 @@ module ArchType (Entry: EntryType) = struct
     | RegOp r -> (get_reg_type curr_type r, curr_type, [])
     | MemOp (disp, base, index, scale) ->
       (get_mem_op_type curr_type disp base index scale, curr_type, [])
-    | LdOp (disp, base, index, scale, size) ->
+    | LdOp (disp, base, index, scale, size, mem_anno (* TODO: check offset and generate constraints *)) ->
       let src_type, src_constraint, src_useful =
         get_ld_op_type smt_ctx sub_sol_func curr_type disp base index scale size
       in
-      (src_type, { curr_type with useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful }, src_constraint)
+      let ld_op_constraint = match MemAnno.get_taint mem_anno with
+        | None -> []
+        | Some taint -> Entry.update_ld_taint_constraint src_type taint
+      in
+      (src_type, { curr_type with useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful }, ld_op_constraint @ src_constraint)
     | StOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a label op")
   
@@ -305,8 +312,11 @@ module ArchType (Entry: EntryType) = struct
       t * (Constraint.t list) =
     match dest with
     | RegOp r -> (set_reg_type curr_type r new_type, [])
-    | StOp (disp, base, index, scale, size, taint) ->
-      let new_type, st_op_constraint = Entry.update_st_taint_constraint new_type taint in
+    | StOp (disp, base, index, scale, size, mem_anno) ->
+      let new_type, st_op_constraint = match MemAnno.get_taint mem_anno with
+        | None -> new_type, []
+        | Some taint -> Entry.update_st_taint_constraint new_type taint
+      in
       let next_type, dest_constraint, dest_useful =
         set_st_op_type smt_ctx sub_sol_func curr_type disp base index scale size new_type
       in
@@ -402,7 +412,7 @@ module ArchType (Entry: EntryType) = struct
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
       { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
         useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars }
-    | Push src ->
+    | Push (src, mem_anno) ->
       let size = Isa.get_op_size src in
       let rsp_type, curr_type, _ = get_src_op_type smt_ctx sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
@@ -412,13 +422,13 @@ module ArchType (Entry: EntryType) = struct
       let curr_type, _ = set_dest_op_type smt_ctx sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
       let src_type, curr_type, src_constraint = get_src_op_type smt_ctx sub_sol_func curr_type src in
       let next_type, dest_constraint = 
-        set_dest_op_type smt_ctx sub_sol_func curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size, TaintConst true)) src_type 
+        set_dest_op_type smt_ctx sub_sol_func curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size, mem_anno)) src_type 
       in
       add_constraints next_type (src_constraint @ dest_constraint)
       (* next_type, src_constraint @ dest_constraint *)
-    | Pop dst ->
+    | Pop (dst, mem_anno) ->
       let size = Isa.get_op_size dst in
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx sub_sol_func curr_type (Isa.LdOp (None, Some Isa.RSP, None, None, size)) in
+      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx sub_sol_func curr_type (Isa.LdOp (None, Some Isa.RSP, None, None, size, mem_anno)) in
       let next_type, dest_constraint = set_dest_op_type smt_ctx sub_sol_func curr_type dst src_type in
       let rsp_type, curr_type, _ = get_src_op_type smt_ctx sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 

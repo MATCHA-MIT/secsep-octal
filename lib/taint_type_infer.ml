@@ -7,9 +7,13 @@ open Single_subtype
 open Taint_subtype
 open Single_type_infer
 open Smt_emitter
+open Full_mem_anno
 
 module TaintTypeInfer = struct
   exception TaintTypeInferError of string
+
+  module MemAnno = FullMemAnno
+  module Isa = Isa (MemAnno)
 
   let taint_type_infer_error msg = raise (TaintTypeInferError ("[Taint Type Infer Error] " ^ msg))
 
@@ -40,7 +44,7 @@ module TaintTypeInfer = struct
       let inner_helper
           (acc: TaintExp.t) (inst: Isa.instruction) :
           TaintExp.t * Isa.instruction =
-        TaintExp.next_var acc, Isa.update_inst_taint (fun _ -> acc) inst
+        TaintExp.next_var acc, Isa.update_inst_taint (fun anno -> MemAnno.update_taint anno acc) inst
       in
       let acc, new_insts = List.fold_left_map inner_helper acc block.insts in
       acc, { block with insts = new_insts }
@@ -110,11 +114,13 @@ module TaintTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (func_name: Isa.label)
       (single_infer_state: SingleTypeInfer.t) : t =
+
     let state = init prog func_name single_infer_state in
     Printf.printf "Before infer, func\n";
     Isa.pp_block_list 0 state.func;
     Printf.printf "Before infer, func_type\n";
     ArchType.pp_arch_type_list 0 state.func_type;
+  
     (* 1. Type prop *)
     (* Prepare SMT context *)
     let solver = snd state.smt_ctx in
@@ -129,6 +135,7 @@ module TaintTypeInfer = struct
         Printf.printf "%s\n" x.label;
         MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
     ) state.func_type;
+
 
     (* 2. Taint type infer *)
     let subtype_list = TaintSubtype.get_taint_constraint block_subtype in
@@ -145,7 +152,11 @@ module TaintTypeInfer = struct
     let taint_sol = TaintSubtype.solve_subtype_list input_var subtype_list in
     let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
-    let func = Isa.update_block_list_taint update_taint state.func in
+    let func = Isa.update_block_list_taint (fun t ->
+      match MemAnno.get_taint t with
+      | None -> t
+      | Some taint -> MemAnno.update_taint t (update_taint taint)
+    ) state.func in
     let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
     Printf.printf "After infer, func\n";
     Isa.pp_block_list 0 func;
