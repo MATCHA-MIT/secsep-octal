@@ -228,30 +228,67 @@ module MemRange = struct
   exception MemRangeError of string
   let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
 
-  type t = MemOffset.t list
+  type range_var_id = int
+
+  type t = 
+    | RangeConst of MemOffset.t list
+    | RangeVar of range_var_id
+    | RangeExp of range_var_id * (MemOffset.t list)
 
   let to_ocaml_string (r: t) : string =
-    Printf.sprintf "[%s]" (String.concat "; " (List.map MemOffset.to_ocaml_string r))
+    match r with
+    | RangeConst o ->
+      Printf.sprintf "RangeConst [%s]" (String.concat "; " (List.map MemOffset.to_ocaml_string o))
+    | RangeVar v -> Printf.sprintf "RangeVar (%d)" v
+    | RangeExp (v, o) -> 
+      Printf.sprintf "RangeExp (%d, [%s])" 
+        v (String.concat "; " (List.map MemOffset.to_ocaml_string o))
+
+  let to_string = to_ocaml_string
 
   let get_vars (r: t) : SingleExp.SingleVarSet.t =
-    let var_list = List.map MemOffset.get_vars r in
-    List.fold_left 
-      (fun acc x -> SingleExp.SingleVarSet.union acc x) 
-      SingleExp.SingleVarSet.empty var_list
+    let helper (x: MemOffset.t list) : SingleExp.SingleVarSet.t =
+      let var_list = List.map MemOffset.get_vars x in
+      List.fold_left 
+        (fun acc x -> SingleExp.SingleVarSet.union acc x) 
+        SingleExp.SingleVarSet.empty var_list
+    in
+    match r with
+    | RangeConst x | RangeExp (_, x) -> helper x
+    | _ -> SingleExp.SingleVarSet.empty
 
   let is_val (global_var: SingleExp.SingleVarSet.t) (r: t) : bool =
-    List.fold_left (
-      fun acc o -> acc && (MemOffset.is_val global_var o)
-    ) true r
+    match r with
+    | RangeConst o ->
+      List.fold_left (
+        fun acc o -> acc && (MemOffset.is_val global_var o)
+      ) true o
+    | _ -> false
 
   let repl_local_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
-    List.map (MemOffset.repl_local_var local_var_map) r
+    match r with
+    | RangeConst o -> RangeConst (List.map (MemOffset.repl_local_var local_var_map) o)
+    | RangeVar _ -> r
+    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_local_var local_var_map) o)
 
   let repl_context_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
-    List.map (MemOffset.repl_context_var local_var_map) r
+    match r with
+    | RangeConst o -> RangeConst (List.map (MemOffset.repl_context_var local_var_map) o)
+    | RangeVar _ -> r
+    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_context_var local_var_map) o)
 
   let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
     (* TODO: re-implement this later!!! *)
-    let _ = smt_ctx in r1 @ r2
+    let helper (o1_list: MemOffset.t list) (o2_list: MemOffset.t list) : MemOffset.t list =
+      let ob_list = List.map (fun x -> (x, false)) o1_list in
+      let ob_list = MemOffset.insert_new_offset_list smt_ctx ob_list (List.rev o2_list) in
+      List.map (fun (x, _) -> x) ob_list
+    in
+    match r1, r2 with
+    | RangeConst o1, RangeConst o2 -> RangeConst (helper o1 o2)
+    | RangeVar v, RangeConst o | RangeConst o, RangeVar v -> RangeExp (v, o)
+    | RangeExp (v, o1), RangeConst o2 | RangeConst o1, RangeExp (v, o2) -> RangeExp (v, helper o1 o2)
+    | _ -> mem_range_error (Printf.sprintf "Cannot merge %s and %s" (to_string r1) (to_string r2))
+    (* let _ = smt_ctx in r1 @ r2 *)
 
 end

@@ -56,8 +56,8 @@ module MemType (Entry: EntryType) = struct
       fun (ptr, off_list) ->
         PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
         List.iter (
-          fun (off, _, entry) ->
-            PP.print_lvl (lvl + 2) "%s\t%s\n" (MemOffset.to_string off) (Entry.to_string entry)
+          fun (off, r, entry) ->
+            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
         ) off_list
     ) mem
 
@@ -310,14 +310,14 @@ module MemType (Entry: EntryType) = struct
         | Eq | Subset ->
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off 1 with
           | Eq -> 
-            let range = if update_init_range then [ off ] else range in
+            let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if is_shared_mem_full_cmp smt_ctx ptr orig_addr_off then
               (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
             else
               (true, cons), (off, range, new_val)
           | Subset -> 
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let range = if update_init_range then MemRange.merge smt_ctx [ off ] range else range in
+            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [off]) range else range in
             (true, (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
           | _ -> acc, entry
           end
