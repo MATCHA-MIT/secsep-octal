@@ -1,10 +1,11 @@
 open Pretty_print
-open Entry_type
-open Single_entry_type
+open Entry_type_basic
+open Single_exp
+(* open Single_entry_type *)
 open Smt_emitter
 open Isa_basic
 
-module CondType (Entry: EntryType) = struct
+module CondType (Entry: EntryTypeBasic) = struct
   exception CondTypeError of string
   let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
 
@@ -66,8 +67,8 @@ module CondType (Entry: EntryType) = struct
 
   let has_top (cond: t) : bool =
     let _, l, r = cond in
-    if SingleEntryType.cmp (Entry.get_single_exp l) SingleTop = 0 || 
-      SingleEntryType.cmp (Entry.get_single_exp r) SingleTop = 0 then
+    if SingleExp.cmp (Entry.get_single_exp l) SingleTop = 0 || 
+      SingleExp.cmp (Entry.get_single_exp r) SingleTop = 0 then
       true
     else false
 
@@ -81,10 +82,10 @@ module CondType (Entry: EntryType) = struct
 end
 
 module SingleCondType = struct
-include (CondType (SingleEntryType))
+include (CondType (SingleExp))
   let naive_check (cond: t) : (bool, t) Either.t =
     let cond, l, r = cond in
-    let e = SingleEntryType.eval (SingleBExp (SingleSub, l, r)) in
+    let e = SingleExp.eval (SingleBExp (SingleSub, l, r)) in
     match e with
     | SingleConst c ->
       begin match cond with
@@ -99,7 +100,7 @@ include (CondType (SingleEntryType))
 
   let naive_check_impossible (cond: t) : bool =
     let cond, l, r = cond in
-    let e = SingleEntryType.eval (SingleBExp (SingleSub, l, r)) in
+    let e = SingleExp.eval (SingleBExp (SingleSub, l, r)) in
     match e with
     | SingleConst c ->
       begin match cond with
@@ -114,8 +115,8 @@ include (CondType (SingleEntryType))
   let get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let z3_ctx, _ = smt_ctx in
     let cond, l, r = cond in
-    let l = SingleEntryType.to_smt_expr smt_ctx l in
-    let r = SingleEntryType.to_smt_expr smt_ctx r in
+    let l = SingleExp.to_smt_expr smt_ctx l in
+    let r = SingleExp.to_smt_expr smt_ctx r in
     match cond with
     | Eq -> Z3.Boolean.mk_eq z3_ctx l r
     | Ne -> Z3.Boolean.mk_not z3_ctx (Z3.Boolean.mk_eq z3_ctx l r)

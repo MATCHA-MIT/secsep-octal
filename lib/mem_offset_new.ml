@@ -244,7 +244,9 @@ module MemRange = struct
       Printf.sprintf "RangeExp (%d, [%s])" 
         v (String.concat "; " (List.map MemOffset.to_ocaml_string o))
 
-  let to_string = to_ocaml_string
+  let to_string (r: t) : string = to_ocaml_string r
+
+  let get_uninit_range () : t = RangeConst []
 
   let get_vars (r: t) : SingleExp.SingleVarSet.t =
     let helper (x: MemOffset.t list) : SingleExp.SingleVarSet.t =

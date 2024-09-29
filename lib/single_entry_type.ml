@@ -3,7 +3,7 @@ open Isa_basic
 open Single_exp
 open Taint_exp
 open Constraint
-open Smt_emitter
+(* open Smt_emitter *)
 
 module SingleEntryType = struct
 include SingleExp
@@ -75,16 +75,11 @@ include SingleExp
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
 
-  let get_single_exp (e: t) : t = e
-
   let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
 
   let get_const_type = get_imm_type
 
   let get_top_type () : t = SingleTop
   let get_top_untaint_type () : t = SingleTop
-
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
-    SmtEmitter.expr_of_single_exp smt_ctx e false
 
 end

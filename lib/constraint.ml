@@ -1,4 +1,4 @@
-open Mem_offset
+open Mem_offset_new
 open Taint_exp
 
 module Constraint = struct
@@ -26,5 +26,10 @@ module Constraint = struct
         | TaintSub (l, r) -> Some (l, r)
         | _ -> None
     ) constraint_list
+
+  let gen_range_subset (sub_range: MemRange.t) (range: MemRange.t) (off: MemOffset.t) : t list =
+    match sub_range with
+    | RangeConst o -> List.map (fun x -> Subset (x, range, off)) o
+    | _ -> constraint_error (Printf.sprintf "Cannot gen range constraint for %s" (MemRange.to_string sub_range))
 
 end

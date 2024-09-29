@@ -1,5 +1,5 @@
 open Z3
-open Single_exp
+open Single_exp_basic
 open Pretty_print
 
 module SmtEmitter = struct
@@ -90,7 +90,7 @@ module SmtEmitter = struct
           SatNo
         end
 
-  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExp.t) (add_constr: bool) : exp_t =
+  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =
     (* let add_constr = true in *)
     let z3_ctx, _ = smt_ctx in
     match se with
@@ -102,7 +102,7 @@ module SmtEmitter = struct
       let e2 = expr_of_single_exp smt_ctx se2 add_constr in
       begin
         match op with
-        | SingleExp.SingleAdd ->  
+        | SingleAdd ->  
             if add_constr then begin
               add_assertions smt_ctx [
                 BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
@@ -110,7 +110,7 @@ module SmtEmitter = struct
               ];
             end;
             BitVector.mk_add z3_ctx e1 e2
-        | SingleExp.SingleSub ->
+        | SingleSub ->
             if add_constr then begin
               add_assertions smt_ctx [
                 BitVector.mk_sub_no_overflow z3_ctx e1 e2;
@@ -118,7 +118,7 @@ module SmtEmitter = struct
               ];
             end;
             BitVector.mk_sub z3_ctx e1 e2
-        | SingleExp.SingleMul ->
+        | SingleMul ->
             if add_constr then begin
               add_assertions smt_ctx [
                 BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
@@ -126,17 +126,17 @@ module SmtEmitter = struct
               ];
             end;
             BitVector.mk_mul z3_ctx e1 e2
-        | SingleExp.SingleSal -> BitVector.mk_shl z3_ctx e1 e2
-        | SingleExp.SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
-        | SingleExp.SingleXor -> BitVector.mk_xor z3_ctx e1 e2
-        | SingleExp.SingleAnd -> BitVector.mk_and z3_ctx e1 e2
-        | SingleExp.SingleOr -> BitVector.mk_or z3_ctx e1 e2
+        | SingleSal -> BitVector.mk_shl z3_ctx e1 e2
+        | SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
+        | SingleXor -> BitVector.mk_xor z3_ctx e1 e2
+        | SingleAnd -> BitVector.mk_and z3_ctx e1 e2
+        | SingleOr -> BitVector.mk_or z3_ctx e1 e2
       end
     | SingleUExp (op, se) ->
       let e = expr_of_single_exp smt_ctx se add_constr in
       begin
         match op with
-        | SingleExp.SingleNot -> BitVector.mk_not z3_ctx e
+        | SingleNot -> BitVector.mk_not z3_ctx e
       end
 
 end

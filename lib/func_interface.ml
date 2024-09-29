@@ -168,7 +168,7 @@ module FuncInterface (Entry: EntryType) = struct
     let p_off, p_range, p_entry = parent_entry in
     let is_full, m_in_range, _ = read_hint in
     let _, c_out_range, c_out_entry = write_mem in 
-    let read_range_constraint = List.map (fun x -> Constraint.Subset (x, p_range, p_off)) m_in_range in
+    let read_range_constraint = Constraint.gen_range_subset m_in_range p_range p_off in
     let p_range, out_range_constraint, out_range_useful_var =
       if MemRange.is_val single_var_set c_out_range then
         let m_out_range = MemRange.repl_local_var local_var_map (MemRange.repl_context_var single_var_map c_out_range) in

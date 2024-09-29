@@ -33,46 +33,46 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				mem_type = 
 					[
 						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], SingleVar (97));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], SingleVar (98));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], SingleVar (99));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), [], SingleVar (100));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), [], SingleVar (101));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), [], SingleVar (102));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), [], SingleVar (103));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), [], SingleVar (104));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), [], SingleVar (105));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), [], SingleVar (106));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), [], SingleVar (107));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), [], SingleVar (108));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), [], SingleVar (109));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), [], SingleVar (110));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), [], SingleVar (111));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), [], SingleVar (112));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), [], SingleVar (113));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), [], SingleVar (114));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), [], SingleVar (115));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), [], SingleVar (116));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), [], SingleVar (117));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), [], SingleVar (118));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), [], SingleVar (119));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), [], SingleVar (120));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), [], SingleVar (121));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), [], SingleVar (122));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), [], SingleVar (123));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), [], SingleVar (124));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), [], SingleVar (125));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), [], SingleVar (126));
-							((SingleVar (4), SingleVar (4)), [], SingleTop);
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (97));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (98));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (99));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (100));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (101));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (102));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (103));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (104));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (105));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (106));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (107));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (108));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (109));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (110));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (111));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (112));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (113));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (114));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (115));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (116));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (117));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (118));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (119));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (120));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (121));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (122));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (123));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (124));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (125));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (126));
+							((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
 						]);
 						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), [], SingleTop);
+							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleTop);
 						]);
 						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), [], SingleTop);
+							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleTop);
 						]);
 						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), [], SingleTop);
+							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleTop);
 						]);
 					]
 				;
@@ -111,46 +111,46 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				mem_type = 
 					[
 						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], SingleVar (127));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], SingleVar (128));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], SingleVar (129));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), [], SingleVar (130));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), [], SingleVar (131));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), [], SingleVar (132));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), [], SingleVar (133));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), [], SingleVar (134));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), [], SingleVar (135));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), [], SingleVar (136));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), [], SingleVar (137));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), [], SingleVar (138));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), [], SingleVar (139));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), [], SingleVar (140));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), [], SingleVar (141));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), [], SingleVar (142));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), [], SingleVar (143));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), [], SingleVar (144));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), [], SingleVar (145));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), [], SingleVar (146));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), [], SingleVar (147));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), [], SingleVar (148));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), [], SingleVar (149));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), [], SingleVar (150));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), [], SingleVar (151));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), [], SingleVar (152));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), [], SingleVar (153));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), [], SingleVar (154));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), [], SingleVar (155));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), [], SingleVar (156));
-							((SingleVar (4), SingleVar (4)), [], SingleVar (33));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (127));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (128));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (129));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (130));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (131));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (132));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (133));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (134));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (135));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (136));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (137));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (138));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (139));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (140));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (141));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (142));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (143));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (144));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (145));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (146));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (147));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (148));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (149));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (150));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (151));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (152));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (153));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (154));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (155));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (156));
+							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (33));
 						]);
 						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), [], SingleVar (34));
+							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (34));
 						]);
 						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), [], SingleVar (35));
+							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (35));
 						]);
 						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), [], SingleVar (36));
+							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (36));
 						]);
 					]
 				;
@@ -189,46 +189,46 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				mem_type = 
 					[
 						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], SingleVar (157));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], SingleVar (158));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], SingleVar (159));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), [], SingleVar (160));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), [], SingleVar (161));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), [], SingleVar (162));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), [], SingleVar (163));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), [], SingleVar (164));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), [], SingleVar (165));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), [], SingleVar (166));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), [], SingleVar (167));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), [], SingleVar (168));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), [], SingleVar (169));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), [], SingleVar (170));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), [], SingleVar (171));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), [], SingleVar (172));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), [], SingleVar (173));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), [], SingleVar (174));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), [], SingleVar (175));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), [], SingleVar (176));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), [], SingleVar (177));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), [], SingleVar (178));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), [], SingleVar (179));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), [], SingleVar (180));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), [], SingleVar (181));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), [], SingleVar (182));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), [], SingleVar (183));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), [], SingleVar (184));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), [], SingleVar (185));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), [], SingleVar (186));
-							((SingleVar (4), SingleVar (4)), [], SingleVar (53));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (157));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (158));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (159));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (160));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (161));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (162));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (163));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (164));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (165));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (166));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (167));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (168));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (169));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (170));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (171));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (172));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (173));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (174));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (175));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (176));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (177));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (178));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (179));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (180));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (181));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (182));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (183));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (184));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (185));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (186));
+							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (53));
 						]);
 						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), [], SingleVar (54));
+							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (54));
 						]);
 						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), [], SingleVar (55));
+							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (55));
 						]);
 						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), [], SingleVar (56));
+							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (56));
 						]);
 					]
 				;
@@ -267,46 +267,46 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				mem_type = 
 					[
 						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], SingleVar (187));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], SingleVar (188));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], SingleVar (189));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), [], SingleVar (190));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), [], SingleVar (191));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), [], SingleVar (192));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), [], SingleVar (193));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), [], SingleVar (194));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), [], SingleVar (195));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), [], SingleVar (196));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), [], SingleVar (197));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), [], SingleVar (198));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), [], SingleVar (199));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), [], SingleVar (200));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), [], SingleVar (201));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), [], SingleVar (202));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), [], SingleVar (203));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), [], SingleVar (204));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), [], SingleVar (205));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), [], SingleVar (206));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), [], SingleVar (207));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), [], SingleVar (208));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), [], SingleVar (209));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), [], SingleVar (210));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), [], SingleVar (211));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), [], SingleVar (212));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), [], SingleVar (213));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), [], SingleVar (214));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), [], SingleVar (215));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), [], SingleVar (216));
-							((SingleVar (4), SingleVar (4)), [], SingleVar (73));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (187));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (188));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (189));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (190));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (191));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (192));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (193));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (194));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (195));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (196));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (197));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (198));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (199));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (200));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (201));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (202));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (203));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (204));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (205));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (206));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (207));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (208));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (209));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (210));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (211));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (212));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (213));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (214));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (215));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (216));
+							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (73));
 						]);
 						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), [], SingleVar (74));
+							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (74));
 						]);
 						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), [], SingleVar (75));
+							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (75));
 						]);
 						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), [], SingleVar (76));
+							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (76));
 						]);
 					]
 				;
@@ -345,46 +345,46 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				mem_type = 
 					[
 						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), [], SingleVar (217));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), [], SingleVar (218));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), [], SingleVar (219));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), [], SingleVar (220));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), [], SingleVar (221));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), [], SingleVar (222));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), [], SingleVar (223));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), [], SingleVar (224));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), [], SingleVar (225));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), [], SingleVar (226));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), [], SingleVar (227));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), [], SingleVar (228));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), [], SingleVar (229));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), [], SingleVar (230));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), [], SingleVar (231));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), [], SingleVar (232));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), [], SingleVar (233));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), [], SingleVar (234));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), [], SingleVar (235));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), [], SingleVar (236));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), [], SingleVar (237));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), [], SingleVar (238));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), [], SingleVar (239));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), [], SingleVar (240));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), [], SingleVar (241));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), [], SingleVar (242));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), [], SingleVar (243));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), [], SingleVar (244));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), [], SingleVar (245));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), [], SingleVar (246));
-							((SingleVar (4), SingleVar (4)), [], SingleVar (93));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (217));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (218));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (219));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (220));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (221));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (222));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (223));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (224));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (225));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (226));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (227));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (228));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (229));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (230));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (231));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (232));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (233));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (234));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (235));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (236));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (237));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (238));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (239));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (240));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (241));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (242));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (243));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (244));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (245));
+							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (246));
+							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (93));
 						]);
 						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), [], SingleVar (94));
+							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (94));
 						]);
 						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), [], SingleVar (95));
+							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (95));
 						]);
 						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), [], SingleVar (96));
+							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (96));
 						]);
 					]
 				;

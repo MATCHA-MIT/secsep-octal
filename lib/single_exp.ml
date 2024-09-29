@@ -1,31 +1,10 @@
 open Isa_basic
+open Single_exp_basic
+open Smt_emitter
 open Pretty_print
 
 module SingleExp = struct
-  exception SingleExpError of string
-  let single_exp_error msg = raise (SingleExpError ("[Single Exp Error] " ^ msg))
-
-  module SingleVarSet = Set.Make(Int)
-
-  type single_bop =
-    | SingleAdd
-    | SingleSub
-    | SingleMul
-    | SingleSal
-    | SingleSar
-    | SingleXor
-    | SingleAnd
-    | SingleOr
-
-  type single_uop =
-    | SingleNot
-
-  type t =
-    | SingleTop
-    | SingleConst of int64
-    | SingleVar of IsaBasic.imm_var_id
-    | SingleBExp of single_bop * t * t
-    | SingleUExp of single_uop * t
+include SingleExpBasic
 
   type local_var_map_t = (IsaBasic.imm_var_id * t) list
 
@@ -525,5 +504,10 @@ module SingleExp = struct
     | [] -> None
     | hd :: [] -> Some hd
     | _ -> single_exp_error (Printf.sprintf "find_base find more than one base for %s" (to_string e))
+
+  let get_single_exp (e: t) : t = e
+
+  let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
+    SmtEmitter.expr_of_single_exp smt_ctx e false
 
 end

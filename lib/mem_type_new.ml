@@ -415,7 +415,7 @@ module MemType (Entry: EntryType) = struct
       entry_t * ((MemOffset.t * MemRange.t * entry_t) list) =
     let helper (acc: entry_t) (off_update: MemOffset.t * bool) : entry_t * (MemOffset.t * MemRange.t * entry_t) =
       let off, update = off_update in
-      if update then Entry.next_var acc, (off, [], acc)
+      if update then Entry.next_var acc, (off, MemRange.get_uninit_range (), acc)
       else
         match List.find_opt (fun (o, _, _) -> MemOffset.cmp o off = 0) part_mem with
         | Some entry -> acc, entry
