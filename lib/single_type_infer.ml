@@ -157,13 +157,17 @@ module SingleTypeInfer = struct
     (* (infer_state: t) : t * (ArchType.block_subtype_t list) = *)
     (infer_state: t) (iter_left: int) : t * (ArchType.block_subtype_t list) =
     let ctx, solver = infer_state.smt_ctx in
-    let helper (block_subtype: ArchType.block_subtype_t list) (block: Isa.basic_block) (block_type: ArchType.t) : ArchType.block_subtype_t list =
+    let helper 
+        (acc: (ArchType.block_subtype_t list) * (Isa.instruction list list)) 
+        (block: Isa.basic_block) (block_type: ArchType.t) : 
+        (ArchType.block_subtype_t list) * (Isa.instruction list list) =
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type.useful_var;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _ = iter_left in
-      let _, block_subtype =
+      let block_subtype, update_block_list = acc in
+      let (_, block_subtype), block =
         (* if iter_left = 1 && block.label = ".L2" then begin
           Printf.printf "skip prop %s\n" block.label;
           block_type, block_subtype
@@ -174,13 +178,20 @@ module SingleTypeInfer = struct
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
       Z3.Solver.pop solver 1;
-      block_subtype
+      block_subtype, block :: update_block_list
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
     Printf.printf "func len %d, type len %d\n" (List.length infer_state.func) (List.length infer_state.func_type);
-    let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
+    let block_subtype, rev_new_block_list = List.fold_left2 helper (block_subtype, []) infer_state.func infer_state.func_type in
     Printf.printf "block_subtype len %d\n" (List.length block_subtype);
-    { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
+    let new_func = 
+      List.map2 (
+        fun (x: Isa.basic_block) (y: Isa.instruction list) -> { x with insts = y }
+      ) infer_state.func (List.rev rev_new_block_list)
+    in
+    { infer_state with 
+      func = new_func;
+      func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
     (* let single_subtype, block_subtype = SingleSubtype.init block_subtype in
     Printf.printf "2\n";

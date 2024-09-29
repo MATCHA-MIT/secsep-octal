@@ -95,7 +95,7 @@ module TaintTypeInfer = struct
       (* Prepare SMT context for the current block *)
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_sol block_type.useful_var;
-      let _, block_subtype =
+      let (_, block_subtype), _ =
         ArchType.type_prop_block (ctx, solver) 
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
           func_interface_list block_type block.insts block_subtype

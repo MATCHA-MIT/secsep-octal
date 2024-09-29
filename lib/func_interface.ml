@@ -84,7 +84,7 @@ module FuncInterface (Entry: EntryType) = struct
           | Some (m_off_l, _), Some (_, m_off_r) ->
             let simp_m_off = m_off_l, m_off_r in
             begin match MemType.get_mem_type smt_ctx parent_mem orig_m_off simp_m_off with
-            | Some (is_full, (p_off, _, p_entry)) ->
+            | Some (is_full, _, (p_off, _, p_entry)) ->
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
               ( (* acc *)
