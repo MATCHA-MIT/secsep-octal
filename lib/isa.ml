@@ -33,6 +33,28 @@ module Isa (MemAnno: MemAnnoType) = struct
       Printf.sprintf "St(%s,%s,anno={%s})" addr_str (Int64.to_string size) (MemAnno.to_string mem_anno)
     | LabelOp label -> label
 
+  let ocaml_string_of_operand (op: operand): string =
+    match op with
+    | ImmOp imm -> ocaml_string_of_immediate imm
+    | RegOp r -> ocaml_string_of_reg r
+    | MemOp (disp, base, index, scale) ->
+      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
+      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
+      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
+      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
+      Printf.sprintf "MemOp (%s, %s, %s, %s)" disp_str base_str index_str scale_str
+    | LdOp (disp, base, index, scale, size, mem_anno)
+    | StOp (disp, base, index, scale, size, mem_anno) ->
+      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
+      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
+      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
+      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
+      Printf.sprintf "%s(%s, %s, %s, %s, %sL, %s)"
+        (match op with LdOp _ -> "LdOp" | StOp _ -> "StOp" | _ -> isa_error "ocaml_string_of_operand")
+        disp_str base_str index_str scale_str
+        (Int64.to_string size) (MemAnno.to_ocaml_string mem_anno)
+    | LabelOp label -> Printf.sprintf "LabelOp %s" label
+
   let get_op_size (op: operand) : int64 =
     match op with
     | RegOp r -> get_reg_size r
@@ -188,6 +210,55 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Syscall -> "syscall"
     | Hlt -> "hlt"
 
+  let ocaml_string_of_instruction (inst: instruction) : string =
+    match inst with
+    | BInst (bop, dst, src2, src1) ->
+      begin match ocaml_opcode_of_binst bop with
+      | Some opcode ->
+        Printf.sprintf "BInst (%s, %s, %s, %s)"
+          opcode
+          (ocaml_string_of_operand dst)
+          (ocaml_string_of_operand src2)
+          (ocaml_string_of_operand src1)
+      | None -> isa_error "cannot find opcode for a bop"
+      end
+    | UInst (uop, dst, src) ->
+      begin match ocaml_opcode_of_uinst uop with
+      | Some opcode ->
+        Printf.sprintf "UInst (%s, %s, %s)"
+          opcode
+          (ocaml_string_of_operand dst)
+          (ocaml_string_of_operand src)
+      | None -> isa_error "cannot find opcode for a uop"
+      end
+    | Cmp (src2, src1) ->
+      Printf.sprintf "Cmp (%s, %s)" (ocaml_string_of_operand src2) (ocaml_string_of_operand src1)
+    | Test (src2, src1) ->
+      Printf.sprintf "Test (%s, %s)" (ocaml_string_of_operand src2) (ocaml_string_of_operand src1)
+    | Push (src, mem_anno) ->
+      Printf.sprintf "Push (%s, %s)" (ocaml_string_of_operand src) (MemAnno.to_ocaml_string mem_anno)
+    | Pop (src, mem_anno) ->
+      Printf.sprintf "Pop (%s, %s)" (ocaml_string_of_operand src) (MemAnno.to_ocaml_string mem_anno)
+    | Xchg (dst2, dst1, o3, o4) ->
+      Printf.sprintf "Xchg (%s, %s, %s, %s)"
+        (ocaml_string_of_operand dst2)
+        (ocaml_string_of_operand dst1)
+        (ocaml_string_of_operand o3)
+        (ocaml_string_of_operand o4)
+    | RepStosq -> "RepStosq"
+    | RepMovsq -> "RepMovsq"
+    | Jmp label -> Printf.sprintf "Jmp %s" label
+    | Jcond (cond, label) ->
+      begin match ocaml_opcode_of_cond_jump cond with
+      | Some opcode -> Printf.sprintf "Jcond (%s, %s)" opcode label
+      | None -> isa_error "cannot find opcode for a cond jump"
+      end
+    | Call label -> Printf.sprintf "Call %s" label
+    | Nop -> "Nop"
+    | Syscall -> "Syscall"
+    | Hlt -> "Hlt"
+      
+
   (* let get_op_list (inst: instruction) : operand list =
     match inst with
     | Mov (op0, op1) | MovS (op0, op1) | MovZ (op0, op1) 
@@ -211,12 +282,14 @@ module Isa (MemAnno: MemAnnoType) = struct
     PP.bprint_lvl lvl buf "[\n";
     List.iter (
       fun bb -> 
-        PP.bprint_lvl (lvl + 1) buf "label = %s\n" bb.label;
-        PP.bprint_lvl (lvl + 1) buf "insts = [\n";
+        PP.bprint_lvl (lvl + 1) buf "{\n";
+        PP.bprint_lvl (lvl + 2) buf "label = %s;\n" bb.label;
+        PP.bprint_lvl (lvl + 2) buf "insts = [\n";
         List.iter (
-          fun inst -> PP.bprint_lvl (lvl + 2) buf "%s;\n" (string_of_instruction inst)
+          fun inst -> PP.bprint_lvl (lvl + 3) buf "%s;\n" (ocaml_string_of_instruction inst)
         ) bb.insts;
-        PP.bprint_lvl (lvl + 1) buf "];\n";
+        PP.bprint_lvl (lvl + 2) buf "]\n";
+        PP.bprint_lvl (lvl + 1) buf "};\n";
     ) block_list;
     PP.bprint_lvl lvl buf "]\n"
 

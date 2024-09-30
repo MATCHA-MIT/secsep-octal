@@ -46,8 +46,20 @@ module FullMemAnno = struct
       (slot_to_string slot_info)
       (taint_to_string taint_info)
 
-  let to_ocaml_string (_: t) : string =
-    "UNIMPLEMENTED"
-    (* let (base, offset, full), taint = anno in *)
+  let to_ocaml_string (anno: t) : string =
+    let slot_info, taint_info = anno in
+    let slot_str = match slot_info with
+    | None -> "None"
+    | Some (base, offset, full) ->
+      Printf.sprintf "Some (%d, %s, %b)"
+        base
+        (MemOffset.to_ocaml_string offset)
+        full
+    in
+    let taint_str = match taint_info with
+    | None -> "None"
+    | Some taint -> Printf.sprintf "Some %s" (TaintExp.to_ocaml_string taint)
+    in
+    Printf.sprintf "(%s, %s)" slot_str taint_str
 
 end

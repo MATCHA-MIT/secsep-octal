@@ -118,6 +118,9 @@ module TaintTypeInfer = struct
     let state = init prog func_name single_infer_state in
     Printf.printf "Before infer, func\n";
     Isa.pp_block_list 0 state.func;
+    let buf = Buffer.create 1000 in
+    Isa.pp_ocaml_block_list 0 buf state.func;
+    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
     Printf.printf "Before infer, func_type\n";
     ArchType.pp_arch_type_list 0 state.func_type;
   

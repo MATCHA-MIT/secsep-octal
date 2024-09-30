@@ -53,6 +53,11 @@ module IsaBasic = struct
   ]
 
   let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
+  let ocaml_string_of_reg (r: register) : string =
+    (* make uppercase *)
+    let s = string_of_reg r in
+    String.capitalize_ascii s
+
   let string_to_reg = string_to_sth reg_map
 
   let fix_reg_size (r: register) (s: int64) : register =
@@ -207,6 +212,12 @@ module IsaBasic = struct
     | ImmLabel x -> "var " ^ (string_of_int x)
     | ImmBExp (i1, i2) -> "(" ^ (string_of_immediate i1) ^ ") + (" ^ (string_of_immediate i2) ^ ")"
 
+  let rec ocaml_string_of_immediate (i: immediate) : string =
+    match i with
+    | ImmNum x -> Printf.sprintf "ImmNum %sL" (Int64.to_string x)
+    | ImmLabel x -> Printf.sprintf "ImmLabel %d" x
+    | ImmBExp (i1, i2) -> Printf.sprintf "ImmBExp (%s, %s)" (ocaml_string_of_immediate i1) (ocaml_string_of_immediate i2)
+
   type scale = Scale1 | Scale2 | Scale4 | Scale8
 
   let scale_val (s: scale) : int64 =
@@ -217,11 +228,17 @@ module IsaBasic = struct
     | Scale8 -> 8L
 
   let scale_to_string (s: scale) : string = Int64.to_string (scale_val s)
+  let ocaml_scale_to_string = scale_to_string
 
   let string_of_option (to_string: 'a -> string) (x: 'a option) : string =
     match x with
     | Some x -> to_string x
     | None -> ""
+  
+  let ocaml_string_of_option (to_ocaml_string: 'a -> string) (x: 'a option) : string =
+    match x with
+    | Some x -> Printf.sprintf "Some %s" (to_ocaml_string x)
+    | None -> "None"
 
   let common_opcode_list = [
     "movabs"; "mov"; "movs"; "movz"; "lea";
@@ -247,6 +264,14 @@ module IsaBasic = struct
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or)
   ]
+
+  let bop_opcode_ocaml_str_map = [
+    ("Add", Add); ("Adc", Adc); ("Sub", Sub);
+    ("Mul", Mul); ("Imul", Imul);
+    ("Sal", Sal); ("Sar", Sar); ("Shl", Shl); ("Shr", Shr);
+    ("Rol", Rol); ("Ror", Ror);
+    ("Xor", Xor); ("And", And); ("Or", Or)
+  ]
   
   type uop =
     | Mov | MovS | MovZ
@@ -258,6 +283,13 @@ module IsaBasic = struct
     ("movs", MovS); ("movz", MovZ);
     ("lea", Lea);
     ("not", Not); ("bswap", Bswap)
+  ]
+
+  let uop_opcode_ocaml_str_map = [
+    ("Mov", Mov); ("Mov", Mov);
+    ("MovS", MovS); ("Movz", MovZ);
+    ("Lea", Lea);
+    ("Not", Not); ("Bswap", Bswap)
   ]
 
   type branch_cond =
@@ -281,6 +313,20 @@ module IsaBasic = struct
     ("jcxz", JOther); ("jecxz", JOther);
   ]
 
+  let cond_jump_opcode_ocaml_str_map = [
+    ("JNe", JNe);
+    ("JE", JE);
+    ("JL", JL);
+    ("JLe", JLe);
+    ("JG", JG);
+    ("JGe", JGe);
+    ("JB", JB);
+    ("JBe", JBe);
+    ("JA", JA);
+    ("JAe", JAe);
+    ("JOther", JOther); (* Dirty implementation for print *)
+  ]
+
   let opcode_is_binst = string_is_sth bop_opcode_map
   let opcode_is_uinst = string_is_sth uop_opcode_map
   let opcode_is_cond_jump = string_is_sth cond_jump_opcode_map
@@ -288,6 +334,10 @@ module IsaBasic = struct
   let opcode_of_binst = string_of_sth bop_opcode_map
   let opcode_of_uinst = string_of_sth uop_opcode_map
   let opcode_of_cond_jump = string_of_sth cond_jump_opcode_map
+
+  let ocaml_opcode_of_binst = string_of_sth bop_opcode_ocaml_str_map
+  let ocaml_opcode_of_uinst = string_of_sth uop_opcode_ocaml_str_map
+  let ocaml_opcode_of_cond_jump = string_of_sth cond_jump_opcode_ocaml_str_map
   
   let op_of_binst = string_to_sth bop_opcode_map
   let op_of_uinst = string_to_sth uop_opcode_map
