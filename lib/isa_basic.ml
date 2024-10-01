@@ -53,10 +53,14 @@ module IsaBasic = struct
   ]
 
   let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
+
   let ocaml_string_of_reg (r: register) : string =
     (* make uppercase *)
     let s = string_of_reg r in
-    String.capitalize_ascii s
+    String.uppercase_ascii s
+
+  let ocaml_string_of_reg_op (r: register) : string =
+    Printf.sprintf "RegOp %s" (ocaml_string_of_reg r)
 
   let string_to_reg = string_to_sth reg_map
 
@@ -212,11 +216,20 @@ module IsaBasic = struct
     | ImmLabel x -> "var " ^ (string_of_int x)
     | ImmBExp (i1, i2) -> "(" ^ (string_of_immediate i1) ^ ") + (" ^ (string_of_immediate i2) ^ ")"
 
+  let ocaml_string_of_int (x: int) : string =
+    Printf.sprintf (if x >= 0 then "%d" else "(%d)") x
+
+  let ocaml_string_of_int64 (x: int64) : string =
+    Printf.sprintf (if x >= 0L then "%LdL" else "(%LdL)") x
+
   let rec ocaml_string_of_immediate (i: immediate) : string =
     match i with
-    | ImmNum x -> Printf.sprintf "ImmNum %sL" (Int64.to_string x)
-    | ImmLabel x -> Printf.sprintf "ImmLabel %d" x
+    | ImmNum x -> Printf.sprintf "ImmNum %s" (ocaml_string_of_int64 x)
+    | ImmLabel x -> Printf.sprintf "ImmLabel %s" (ocaml_string_of_int x)
     | ImmBExp (i1, i2) -> Printf.sprintf "ImmBExp (%s, %s)" (ocaml_string_of_immediate i1) (ocaml_string_of_immediate i2)
+
+  let ocaml_string_of_immediate_op (i: immediate) : string =
+    Printf.sprintf "ImmOp (%s)" (ocaml_string_of_immediate i)
 
   type scale = Scale1 | Scale2 | Scale4 | Scale8
 
@@ -237,7 +250,7 @@ module IsaBasic = struct
   
   let ocaml_string_of_option (to_ocaml_string: 'a -> string) (x: 'a option) : string =
     match x with
-    | Some x -> Printf.sprintf "Some %s" (to_ocaml_string x)
+    | Some x -> Printf.sprintf "Some (%s)" (to_ocaml_string x)
     | None -> "None"
 
   let common_opcode_list = [

@@ -33,10 +33,7 @@ module TaintTypeInfer = struct
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
 
-  let init
-      (prog: Isa.prog)
-      (func_name: string)
-      (single_infer_state: SingleTypeInfer.t) : t =
+  let init (single_infer_state: SingleTypeInfer.t) : t =
     let start_var = TaintExp.TaintVar 1 in
     let helper_code
         (acc: TaintExp.t) (block: Isa.basic_block) :
@@ -74,7 +71,7 @@ module TaintTypeInfer = struct
       }
     in
     let next_var, func_type = List.fold_left_map helper_arch start_var single_infer_state.func_type in
-    let _, func = List.fold_left_map helper_code next_var ((Isa.get_func prog func_name).body) in
+    let _, func = List.fold_left_map helper_code next_var single_infer_state.func in
     {
       func = func;
       func_type = func_type;
@@ -110,14 +107,11 @@ module TaintTypeInfer = struct
     block_subtype
 
   let infer_one_func
-      (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
-      (func_name: Isa.label)
       (single_infer_state: SingleTypeInfer.t) : t =
 
-    let state = init prog func_name single_infer_state in
+    let state = init single_infer_state in
     Printf.printf "Before infer, func\n";
-    Isa.pp_block_list 0 state.func;
     let buf = Buffer.create 1000 in
     Isa.pp_ocaml_block_list 0 buf state.func;
     Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
@@ -161,10 +155,14 @@ module TaintTypeInfer = struct
       | Some taint -> MemAnno.update_taint t (update_taint taint)
     ) state.func in
     let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
+
     Printf.printf "After infer, func\n";
-    Isa.pp_block_list 0 func;
+    let buf = Buffer.create 1000 in
+    Isa.pp_ocaml_block_list 0 buf func;
+    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
     Printf.printf "After infer, func_type\n";
     ArchType.pp_arch_type_list 0 func_type;
+
     { state with 
       func = func;
       func_type = func_type;

@@ -18,50 +18,50 @@ let get_mem_interface
   | None -> mem_interface_error (Printf.sprintf "Cannot get mem interface of func %s" func_name)
 
 let salsa20_global : SingleTypeInfer.ArchType.MemType.t = [
-  -2, [ ((SingleConst 0L, SingleConst 32L), [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
-  -3, [ ((SingleConst 0L, SingleConst 8L), [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
-  -4, [ ((SingleConst 0L, SingleConst 64L), [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+  -2, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
+  -3, [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
+  -4, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
 ]
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
 let standalone_salsa20 : (IsaBasic.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "salsa20_words", [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
-    rsi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
   ];
   "salsa20_block", [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
-    rsi, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop) ];
   ];
   "salsa20", [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleVar rsi), [], SingleTop) ];
-    rdx, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ]
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleVar rsi), RangeConst [], SingleTop) ];
+    rdx, [ ((SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop) ]
   ];
   "_start", salsa20_global @ [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ]
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]
   ]
 ]
 
 let sha512_final_impl : (IsaBasic.label * SingleTypeInfer.ArchType.MemType.t) list = [
   "sha512_block_data_order", [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ];
-    rsi, [ ((SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar rdx)), [], SingleTop) ];
-    -2,  [ ((SingleConst 0L, SingleConst 640L), [], SingleTop) ];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar rdx)), RangeConst [], SingleTop) ];
+    -2,  [ ((SingleConst 0L, SingleConst 640L), RangeConst [], SingleTop) ];
   ];
   (* "sha512_final_impl", [
-    rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleVar rsi), [], SingleTop) ];
-    rdx, [ ((SingleConst 0L, SingleConst 216L), [], SingleTop) ];
-    -2,  [ ((SingleConst 0L, SingleConst 640L), [], SingleTop) ];
+    rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    rdi, [ ((SingleConst 0L, SingleVar rsi), RangeConst [], SingleTop) ];
+    rdx, [ ((SingleConst 0L, SingleConst 216L), RangeConst [], SingleTop) ];
+    -2,  [ ((SingleConst 0L, SingleConst 640L), RangeConst [], SingleTop) ];
   ] *)
 ]
 
 let salsa20_block_init_mem : SingleTypeInfer.ArchType.MemType.t = [
-  (rsp, [ ((SingleConst 0L, SingleConst 0L), [], SingleTop) ]);
-  (rdi, [ ((SingleConst 0L, SingleConst 64L), [], SingleTop) ]);
-  (rsi, [ ((SingleConst 0L, SingleConst 32L), [], SingleTop) ]);
+  (rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]);
+  (rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ]);
+  (rsi, [ ((SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop) ]);
 ]
 

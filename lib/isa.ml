@@ -35,8 +35,8 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   let ocaml_string_of_operand (op: operand): string =
     match op with
-    | ImmOp imm -> ocaml_string_of_immediate imm
-    | RegOp r -> ocaml_string_of_reg r
+    | ImmOp imm -> ocaml_string_of_immediate_op imm
+    | RegOp r -> ocaml_string_of_reg_op r
     | MemOp (disp, base, index, scale) ->
       let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
       let base_str = ocaml_string_of_option ocaml_string_of_reg base in
@@ -247,13 +247,13 @@ module Isa (MemAnno: MemAnnoType) = struct
         (ocaml_string_of_operand o4)
     | RepStosq -> "RepStosq"
     | RepMovsq -> "RepMovsq"
-    | Jmp label -> Printf.sprintf "Jmp %s" label
+    | Jmp label -> Printf.sprintf "Jmp \"%s\"" label
     | Jcond (cond, label) ->
       begin match ocaml_opcode_of_cond_jump cond with
-      | Some opcode -> Printf.sprintf "Jcond (%s, %s)" opcode label
+      | Some opcode -> Printf.sprintf "Jcond (%s, \"%s\")" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
       end
-    | Call label -> Printf.sprintf "Call %s" label
+    | Call label -> Printf.sprintf "Call \"%s\"" label
     | Nop -> "Nop"
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
@@ -283,7 +283,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     List.iter (
       fun bb -> 
         PP.bprint_lvl (lvl + 1) buf "{\n";
-        PP.bprint_lvl (lvl + 2) buf "label = %s;\n" bb.label;
+        PP.bprint_lvl (lvl + 2) buf "label = \"%s\";\n" bb.label;
         PP.bprint_lvl (lvl + 2) buf "insts = [\n";
         List.iter (
           fun inst -> PP.bprint_lvl (lvl + 3) buf "%s;\n" (ocaml_string_of_instruction inst)
@@ -323,6 +323,10 @@ module Isa (MemAnno: MemAnnoType) = struct
       Cmp (update_helper op1, update_helper op2)
     | Test (op1, op2) ->
       Test (update_helper op1, update_helper op2)
+    | Push (op, mem_anno) ->
+      Push (update_helper op, update_func mem_anno)
+    | Pop (op, mem_anno) ->
+      Pop (update_helper op, update_func mem_anno)
     | _ -> inst
 
   let update_block_taint (update_func: MemAnno.t -> MemAnno.t) (block: basic_block) : basic_block =
