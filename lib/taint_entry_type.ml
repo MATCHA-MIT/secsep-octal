@@ -88,13 +88,15 @@ module TaintEntryType (Entry: EntryType) = struct
     [ Constraint.TaintSub (taint, TaintConst false)]
 
   let update_ld_taint_constraint (e: t) (ld_taint: TaintExp.t) : (Constraint.t list) =
+    (* e represents the data loaded from memory *)
     let _, taint = e in
-    (* TaintEq (taint, ld_taint) *)
+    (* t_mem == t_ld *)
     [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint) ]
 
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
+    (* e represents the data about to go into memory *)
     let single, taint = e in
-    (single, st_taint), [ TaintSub (taint, st_taint) ]
+    (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
   
   let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
     let s1, t1 = e1 in
@@ -130,6 +132,14 @@ module TaintEntryType (Entry: EntryType) = struct
     let s_index, t_index = split_option index in
     Entry.get_mem_op_type disp s_base s_index scale,
     TaintExp.merge_opt t_base t_index
+
+  let handle_mem_rw (t1: t) (t2: t) : (Constraint.t list) =
+    (* for instruction that loads from then stores to a memory location, establish necessary conditions *)
+    let s1, t1 = t1 in
+    let s2, t2 = t2 in
+    (Entry.handle_mem_rw s1 s2) @
+    (* Taint annotation for the LdOp and StOp should be equal *)
+    [ TaintSub (t1, t2); TaintSub (t2, t1) ]
     
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     let single_map, taint_map = map in

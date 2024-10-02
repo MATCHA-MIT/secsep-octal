@@ -75,6 +75,12 @@ module Isa (MemAnno: MemAnnoType) = struct
     | LabelOp l1, LabelOp l2 -> l1 = l2
     | _ -> false
 
+  let is_ld_st_related (ld_op: operand) (st_op: operand) : bool = (* true if both operand operates on the same address *)
+    match ld_op, st_op with
+    | LdOp (d1, b1, i1, s1, size1, _), StOp(d2, b2, i2, s2, size2, _) ->
+      d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
+    | _ -> false
+
   let get_reg_op_size (op_list: operand list) : int64 option =
     let helper (acc: int64 option) (op: operand) : int64 option =
       match op, acc with

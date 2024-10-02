@@ -327,13 +327,14 @@ module ArchType (Entry: EntryType) = struct
         get_ld_op_type smt_ctx sub_sol_func curr_type disp base index scale size
       in
       let ld_op_constraint = match taint_anno with
-        | None -> []
-        | Some taint -> Entry.update_ld_taint_constraint src_type taint
-      in
-      src_type, 
-      { curr_type with useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful }, 
-      ld_op_constraint @ src_constraint,
-      LdOp (disp, base, index, scale, size, (slot_anno, taint_anno))
+      | None -> []
+      | Some ld_taint -> Entry.update_ld_taint_constraint src_type ld_taint in
+      (
+        src_type,
+        { curr_type with useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful },
+        ld_op_constraint @ src_constraint,
+        LdOp (disp, base, index, scale, size, (slot_anno, taint_anno))
+      )
     | StOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a st op")
     | LabelOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a label op")
   
@@ -349,7 +350,7 @@ module ArchType (Entry: EntryType) = struct
     | StOp (disp, base, index, scale, size, (_, taint_anno)) ->
       let new_type, st_op_constraint = match taint_anno with
         | None -> new_type, []
-        | Some taint -> Entry.update_st_taint_constraint new_type taint
+        | Some st_taint -> Entry.update_st_taint_constraint new_type st_taint
       in
       let next_type, dest_constraint, dest_useful, slot_anno =
         set_st_op_type smt_ctx sub_sol_func curr_type disp base index scale size new_type
@@ -385,7 +386,15 @@ module ArchType (Entry: EntryType) = struct
       let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx sub_sol_func curr_type dest dest_type in
-      let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint) in
+      let ldst_bind_constraint = begin
+        if Isa.is_ld_st_related src0 dest then begin
+          Entry.handle_mem_rw src0_type dest_type
+        end else if Isa.is_ld_st_related src1 dest then begin
+          Entry.handle_mem_rw src1_type dest_type
+        end else
+          []
+      end in
+      let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
       { next_type with local_var_map = new_local_var },
       BInst (bop, dest, src0, src1)
     (* | UInst (Mov, dest, src)

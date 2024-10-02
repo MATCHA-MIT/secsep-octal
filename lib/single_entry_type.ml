@@ -75,6 +75,8 @@ include SingleExp
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
 
+  let handle_mem_rw (_: t) (_: t) : Constraint.t list = []
+
   let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
 
   let get_const_type = get_imm_type
