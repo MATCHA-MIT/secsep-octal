@@ -110,16 +110,15 @@ module TaintSubtype = struct
     let sub, sup = subtype in
     match sup with
     | TaintConst false -> 
-      Printf.printf "Add untaint %s\n" (TaintExp.to_string sub);
+      (* Printf.printf "Add untaint %s\n" (TaintExp.to_string sub); *)
       add_untaint untaint_var sub, None
     | TaintConst true -> untaint_var, None (* This subtype relation implies nothing, so remove *)
     | _ ->
-      if TaintExp.TaintVarSet.is_empty (TaintExp.TaintVarSet.inter untaint_var (TaintExp.get_var_set sup)) then
-        untaint_var, remove_untaint untaint_var subtype
-      else begin
-        Printf.printf "Add untaint %s -> %s\n" (TaintExp.to_string sub) (TaintExp.to_string sup);
+      if TaintExp.TaintVarSet.subset (TaintExp.get_var_set sup) (untaint_var) then begin
+        (* Printf.printf "Add untaint %s -> %s\n" (TaintExp.to_string sub) (TaintExp.to_string sup); *)
         add_untaint untaint_var sub, None
-      end
+      end else
+        untaint_var, remove_untaint untaint_var subtype
       
   
   let add_taint (* for true -> sup *)
@@ -148,9 +147,10 @@ module TaintSubtype = struct
       (subtype_list: sub_t list) :
       TaintExp.TaintVarSet.t * (sub_t list) =
     let old_num = TaintExp.TaintVarSet.cardinal var_set in
+    let old_len = List.length subtype_list in
     let var_set, subtype_opt_list = List.fold_left_map filter_helper var_set subtype_list in
     let subtype_list = List.filter_map (fun x -> x) subtype_opt_list in
-    if TaintExp.TaintVarSet.cardinal var_set > old_num then
+    if TaintExp.TaintVarSet.cardinal var_set > old_num && List.length subtype_list < old_len then
       filter_naive filter_helper var_set subtype_list
     else
       var_set, subtype_list
@@ -313,15 +313,13 @@ module TaintSubtype = struct
     (* Update tv_rel_list (which is expected to contain all constraints) *)
     let tv_rel_list, subtype_opt_list = List.fold_left_map update tv_rel_list subtype_list in
     let subtype_list = List.filter_map (fun x -> x) subtype_opt_list in
-    Printf.printf "solve_subtype_list_helper, after update subtype_list\n";
-    pp_sub_t_list 0 subtype_list;
     (* Find sol based on current (might be incomplete) tv_rel_list *)
     let tv_rel_list = find_var_sol input_var tv_rel_list in
     let sol_list = List.map (fun x -> x.var_idx, Option.get x.sol) tv_rel_list in
     (* Simplify subtype_list with current sol (the sol might be incomplete) *)
     let subtype_list = 
       List.map (
-        fun (x, y) -> TaintExp.repl_context_var sol_list x, TaintExp.repl_context_var sol_list y
+        fun (x, y) -> TaintExp.repl_context_var_no_error sol_list x, TaintExp.repl_context_var_no_error sol_list y
       ) subtype_list 
     in
     (* Remove always sat subtype *)
@@ -336,7 +334,7 @@ module TaintSubtype = struct
       pp_sub_t_list 0 subtype_list;
       let remain = 
         List.filter (
-          fun (x, y) -> not (check_sub_t (TaintExp.repl_context_var sol_list x, TaintExp.repl_context_var sol_list y))
+          fun (x, y) -> not (check_sub_t (TaintExp.repl_context_var_no_error sol_list x, TaintExp.repl_context_var_no_error sol_list y))
         ) subtype_list 
       in
       pp_sub_t_list 0 remain;

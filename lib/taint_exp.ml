@@ -116,8 +116,10 @@ module TaintExp = struct
       Printf.sprintf "TaintExp (TaintVarSet.of_list [ %s ])" (String.concat "; " var_str_list)
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
-    let new_idx = -pc in
-    (new_idx, e) :: map, TaintVar new_idx
+    let _ = pc in
+    map, e
+    (* let new_idx = -pc in
+    (new_idx, e) :: map, TaintVar new_idx *)
 
   let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
     match e1 with
