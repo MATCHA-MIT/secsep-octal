@@ -83,6 +83,12 @@ module TaintEntryType (Entry: EntryType) = struct
     (Entry.get_eq_taint_constraint single new_single) @
     [ Constraint.TaintSub (taint, new_taint); Constraint.TaintSub (new_taint, taint) ]
 
+  let get_sub_taint_constraint (sub: t) (sup: t) : Constraint.t list =
+    let sub_s, sub_t = sub in
+    let sup_s, sup_t = sup in
+    (Entry.get_eq_taint_constraint sub_s sup_s) @
+    [ Constraint.TaintSub (sub_t, sup_t) ]
+
   let get_untaint_constraint (e: t) : Constraint.t list =
     let _, taint = e in
     [ Constraint.TaintSub (taint, TaintConst false)]
@@ -163,6 +169,15 @@ module TaintEntryType (Entry: EntryType) = struct
     Entry.pp_local_var lvl single_map;
     TaintExp.pp_local_var lvl taint_map
 
+  let add_context_map
+      (is_mem: bool)
+      (map: local_var_map_t) (e1: t) (e2: t) :
+      local_var_map_t =
+    let single_map, taint_map = map in
+    let s1, t1 = e1 in
+    let s2, t2 = e2 in
+    Entry.add_context_map is_mem single_map s1 s2,
+    TaintExp.add_context_map is_mem taint_map t1 t2
   let repl_local_var (map: local_var_map_t) (e: t) : t =
     let single_map, taint_map = map in
     let single, taint = e in

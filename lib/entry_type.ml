@@ -29,6 +29,7 @@ module type EntryType = sig
   val mem_partial_write_val: t -> t -> t (* a lazy implementation to handle partially writing a mem entry *)
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)
   val get_eq_taint_constraint: t -> t -> Constraint.t list
+  val get_sub_taint_constraint: t -> t -> Constraint.t list
   val get_untaint_constraint: t -> Constraint.t list
   val update_ld_taint_constraint: t -> TaintExp.t -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t -> t * Constraint.t list
@@ -50,6 +51,9 @@ module type EntryType = sig
   val add_local_var: local_var_map_t -> t -> t -> local_var_map_t
   val add_local_global_var: local_var_map_t -> SingleExp.SingleVarSet.t -> local_var_map_t
   val pp_local_var: int -> local_var_map_t -> unit
+
+  (* This is used to build var map and var constraints when connecting two context *)
+  val add_context_map: bool (* is_mem *) -> local_var_map_t -> t -> t -> local_var_map_t
 
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t

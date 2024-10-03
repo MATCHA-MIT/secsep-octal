@@ -143,6 +143,26 @@ module TaintExp = struct
       fun (x, e) -> PP.print_lvl (lvl + 1) "%d -> %s\n" x (to_string e)
     ) map
 
+  let add_context_map
+      (is_mem: bool)
+      (map: local_var_map_t) (e1: t) (e2: t) :
+      local_var_map_t =
+    match e1 with
+    | TaintVar v ->
+      let found, map =
+        List.fold_left_map (
+          fun (acc: bool) (idx, e) ->
+            if acc then true, (idx, e)
+            else
+              let found = (idx = v) in
+              if found && is_mem then found, (idx, e2)
+              else found, (idx, e)
+        ) false map
+      in
+      if found then map
+      else (v, e2) :: map
+    | _ -> map
+
   let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
     List.find_map (fun (i, e) -> if i = idx then Some e else None) map
 

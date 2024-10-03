@@ -46,7 +46,7 @@ module FuncInterface (Entry: EntryType) = struct
     let child_single_reg = List.map Entry.get_single_exp child_reg in
     let parent_single_reg = List.map Entry.get_single_exp parent_reg in
     List.fold_left2 SingleExp.add_local_var [] child_single_reg parent_single_reg,
-    List.fold_left2 Entry.add_local_var Entry.get_empty_var_map child_reg parent_reg
+    List.fold_left2 (Entry.add_context_map false) Entry.get_empty_var_map child_reg parent_reg
 
   type var_map_set_t = SingleExp.local_var_map_t * SingleExp.SingleVarSet.t * Entry.local_var_map_t
   type read_hint_t =
@@ -90,7 +90,7 @@ module FuncInterface (Entry: EntryType) = struct
               ( (* acc *)
                 (SingleExp.add_local_var single_var_map c_exp p_exp,
                 SingleExp.SingleVarSet.union single_var_set (SingleExp.get_vars c_exp),
-                Entry.add_local_var var_map c_entry p_entry),
+                (Entry.add_context_map true) var_map c_entry p_entry),
                 acc_useful
               ),
               Mapped (p_off, is_full, m_range, c_entry)
@@ -185,14 +185,15 @@ module FuncInterface (Entry: EntryType) = struct
         if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
         else Entry.get_top_type ()
       in
-      let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
+      (* We don't need this here since it is ensured by taint type check/inference of the child function!!! *)
+      (* let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in *)
       if is_full then 
         (p_off, p_range, m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint,
+        read_range_constraint @ out_range_constraint,
         out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint,
+        read_range_constraint @ out_range_constraint,
         out_range_useful_var
     end
 
@@ -285,6 +286,22 @@ module FuncInterface (Entry: EntryType) = struct
     in
     List.fold_left2 helper (parent_mem, [], SingleExp.SingleVarSet.empty) read_hint write_mem
 
+  let get_reg_taint_constraint
+      (var_map: Entry.local_var_map_t)
+      (parent_reg: RegType.t) (child_reg: RegType.t) : Constraint.t list =
+    List.map2 (
+      fun (p_type: entry_t) (c_type: entry_t) ->
+        Entry.get_sub_taint_constraint p_type (Entry.repl_context_var var_map c_type)
+    ) parent_reg child_reg |> List.flatten
+
+  let get_mem_taint_constraint
+      (var_map: Entry.local_var_map_t)
+      (parent_mem: MemType.t) (child_mem: MemType.t) : Constraint.t list =
+    MemType.fold_left2 (
+      fun (acc: Constraint.t list) (p_entry: entry_t) (c_entry: entry_t) ->
+        (Entry.get_eq_taint_constraint p_entry (Entry.repl_context_var var_map c_entry)) @ acc
+    ) [] parent_mem child_mem
+
   let func_call_helper
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
@@ -308,6 +325,12 @@ module FuncInterface (Entry: EntryType) = struct
     let reg_type = set_reg_type var_map child_out_reg in
     let mem_type, constraint_list, write_useful_vars = 
       set_mem_type smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
+
+    let constraint_list = 
+      get_reg_taint_constraint var_map parent_reg child_reg @
+      get_mem_taint_constraint var_map parent_mem child_mem @
+      constraint_list
+    in
 
     (* TODO: Check context!!! *)
     reg_type, mem_type, constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars
