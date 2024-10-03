@@ -79,3 +79,39 @@ Not all expr requires z3 check
 TODO: Check how it parse $K512+512
 TODO: Optimize the add of constraints of single expressions themselves
 TODO: Find out why big integers is involved in z3
+
+# Adding support for transformation
+
+For a function, its initial memory type describes the memory layout comprised of several `mem_content`.
+Each `mem_content` consists of
+* a base pointer, which corresponds to a register, whose type is described by the initial register type
+* several memory slots related to the base pointer, each of which contains information of offset and type
+
+A pointer is
+* original, if it points to memory in the original program
+* shifted, if it points to shadow memory for tainted data introduced by the transformation
+
+We infer the **unity** for each `mem_content` by inspecting taint annotation of its slots:
+
+* all T, all F, all same taint var: the `mem_content` is **unified**
+  * implies that the base pointer is either original or shifted
+  * memory operands that access these slots do not need transformation
+* mixture of T and F: the `mem_content` is **ununified**
+  * implies that the base pointer is original
+  * memory operands that access these slots have to handle offsets by adding delta
+* mixture of T/F and taint var: reject and quit, since instantiation not adequate
+
+Also, we reject and quit if any memory operand has its taint annotation being a variable
+
+For each memory operand:
+
+* if accessing unified memory:
+  * no action is needed
+* if accessing ununified memory:
+  * do the transformation (by adding delta) if the operand's taint annotation is true
+
+For each function call:
+
+* if a sub-region of a `mem_content` is mapped into the callee's memory
+  * if the `mem_content` ununified, and the sub-region is unified, then add delta to the pointer argument passed to the callee
+* for callee-saved registers, the caller identifies useful registers among them, and do the push/pop job before and after the call
