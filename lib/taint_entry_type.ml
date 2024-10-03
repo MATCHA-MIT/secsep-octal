@@ -93,16 +93,22 @@ module TaintEntryType (Entry: EntryType) = struct
     let _, taint = e in
     [ Constraint.TaintSub (taint, TaintConst false)]
 
-  let update_ld_taint_constraint (e: t) (ld_taint: TaintExp.t) : (Constraint.t list) =
+  let update_ld_taint_constraint (e: t) (ld_taint: TaintExp.t option) : (Constraint.t list) =
     (* e represents the data loaded from memory *)
-    let _, taint = e in
-    (* t_mem == t_ld *)
-    [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint) ]
+    match ld_taint with
+    | Some ld_taint ->
+      let _, taint = e in
+      (* t_mem == t_ld *)
+      [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint) ]
+    | None -> []
 
-  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
+  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
     (* e represents the data about to go into memory *)
-    let single, taint = e in
-    (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
+    match st_taint with
+    | Some st_taint ->
+      let single, taint = e in
+      (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
+    | None -> e, []
   
   let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
     let s1, t1 = e1 in

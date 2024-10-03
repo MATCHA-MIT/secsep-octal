@@ -67,7 +67,8 @@ module TaintTypeInfer = struct
         constraint_list = [];
         local_var_map = TaintEntryType.get_empty_var_map;
         useful_var = block_single_type.useful_var;
-        global_var = block_single_type.global_var
+        global_var = block_single_type.global_var;
+        prop_mode = ArchType.TypeInferTaint;
       }
     in
     let next_var, func_type = List.fold_left_map helper_arch start_var single_infer_state.func_type in

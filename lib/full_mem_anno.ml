@@ -1,6 +1,7 @@
 open Isa_basic
 open Mem_offset_new
 open Taint_exp
+open Smt_emitter
 
 module FullMemAnno = struct
 
@@ -61,5 +62,15 @@ module FullMemAnno = struct
     | Some taint -> Printf.sprintf "Some %s" (TaintExp.to_ocaml_string taint)
     in
     Printf.sprintf "(%s, %s)" slot_str taint_str
+
+  let check_slot
+      (smt_ctx: SmtEmitter.t)
+      (addr_off: MemOffset.t)
+      (slot_info: slot_t) : bool =
+    let _, s_off, is_full = slot_info in
+    match MemOffset.offset_full_cmp smt_ctx addr_off s_off 1 with
+    | Eq -> true
+    | Subset -> not is_full
+    | _ -> false
 
 end

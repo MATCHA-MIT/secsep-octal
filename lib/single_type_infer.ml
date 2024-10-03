@@ -76,12 +76,18 @@ module SingleTypeInfer = struct
           let next_pc = start_pc + List.length bb.insts in
           if bb.label = func_name then begin
             Printf.printf "BB %s pc = %d\n" bb.label start_pc;
-            ((next_pc, start_var), 
-            ArchType.init_func_input_from_layout bb.label (SingleVar 0) start_pc func_mem_interface global_var_set)
+            (
+              (next_pc, start_var), 
+              ArchType.init_func_input_from_layout 
+                bb.label (SingleVar 0) start_pc func_mem_interface 
+                global_var_set ArchType.TypeInferDep
+            )
           end else begin
             Printf.printf "BB %s pc = %d\n" bb.label start_pc;
             let next_var, arch_type =
-              ArchType.init_from_layout bb.label start_var start_pc func_mem_interface global_var_set
+              ArchType.init_from_layout 
+                bb.label start_var start_pc func_mem_interface 
+                global_var_set ArchType.TypeInferDep
             in
             ((next_pc, next_var), arch_type)
           end

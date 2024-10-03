@@ -1529,6 +1529,7 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				local_var_map = [];
 				useful_var = SingleExp.SingleVarSet.of_list [];
 				global_var = SingleExp.SingleVarSet.of_list [-2];
+        prop_mode = TypeInferDep;
 			}
 			;
 			{
@@ -1607,6 +1608,7 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				local_var_map = [];
 				useful_var = SingleExp.SingleVarSet.of_list [21; 24];
 				global_var = SingleExp.SingleVarSet.of_list [-2];
+        prop_mode = TypeInferDep;
 			}
 			;
 			{
@@ -1685,6 +1687,7 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				local_var_map = [];
 				useful_var = SingleExp.SingleVarSet.of_list [41; 49];
 				global_var = SingleExp.SingleVarSet.of_list [-2];
+        prop_mode = TypeInferDep;
 			}
 			;
 			{
@@ -1763,6 +1766,7 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				local_var_map = [];
 				useful_var = SingleExp.SingleVarSet.of_list [-2; 61; 67; 207; 209; 210];
 				global_var = SingleExp.SingleVarSet.of_list [-2];
+        prop_mode = TypeInferDep;
 			}
 			;
 			{
@@ -1841,6 +1845,7 @@ let salsa20_words_single_infer_state : SingleTypeInfer.t =
 				local_var_map = [];
 				useful_var = SingleExp.SingleVarSet.of_list [80; 81; 82; 89; 90; 91; 92; 94; 95; 96];
 				global_var = SingleExp.SingleVarSet.of_list [-2];
+        prop_mode = TypeInferDep;
 			}
 			;
 		]

@@ -52,9 +52,9 @@ include SingleExp
   let get_untaint_constraint (e: t) : Constraint.t list =
   let _ = e in []
 
-  let update_ld_taint_constraint (_: t) (_: TaintExp.t) : Constraint.t list = []
+  let update_ld_taint_constraint (_: t) (_: TaintExp.t option) : Constraint.t list = []
 
-  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =
+  let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
     let _ = st_taint in e, []
 
   let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
