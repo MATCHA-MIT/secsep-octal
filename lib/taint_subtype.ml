@@ -345,6 +345,16 @@ module TaintSubtype = struct
 
 
   let solve_subtype_list (input_var: TaintExp.TaintVarSet.t) (orig_subtype_list: sub_t list) : TaintExp.local_var_map_t =
+    (*
+    (* dirty test to assign taint const to specified vars *)
+    let assign_taint = [13; 14; 15; 16; 4; 6; 37] in
+    let assign_untaint = [] in
+    let orig_subtype_list = 
+      (List.map (fun x -> (TaintExp.TaintConst true, TaintExp.TaintVar x)) assign_taint) @
+      (List.map (fun x -> (TaintExp.TaintVar x, TaintExp.TaintConst false)) assign_untaint) @
+      orig_subtype_list in
+    *)
+
     Printf.printf "solve_subtype_list, orig_subtype_list\n";
     pp_sub_t_list 0 orig_subtype_list;
     (* Handle naive cases*)

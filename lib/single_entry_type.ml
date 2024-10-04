@@ -47,8 +47,7 @@ include SingleExp
     let _ = old_e, new_e in []
 
   let get_untaint_constraint (e: t) : Constraint.t list =
-  let _ = e in []
-
+    let _ = e in []
   let update_ld_taint_constraint (_: t) (_: TaintExp.t) : Constraint.t list = []
 
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t) : t * (Constraint.t list) =

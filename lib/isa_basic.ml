@@ -299,7 +299,7 @@ module IsaBasic = struct
   ]
 
   let uop_opcode_ocaml_str_map = [
-    ("Mov", Mov); ("Mov", Mov);
+    ("Mov", Mov);
     ("MovS", MovS); ("MovZ", MovZ);
     ("Lea", Lea);
     ("Not", Not); ("Bswap", Bswap)

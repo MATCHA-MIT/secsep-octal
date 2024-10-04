@@ -7,10 +7,13 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   include IsaBasic
 
+  (* disp, base, index, scale *)
+  type mem_op = immediate option * register option * register option * scale option
+
   type operand =
     | ImmOp of immediate
     | RegOp of register
-    | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
+    | MemOp of mem_op
     | LdOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | LabelOp of label
@@ -341,5 +344,8 @@ module Isa (MemAnno: MemAnnoType) = struct
   let update_block_list_taint 
       (update_func: MemAnno.t -> MemAnno.t) (block_list: basic_block list) : basic_block list =
     List.map (update_block_taint update_func) block_list
+
+  let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
+    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm))
 
 end

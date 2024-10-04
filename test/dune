@@ -20,7 +20,11 @@
  ; (libraries type)
  ; (modes byte)
 
- (name test_taint_type_infer)
+ ; (name test_taint_type_infer)
+ ; (libraries type)
+ ; (modes byte)
+
+ (name test_transform)
  (libraries type)
  (modes byte)
 
