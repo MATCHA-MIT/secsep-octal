@@ -105,9 +105,9 @@ module ArchType (Entry: EntryType) = struct
       (start_pc: int) (mem_type: MemType.t)
       (global_var: SingleExp.SingleVarSet.t)
       (prop_mode: prop_mode_t)
-       : t =
-    let idx0, reg_type = RegType.init_reg_type start_var in
-    Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0);
+      : t =
+    let _, reg_type = RegType.init_reg_type start_var in
+    (* Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0); *)
     {
       label = label;
       pc = start_pc;
@@ -130,9 +130,9 @@ module ArchType (Entry: EntryType) = struct
       (global_var: SingleExp.SingleVarSet.t)
       (prop_mode: prop_mode_t) : entry_t * t =
     let idx0, reg_type = RegType.init_reg_type start_var in
-    Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0);
+    (* Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0); *)
     let idx1, mem_type = MemType.init_mem_type_from_layout idx0 mem_layout in
-    Printf.printf "BB %s vars for mem: [%s, %s)\n" label (Entry.to_string idx0) (Entry.to_string idx1);
+    (* Printf.printf "BB %s vars for mem: [%s, %s)\n" label (Entry.to_string idx0) (Entry.to_string idx1); *)
     idx1, {
       label = label;
       pc = start_pc;

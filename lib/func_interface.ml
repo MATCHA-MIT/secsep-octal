@@ -186,14 +186,14 @@ module FuncInterface (Entry: EntryType) = struct
         else Entry.get_top_type ()
       in
       (* We don't need this here since it is ensured by taint type check/inference of the child function!!! *)
-      (* let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in *)
+      let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
       if is_full then 
         (p_off, p_range, m_out_entry), 
-        read_range_constraint @ out_range_constraint,
+        read_range_constraint @ out_range_constraint @ write_val_constraint,
         out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
-        read_range_constraint @ out_range_constraint,
+        read_range_constraint @ out_range_constraint @ write_val_constraint,
         out_range_useful_var
     end
 
@@ -328,9 +328,18 @@ module FuncInterface (Entry: EntryType) = struct
 
     let constraint_list = 
       get_reg_taint_constraint var_map parent_reg child_reg @
-      get_mem_taint_constraint var_map parent_mem child_mem @
+      (* get_mem_taint_constraint var_map parent_mem child_mem @ *)
       constraint_list
     in
+
+    (* How to handle taint in func call:
+       1. Build taint var map (add_reg_var_map, add_mem_var_map)
+       2. Add constraints:
+          1. Reg: p_taint => cin_taint (get_reg_taint_constraint)
+          2. Mem: p_taint = cin_taint = cout_taint
+              (Child function ensures cin_taint = cout_taint
+              and set_mem_type ensures that p_taint = cout_taint)
+      *)
 
     (* TODO: Check context!!! *)
     reg_type, mem_type, constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars
