@@ -110,7 +110,6 @@ module TaintTypeInfer = struct
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
       (single_infer_state: SingleTypeInfer.t) : t =
-
     let state = init single_infer_state in
     Printf.printf "Before infer, func\n";
     let buf = Buffer.create 1000 in
@@ -133,7 +132,6 @@ module TaintTypeInfer = struct
         Printf.printf "%s\n" x.label;
         MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
     ) state.func_type;
-
 
     (* 2. Taint type infer *)
     let subtype_list = TaintSubtype.get_taint_constraint block_subtype in

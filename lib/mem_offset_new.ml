@@ -235,6 +235,8 @@ module MemRange = struct
     | RangeVar of range_var_id
     | RangeExp of range_var_id * (MemOffset.t list)
 
+  type local_var_map_t = (range_var_id * (MemOffset.t list)) list
+
   let to_ocaml_string (r: t) : string =
     match r with
     | RangeConst o ->
@@ -247,6 +249,11 @@ module MemRange = struct
   let to_string (r: t) : string = to_ocaml_string r
 
   let get_uninit_range () : t = RangeConst []
+
+  let next_var (e: t) : t =
+    match e with
+    | RangeVar v -> RangeVar (v + 1)
+    | _ -> mem_range_error "next_var should only be called on mem range var"
 
   let get_vars (r: t) : SingleExp.SingleVarSet.t =
     let helper (x: MemOffset.t list) : SingleExp.SingleVarSet.t =
