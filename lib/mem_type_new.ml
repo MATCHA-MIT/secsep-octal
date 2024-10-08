@@ -43,14 +43,19 @@ include Set.Make(Int)
 
 end
 
+module MemTypeBasic = struct
+  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
+  type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
+  type 'a mem_content = ('a mem_part) list
+end
+
 module MemType (Entry: EntryType) = struct
   exception MemTypeError of string
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
+  include MemTypeBasic
+
   type entry_t = Entry.t
-  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
-  type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
-  type 'a mem_content = ('a mem_part) list
   type t = entry_t mem_content
 
   let pp_mem_type (lvl: int) (mem: t) =

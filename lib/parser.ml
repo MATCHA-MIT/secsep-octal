@@ -392,7 +392,7 @@ module Parser = struct
           parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
         end
       | ("jmp", [LabelOp lb]) -> Jmp (lb)
-      | ("call", [LabelOp lb]) -> Call (lb)
+      | ("call", [LabelOp lb]) -> Call (lb, None)
       | (_, [LabelOp lb]) ->
         begin match Isa.op_of_cond_jump mnemonic with
         | Some op -> Jcond (op, lb)

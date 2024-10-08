@@ -5,24 +5,99 @@ open Taint_type_infer
 open Full_mem_anno
 open Pretty_print
 
+module MemAnno = FullMemAnno
+module Isa = Isa (MemAnno)
+
+module ArchType = TaintTypeInfer.ArchType
+module MemType = ArchType.MemType
+module FuncInterface = ArchType.FuncInterface
+
+exception TransformError of string
+let transform_error msg = raise (TransformError ("[Transform Error] " ^ msg))
+
+module InstTransform = struct
+
+  type t = {
+    (* was *)
+    orig: Isa.instruction;
+
+    (* now *)
+    inst: Isa.instruction option; (* transformed instruction *)
+    inst_pre: Isa.instruction list option; (* additional instruction inserted ahead, in reversed order *)
+
+    (* extra info *)
+    changed: bool option;
+  }
+
+  let init (orig: Isa.instruction) : t =
+    {
+      orig = orig;
+      inst = None;
+      inst_pre = None;
+      changed = None;
+    }
+
+  (* make sure to set values through this function, so that extra info can be updated *)
+  let assign (t: t) (inst: Isa.instruction) (inst_pre: Isa.instruction list) : t =
+    let inst' = Some inst in
+    let inst_pre' = match inst_pre with
+    | [] -> None
+    | _ -> Some inst_pre
+    in
+    let changed' = Some ((Option.is_some inst_pre') || (Isa.string_of_instruction t.orig <> Isa.string_of_instruction inst)) in
+    {
+      t with
+      inst = inst';
+      inst_pre = inst_pre';
+      changed = changed';
+    }
+
+  let get_res_rev (t: t) : Isa.instruction list =
+    if Option.is_none t.inst then
+      transform_error "Transformed instruction not available";
+    (Option.get t.inst) :: match t.inst_pre with
+    | None -> []
+    | Some l -> l
+
+  let get_res (t: t) : Isa.instruction list = List.rev (get_res_rev t)
+
+  let pp_transform (lvl: int) (buf: Buffer.t) (t: t) =
+    if Option.get t.changed = false then begin
+      PP.bprint_lvl lvl buf "%s;\n" (Isa.ocaml_string_of_instruction t.orig);
+    end else begin
+      PP.bprint_lvl lvl buf "\n";
+      PP.bprint_lvl lvl buf "(* >>>>>>>>>>>>> WAS >>>>>>>>>>>>> *)\n";
+
+      PP.bprint_lvl lvl buf "(* %s *)\n" (Isa.ocaml_string_of_instruction t.orig);
+
+      List.iter (fun inst ->
+        PP.bprint_lvl lvl buf "   %s;\n" (Isa.ocaml_string_of_instruction inst);
+      ) (get_res t);
+
+      PP.bprint_lvl lvl buf "(* <<<<<<<<<<<<< NOW <<<<<<<<<<<<< *)\n\n";
+    end
+
+  let pp_transformed (lvl: int) (buf: Buffer.t) (t: t) =
+    List.iter (fun inst ->
+      PP.bprint_lvl lvl buf "%s\n" (Isa.string_of_instruction inst);
+    ) (get_res t);
+    ()
+
+end
+
 module Transform = struct
-
-  exception TransformError of string
-  let transform_error msg = raise (TransformError ("[Transform Error] " ^ msg))
-
-  module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
-
-  module ArchType = TaintTypeInfer.ArchType
-  module MemType = ArchType.MemType
-  module FuncInterface = ArchType.FuncInterface
 
   type unity =
     | Unified
     | Ununified
 
+  type basic_block = {
+    label: Isa.label;
+    insts: InstTransform.t list;
+  }
+
   type func_state = {
-    bbs: Isa.basic_block list;
+    bbs: basic_block list;
     bb_types: ArchType.t list;
     init_mem_unity: (Isa.imm_var_id * unity) list;
   }
@@ -74,8 +149,15 @@ module Transform = struct
     | SingleVar var_id -> var_id
     | _ -> transform_error "Unexpected single expression for RSP"
     in
+    let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
+      {
+        label = bb.label;
+        insts = List.map (fun inst -> InstTransform.init inst) bb.insts;
+      }
+    ) ti_state.func
+    in
     {
-      bbs = ti_state.func;
+      bbs = extended_bbs;
       bb_types = ti_state.func_type;
       init_mem_unity = helper_get_unity first_bb_state.mem_type rsp_var_id;
     }, rsp_var_id
@@ -88,7 +170,7 @@ module Transform = struct
     in
     Option.get result
 
-  let transform_instruction (func_state: func_state) (inst: Isa.instruction) (rsp_var_id: Isa.imm_var_id) : Isa.instruction list =
+  let transform_instruction (func_state: func_state) (tf: InstTransform.t) (rsp_var_id: Isa.imm_var_id) : InstTransform.t =
     let helper_add_delta (mem_op: Isa.mem_op) : Isa.mem_op * (Isa.instruction list) =
       let d, b, i, s = mem_op in
       match d, b with
@@ -131,19 +213,20 @@ module Transform = struct
         end
       | _ -> (operand, [])
     in
-    match inst with
+    let orig = tf.orig in
+    let inst, inst_pre = match orig with
     | BInst (bop, o1, o2, o3) -> begin
         let o1', prep_insts1 = helper_prepare_memop o1 in
         let o2', prep_insts2 = helper_prepare_memop o2 in
         let o3', prep_insts3 = helper_prepare_memop o3 in
         let inst' = Isa.BInst (bop, o1', o2', o3') in
-        inst' :: (prep_insts3 @ prep_insts2 @ prep_insts1)
+        (inst', (prep_insts3 @ prep_insts2 @ prep_insts1))
       end
     | UInst (uop, o1, o2) -> begin
         let o1', prep_insts1 = helper_prepare_memop o1 in
         let o2', prep_insts2 = helper_prepare_memop o2 in
         let inst' = Isa.UInst (uop, o1', o2') in
-        inst' :: (prep_insts2 @ prep_insts1)
+        (inst', (prep_insts2 @ prep_insts1))
       end
     | Xchg (o1, o2, o3, o4) -> begin
         let o1', prep_insts1 = helper_prepare_memop o1 in
@@ -151,25 +234,25 @@ module Transform = struct
         let o3', prep_insts3 = helper_prepare_memop o3 in
         let o4', prep_insts4 = helper_prepare_memop o4 in
         let inst' = Isa.Xchg (o1', o2', o3', o4') in
-        inst' :: (prep_insts4 @ prep_insts3 @ prep_insts2 @ prep_insts1)
+        (inst', (prep_insts4 @ prep_insts3 @ prep_insts2 @ prep_insts1))
       end
     | Cmp (o1, o2) -> begin
         let o1', prep_insts1 = helper_prepare_memop o1 in
         let o2', prep_insts2 = helper_prepare_memop o2 in
         let inst' = Isa.Cmp (o1', o2') in
-        inst' :: (prep_insts2 @ prep_insts1)
+        (inst', (prep_insts2 @ prep_insts1))
       end
     | Test (o1, o2) -> begin
         let o1', prep_insts1 = helper_prepare_memop o1 in
         let o2', prep_insts2 = helper_prepare_memop o2 in
         let inst' = Isa.Test (o1', o2') in
-        inst' :: (prep_insts2 @ prep_insts1)
+        (inst', (prep_insts2 @ prep_insts1))
       end
     | Jmp _
     | Jcond _
     | Nop
     | Syscall
-    | Hlt -> [inst]
+    | Hlt -> (orig, [])
     | Push (o, mem_anno)
     | Pop (o, mem_anno) -> begin
         let slot_anno, taint_anno = mem_anno in
@@ -193,27 +276,44 @@ module Transform = struct
         | StOp (_, _, _, _, w, _) -> w
         | _ -> transform_error "Operand not supported for Push/Pop simulation"
         in
-        match inst with
+        match orig with
         | Push _ ->
           let inst_rsp_sub = Isa.make_inst_add_i_r (Int64.neg o_size) Isa.RSP in
           let inst_st = Isa.UInst(Isa.Mov, Isa.StOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno), o') in
-          inst_st :: inst_rsp_sub :: prep_insts
+          (inst_st, inst_rsp_sub :: prep_insts)
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
-          inst_rsp_add :: inst_ld :: prep_insts
+          (inst_rsp_add, inst_ld :: prep_insts)
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> transform_error "Call unimplemented"
     | RepStosq -> transform_error "RepStosq unimplemented"
     | RepMovsq -> transform_error "RepStosq unimplemented"
+    in
+    InstTransform.assign tf inst inst_pre
+
+  let pp_ocaml_block_list (lvl: int) (buf: Buffer.t) (block_list: basic_block list) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun bb ->
+        PP.bprint_lvl (lvl + 1) buf "{\n";
+        PP.bprint_lvl (lvl + 2) buf "label = \"%s\";\n" bb.label;
+        PP.bprint_lvl (lvl + 2) buf "insts = [\n";
+        List.iter (
+          fun tf -> InstTransform.pp_transform (lvl + 3) buf tf
+        ) bb.insts;
+        PP.bprint_lvl (lvl + 2) buf "]\n";
+        PP.bprint_lvl (lvl + 1) buf "};\n";
+    ) block_list;
+    PP.bprint_lvl lvl buf "]\n"
 
   let pp_func_state (func_state: func_state) =
     let buf = Buffer.create 1000 in
 
     PP.bprint_lvl 0 buf "\nTransformed function %s\n" (List.hd func_state.bbs).label;
     PP.bprint_lvl 0 buf "Program:\n";
-    Isa.pp_ocaml_block_list 0 buf func_state.bbs;
+    pp_ocaml_block_list 0 buf func_state.bbs;
     PP.bprint_lvl 0 buf "\nBB Types:\n";
     ArchType.pp_ocaml_arch_type_list 0 buf func_state.bb_types;
     PP.bprint_lvl 0 buf "\n";
@@ -221,20 +321,23 @@ module Transform = struct
     Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
     ()
 
-  let transform_basic_block (func_state: func_state) (bb: Isa.basic_block) (rsp_var_id: Isa.imm_var_id) : Isa.basic_block =
+  let transform_basic_block (func_state: func_state) (bb: basic_block) (rsp_var_id: Isa.imm_var_id) : basic_block =
     let new_insts = List.fold_left (
-      fun (acc: Isa.instruction list) (inst: Isa.instruction) ->
-        (transform_instruction func_state inst rsp_var_id) @ acc
+      fun (acc: InstTransform.t list) (trans: InstTransform.t) ->
+        (transform_instruction func_state trans rsp_var_id) :: acc
     ) [] bb.insts in
     { bb with insts = List.rev new_insts }
 
-  let transform_one_function 
+  let transform_one_function
       ((* func_interface_list *) _: FuncInterface.t list)
       (taint_infer_state: TaintTypeInfer.t)
       : func_state =
     let func_state, rsp_var_id = init_func_state taint_infer_state in
     let func_state =
-      { func_state with bbs = List.map (fun (bb: Isa.basic_block) -> transform_basic_block func_state bb rsp_var_id) func_state.bbs }
+      {
+        func_state with
+        bbs = List.map (fun (bb: basic_block) -> transform_basic_block func_state bb rsp_var_id) func_state.bbs
+      }
     in
     pp_func_state func_state;
     func_state

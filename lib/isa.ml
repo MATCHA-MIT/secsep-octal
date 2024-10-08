@@ -2,6 +2,7 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
+open Call_anno_type
 
 module Isa (MemAnno: MemAnnoType) = struct
 
@@ -110,7 +111,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | RepMovsq
     | Jmp of label
     | Jcond of branch_cond * label
-    | Call of label
+    | Call of label * CallAnno.t
     | Nop
     | Syscall
     | Hlt
@@ -214,7 +215,7 @@ module Isa (MemAnno: MemAnnoType) = struct
       | Some opcode -> Printf.sprintf "%s\t\t%s" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
       end
-    | Call label -> Printf.sprintf "call\t\t%s" label
+    | Call (label, call_anno) -> Printf.sprintf "call\t\t%s, %s" label (CallAnno.to_string call_anno)
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
@@ -262,7 +263,7 @@ module Isa (MemAnno: MemAnnoType) = struct
       | Some opcode -> Printf.sprintf "Jcond (%s, \"%s\")" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
       end
-    | Call label -> Printf.sprintf "Call \"%s\"" label
+    | Call (label, call_anno) -> Printf.sprintf "Call (\"%s\", %s)" label (CallAnno.to_ocaml_string call_anno)
     | Nop -> "Nop"
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
