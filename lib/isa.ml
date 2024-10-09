@@ -19,6 +19,10 @@ module Isa (MemAnno: MemAnnoType) = struct
     | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | LabelOp of label
 
+  let memop_to_mem_operand (op: mem_op) =
+    let (disp, base, index, scale) = op in
+    MemOp (disp, base, index, scale)
+
   let rec string_of_operand (op: operand): string =
     match op with
     | ImmOp imm -> string_of_immediate imm
@@ -348,5 +352,11 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
     BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm))
+
+  let make_inst_add_i_m64 (imm: int64) (mem_op: mem_op) : instruction =
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm))
 
 end

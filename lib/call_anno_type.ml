@@ -4,6 +4,9 @@ open Mem_offset_new
 
 module CallAnno = struct
 
+  exception CallAnnoError of string
+  let transform_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
+
   (* which slot in parent's memory is this slot mapped to *)
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)
   type slot_info = IsaBasic.imm_var_id * MemOffset.t * bool
@@ -13,8 +16,20 @@ module CallAnno = struct
     | BaseAsReg of IsaBasic.register (* passed as an arg register *)
     | BaseAsSlot of IsaBasic.imm_var_id * MemOffset.t (* passed as a (full) slot in parent's memory *)
 
-  type t' = (slot_info * base_info) MemTypeBasic.mem_content
+  type slot_t = (slot_info * base_info)
+
+  type t' = slot_t MemTypeBasic.mem_content
   type t = t' option
+
+  let cmp_base_info (x: base_info) (y: base_info) : int =
+    match x, y with
+    | BaseAsReg r1, BaseAsReg r2 -> Int.compare (IsaBasic.get_reg_idx r1) (IsaBasic.get_reg_idx r2)
+    | BaseAsSlot (v1, o1), BaseAsSlot (v2, o2) ->
+      let cmp1 = Int.compare v1 v2 in
+      if cmp1 != 0 then cmp1
+      else MemOffset.cmp o1 o2
+    | BaseAsReg _, BaseAsSlot _ -> -1
+    | BaseAsSlot _, BaseAsReg _ -> 1
 
   let to_ocaml_string (anno: t) : string =
     match anno with

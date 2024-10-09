@@ -44,46 +44,12 @@ include Set.Make(Int)
 end
 
 module MemTypeBasic = struct
-  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
-  type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
-  type 'a mem_content = ('a mem_part) list
-end
-
-module MemType (Entry: EntryType) = struct
   exception MemTypeError of string
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
-  include MemTypeBasic
-
-  type entry_t = Entry.t
-  type t = entry_t mem_content
-
-  let pp_mem_type (lvl: int) (mem: t) =
-    PP.print_lvl lvl "<MemType>\n";
-    List.iter (
-      fun (ptr, off_list) ->
-        PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
-        List.iter (
-          fun (off, r, entry) ->
-            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
-        ) off_list
-    ) mem
-
-  let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
-    PP.bprint_lvl lvl buf "[\n";
-    List.iter (
-      fun (ptr, off_list) ->
-        PP.bprint_lvl (lvl + 1) buf "(%d, [\n" ptr;
-        List.iter (
-          fun (off, range, entry) ->
-            PP.bprint_lvl (lvl + 2) buf "(%s, %s, %s);\n" 
-              (MemOffset.to_ocaml_string off) 
-              (MemRange.to_ocaml_string range) 
-              (Entry.to_ocaml_string entry)
-        ) off_list;
-        PP.bprint_lvl (lvl + 1) buf "]);\n"
-    ) mem;
-    PP.bprint_lvl lvl buf "]\n"
+  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
+  type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
+  type 'a mem_content = ('a mem_part) list
 
   let map (func: 'a -> 'b) (mem: 'a mem_content) : 'b mem_content =
     let helper_inner 
@@ -173,6 +139,41 @@ module MemType (Entry: EntryType) = struct
         )
     ) mem_layout
 
+end
+
+module MemType (Entry: EntryType) = struct
+  include MemTypeBasic
+
+  type entry_t = Entry.t
+  type t = entry_t mem_content
+
+  let pp_mem_type (lvl: int) (mem: t) =
+    PP.print_lvl lvl "<MemType>\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
+        List.iter (
+          fun (off, r, entry) ->
+            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
+        ) off_list
+    ) mem
+
+  let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.bprint_lvl (lvl + 1) buf "(%d, [\n" ptr;
+        List.iter (
+          fun (off, range, entry) ->
+            PP.bprint_lvl (lvl + 2) buf "(%s, %s, %s);\n" 
+              (MemOffset.to_ocaml_string off) 
+              (MemRange.to_ocaml_string range) 
+              (Entry.to_ocaml_string entry)
+        ) off_list;
+        PP.bprint_lvl (lvl + 1) buf "]);\n"
+    ) mem;
+    PP.bprint_lvl lvl buf "]\n"
+
   let init_mem_type_from_layout
       (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
     let helper (acc: entry_t) (entry: 'a) : entry_t * 'a =
@@ -219,6 +220,23 @@ module MemType (Entry: EntryType) = struct
 
   let get_part_mem (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : (MemOffset.t * MemRange.t * 'a) list =
     let _, part_mem = List.find (fun (x, _) -> x = ptr) mem in part_mem
+
+  (* get the entry from memory type using strict comparison *)
+  let get_mem_type_strict
+      (mem: entry_t mem_content)
+      (location: IsaBasic.imm_var_id * MemOffset.t)
+      : entry_t option =
+    let base, off = location in
+    List.find_map (
+      fun mem_part ->
+        let base', slots = mem_part in
+        if base' != base then None else
+        List.find_map (
+          fun (off', _, entry) ->
+            if MemOffset.cmp off' off = 0 then Some entry
+            else None
+        ) slots
+    ) mem
 
   let get_part_mem_type
       (smt_ctx: SmtEmitter.t)
