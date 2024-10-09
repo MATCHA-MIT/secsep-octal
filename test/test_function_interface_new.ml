@@ -27,17 +27,17 @@ let standalone_salsa20 : (IsaBasic.label * SingleTypeInfer.ArchType.MemType.t) l
   "salsa20_words", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    rsi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
   "salsa20_block", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
     rdi, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    rsi, [ ((SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop) ];
+    rsi, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
   "salsa20", [
     rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
-    rdi, [ ((SingleConst 0L, SingleVar rsi), RangeConst [], SingleTop) ];
-    rdx, [ ((SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop) ]
+    rdi, [ ((SingleConst 0L, SingleVar rsi), RangeConst [(SingleConst 0L, SingleVar rsi)], SingleTop) ];
+    rdx, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
   "_start", salsa20_global @ [
     rsp, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]

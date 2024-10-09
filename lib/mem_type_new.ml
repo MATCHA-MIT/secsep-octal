@@ -94,6 +94,34 @@ module MemType (Entry: EntryType) = struct
     in
     List.map helper_outer mem
 
+  let map_full 
+      (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b)
+      (mem: 'a mem_content) : 'b mem_content =
+    let helper_outer 
+        (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
+        IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list) =
+      let ptr, part_mem = entry in
+      ptr, List.map func part_mem
+    in
+    List.map helper_outer mem
+
+  let map2_full
+      (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b ->
+              MemOffset.t * MemRange.t * 'c)
+      (mem1: 'a mem_content) (mem2: 'b mem_content) : 'c mem_content =
+    let helper_outer 
+        (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
+        (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) :
+        IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'c) list) =
+      let ptr1, part_mem1 = entry1 in
+      let ptr2, part_mem2 = entry2 in
+      if ptr1 = ptr2 then
+        ptr1, List.map2 func part_mem1 part_mem2
+      else
+        mem_type_error "[map2_full] ptr does not match"
+    in
+    List.map2 helper_outer mem1 mem2
+
   let fold_left
       (func: 'acc -> 'a -> 'acc)
       (acc: 'acc)
@@ -107,6 +135,17 @@ module MemType (Entry: EntryType) = struct
         (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 'acc =
       let _, l = entry in
       List.fold_left helper_inner acc l
+    in
+    List.fold_left helper_outer acc mem
+
+  let fold_left_full
+      (func: 'acc -> MemOffset.t * MemRange.t * 'a -> 'acc)
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc =
+    let helper_outer
+        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 'acc =
+      let _, l = entry in
+      List.fold_left func acc l
     in
     List.fold_left helper_outer acc mem
 
@@ -126,6 +165,19 @@ module MemType (Entry: EntryType) = struct
         'acc * (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
       let id, l = entry in
       let acc, l = List.fold_left_map helper_inner acc l in
+      acc, (id, l)
+    in
+    List.fold_left_map helper_outer acc mem
+
+  let fold_left_map_full
+      (func: 'acc -> MemOffset.t * MemRange.t * 'a -> ('acc * (MemOffset.t * MemRange.t * 'b)))
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc * ('b mem_content) =
+    let helper_outer
+        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
+        'acc * (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
+      let id, l = entry in
+      let acc, l = List.fold_left_map func acc l in
       acc, (id, l)
     in
     List.fold_left_map helper_outer acc mem
@@ -155,15 +207,33 @@ module MemType (Entry: EntryType) = struct
     in
     List.fold_left2 helper_outer acc mem1 mem2
 
+  let fold_left2_full
+      (func: 'acc -> MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b -> 'acc)
+      (acc: 'acc)
+      (mem1: 'a mem_content)
+      (mem2: 'b mem_content) : 'acc =
+    let helper_outer
+        (acc: 'acc) 
+        (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
+        (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) : 'acc =
+      let v1, l1 = entry1 in
+      let v2, l2 = entry2 in
+      if v1 = v2 then List.fold_left2 func acc l1 l2
+      else mem_type_error "[fold_left2_full] ptr does not match"
+    in
+    List.fold_left2 helper_outer acc mem1 mem2
+
   let add_base_to_offset (mem_layout: 'a mem_content) : 'a mem_content =
     List.map (
       fun (base, off_list) ->
         (base,
         List.map (
-          fun ((l, r), range, entry) ->
-            (SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)), 
-            SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, r))),
-            range, entry
+          fun (off, range, entry) ->
+            MemOffset.add_base (SingleVar base) off,
+            (* (SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)), 
+            SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, r))), *)
+            MemRange.add_base (SingleVar base) range, 
+            entry
         ) off_list
         )
     ) mem_layout

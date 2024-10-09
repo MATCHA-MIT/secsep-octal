@@ -31,9 +31,8 @@ module RangeTypeInfer = struct
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
 
-  let init 
-      (func_name: Isa.label)
-      (single_infer_state: SingleTypeInfer.t) : t =
+  let init (single_infer_state: SingleTypeInfer.t) : t =
+    let func_name = single_infer_state.func_name in
     let start_var = MemRange.RangeVar 1 in
     let helper
         (acc: MemRange.t) (block_single_type: SingleTypeInfer.ArchType.t) :
@@ -46,8 +45,14 @@ module RangeTypeInfer = struct
             fun (acc: MemRange.t) (ptr, part_mem) ->
               let acc, part_mem =
                 List.fold_left_map (
-                  fun (acc: MemRange.t) (off, _, entry) ->
-                    MemRange.next_var acc, (off, acc, entry)
+                  fun (acc: MemRange.t) (off, range, entry) ->
+                    match range with
+                    | MemRange.RangeConst [ range_off ] ->
+                      if MemOffset.cmp off range_off = 0 then
+                        acc, (off, range, entry)
+                      else
+                        MemRange.next_var acc, (off, acc, entry)
+                    | _ -> MemRange.next_var acc, (off, acc, entry)
                 ) acc part_mem
               in
               acc, (ptr, part_mem)
@@ -94,11 +99,43 @@ module RangeTypeInfer = struct
     { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
 
-  (* let infer_one_func
-      (func_name: Isa.label)
+  let infer_one_func
       (func_interface_list: FuncInterface.t list)
       (single_infer_state: SingleTypeInfer.t) : t =
-    let state = init func_name single_infer_state in *)
+    (* Printf.printf "Single infer func_type\n";
+    ArchType.pp_arch_type_list 0 single_infer_state.func_type; *)
+    let state = init single_infer_state in
+    (* Printf.printf "Before infer, func\n";
+    let buf = Buffer.create 1000 in
+    Isa.pp_ocaml_block_list 0 buf state.func;
+    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
+    Printf.printf "Before infer, func_type\n";
+    ArchType.pp_arch_type_list 0 state.func_type;
+
+    (* Prepare SMT context *)
+    let solver = snd state.smt_ctx in
+    Z3.Solver.push solver;
+
+    (* 1. Type prop *)
+    ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
+    let state, block_subtype = type_prop_all_blocks func_interface_list state in
+
+    Printf.printf "After infer, unknown list:\n";
+    List.iter (
+      fun (x: ArchType.t) -> 
+        Printf.printf "%s\n" x.label;
+        MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+    ) state.func_type;
+
+    (* 2. Range type infer *)
+    let subtype_list = RangeSubtype.get_range_constraint block_subtype in
+    let subtype_list = 
+      RangeSubtype.solve state.smt_ctx (MemRange.is_val state.input_single_var_set) subtype_list 3 
+    in
+    RangeSubtype.pp_range_subtype 0 subtype_list;
+
+    Z3.Solver.pop solver 1;
+    state
     
 
 end

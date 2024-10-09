@@ -20,6 +20,7 @@ module SingleTypeInfer = struct
   module FuncInterface = ArchType.FuncInterface
 
   type t = {
+    func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
     single_subtype: SingleSubtype.t;
@@ -33,6 +34,7 @@ module SingleTypeInfer = struct
 
   let pp_ocaml_state (lvl: int) (buf: Buffer.t) (infer_state: t) =
     PP.bprint_lvl lvl buf "{\n";
+    PP.bprint_lvl (lvl + 1) buf "func_name = \"%s\";\n" infer_state.func_name;
     PP.bprint_lvl (lvl + 1) buf "func =\n"; Isa.pp_ocaml_block_list (lvl + 2) buf infer_state.func; PP.bprint_lvl (lvl + 2) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "func_type =\n"; ArchType.pp_ocaml_arch_type_list (lvl + 2) buf infer_state.func_type; PP.bprint_lvl (lvl + 2) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "single_subtype =\n"; SingleSubtype.pp_ocaml_single_subtype (lvl + 2) buf infer_state.single_subtype; PP.bprint_lvl (lvl + 2) buf ";\n";
@@ -95,6 +97,7 @@ module SingleTypeInfer = struct
     in
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
+      func_name = func_name;
       func = func_body;
       func_type = arch_type_list;
       single_subtype = [];
@@ -335,11 +338,21 @@ module SingleTypeInfer = struct
     Z3.Solver.pop (snd infer_state.smt_ctx) 1;
     res
 
+  let pp_ocaml_infer_result (lvl: int) (buf: Buffer.t) (func_type_list: t list) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun x -> 
+        pp_ocaml_state (lvl + 1) buf x;
+        PP.bprint_lvl (lvl + 1) buf ";\n"
+    ) func_type_list;
+    PP.bprint_lvl lvl buf "]\n"
+
   let infer
+      (prog_name: Isa.label)
       (prog: Isa.prog)
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
       (iter: int)
-      (solver_iter: int) : (FuncInterface.t list) * (t list) =
+      (solver_iter: int) : t list =
     (* TODO: The correct order is for each function, infer its single type, then taint type, then next function.
       So this function should be moved to a upper-level model that infer all types. *)
     let helper 
@@ -351,11 +364,16 @@ module SingleTypeInfer = struct
       Printf.printf "Infer state of func %s\n" func_name;
       pp_func_type 0 infer_state;
       FuncInterface.pp_func_interface 0 func_interface;
-      let buf = Buffer.create 1000 in
+      (* let buf = Buffer.create 1000 in
       pp_ocaml_state 0 buf infer_state;
-      Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
+      Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
-    List.fold_left_map helper [] func_mem_interface_list
+    let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
+    let buf = Buffer.create 1000 in
+    pp_ocaml_infer_result 0 buf infer_result;
+    Printf.printf "let %s_single_infer_state : SingleTypeInfer.t list =\n" prog_name;
+    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
+    infer_result
 
 end

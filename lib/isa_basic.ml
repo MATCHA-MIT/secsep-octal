@@ -241,7 +241,13 @@ module IsaBasic = struct
     | Scale8 -> 8L
 
   let scale_to_string (s: scale) : string = Int64.to_string (scale_val s)
-  let ocaml_scale_to_string = scale_to_string
+  
+  let ocaml_scale_to_string (s: scale) : string =
+    match s with
+    | Scale1 -> "Scale1"
+    | Scale2 -> "Scale2"
+    | Scale4 -> "Scale4"
+    | Scale8 -> "Scale8"
 
   let string_of_option (to_string: 'a -> string) (x: 'a option) : string =
     match x with

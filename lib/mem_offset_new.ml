@@ -208,6 +208,11 @@ module MemOffset = struct
   let repl_context_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
     let l, r = o in SingleExp.repl_context_var local_var_map l, SingleExp.repl_context_var local_var_map r
 
+  let add_base (base_ptr: SingleExp.t) (o: t) : t =
+    let l, r = o in
+    SingleExp.eval (SingleBExp (SingleAdd, base_ptr, l)), 
+    SingleExp.eval (SingleBExp (SingleAdd, base_ptr, r))
+
   let pp_off_list (lvl: int) (off_list: t list) =
     PP.print_lvl lvl "MemOffset list\n";
     List.iter (
@@ -246,7 +251,14 @@ module MemRange = struct
       Printf.sprintf "RangeExp (%d, [%s])" 
         v (String.concat "; " (List.map MemOffset.to_ocaml_string o))
 
-  let to_string (r: t) : string = to_ocaml_string r
+  let to_string (r: t) : string = 
+    match r with
+    | RangeConst o ->
+      Printf.sprintf "RangeConst [%s]" (String.concat "; " (List.map MemOffset.to_string o))
+    | RangeVar v -> Printf.sprintf "RangeVar (%d)" v
+    | RangeExp (v, o) -> 
+      Printf.sprintf "RangeExp (%d, [%s])" 
+        v (String.concat "; " (List.map MemOffset.to_string o))
 
   let get_uninit_range () : t = RangeConst []
 
@@ -286,6 +298,13 @@ module MemRange = struct
     | RangeVar _ -> r
     | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_context_var local_var_map) o)
 
+  let add_base (base_ptr: SingleExp.t) (r: t) : t =
+    match r with
+    | RangeConst o_list -> RangeConst (List.map (MemOffset.add_base base_ptr) o_list)
+    | _ -> 
+      mem_range_error 
+        (Printf.sprintf "Cannot add base %s to %s" (SingleExp.to_string base_ptr) (to_string r))
+
   let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
     (* TODO: re-implement this later!!! *)
     let helper (o1_list: MemOffset.t list) (o2_list: MemOffset.t list) : MemOffset.t list =
@@ -299,5 +318,28 @@ module MemRange = struct
     | RangeExp (v, o1), RangeConst o2 | RangeConst o1, RangeExp (v, o2) -> RangeExp (v, helper o1 o2)
     | _ -> mem_range_error (Printf.sprintf "Cannot merge %s and %s" (to_string r1) (to_string r2))
     (* let _ = smt_ctx in r1 @ r2 *)
+
+  let repl_range_sol
+      (smt_ctx: SmtEmitter.t)
+      (range_sol: ((range_var_id * int) * t) list) (r: t) : t =
+    let find_var =
+      match r with
+      | RangeConst _ -> None
+      | RangeVar v -> Some (v, [])
+      | RangeExp (v, const_part) -> Some (v, const_part)
+    in
+    match find_var with
+    | None -> r
+    | Some (v, const_part) ->
+      let find_sol =
+        List.find_map (
+          fun ((idx, _), sol) ->
+            if idx = v then Some sol else None
+        ) range_sol
+      in
+      begin match find_sol with
+      | Some sol -> merge smt_ctx sol (RangeConst const_part)
+      | None -> r
+      end
 
 end

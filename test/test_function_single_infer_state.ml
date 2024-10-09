@@ -2,1917 +2,2047 @@ open Type.Single_type_infer
 open Type.Smt_emitter
 open Type.Single_exp
 
-let salsa20_words_single_infer_state : SingleTypeInfer.t = 
-{
-	func =
-		[
-			{
-				label = "sha512_block_data_order";
-				insts = [
-					Jmp ".LFB47";
+let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
+	[
+		{
+			func_name = "salsa20_words";
+			func =
+				[
+					{
+						label = "salsa20_words";
+						insts = [
+							Jmp ".LFB2";
+						]
+					};
+					{
+						label = ".LFB2";
+						insts = [
+							Push (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							UInst (Mov, RegOp RCX, RegOp RSI);
+							Push (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
+							Push (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
+							Push (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
+							Push (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
+							Push (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum 8L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp EBP, LdOp(Some (ImmNum 16L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp EDX, LdOp(Some (ImmNum 44L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R8D, LdOp(None, Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R15D, LdOp(Some (ImmNum 4L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R13D, LdOp(Some (ImmNum 20L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R11D, LdOp(Some (ImmNum 36L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum (-44L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum 12L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp EBX, LdOp(Some (ImmNum 56L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum (-32L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), true), None)), RegOp EDX);
+							UInst (Mov, RegOp R14D, RegOp R8D);
+							UInst (Mov, RegOp EDX, LdOp(Some (ImmNum 48L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp ESI, LdOp(Some (ImmNum 24L), Some (RSI), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R12D, LdOp(Some (ImmNum 32L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R9D, LdOp(Some (ImmNum 52L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum (-40L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), true), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum 28L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp R10D, RegOp EDX);
+							UInst (Mov, RegOp EDX, RegOp EBX);
+							UInst (Mov, StOp(Some (ImmNum (-36L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum 40L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum 60L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum (-24L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), true), None)), ImmOp (ImmNum 10L));
+							UInst (Mov, StOp(Some (ImmNum (-28L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)), RegOp EBP);
+							UInst (Mov, StOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), true), None)), RegOp RCX);
+							UInst (Mov, StOp(Some (ImmNum (-20L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), true), None)), RegOp R8D);
+							UInst (Mov, RegOp R8D, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)));
+							UInst (Mov, StOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), true), None)), RegOp RDI);
+							UInst (Mov, RegOp EDI, RegOp R11D);
+							Jmp ".L2";
+						]
+					};
+					{
+						label = ".L2";
+						insts = [
+							UInst (Mov, RegOp EBX, LdOp(Some (ImmNum (-28L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)));
+							UInst (Lea, RegOp EBP, MemOp (None, Some (R14), Some (R10), None));
+							UInst (Lea, RegOp R11D, MemOp (Some (ImmNum 0L), Some (R13), Some (R15), None));
+							BInst (Rol, RegOp EBP, RegOp EBP, ImmOp (ImmNum 7L));
+							BInst (Rol, RegOp R11D, RegOp R11D, ImmOp (ImmNum 7L));
+							BInst (Xor, RegOp EBP, RegOp EBP, RegOp EBX);
+							BInst (Xor, RegOp R11D, RegOp R11D, RegOp EDI);
+							UInst (Lea, RegOp ECX, MemOp (Some (ImmNum 0L), Some (RBP), Some (R14), None));
+							BInst (Rol, RegOp ECX, RegOp ECX, ImmOp (ImmNum 9L));
+							BInst (Xor, RegOp ECX, RegOp ECX, RegOp R12D);
+							UInst (Mov, RegOp R12D, LdOp(Some (ImmNum (-36L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)));
+							UInst (Mov, RegOp EBX, RegOp ECX);
+							UInst (Lea, RegOp ECX, MemOp (Some (ImmNum 0L), Some (RBP), Some (RCX), None));
+							BInst (Rol, RegOp ECX, RegOp ECX, ImmOp (ImmNum 13L));
+							UInst (Mov, StOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)), RegOp EBX);
+							BInst (Xor, RegOp ECX, RegOp ECX, RegOp R10D);
+							UInst (Lea, RegOp R10D, MemOp (None, Some (RBX), Some (RCX), None));
+							UInst (Mov, StOp(Some (ImmNum (-52L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)), RegOp ECX);
+							UInst (Lea, RegOp ECX, MemOp (None, Some (R11), Some (R13), None));
+							BInst (Rol, RegOp ECX, RegOp ECX, ImmOp (ImmNum 9L));
+							UInst (Lea, RegOp EBX, MemOp (None, Some (R8), Some (RSI), None));
+							BInst (Ror, RegOp R10D, RegOp R10D, ImmOp (ImmNum 14L));
+							BInst (Xor, RegOp ECX, RegOp ECX, RegOp R9D);
+							BInst (Xor, RegOp R10D, RegOp R10D, RegOp R14D);
+							BInst (Rol, RegOp EBX, RegOp EBX, ImmOp (ImmNum 7L));
+							UInst (Lea, RegOp R14D, MemOp (None, Some (R11), Some (RCX), None));
+							BInst (Xor, RegOp EBX, RegOp EBX, RegOp EDX);
+							UInst (Mov, RegOp EDI, RegOp ECX);
+							UInst (Mov, StOp(Some (ImmNum (-48L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), true), None)), RegOp ECX);
+							BInst (Rol, RegOp R14D, RegOp R14D, ImmOp (ImmNum 13L));
+							UInst (Lea, RegOp R9D, MemOp (None, Some (RBX), Some (R8), None));
+							BInst (Xor, RegOp R14D, RegOp R14D, RegOp R15D);
+							UInst (Mov, RegOp R15D, LdOp(Some (ImmNum (-44L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)));
+							BInst (Rol, RegOp R9D, RegOp R9D, ImmOp (ImmNum 9L));
+							BInst (Add, RegOp EDI, RegOp EDI, RegOp R14D);
+							BInst (Xor, RegOp R9D, RegOp R9D, RegOp R15D);
+							BInst (Ror, RegOp EDI, RegOp EDI, ImmOp (ImmNum 14L));
+							UInst (Mov, RegOp R15D, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), true), None)));
+							BInst (Xor, RegOp EDI, RegOp EDI, RegOp R13D);
+							UInst (Lea, RegOp R13D, MemOp (None, Some (RBX), Some (R9), None));
+							BInst (Rol, RegOp R13D, RegOp R13D, ImmOp (ImmNum 13L));
+							BInst (Xor, RegOp R13D, RegOp R13D, RegOp ESI);
+							UInst (Lea, RegOp ESI, MemOp (None, Some (RAX), Some (R15), None));
+							UInst (Lea, RegOp EDX, MemOp (None, Some (R9), Some (R13), None));
+							BInst (Rol, RegOp ESI, RegOp ESI, ImmOp (ImmNum 7L));
+							BInst (Ror, RegOp EDX, RegOp EDX, ImmOp (ImmNum 14L));
+							BInst (Xor, RegOp EDX, RegOp EDX, RegOp R8D);
+							UInst (Mov, RegOp R8D, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), true), None)));
+							BInst (Xor, RegOp ESI, RegOp ESI, RegOp R8D);
+							UInst (Lea, RegOp R8D, MemOp (None, Some (RSI), Some (RAX), None));
+							BInst (Rol, RegOp R8D, RegOp R8D, ImmOp (ImmNum 9L));
+							BInst (Xor, RegOp R8D, RegOp R8D, RegOp R12D);
+							UInst (Lea, RegOp R12D, MemOp (None, Some (RSI), Some (R8), None));
+							BInst (Rol, RegOp R12D, RegOp R12D, ImmOp (ImmNum 13L));
+							BInst (Xor, RegOp R12D, RegOp R12D, RegOp R15D);
+							UInst (Lea, RegOp R15D, MemOp (None, Some (R10), Some (RSI), None));
+							UInst (Lea, RegOp ECX, MemOp (None, Some (R8), Some (R12), None));
+							BInst (Ror, RegOp ECX, RegOp ECX, ImmOp (ImmNum 14L));
+							BInst (Xor, RegOp ECX, RegOp ECX, RegOp EAX);
+							BInst (Rol, RegOp R15D, RegOp R15D, ImmOp (ImmNum 7L));
+							BInst (Xor, RegOp R15D, RegOp R15D, RegOp R14D);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R10), Some (R15), None));
+							BInst (Rol, RegOp EAX, RegOp EAX, ImmOp (ImmNum 9L));
+							UInst (Mov, RegOp R14D, RegOp EAX);
+							BInst (Xor, RegOp R14D, RegOp R14D, RegOp R9D);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R15), Some (R14), None));
+							UInst (Mov, StOp(Some (ImmNum (-44L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), RegOp R14D);
+							BInst (Rol, RegOp EAX, RegOp EAX, ImmOp (ImmNum 13L));
+							UInst (Mov, RegOp R9D, RegOp EAX);
+							BInst (Xor, RegOp R9D, RegOp R9D, RegOp ESI);
+							UInst (Lea, RegOp ESI, MemOp (Some (ImmNum 0L), Some (RBP), Some (RDI), None));
+							BInst (Rol, RegOp ESI, RegOp ESI, ImmOp (ImmNum 7L));
+							BInst (Add, RegOp R14D, RegOp R14D, RegOp R9D);
+							UInst (Mov, StOp(Some (ImmNum (-40L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), true), None)), RegOp R9D);
+							BInst (Xor, RegOp ESI, RegOp ESI, RegOp R13D);
+							BInst (Ror, RegOp R14D, RegOp R14D, ImmOp (ImmNum 14L));
+							UInst (Lea, RegOp EAX, MemOp (None, Some (RDI), Some (RSI), None));
+							BInst (Xor, RegOp R14D, RegOp R14D, RegOp R10D);
+							BInst (Rol, RegOp EAX, RegOp EAX, ImmOp (ImmNum 9L));
+							UInst (Mov, RegOp R9D, RegOp EAX);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R11), Some (RDX), None));
+							BInst (Xor, RegOp R9D, RegOp R9D, RegOp R8D);
+							BInst (Rol, RegOp EAX, RegOp EAX, ImmOp (ImmNum 7L));
+							UInst (Lea, RegOp R8D, MemOp (None, Some (RSI), Some (R9), None));
+							UInst (Mov, StOp(Some (ImmNum (-36L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), RegOp R9D);
+							BInst (Rol, RegOp R8D, RegOp R8D, ImmOp (ImmNum 13L));
+							UInst (Mov, RegOp R10D, RegOp R8D);
+							UInst (Mov, RegOp R8D, RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)));
+							BInst (Xor, RegOp R8D, RegOp R8D, RegOp R12D);
+							BInst (Xor, RegOp R10D, RegOp R10D, RegOp EBP);
+							UInst (Lea, RegOp R12D, MemOp (None, Some (RDX), Some (R8), None));
+							UInst (Lea, RegOp R13D, MemOp (None, Some (R9), Some (R10), None));
+							UInst (Mov, StOp(Some (ImmNum (-32L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), true), None)), RegOp R8D);
+							BInst (Rol, RegOp R12D, RegOp R12D, ImmOp (ImmNum 9L));
+							BInst (Ror, RegOp R13D, RegOp R13D, ImmOp (ImmNum 14L));
+							UInst (Mov, StOp(Some (ImmNum (-28L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)), RegOp R10D);
+							UInst (Lea, RegOp R10D, MemOp (None, Some (RBX), Some (RCX), None));
+							BInst (Xor, RegOp R12D, RegOp R12D, RegOp EAX);
+							BInst (Xor, RegOp R13D, RegOp R13D, RegOp EDI);
+							BInst (Rol, RegOp R10D, RegOp R10D, ImmOp (ImmNum 7L));
+							UInst (Lea, RegOp EDI, MemOp (None, Some (R8), Some (R12), None));
+							BInst (Rol, RegOp EDI, RegOp EDI, ImmOp (ImmNum 13L));
+							BInst (Xor, RegOp EDI, RegOp EDI, RegOp R11D);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R12), Some (RDI), None));
+							BInst (Ror, RegOp EAX, RegOp EAX, ImmOp (ImmNum 14L));
+							UInst (Mov, RegOp R8D, RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), true), None)));
+							BInst (Xor, RegOp R8D, RegOp R8D, RegOp EDX);
+							UInst (Mov, RegOp EDX, LdOp(Some (ImmNum (-52L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)));
+							BInst (Xor, RegOp R10D, RegOp R10D, RegOp EDX);
+							UInst (Lea, RegOp R9D, MemOp (None, Some (RCX), Some (R10), None));
+							BInst (Rol, RegOp R9D, RegOp R9D, ImmOp (ImmNum 9L));
+							BInst (Xor, RegOp R9D, RegOp R9D, RegOp EAX);
+							UInst (Lea, RegOp EDX, MemOp (None, Some (R10), Some (R9), None));
+							BInst (Rol, RegOp EDX, RegOp EDX, ImmOp (ImmNum 13L));
+							BInst (Xor, RegOp EDX, RegOp EDX, RegOp EBX);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R9), Some (RDX), None));
+							BInst (Ror, RegOp EAX, RegOp EAX, ImmOp (ImmNum 14L));
+							BInst (Xor, RegOp EAX, RegOp EAX, RegOp ECX);
+							BInst (Sub, StOp(Some (ImmNum (-24L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), true), None)), LdOp(Some (ImmNum (-24L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), true), None)), ImmOp (ImmNum 1L));
+							Jcond (JNe, ".L2");
+							UInst (Mov, StOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)), RegOp R8D);
+							UInst (Mov, RegOp R8D, LdOp(Some (ImmNum (-20L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), true), None)));
+							UInst (Mov, RegOp R11D, RegOp EDI);
+							UInst (Mov, RegOp EBX, RegOp EDX);
+							UInst (Mov, RegOp RDI, LdOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), true), None)));
+							UInst (Mov, RegOp RCX, LdOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), true), None)));
+							UInst (Mov, RegOp EDX, RegOp R10D);
+							UInst (Mov, RegOp R10D, RegOp EAX);
+							UInst (Lea, RegOp EAX, MemOp (None, Some (R14), Some (R8), None));
+							UInst (Mov, RegOp EBP, LdOp(Some (ImmNum (-28L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)));
+							UInst (Mov, StOp(None, Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							BInst (Add, RegOp R15D, RegOp R15D, LdOp(Some (ImmNum 4L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 4L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R15D);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-44L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)));
+							BInst (Add, RegOp EAX, RegOp EAX, LdOp(Some (ImmNum 8L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 8L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), true), None)));
+							BInst (Add, RegOp EAX, RegOp EAX, LdOp(Some (ImmNum 12L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 12L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							BInst (Add, RegOp EBP, RegOp EBP, LdOp(Some (ImmNum 16L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 16L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EBP);
+							BInst (Add, RegOp R13D, RegOp R13D, LdOp(Some (ImmNum 20L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 20L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R13D);
+							BInst (Add, RegOp ESI, RegOp ESI, LdOp(Some (ImmNum 24L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-36L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)));
+							UInst (Mov, StOp(Some (ImmNum 24L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp ESI);
+							BInst (Add, RegOp EAX, RegOp EAX, LdOp(Some (ImmNum 28L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 28L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							BInst (Add, RegOp R12D, RegOp R12D, LdOp(Some (ImmNum 32L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 32L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R12D);
+							BInst (Add, RegOp R11D, RegOp R11D, LdOp(Some (ImmNum 36L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), true), None)));
+							UInst (Mov, StOp(Some (ImmNum 36L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R11D);
+							BInst (Add, RegOp EAX, RegOp EAX, LdOp(Some (ImmNum 40L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 40L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							UInst (Mov, RegOp EAX, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), true), None)));
+							BInst (Add, RegOp EAX, RegOp EAX, LdOp(Some (ImmNum 44L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 44L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EAX);
+							BInst (Add, RegOp EDX, RegOp EDX, LdOp(Some (ImmNum 48L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 48L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EDX);
+							BInst (Add, RegOp R9D, RegOp R9D, LdOp(Some (ImmNum 52L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 52L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R9D);
+							BInst (Add, RegOp EBX, RegOp EBX, LdOp(Some (ImmNum 56L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 56L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp EBX);
+							UInst (Mov, RegOp R15D, LdOp(Some (ImmNum 60L), Some (RCX), None, None, 4L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), false), None)));
+							BInst (Add, RegOp R15D, RegOp R15D, RegOp R10D);
+							UInst (Mov, StOp(Some (ImmNum 60L), Some (RDI), None, None, 4L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R15D);
+							Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
+							Pop (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
+							Pop (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
+							Pop (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
+							Pop (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
+							Pop (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".LFE2";
+						insts = [
+						]
+					};
+					{
+						label = ".Ret";
+						insts = [
+						]
+					};
 				]
-			};
-			{
-				label = ".LFB47";
-				insts = [
-					Push (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
-					BInst (Sal, RegOp RDX, RegOp RDX, ImmOp (ImmNum 7L));
-					Push (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
-					Push (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
-					Push (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
-					UInst (Mov, RegOp R12, RegOp RSI);
-					Push (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
-					Push (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
-					BInst (Sub, RegOp RSP, RegOp RSP, ImmOp (ImmNum 72L));
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 32L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 56L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum 64L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), true), None)), RegOp RDI);
-					UInst (Mov, RegOp R13, LdOp(None, Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 40L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), RegOp RAX);
-					UInst (Lea, RegOp RAX, MemOp (None, Some (RSI), Some (RDX), None));
-					UInst (Mov, StOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 48L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum 56L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), true), None)), RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 8L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 16L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 24L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)));
-					UInst (Mov, StOp(None, Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)), RegOp RCX);
-					Jmp ".L8";
+				;
+			func_type =
+				[
+					{
+						label = "salsa20_words";
+						pc = 5;
+						reg_type = 
+							[
+								SingleVar (0);
+								SingleVar (1);
+								SingleVar (2);
+								SingleVar (3);
+								SingleVar (4);
+								SingleVar (5);
+								SingleVar (6);
+								SingleVar (7);
+								SingleVar (8);
+								SingleVar (9);
+								SingleVar (10);
+								SingleVar (11);
+								SingleVar (12);
+								SingleVar (13);
+								SingleVar (14);
+								SingleVar (15);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), RangeConst [], SingleVar (93));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (94));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), RangeConst [], SingleVar (95));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (96));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), RangeConst [], SingleVar (97));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (98));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), RangeConst [], SingleVar (99));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (100));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), RangeConst [], SingleVar (101));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (102));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (103));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (104));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (105));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (106));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (107));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (108));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (109));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (110));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleTop);
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L)))], SingleTop);
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFB2";
+						pc = 6;
+						reg_type = 
+							[
+								SingleVar (17);
+								SingleVar (18);
+								SingleVar (19);
+								SingleVar (20);
+								SingleVar (21);
+								SingleVar (22);
+								SingleVar (23);
+								SingleVar (24);
+								SingleVar (25);
+								SingleVar (26);
+								SingleVar (27);
+								SingleVar (28);
+								SingleVar (29);
+								SingleVar (30);
+								SingleVar (31);
+								SingleVar (32);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), RangeConst [], SingleVar (111));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (112));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), RangeConst [], SingleVar (113));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (114));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), RangeConst [], SingleVar (115));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (116));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), RangeConst [], SingleVar (117));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (118));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), RangeConst [], SingleVar (119));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (120));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (121));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (122));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (123));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (124));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (125));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (126));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (127));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (128));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (33));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (34));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L)))], SingleVar (35));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [21; 23];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L2";
+						pc = 45;
+						reg_type = 
+							[
+								SingleVar (36);
+								SingleVar (37);
+								SingleVar (38);
+								SingleVar (39);
+								SingleVar (40);
+								SingleVar (41);
+								SingleVar (42);
+								SingleVar (43);
+								SingleVar (44);
+								SingleVar (45);
+								SingleVar (46);
+								SingleVar (47);
+								SingleVar (48);
+								SingleVar (49);
+								SingleVar (50);
+								SingleVar (51);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), RangeConst [], SingleVar (129));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (130));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), RangeConst [], SingleVar (131));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (132));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), RangeConst [], SingleVar (133));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (134));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), RangeConst [], SingleVar (135));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (136));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), RangeConst [], SingleVar (137));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (138));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (139));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (140));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (141));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (142));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (143));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (144));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (145));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (146));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (52));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (53));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L)))], SingleVar (54));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [40; 139; 140];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFE2";
+						pc = 221;
+						reg_type = 
+							[
+								SingleVar (55);
+								SingleVar (56);
+								SingleVar (57);
+								SingleVar (58);
+								SingleVar (59);
+								SingleVar (60);
+								SingleVar (61);
+								SingleVar (62);
+								SingleVar (63);
+								SingleVar (64);
+								SingleVar (65);
+								SingleVar (66);
+								SingleVar (67);
+								SingleVar (68);
+								SingleVar (69);
+								SingleVar (70);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), RangeConst [], SingleVar (147));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (148));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), RangeConst [], SingleVar (149));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (150));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), RangeConst [], SingleVar (151));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (152));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), RangeConst [], SingleVar (153));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (154));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), RangeConst [], SingleVar (155));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (156));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (157));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (158));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (159));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (160));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (161));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (162));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (163));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (164));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (71));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (72));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L)))], SingleVar (73));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".Ret";
+						pc = 221;
+						reg_type = 
+							[
+								SingleVar (74);
+								SingleVar (75);
+								SingleVar (76);
+								SingleVar (77);
+								SingleVar (78);
+								SingleVar (79);
+								SingleVar (80);
+								SingleVar (81);
+								SingleVar (82);
+								SingleVar (83);
+								SingleVar (84);
+								SingleVar (85);
+								SingleVar (86);
+								SingleVar (87);
+								SingleVar (88);
+								SingleVar (89);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L))), RangeConst [], SingleVar (165));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-100L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (166));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L))), RangeConst [], SingleVar (167));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-92L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (168));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L))), RangeConst [], SingleVar (169));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-84L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (170));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L))), RangeConst [], SingleVar (171));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-76L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (172));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L))), RangeConst [], SingleVar (173));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-68L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (174));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (175));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (176));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (177));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (178));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (179));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (180));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (181));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (182));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (90));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (91));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (64L)))], SingleVar (92));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [77; 78; 79; 86; 87; 88; 89; 91; 92];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
 				]
-			};
-			{
-				label = ".L8";
-				insts = [
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)));
-					UInst (Mov, RegOp RAX, LdOp(None, Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)));
-					UInst (Mov, RegOp R10, LdOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)));
-					UInst (Mov, RegOp RCX, RegOp RDI);
-					UInst (Mov, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RDX, RegOp RDI);
-					UInst (Mov, StOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDI);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)));
-					UInst (Mov, RegOp R15, LdOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)));
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDI);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RSI);
-					UInst (Mov, RegOp RSI, ImmOp (ImmNum 4794697086780616226L));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R14);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDI);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp R15);
-					UInst (Not, RegOp RAX, RegOp RAX);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp R10);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R13);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R13);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R13);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R14);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R15);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp R13);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(None, Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RDX);
-					UInst (Lea, RegOp R9, MemOp (None, Some (RCX), Some (RSI), None));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 8L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp RDX, RegOp R9);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					UInst (Mov, RegOp RSI, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R9);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R9);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RAX);
-					UInst (Lea, RegOp RAX, MemOp (None, Some (RSI), Some (R10), None));
-					UInst (Mov, RegOp R10, RegOp RBX);
-					UInst (Mov, RegOp RSI, ImmOp (ImmNum 8158064640168781261L));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RDI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R9);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp R9);
-					UInst (Not, RegOp RAX, RegOp RAX);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R14);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RCX);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp R13);
-					BInst (And, RegOp R8, RegOp R8, RegOp R13);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RCX);
-					UInst (Lea, RegOp R11, MemOp (None, Some (RDX), Some (R15), None));
-					UInst (Mov, RegOp R15, ImmOp (ImmNum 4131703408338449720L));
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R14);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp R13);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDI);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R11);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 16L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp RBP, RegOp RDX);
-					UInst (Mov, RegOp RDI, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R11);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R11);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Lea, RegOp RAX, MemOp (None, Some (RDI), Some (R10), None));
-					UInst (Mov, RegOp RDI, ImmOp (ImmNum (-5349999486874862801L)));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R11);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp R11);
-					UInst (Not, RegOp RAX, RegOp RAX);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RBX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RDX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDX);
-					UInst (Lea, RegOp R10, MemOp (None, Some (RSI), Some (R14), None));
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDX);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp R13);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RDX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R11);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R10);
-					BInst (And, RegOp R8, RegOp R8, RegOp R10);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 24L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R14, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R10);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R10);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Lea, RegOp RAX, MemOp (None, Some (R14), Some (RBX), None));
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum 32L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp RBX, ImmOp (ImmNum (-1606136188198331460L)));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R10);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Not, RegOp RAX, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)), RegOp R14);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp R9);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RSI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RSI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RDX);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RSI);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RBX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RAX);
-					UInst (Lea, RegOp RAX, MemOp (None, Some (RDI), Some (R13), None));
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					UInst (Lea, RegOp R8, MemOp (None, Some (R14), Some (R15), None));
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum 40L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R15, ImmOp (ImmNum 6480981068601479193L));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RAX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Not, RegOp R9, RegOp R9);
-					UInst (Mov, RegOp RBX, RegOp R10);
-					BInst (And, RegOp R9, RegOp R9, RegOp R11);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RAX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RSI);
-					UInst (Mov, StOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)), RegOp R14);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RSI);
-					BInst (And, RegOp R9, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RSI);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RCX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Lea, RegOp R9, MemOp (None, Some (R14), Some (R15), None));
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum 48L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R15, ImmOp (ImmNum (-7908458776815382629L)));
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RCX);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Not, RegOp R11, RegOp R11);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RCX);
-					BInst (And, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, StOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)), RegOp R14);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R8);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RSI);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RDI);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R9);
-					BInst (And, RegOp R11, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R8);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Lea, RegOp R11, MemOp (None, Some (R14), Some (R15), None));
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum 56L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R15, ImmOp (ImmNum (-6116909921290321640L)));
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp RDX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Not, RegOp R10, RegOp R10);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDX);
-					BInst (And, RegOp R10, RegOp R10, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)), RegOp R14);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp R9);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R11);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp RDI);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp R8);
-					BInst (And, RegOp R10, RegOp R10, RegOp R9);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp RSI);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R10);
-					UInst (Lea, RegOp R10, MemOp (None, Some (R14), Some (R15), None));
-					BInst (Add, RegOp R10, RegOp R10, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RSI);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RBX);
-					UInst (Not, RegOp RAX, RegOp RAX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RSI);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R11);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R10);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R11);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp R8);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp R9);
-					BInst (And, RegOp RAX, RegOp RAX, RegOp R11);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R9);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 64L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R15, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, RegOp RDI);
-					BInst (Xor, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RAX);
-					UInst (Mov, RegOp RAX, ImmOp (ImmNum (-2880145864133508542L)));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp R15);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp RDI);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Not, RegOp RCX, RegOp RCX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDI);
-					BInst (And, RegOp RCX, RegOp RCX, RegOp RDX);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R10);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R10);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R11);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R10);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R9);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp R11);
-					BInst (And, RegOp RCX, RegOp RCX, RegOp R10);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R11);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R8);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 72L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R14, RegOp RCX);
-					UInst (Mov, StOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, ImmOp (ImmNum 1334009975649890238L));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R14);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R8);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Not, RegOp RDX, RegOp RDX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R8);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RSI);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R11);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R10);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RAX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R10);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RCX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R10);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RAX);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, LdOp(Some (ImmNum 80L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R15, RegOp RDX);
-					UInst (Mov, StOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)), RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, ImmOp (ImmNum 2608012711638119052L));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R15);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R9);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Not, RegOp RSI, RegOp RSI);
-					UInst (Mov, RegOp RBX, RegOp R8);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R9);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp RDI);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RCX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R10);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RAX);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp RCX);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RAX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum 88L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R14, RegOp RSI);
-					UInst (Mov, StOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)), RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R11);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R11);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RSI);
-					UInst (Mov, RegOp RSI, ImmOp (ImmNum 6128411473006802146L));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R14);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R11);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBX);
-					UInst (Not, RegOp RDI, RegOp RDI);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R11);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp R8);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RDX);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RSI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RAX);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RCX);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp RDX);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R10);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum 96L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)), RegOp RDI);
-					UInst (Mov, RegOp R15, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R10);
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum 104L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum 48L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), true), None)), RegOp R13);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R10);
-					UInst (Mov, StOp(Some (ImmNum 40L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)), RegOp R14);
-					UInst (Mov, RegOp R13, LdOp(Some (ImmNum 40L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDI);
-					UInst (Mov, StOp(Some (ImmNum 40L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)), RegOp R12);
-					UInst (Mov, RegOp RDI, ImmOp (ImmNum 8268148722764581231L));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R15);
-					UInst (Mov, RegOp R15, LdOp(Some (ImmNum 112L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R10);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBX);
-					UInst (Not, RegOp R8, RegOp R8);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R10);
-					BInst (And, RegOp R8, RegOp R8, RegOp R9);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RDX);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RDX);
-					BInst (And, RegOp R8, RegOp R8, RegOp RSI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					UInst (Mov, RegOp R8, ImmOp (ImmNum (-9160688886553864527L)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R14);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RAX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Not, RegOp R9, RegOp R9);
-					UInst (Mov, RegOp RBX, RegOp R10);
-					BInst (And, RegOp R9, RegOp R9, RegOp R11);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RAX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RSI);
-					BInst (And, RegOp R9, RegOp R9, RegOp RDI);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RSI);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RSI);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R9);
-					UInst (Mov, RegOp R9, ImmOp (ImmNum (-7215885187991268811L)));
-					BInst (Add, RegOp R9, RegOp R9, RegOp R15);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RCX);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBX);
-					UInst (Not, RegOp R11, RegOp R11);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (And, RegOp R11, RegOp R11, RegOp R10);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RCX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R8);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R8);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RSI);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RDI);
-					BInst (And, RegOp R11, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum 120L), Some (R12), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), false), None)));
-					UInst (Mov, RegOp R14, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R11);
-					UInst (Mov, RegOp R11, ImmOp (ImmNum (-4495734319001033068L)));
-					BInst (Add, RegOp R11, RegOp R11, RegOp R14);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp RDX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Not, RegOp R10, RegOp R10);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDX);
-					BInst (And, RegOp R10, RegOp R10, RegOp RAX);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp R9);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R11);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R10);
-					UInst (Mov, RegOp R10, RegOp RDI);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp R8);
-					BInst (And, RegOp R10, RegOp R10, RegOp R9);
-					BInst (Xor, RegOp R10, RegOp R10, RegOp RBP);
-					BInst (Add, RegOp R10, RegOp R10, RegOp RBX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R10);
-					UInst (Mov, RegOp R10D, ImmOp (ImmLabel (-2)));
-					Jmp ".L7";
+				;
+			single_subtype =
+				[
+					{ var_idx = (15, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (14, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (13, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 45); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 221); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 221); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (146, 45); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 221); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (145, 45); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 221); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (144, 45); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 221); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (143, 45); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 221); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (142, 45); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 221); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 221); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (141, 45); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 221); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (140, 45); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (139, 45); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 45); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
 				]
-			};
-			{
-				label = ".L7";
-				insts = [
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp RBX, RegOp R12);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R15);
-					UInst (Mov, RegOp R12, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R15);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R15);
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)));
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					BInst (Add, StOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)), LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)), RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RSI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					UInst (Not, RegOp R12, RegOp R12);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					BInst (And, RegOp R12, RegOp R12, RegOp RDX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RCX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R11);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)));
-					BInst (Add, RegOp RBX, RegOp RBX, LdOp(Some (ImmNum 128L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R9);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R11);
-					BInst (And, RegOp R12, RegOp R12, RegOp R8);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RAX);
-					BInst (Add, RegOp RCX, RegOp RCX, LdOp(Some (ImmNum 136L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R12);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					UInst (Mov, RegOp R12, RegOp RBX);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RBX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)));
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R14);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R14);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R14);
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Lea, RegOp R12, MemOp (None, Some (RBX), Some (RBP), None));
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					UInst (Mov, StOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)), RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RDI);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R11);
-					BInst (Xor, RegOp R12, RegOp R12, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Add, RegOp R12, RegOp R12, RegOp RCX);
-					UInst (Not, RegOp RBX, RegOp RBX);
-					UInst (Mov, RegOp RCX, RegOp RDI);
-					BInst (And, RegOp RCX, RegOp RCX, RegOp RSI);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp RAX);
-					BInst (Add, RegOp R12, RegOp R12, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp RAX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R9);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R12);
-					BInst (Add, RegOp RDX, RegOp RDX, LdOp(Some (ImmNum 144L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R11);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp R9);
-					BInst (And, RegOp RCX, RegOp RCX, RegOp RAX);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					BInst (Add, RegOp R12, RegOp R12, RegOp RCX);
-					UInst (Mov, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RCX, RegOp RBP);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					BInst (Shr, RegOp RBX, RegOp RBX, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)));
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					UInst (Mov, StOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RCX);
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R8);
-					UInst (Not, RegOp RDX, RegOp RDX);
-					UInst (Mov, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RDI);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp R8);
-					BInst (And, RegOp RCX, RegOp RCX, RegOp RSI);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R12);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R11);
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R12);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBP);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R12);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R11);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp R12);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RCX);
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp RDX);
-					UInst (Mov, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RDX, RegOp RBX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)));
-					BInst (Shr, RegOp RCX, RegOp RCX, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RCX);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					BInst (Shr, RegOp RBX, RegOp RBX, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RCX);
-					UInst (Mov, StOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)), RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					UInst (Mov, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RCX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, LdOp(Some (ImmNum 152L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RSI);
-					UInst (Not, RegOp RDX, RegOp RDX);
-					UInst (Mov, RegOp RSI, RegOp R8);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp R9);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RDI);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RBP);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RBP);
-					UInst (Mov, RegOp RCX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RAX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RBP);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp R12);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R12);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RBP);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RCX);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RSI);
-					BInst (Shr, RegOp RSI, RegOp RSI, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R13);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RCX);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					BInst (Shr, RegOp RSI, RegOp RSI, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RSI);
-					UInst (Lea, RegOp RSI, MemOp (None, Some (RDX), Some (RCX), None));
-					UInst (Mov, RegOp RCX, RegOp R11);
-					UInst (Mov, RegOp RDX, RegOp R11);
-					BInst (Add, RegOp RDI, RegOp RDI, LdOp(Some (ImmNum 160L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					UInst (Mov, StOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)), RegOp RSI);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R11);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RSI);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R11);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDI);
-					UInst (Not, RegOp RDX, RegOp RDX);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp R11);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp R8);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RBX);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RBX);
-					UInst (Mov, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R12);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RCX);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RBX);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp RBP);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R12);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RBP);
-					BInst (And, RegOp RDX, RegOp RDX, RegOp RBX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RDI);
-					UInst (Mov, RegOp RSI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RDI);
-					BInst (Shr, RegOp RDI, RegOp RDI, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R15);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RSI);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Add, RegOp R8, RegOp R8, LdOp(Some (ImmNum 168L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Shr, RegOp RDI, RegOp RDI, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp RAX);
-					UInst (Mov, RegOp RDI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RDI);
-					UInst (Mov, StOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)), RegOp RDI);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp RAX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp RSI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RAX);
-					UInst (Not, RegOp R8, RegOp R8);
-					UInst (Mov, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R11);
-					BInst (And, RegOp R8, RegOp R8, RegOp RAX);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp R9);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Add, RegOp R12, RegOp R12, RegOp RDX);
-					UInst (Mov, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RSI);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBP);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBX);
-					UInst (Mov, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBP);
-					BInst (And, RegOp R8, RegOp R8, RegOp RBX);
-					BInst (And, RegOp RSI, RegOp RSI, RegOp RCX);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RSI);
-					UInst (Mov, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp RSI, RegOp R8);
-					BInst (Shr, RegOp R8, RegOp R8, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)));
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R14);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RDI);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)));
-					BInst (Shr, RegOp R8, RegOp R8, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Lea, RegOp R8, MemOp (None, Some (RSI), Some (RDI), None));
-					UInst (Mov, RegOp RSI, RegOp R12);
-					UInst (Mov, StOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)), RegOp R8);
-					UInst (Mov, RegOp RDI, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R12);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R12);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum 176L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R8);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R12);
-					UInst (Not, RegOp R9, RegOp R9);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RAX);
-					BInst (And, RegOp R9, RegOp R9, RegOp R12);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp R11);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp RSI);
-					UInst (Mov, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RDI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RBX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RCX);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RBX);
-					BInst (And, RegOp R9, RegOp R9, RegOp RCX);
-					BInst (And, RegOp RDI, RegOp RDI, RegOp RDX);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R8, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R9);
-					BInst (Shr, RegOp R9, RegOp R9, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)));
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R8);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)));
-					BInst (Shr, RegOp R9, RegOp R9, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RBP);
-					UInst (Mov, StOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)), RegOp R9);
-					UInst (Mov, RegOp R8, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RBP);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBP);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum 184L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R9);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R12);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBP);
-					BInst (And, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Not, RegOp R8, RegOp R8);
-					BInst (And, RegOp R8, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RSI);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					UInst (Mov, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RCX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RDX);
-					BInst (And, RegOp R8, RegOp R8, RegOp RSI);
-					BInst (And, RegOp R11, RegOp R11, RegOp RDX);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RDI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R11);
-					BInst (Shr, RegOp R11, RegOp R11, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)));
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-120L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R9);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)));
-					BInst (Shr, RegOp R11, RegOp R11, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Lea, RegOp R11, MemOp (None, Some (R8), Some (R9), None));
-					UInst (Mov, RegOp R8, RegOp RBX);
-					UInst (Mov, StOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)), RegOp R11);
-					UInst (Mov, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RBX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum 192L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBX);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp R9);
-					UInst (Not, RegOp R8, RegOp R8);
-					UInst (Mov, RegOp R9, RegOp RBP);
-					BInst (And, RegOp R9, RegOp R9, RegOp RBX);
-					BInst (And, RegOp R8, RegOp R8, RegOp R12);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RDI);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RDI);
-					BInst (And, RegOp R11, RegOp R11, RegOp RSI);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RDX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RSI);
-					BInst (And, RegOp R8, RegOp R8, RegOp RDI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)));
-					BInst (Add, RegOp R9, RegOp R9, RegOp R8);
-					UInst (Lea, RegOp R8, MemOp (None, Some (RCX), Some (RAX), None));
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp R9);
-					UInst (Mov, RegOp RCX, RegOp R11);
-					UInst (Mov, RegOp R9, RegOp R11);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-112L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
-					BInst (Shr, RegOp R9, RegOp R9, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R9);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)));
-					BInst (Shr, RegOp R11, RegOp R11, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R11);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R11, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R8);
-					UInst (Mov, StOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)), RegOp R11);
-					UInst (Mov, RegOp R9, RegOp RCX);
-					UInst (Mov, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R8);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 200L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R11);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R8);
-					UInst (Not, RegOp R12, RegOp R12);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RBX);
-					BInst (And, RegOp R12, RegOp R12, RegOp R8);
-					BInst (And, RegOp R9, RegOp R9, RegOp RBP);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RAX);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RAX);
-					UInst (Mov, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RAX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R9);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					BInst (Xor, RegOp R12, RegOp R12, RegOp RDI);
-					UInst (Mov, RegOp R9, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					BInst (And, RegOp R12, RegOp R12, RegOp RDI);
-					BInst (And, RegOp R9, RegOp R9, RegOp RAX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R12);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R9);
-					UInst (Lea, RegOp R9, MemOp (None, Some (RDX), Some (RCX), None));
-					UInst (Mov, RegOp RDX, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)));
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R11);
-					UInst (Mov, RegOp R12, RegOp RDX);
-					UInst (Mov, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RDX);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R11);
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 7L));
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)));
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-104L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R11);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)));
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R12);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R11);
-					UInst (Mov, RegOp R12, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					UInst (Mov, StOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)), RegOp R12);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					UInst (Mov, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RDX, RegOp RDX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R9);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RDX);
-					UInst (Mov, RegOp RDX, LdOp(Some (ImmNum 208L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RDI);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R9);
-					UInst (Not, RegOp RBP, RegOp RBP);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R11);
-					BInst (And, RegOp R12, RegOp R12, RegOp RAX);
-					UInst (Mov, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R9);
-					BInst (And, RegOp R11, RegOp R11, RegOp RBX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RCX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RDI);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RAX);
-					BInst (And, RegOp R11, RegOp R11, RegOp RCX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)));
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Lea, RegOp R11, MemOp (None, Some (RSI), Some (RDX), None));
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp RBP);
-					UInst (Mov, RegOp RSI, RegOp R12);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-96L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)));
-					UInst (Mov, RegOp R12, RegOp RBP);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-56L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)));
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R11);
-					UInst (Mov, StOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)), RegOp R12);
-					UInst (Mov, RegOp RBP, RegOp RSI);
-					UInst (Mov, RegOp RSI, RegOp R11);
-					BInst (Xor, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R11);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RSI);
-					UInst (Mov, RegOp RSI, LdOp(Some (ImmNum 216L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RAX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R11);
-					BInst (And, RegOp R12, RegOp R12, RegOp RCX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Not, RegOp RBX, RegOp RBX);
-					UInst (Mov, RegOp RBP, RegOp R9);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp R11);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R8);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDX);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RCX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RDX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R12);
-					BInst (Add, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Lea, RegOp RBX, MemOp (None, Some (RDI), Some (RSI), None));
-					UInst (Mov, RegOp RDI, RegOp R13);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp R13);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R13);
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-88L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)));
-					UInst (Mov, RegOp R12, RegOp RBP);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-48L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)));
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp R12, RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RBX);
-					UInst (Mov, StOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)), RegOp R12);
-					BInst (Xor, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RDI);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum 224L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RCX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RBX);
-					BInst (And, RegOp R12, RegOp R12, RegOp RDX);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp RBP);
-					UInst (Not, RegOp R8, RegOp R8);
-					UInst (Mov, RegOp RBP, RegOp R11);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RBX);
-					BInst (And, RegOp R8, RegOp R8, RegOp R9);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RSI);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (Add, RegOp RAX, RegOp RAX, RegOp RDI);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RSI);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp RCX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RDX);
-					BInst (And, RegOp R8, RegOp R8, RegOp RSI);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp R12);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R15);
-					BInst (Add, RegOp RDI, RegOp RDI, RegOp R8);
-					UInst (Mov, RegOp R8, RegOp R15);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R15);
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-80L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBP);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R13);
-					UInst (Mov, RegOp R13, LdOp(Some (ImmNum (-32L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)));
-					UInst (Mov, RegOp RBP, RegOp R13);
-					UInst (Mov, RegOp R12, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R13);
-					BInst (Shr, RegOp R13, RegOp R13, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RDX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R13);
-					BInst (And, RegOp R12, RegOp R12, RegOp RSI);
-					UInst (Lea, RegOp R13, MemOp (None, Some (R8), Some (RBP), None));
-					UInst (Mov, RegOp RBP, RegOp RAX);
-					UInst (Mov, RegOp R8, RegOp RAX);
-					BInst (Xor, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RAX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R8);
-					UInst (Mov, RegOp R8, LdOp(Some (ImmNum 232L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp R8, RegOp R8, RegOp R13);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					BInst (Add, RegOp R8, RegOp R8, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RAX);
-					UInst (Not, RegOp RBP, RegOp RBP);
-					UInst (Mov, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RBX);
-					BInst (And, RegOp R9, RegOp R9, RegOp R11);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RAX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDI);
-					BInst (Add, RegOp RCX, RegOp RCX, RegOp R8);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp RDX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RSI);
-					BInst (And, RegOp R9, RegOp R9, RegOp RDI);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp R12);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R14);
-					BInst (Add, RegOp R8, RegOp R8, RegOp R9);
-					UInst (Mov, RegOp R9, RegOp R14);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R14);
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, LdOp(Some (ImmNum (-72L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)));
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBP);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R15);
-					UInst (Mov, RegOp R15, LdOp(Some (ImmNum (-24L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)));
-					UInst (Mov, RegOp RBP, RegOp R15);
-					UInst (Mov, RegOp R12, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R15);
-					BInst (Shr, RegOp R15, RegOp R15, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RSI);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R15);
-					BInst (And, RegOp R12, RegOp R12, RegOp RDI);
-					UInst (Lea, RegOp R15, MemOp (None, Some (R9), Some (RBP), None));
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					UInst (Mov, RegOp R9, RegOp RCX);
-					BInst (Xor, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R9);
-					UInst (Mov, RegOp R9, LdOp(Some (ImmNum 240L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp R9, RegOp R9, RegOp R15);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					BInst (Add, RegOp R9, RegOp R9, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					UInst (Not, RegOp RBP, RegOp RBP);
-					UInst (Mov, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RAX);
-					BInst (And, RegOp R11, RegOp R11, RegOp RBX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RCX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R8);
-					BInst (Add, RegOp RDX, RegOp RDX, RegOp R9);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Mov, RegOp R11, RegOp RSI);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RDI);
-					BInst (And, RegOp R11, RegOp R11, RegOp R8);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-40L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)));
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBP);
-					BInst (Add, RegOp R9, RegOp R9, RegOp R11);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R11, RegOp R12);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum (-64L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)));
-					BInst (Shr, RegOp RBP, RegOp RBP, ImmOp (ImmNum 7L));
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R13);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R13);
-					BInst (Add, RegOp R11, RegOp R11, RegOp R14);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp R13);
-					BInst (Shr, RegOp R12, RegOp R12, ImmOp (ImmNum 6L));
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R12);
-					UInst (Mov, RegOp R12, RegOp RDI);
-					UInst (Lea, RegOp R14, MemOp (None, Some (R11), Some (RBP), None));
-					UInst (Mov, RegOp RBP, RegOp RDX);
-					UInst (Mov, RegOp R11, RegOp RDX);
-					BInst (Xor, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp RDX);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp R11);
-					UInst (Mov, RegOp R11, LdOp(Some (ImmNum 248L), Some (R10), None, None, 8L, (Some (-2, (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), false), None)));
-					BInst (Add, RegOp R11, RegOp R11, RegOp R14);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDX);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBP);
-					UInst (Not, RegOp RBX, RegOp RBX);
-					UInst (Mov, RegOp RBP, RegOp RCX);
-					BInst (And, RegOp RBP, RegOp RBP, RegOp RDX);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp RAX);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp RBP);
-					UInst (Mov, RegOp RBP, RegOp R9);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp R9);
-					BInst (Xor, RegOp RBP, RegOp RBP, RegOp RBX);
-					UInst (Mov, RegOp RBX, RegOp RDI);
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R8);
-					BInst (And, RegOp RBX, RegOp RBX, RegOp R9);
-					BInst (And, RegOp R12, RegOp R12, RegOp R8);
-					BInst (Add, RegOp RSI, RegOp RSI, RegOp R11);
-					BInst (Sub, RegOp R10, RegOp R10, ImmOp (ImmNum (-128L)));
-					BInst (Xor, RegOp RBX, RegOp RBX, RegOp R12);
-					BInst (Add, RegOp RBX, RegOp RBX, RegOp RBP);
-					BInst (Add, RegOp R11, RegOp R11, RegOp RBX);
-					UInst (Mov, RegOp EBX, ImmOp (ImmBExp (ImmLabel (-2), ImmNum 512L)));
-					Cmp (RegOp RBX, RegOp R10);
-					Jcond (JNe, ".L7");
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum 64L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), true), None)));
-					BInst (Add, StOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)), LdOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)), RegOp R9);
-					UInst (Mov, RegOp R15, LdOp(Some (ImmNum (-16L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)));
-					UInst (Mov, RegOp R13, LdOp(Some (ImmNum 48L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), true), None)));
-					BInst (Add, StOp(None, Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)), LdOp(None, Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)), RegOp RDI);
-					UInst (Mov, RegOp RDI, RegOp RBX);
-					UInst (Mov, RegOp R12, LdOp(Some (ImmNum 40L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)));
-					UInst (Mov, StOp(Some (ImmNum 8L), Some (RBX), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R15);
-					UInst (Mov, RegOp R15, LdOp(None, Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)));
-					BInst (Add, RegOp R13, RegOp R13, RegOp R11);
-					BInst (Add, StOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)), LdOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)), RegOp R8);
-					UInst (Mov, RegOp R14, LdOp(Some (ImmNum (-8L)), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)));
-					BInst (Sub, RegOp R12, RegOp R12, ImmOp (ImmNum (-128L)));
-					UInst (Mov, StOp(None, Some (RBX), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R13);
-					UInst (Mov, StOp(Some (ImmNum 16L), Some (RBX), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R14);
-					UInst (Mov, StOp(Some (ImmNum 24L), Some (RBX), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp R15);
-					BInst (Add, StOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)), LdOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)), RegOp RSI);
-					UInst (Mov, RegOp RBX, LdOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)));
-					UInst (Mov, RegOp RSI, RegOp RDI);
-					BInst (Add, StOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)), LdOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)), RegOp RDX);
-					UInst (Mov, StOp(Some (ImmNum 32L), Some (RDI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp RBX);
-					UInst (Mov, RegOp RDI, LdOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)));
-					BInst (Add, StOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), LdOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), RegOp RCX);
-					UInst (Mov, RegOp RCX, LdOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)));
-					BInst (Add, StOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), LdOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)));
-					UInst (Mov, StOp(Some (ImmNum 40L), Some (RSI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp RDI);
-					UInst (Mov, StOp(Some (ImmNum 48L), Some (RSI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp RCX);
-					UInst (Mov, StOp(Some (ImmNum 56L), Some (RSI), None, None, 8L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp RAX);
-					UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 56L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), true), None)));
-					Cmp (RegOp R12, RegOp RAX);
-					Jcond (JNe, ".L8");
-					BInst (Add, RegOp RSP, RegOp RSP, ImmOp (ImmNum 72L));
-					Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
-					Pop (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
-					Pop (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
-					Pop (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
-					Pop (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
-					Pop (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
-					Jmp ".Ret";
-				]
-			};
-			{
-				label = ".Ret";
-				insts = [
-				]
-			};
-		]
+				;
+			next_var = SingleTop;
+			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			smt_ctx = SmtEmitter.init_smt_ctx ();
+		}
 		;
-	func_type =
-		[
-			{
-				label = "sha512_block_data_order";
-				pc = 3;
-				reg_type = 
-					[
-						SingleVar (0);
-						SingleVar (1);
-						SingleVar (2);
-						SingleVar (3);
-						SingleVar (4);
-						SingleVar (5);
-						SingleVar (6);
-						SingleVar (7);
-						SingleVar (8);
-						SingleVar (9);
-						SingleVar (10);
-						SingleVar (11);
-						SingleVar (12);
-						SingleVar (13);
-						SingleVar (14);
-						SingleVar (15);
-					]
+		{
+			func_name = "salsa20_block";
+			func =
+				[
+					{
+						label = "salsa20_block";
+						insts = [
+							Jmp ".LFB3";
+						]
+					};
+					{
+						label = ".LFB3";
+						insts = [
+							Push (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							UInst (Mov, RegOp RBX, RegOp RDI);
+							BInst (Add, RegOp RSP, RegOp RSP, ImmOp (ImmNum (-128L)));
+							UInst (Mov, RegOp RAX, LdOp(None, Some (RSI), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), false), None)));
+							UInst (Lea, RegOp RDI, MemOp (Some (ImmNum 64L), Some (RSP), None, None));
+							UInst (Mov, StOp(None, Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 1634760805L));
+							UInst (Mov, StOp(Some (ImmNum 4L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RAX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 8L), Some (RSI), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 20L), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 857760878L));
+							UInst (Mov, StOp(Some (ImmNum 12L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RAX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 16L), Some (RSI), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), false), None)));
+							UInst (Mov, StOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RDX);
+							UInst (Mov, StOp(Some (ImmNum 44L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RAX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 24L), Some (RSI), None, None, 8L, (Some (6, (SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), false), None)));
+							UInst (Mov, RegOp RSI, RegOp RSP);
+							UInst (Mov, StOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RCX);
+							UInst (Mov, StOp(Some (ImmNum 52L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RAX);
+							UInst (Mov, StOp(Some (ImmNum 40L), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 2036477234L));
+							UInst (Mov, StOp(Some (ImmNum 60L), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 1797285236L));
+							Call "salsa20_words";
+							BInst (Xor, RegOp EAX, RegOp EAX, RegOp EAX);
+							Jmp ".L7";
+						]
+					};
+					{
+						label = ".L7";
+						insts = [
+							UInst (Mov, RegOp EDX, RegOp EAX);
+							UInst (Mov, RegOp ECX, RegOp EAX);
+							BInst (Sar, RegOp EDX, RegOp EDX, ImmOp (ImmNum 2L));
+							BInst (And, RegOp ECX, RegOp ECX, ImmOp (ImmNum 3L));
+							UInst (MovS, RegOp RDX, RegOp EDX);
+							BInst (Sal, RegOp ECX, RegOp ECX, ImmOp (ImmNum 3L));
+							UInst (Mov, RegOp EDX, LdOp(Some (ImmNum 64L), Some (RSP), Some (RDX), Some (Scale4), 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), false), None)));
+							BInst (Shr, RegOp EDX, RegOp EDX, RegOp CL);
+							UInst (Mov, StOp(None, Some (RBX), Some (RAX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), false), None)), RegOp DL);
+							BInst (Add, RegOp RAX, RegOp RAX, ImmOp (ImmNum 1L));
+							Cmp (RegOp RAX, ImmOp (ImmNum 64L));
+							Jcond (JNe, ".L7");
+							BInst (Sub, RegOp RSP, RegOp RSP, ImmOp (ImmNum (-128L)));
+							Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".LFE3";
+						insts = [
+						]
+					};
+					{
+						label = ".Ret";
+						insts = [
+						]
+					};
+				]
 				;
-				mem_type = 
-					[
-						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (97));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (98));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (99));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (100));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (101));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (102));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (103));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (104));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (105));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (106));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (107));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (108));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (109));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (110));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (111));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (112));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (113));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (114));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (115));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (116));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (117));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (118));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (119));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (120));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (121));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (122));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (123));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (124));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (125));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (126));
-							((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
-						]);
-						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleTop);
-						]);
-						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleTop);
-						]);
-						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleTop);
-						]);
-					]
+			func_type =
+				[
+					{
+						label = "salsa20_block";
+						pc = 5;
+						reg_type = 
+							[
+								SingleVar (0);
+								SingleVar (1);
+								SingleVar (2);
+								SingleVar (3);
+								SingleVar (4);
+								SingleVar (5);
+								SingleVar (6);
+								SingleVar (7);
+								SingleVar (8);
+								SingleVar (9);
+								SingleVar (10);
+								SingleVar (11);
+								SingleVar (12);
+								SingleVar (13);
+								SingleVar (14);
+								SingleVar (15);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (93));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (94));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (95));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleTop);
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L)))], SingleTop);
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFB3";
+						pc = 6;
+						reg_type = 
+							[
+								SingleVar (17);
+								SingleVar (18);
+								SingleVar (19);
+								SingleVar (20);
+								SingleVar (21);
+								SingleVar (22);
+								SingleVar (23);
+								SingleVar (24);
+								SingleVar (25);
+								SingleVar (26);
+								SingleVar (27);
+								SingleVar (28);
+								SingleVar (29);
+								SingleVar (30);
+								SingleVar (31);
+								SingleVar (32);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (96));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (97));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (98));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (33));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (34));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L)))], SingleVar (35));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [21; 23];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L7";
+						pc = 28;
+						reg_type = 
+							[
+								SingleVar (36);
+								SingleVar (37);
+								SingleVar (38);
+								SingleVar (39);
+								SingleVar (40);
+								SingleVar (41);
+								SingleVar (42);
+								SingleVar (43);
+								SingleVar (44);
+								SingleVar (45);
+								SingleVar (46);
+								SingleVar (47);
+								SingleVar (48);
+								SingleVar (49);
+								SingleVar (50);
+								SingleVar (51);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (99));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (100));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (101));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (52));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (53));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L)))], SingleVar (54));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [36; 39; 40];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFE3";
+						pc = 43;
+						reg_type = 
+							[
+								SingleVar (55);
+								SingleVar (56);
+								SingleVar (57);
+								SingleVar (58);
+								SingleVar (59);
+								SingleVar (60);
+								SingleVar (61);
+								SingleVar (62);
+								SingleVar (63);
+								SingleVar (64);
+								SingleVar (65);
+								SingleVar (66);
+								SingleVar (67);
+								SingleVar (68);
+								SingleVar (69);
+								SingleVar (70);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (102));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (103));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (104));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (71));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (72));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L)))], SingleVar (73));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".Ret";
+						pc = 43;
+						reg_type = 
+							[
+								SingleVar (74);
+								SingleVar (75);
+								SingleVar (76);
+								SingleVar (77);
+								SingleVar (78);
+								SingleVar (79);
+								SingleVar (80);
+								SingleVar (81);
+								SingleVar (82);
+								SingleVar (83);
+								SingleVar (84);
+								SingleVar (85);
+								SingleVar (86);
+								SingleVar (87);
+								SingleVar (88);
+								SingleVar (89);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (105));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (106));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (107));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (90));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (91));
+								]);
+								(6, [
+									((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L))), RangeConst [(SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleConst (32L)))], SingleVar (92));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [77; 78; 79; 86; 87; 88; 89; 91; 92];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+				]
 				;
-				flag = (SingleTop, SingleTop);
-				branch_hist = [];
-				full_not_taken_hist = [];
-				constraint_list = [];
-				local_var_map = [];
-				useful_var = SingleExp.SingleVarSet.of_list [];
-				global_var = SingleExp.SingleVarSet.of_list [-2];
-        prop_mode = TypeInferDep;
-			}
-			;
-			{
-				label = ".LFB47";
-				pc = 4;
-				reg_type = 
-					[
-						SingleVar (17);
-						SingleVar (18);
-						SingleVar (19);
-						SingleVar (20);
-						SingleVar (21);
-						SingleVar (22);
-						SingleVar (23);
-						SingleVar (24);
-						SingleVar (25);
-						SingleVar (26);
-						SingleVar (27);
-						SingleVar (28);
-						SingleVar (29);
-						SingleVar (30);
-						SingleVar (31);
-						SingleVar (32);
-					]
+			single_subtype =
+				[
+					{ var_idx = (15, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (14, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (13, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 28); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 43); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 43); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 28); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 43); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 28); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 43); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 28); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 43); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (48, 28); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 43); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 28); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 43); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 43); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (101, 28); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 43); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 28); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (39, 28); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (36, 28); sol = SolCond (39, Range (SingleConst (0L), SingleConst (63L), 1L), Range (SingleConst (0L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+				]
 				;
-				mem_type = 
-					[
-						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (127));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (128));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (129));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (130));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (131));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (132));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (133));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (134));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (135));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (136));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (137));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (138));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (139));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (140));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (141));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (142));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (143));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (144));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (145));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (146));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (147));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (148));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (149));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (150));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (151));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (152));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (153));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (154));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (155));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (156));
-							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (33));
-						]);
-						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (34));
-						]);
-						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (35));
-						]);
-						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (36));
-						]);
-					]
-				;
-				flag = (SingleTop, SingleTop);
-				branch_hist = [];
-				full_not_taken_hist = [];
-				constraint_list = [];
-				local_var_map = [];
-				useful_var = SingleExp.SingleVarSet.of_list [21; 24];
-				global_var = SingleExp.SingleVarSet.of_list [-2];
-        prop_mode = TypeInferDep;
-			}
-			;
-			{
-				label = ".L8";
-				pc = 32;
-				reg_type = 
-					[
-						SingleVar (37);
-						SingleVar (38);
-						SingleVar (39);
-						SingleVar (40);
-						SingleVar (41);
-						SingleVar (42);
-						SingleVar (43);
-						SingleVar (44);
-						SingleVar (45);
-						SingleVar (46);
-						SingleVar (47);
-						SingleVar (48);
-						SingleVar (49);
-						SingleVar (50);
-						SingleVar (51);
-						SingleVar (52);
-					]
-				;
-				mem_type = 
-					[
-						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (157));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (158));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (159));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (160));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (161));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (162));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (163));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (164));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (165));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (166));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (167));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (168));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (169));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (170));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (171));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (172));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (173));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (174));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (175));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (176));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (177));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (178));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (179));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (180));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (181));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (182));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (183));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (184));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (185));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (186));
-							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (53));
-						]);
-						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (54));
-						]);
-						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (55));
-						]);
-						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (56));
-						]);
-					]
-				;
-				flag = (SingleTop, SingleTop);
-				branch_hist = [];
-				full_not_taken_hist = [];
-				constraint_list = [];
-				local_var_map = [];
-				useful_var = SingleExp.SingleVarSet.of_list [41; 49];
-				global_var = SingleExp.SingleVarSet.of_list [-2];
-        prop_mode = TypeInferDep;
-			}
-			;
-			{
-				label = ".L7";
-				pc = 566;
-				reg_type = 
-					[
-						SingleVar (57);
-						SingleVar (58);
-						SingleVar (59);
-						SingleVar (60);
-						SingleVar (61);
-						SingleVar (62);
-						SingleVar (63);
-						SingleVar (64);
-						SingleVar (65);
-						SingleVar (66);
-						SingleVar (67);
-						SingleVar (68);
-						SingleVar (69);
-						SingleVar (70);
-						SingleVar (71);
-						SingleVar (72);
-					]
-				;
-				mem_type = 
-					[
-						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (187));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (188));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (189));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (190));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (191));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (192));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (193));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (194));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (195));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (196));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (197));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (198));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (199));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (200));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (201));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (202));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (203));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (204));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (205));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (206));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (207));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (208));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (209));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (210));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (211));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (212));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (213));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (214));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (215));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (216));
-							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (73));
-						]);
-						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (74));
-						]);
-						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (75));
-						]);
-						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (76));
-						]);
-					]
-				;
-				flag = (SingleTop, SingleTop);
-				branch_hist = [];
-				full_not_taken_hist = [];
-				constraint_list = [];
-				local_var_map = [];
-				useful_var = SingleExp.SingleVarSet.of_list [-2; 61; 67; 207; 209; 210];
-				global_var = SingleExp.SingleVarSet.of_list [-2];
-        prop_mode = TypeInferDep;
-			}
-			;
-			{
-				label = ".Ret";
-				pc = 1421;
-				reg_type = 
-					[
-						SingleVar (77);
-						SingleVar (78);
-						SingleVar (79);
-						SingleVar (80);
-						SingleVar (81);
-						SingleVar (82);
-						SingleVar (83);
-						SingleVar (84);
-						SingleVar (85);
-						SingleVar (86);
-						SingleVar (87);
-						SingleVar (88);
-						SingleVar (89);
-						SingleVar (90);
-						SingleVar (91);
-						SingleVar (92);
-					]
-				;
-				mem_type = 
-					[
-						(4, [
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (217));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (218));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (219));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (220));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (221));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (222));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (223));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (224));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (225));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (226));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (227));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (228));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (229));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (230));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (231));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (232));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (233));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (234));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (235));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (236));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (237));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L))), RangeConst [], SingleVar (238));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-64L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (239));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L))), RangeConst [], SingleVar (240));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (241));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (242));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (243));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (244));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (245));
-							((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (246));
-							((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (93));
-						]);
-						(7, [
-							((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleConst (64L))), RangeConst [], SingleVar (94));
-						]);
-						(6, [
-							((SingleVar (6), SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L)))), RangeConst [], SingleVar (95));
-						]);
-						(-2, [
-							((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (640L))), RangeConst [], SingleVar (96));
-						]);
-					]
-				;
-				flag = (SingleTop, SingleTop);
-				branch_hist = [];
-				full_not_taken_hist = [];
-				constraint_list = [];
-				local_var_map = [];
-				useful_var = SingleExp.SingleVarSet.of_list [80; 81; 82; 89; 90; 91; 92; 94; 95; 96];
-				global_var = SingleExp.SingleVarSet.of_list [-2];
-        prop_mode = TypeInferDep;
-			}
-			;
-		]
+			next_var = SingleTop;
+			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			smt_ctx = SmtEmitter.init_smt_ctx ();
+		}
 		;
-	single_subtype =
-		[
-			{ var_idx = (15, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (14, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (13, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (12, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (5, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (3, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (36, 4); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (35, 4); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (32, 4); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (31, 4); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (30, 4); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (29, 4); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (22, 4); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (20, 4); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (2, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (19, 4); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (56, 32); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (55, 32); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (186, 32); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (185, 32); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (184, 32); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (183, 32); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (182, 32); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (181, 32); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (6, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (76, 566); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (96, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (75, 566); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (95, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (94, 1421); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-			{ var_idx = (216, 566); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (92, 1421); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (215, 566); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (91, 1421); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (214, 566); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (90, 1421); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (213, 566); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (89, 1421); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (212, 566); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (82, 1421); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (81, 1421); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (211, 566); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (80, 1421); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (180, 32); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (179, 32); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (-2, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (210, 566); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (209, 566); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (207, 566); sol = SolCond (1412, Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)), 128L), Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-256L)), 128L), Single (SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (67, 566); sol = SolCond (1380, Range (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (384L)), 128L), Range (SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (256L)), 128L), Single (SingleBExp (SingleAdd, SingleVar (-2), SingleConst (384L)))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (23, 4); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (49, 32); sol = SolSimple (Range (SingleVar (6), SingleBExp (SingleAdd, SingleBExp (SingleAdd, SingleVar (6), SingleBExp (SingleMul, SingleVar (2), SingleConst (128L))), SingleConst (-128L)), 128L)); subtype_list = []; supertype_list = [] };
-			{ var_idx = (61, 566); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (41, 32); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (7, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (24, 4); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-			{ var_idx = (4, 3); sol = SolNone; subtype_list = []; supertype_list = [] };
-			{ var_idx = (21, 4); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-		]
+		{
+			func_name = "salsa20";
+			func =
+				[
+					{
+						label = "salsa20";
+						insts = [
+							Jmp ".LFB4";
+						]
+					};
+					{
+						label = ".LFB4";
+						insts = [
+							Test (RegOp RSI, RegOp RSI);
+							Jcond (JE, ".L19");
+							Push (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							UInst (Mov, RegOp R15, RegOp RSI);
+							Push (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
+							UInst (Mov, RegOp R14, RegOp RDI);
+							Push (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
+							Push (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
+							UInst (Mov, RegOp R12, RegOp RCX);
+							Push (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
+							UInst (Mov, RegOp RBP, RegOp RDX);
+							Push (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
+							BInst (Xor, RegOp EBX, RegOp EBX, RegOp EBX);
+							BInst (Sub, RegOp RSP, RegOp RSP, ImmOp (ImmNum 72L));
+							UInst (Mov, RegOp R13, RegOp RSP);
+							Jmp ".L14";
+						]
+					};
+					{
+						label = ".L14";
+						insts = [
+							UInst (Mov, RegOp EAX, RegOp EBX);
+							BInst (And, RegOp EAX, RegOp EAX, ImmOp (ImmNum 63L));
+							Jcond (JE, ".L22");
+							UInst (MovS, RegOp RAX, RegOp EAX);
+							UInst (MovZ, RegOp EAX, LdOp(None, Some (RSP), Some (RAX), None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), false), None)));
+							BInst (Xor, StOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), LdOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), RegOp AL);
+							BInst (Add, RegOp RBX, RegOp RBX, ImmOp (ImmNum 1L));
+							Cmp (RegOp R15, RegOp RBX);
+							Jcond (JNe, ".L14");
+							BInst (Add, RegOp RSP, RegOp RSP, ImmOp (ImmNum 72L));
+							Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
+							Pop (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
+							Pop (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
+							Pop (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
+							Pop (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
+							Pop (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".L22";
+						insts = [
+							UInst (Mov, RegOp ECX, RegOp EBX);
+							UInst (Mov, RegOp RDX, RegOp R12);
+							UInst (Mov, RegOp RSI, RegOp RBP);
+							UInst (Mov, RegOp RDI, RegOp R13);
+							BInst (Sar, RegOp ECX, RegOp ECX, ImmOp (ImmNum 6L));
+							UInst (MovS, RegOp RCX, RegOp ECX);
+							Call "salsa20_block";
+							UInst (MovZ, RegOp EAX, LdOp(None, Some (RSP), None, None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), false), None)));
+							BInst (Xor, StOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), LdOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), RegOp AL);
+							BInst (Add, RegOp RBX, RegOp RBX, ImmOp (ImmNum 1L));
+							Cmp (RegOp R15, RegOp RBX);
+							Jcond (JNe, ".L14");
+							BInst (Add, RegOp RSP, RegOp RSP, ImmOp (ImmNum 72L));
+							Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), true), None));
+							Pop (RegOp RBP, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), true), None));
+							Pop (RegOp R12, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), true), None));
+							Pop (RegOp R13, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), true), None));
+							Pop (RegOp R14, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), true), None));
+							Pop (RegOp R15, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".L19";
+						insts = [
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".LFE4";
+						insts = [
+						]
+					};
+					{
+						label = ".Ret";
+						insts = [
+						]
+					};
+				]
+				;
+			func_type =
+				[
+					{
+						label = "salsa20";
+						pc = 5;
+						reg_type = 
+							[
+								SingleVar (0);
+								SingleVar (1);
+								SingleVar (2);
+								SingleVar (3);
+								SingleVar (4);
+								SingleVar (5);
+								SingleVar (6);
+								SingleVar (7);
+								SingleVar (8);
+								SingleVar (9);
+								SingleVar (10);
+								SingleVar (11);
+								SingleVar (12);
+								SingleVar (13);
+								SingleVar (14);
+								SingleVar (15);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (131));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (132));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (133));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (134));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (135));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (136));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (137));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleTop);
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleTop);
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFB4";
+						pc = 6;
+						reg_type = 
+							[
+								SingleVar (17);
+								SingleVar (18);
+								SingleVar (19);
+								SingleVar (20);
+								SingleVar (21);
+								SingleVar (22);
+								SingleVar (23);
+								SingleVar (24);
+								SingleVar (25);
+								SingleVar (26);
+								SingleVar (27);
+								SingleVar (28);
+								SingleVar (29);
+								SingleVar (30);
+								SingleVar (31);
+								SingleVar (32);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (138));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (139));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (140));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (141));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (142));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (143));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (144));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (33));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (34));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (35));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [21; 23];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L14";
+						pc = 22;
+						reg_type = 
+							[
+								SingleVar (36);
+								SingleVar (37);
+								SingleVar (38);
+								SingleVar (39);
+								SingleVar (40);
+								SingleVar (41);
+								SingleVar (42);
+								SingleVar (43);
+								SingleVar (44);
+								SingleVar (45);
+								SingleVar (46);
+								SingleVar (47);
+								SingleVar (48);
+								SingleVar (49);
+								SingleVar (50);
+								SingleVar (51);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (145));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (146));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (147));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (148));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (149));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (150));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (151));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (52));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (53));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (54));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [39; 40; 50; 51];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L22";
+						pc = 39;
+						reg_type = 
+							[
+								SingleVar (55);
+								SingleVar (56);
+								SingleVar (57);
+								SingleVar (58);
+								SingleVar (59);
+								SingleVar (60);
+								SingleVar (61);
+								SingleVar (62);
+								SingleVar (63);
+								SingleVar (64);
+								SingleVar (65);
+								SingleVar (66);
+								SingleVar (67);
+								SingleVar (68);
+								SingleVar (69);
+								SingleVar (70);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (152));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (153));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (154));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (155));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (156));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (157));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (158));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (71));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (72));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (73));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [58; 59; 60; 68; 69; 70];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L19";
+						pc = 59;
+						reg_type = 
+							[
+								SingleVar (74);
+								SingleVar (75);
+								SingleVar (76);
+								SingleVar (77);
+								SingleVar (78);
+								SingleVar (79);
+								SingleVar (80);
+								SingleVar (81);
+								SingleVar (82);
+								SingleVar (83);
+								SingleVar (84);
+								SingleVar (85);
+								SingleVar (86);
+								SingleVar (87);
+								SingleVar (88);
+								SingleVar (89);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (159));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (160));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (161));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (162));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (163));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (164));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (165));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (90));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (91));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (92));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFE4";
+						pc = 60;
+						reg_type = 
+							[
+								SingleVar (93);
+								SingleVar (94);
+								SingleVar (95);
+								SingleVar (96);
+								SingleVar (97);
+								SingleVar (98);
+								SingleVar (99);
+								SingleVar (100);
+								SingleVar (101);
+								SingleVar (102);
+								SingleVar (103);
+								SingleVar (104);
+								SingleVar (105);
+								SingleVar (106);
+								SingleVar (107);
+								SingleVar (108);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (166));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (167));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (168));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (169));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (170));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (171));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (172));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (109));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (110));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (111));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".Ret";
+						pc = 60;
+						reg_type = 
+							[
+								SingleVar (112);
+								SingleVar (113);
+								SingleVar (114);
+								SingleVar (115);
+								SingleVar (116);
+								SingleVar (117);
+								SingleVar (118);
+								SingleVar (119);
+								SingleVar (120);
+								SingleVar (121);
+								SingleVar (122);
+								SingleVar (123);
+								SingleVar (124);
+								SingleVar (125);
+								SingleVar (126);
+								SingleVar (127);
+							]
+						;
+						mem_type = 
+							[
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), RangeConst [], SingleVar (173));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L))), RangeConst [], SingleVar (174));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-40L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L))), RangeConst [], SingleVar (175));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-32L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L))), RangeConst [], SingleVar (176));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-24L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L))), RangeConst [], SingleVar (177));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-16L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (178));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (179));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (128));
+								]);
+								(7, [
+									((SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), RangeConst [(SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6)))], SingleVar (129));
+								]);
+								(2, [
+									((SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L))), RangeConst [(SingleVar (2), SingleBExp (SingleAdd, SingleVar (2), SingleConst (32L)))], SingleVar (130));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [115; 116; 117; 124; 125; 126; 127; 129; 130];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+				]
+				;
+			single_subtype =
+				[
+					{ var_idx = (15, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (14, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (13, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (2, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (34, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (19, 6); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 22); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (151, 22); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (150, 22); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (149, 22); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (148, 22); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (147, 22); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (146, 22); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (158, 39); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (157, 39); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (156, 39); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (155, 39); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (154, 39); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (153, 39); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 59); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (130, 60); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 59); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (129, 60); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 59); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (127, 60); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 59); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (126, 60); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 59); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (125, 60); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 59); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (124, 60); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 59); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (117, 60); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 59); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (116, 60); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 59); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (115, 60); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 22); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (68, 39); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 22); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (60, 39); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (58, 39); sol = SolCond (50, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (70, 39); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 22); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (69, 39); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 22); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (59, 39); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 22); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (39, 22); sol = SolCond (30, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+				]
+				;
+			next_var = SingleTop;
+			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			smt_ctx = SmtEmitter.init_smt_ctx ();
+		}
 		;
-	next_var = SingleTop;
-	input_var_set = SingleExp.SingleVarSet.of_list [-2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
-	smt_ctx = SmtEmitter.init_smt_ctx ();
-}
+		{
+			func_name = "_start";
+			func =
+				[
+					{
+						label = "_start";
+						insts = [
+							Jmp ".LFB5";
+						]
+					};
+					{
+						label = ".LFB5";
+						insts = [
+							Push (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							BInst (Xor, RegOp EDX, RegOp EDX, RegOp EDX);
+							BInst (Sub, RegOp RSP, RegOp RSP, ImmOp (ImmNum 240L));
+							UInst (Mov, StOp(Some (ImmNum 32L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), true), None)), ImmOp (ImmNum 1296236545L));
+							UInst (Lea, RegOp RAX, MemOp (Some (ImmNum 32L), Some (RSP), None, None));
+							UInst (Mov, StOp(Some (ImmNum 40L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), true), None)), ImmOp (ImmLabel (-2)));
+							UInst (Mov, StOp(Some (ImmNum 48L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), true), None)), ImmOp (ImmNum 32L));
+							UInst (Mov, StOp(Some (ImmNum 56L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 64L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 72L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), true), None)), ImmOp (ImmNum 0L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 3L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 13L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 61L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 51L));
+							Xchg (RegOp RBX, RegOp RBX, RegOp RBX, RegOp RBX);
+							UInst (Mov, StOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)), RegOp RDX);
+							BInst (Xor, RegOp EDX, RegOp EDX, RegOp EDX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 8L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), true), None)));
+							UInst (Lea, RegOp RAX, MemOp (Some (ImmNum 80L), Some (RSP), None, None));
+							UInst (Mov, StOp(Some (ImmNum 80L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), true), None)), ImmOp (ImmNum 1296236545L));
+							UInst (Mov, StOp(Some (ImmNum 88L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), true), None)), ImmOp (ImmLabel (-3)));
+							UInst (Mov, StOp(Some (ImmNum 96L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), true), None)), ImmOp (ImmNum 8L));
+							UInst (Mov, StOp(Some (ImmNum 104L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 112L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 120L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), true), None)), ImmOp (ImmNum 0L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 3L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 13L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 61L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 51L));
+							Xchg (RegOp RBX, RegOp RBX, RegOp RBX, RegOp RBX);
+							UInst (Mov, StOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)), RegOp RDX);
+							BInst (Xor, RegOp EDX, RegOp EDX, RegOp EDX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 16L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), true), None)));
+							UInst (Lea, RegOp RAX, MemOp (Some (ImmNum 128L), Some (RSP), None, None));
+							UInst (Mov, StOp(Some (ImmNum 128L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), true), None)), ImmOp (ImmNum 1296236545L));
+							UInst (Mov, StOp(Some (ImmNum 136L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), true), None)), ImmOp (ImmLabel (-4)));
+							UInst (Mov, StOp(Some (ImmNum 144L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), true), None)), ImmOp (ImmNum 64L));
+							UInst (Mov, StOp(Some (ImmNum 152L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 160L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), true), None)), ImmOp (ImmNum 0L));
+							UInst (Mov, StOp(Some (ImmNum 168L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), true), None)), ImmOp (ImmNum 0L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 3L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 13L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 61L));
+							BInst (Rol, RegOp RDI, RegOp RDI, ImmOp (ImmNum 51L));
+							Xchg (RegOp RBX, RegOp RBX, RegOp RBX, RegOp RBX);
+							UInst (Mov, StOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)), RegOp RDX);
+							UInst (Lea, RegOp RBX, MemOp (Some (ImmNum 176L), Some (RSP), None, None));
+							BInst (Xor, RegOp ECX, RegOp ECX, RegOp ECX);
+							UInst (Mov, RegOp RDX, LdOp(Some (ImmLabel (-3)), None, None, None, 8L, (Some (-3, (SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), true), None)));
+							UInst (Mov, RegOp ESI, ImmOp (ImmLabel (-2)));
+							UInst (Mov, RegOp RDI, RegOp RBX);
+							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
+							Call "salsa20_block";
+							UInst (MovZ, RegOp EAX, LdOp(Some (ImmLabel (-4)), None, None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)));
+							BInst (Xor, RegOp AL, RegOp AL, LdOp(Some (ImmNum 176L), Some (RSP), None, None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), false), None)));
+							UInst (Mov, StOp(Some (ImmLabel (-4)), None, None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)), RegOp AL);
+							UInst (Mov, RegOp EAX, ImmOp (ImmNum 1L));
+							Jmp ".L24";
+						]
+					};
+					{
+						label = ".L24";
+						insts = [
+							UInst (MovZ, RegOp EDX, LdOp(Some (ImmLabel (-4)), Some (RAX), None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)));
+							BInst (Xor, RegOp DL, RegOp DL, LdOp(None, Some (RBX), Some (RAX), None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), false), None)));
+							BInst (Add, RegOp RAX, RegOp RAX, ImmOp (ImmNum 1L));
+							UInst (Mov, StOp(Some (ImmBExp (ImmLabel (-4), ImmNum (-1L))), Some (RAX), None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)), RegOp DL);
+							Cmp (RegOp RAX, ImmOp (ImmNum 64L));
+							Jcond (JNe, ".L24");
+							UInst (Mov, RegOp EAX, ImmOp (ImmNum 60L));
+							BInst (Xor, RegOp EDI, RegOp EDI, RegOp EDI);
+							Syscall;
+							Hlt;
+							BInst (Add, RegOp RSP, RegOp RSP, ImmOp (ImmNum 240L));
+							Pop (RegOp RBX, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), true), None));
+							Jmp ".Ret";
+						]
+					};
+					{
+						label = ".LFE5";
+						insts = [
+						]
+					};
+					{
+						label = ".Ret";
+						insts = [
+						]
+					};
+				]
+				;
+			func_type =
+				[
+					{
+						label = "_start";
+						pc = 5;
+						reg_type = 
+							[
+								SingleVar (0);
+								SingleVar (1);
+								SingleVar (2);
+								SingleVar (3);
+								SingleVar (4);
+								SingleVar (5);
+								SingleVar (6);
+								SingleVar (7);
+								SingleVar (8);
+								SingleVar (9);
+								SingleVar (10);
+								SingleVar (11);
+								SingleVar (12);
+								SingleVar (13);
+								SingleVar (14);
+								SingleVar (15);
+							]
+						;
+						mem_type = 
+							[
+								(-2, [
+									((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L))), RangeConst [(SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L)))], SingleTop);
+								]);
+								(-3, [
+									((SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), RangeConst [(SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L)))], SingleTop);
+								]);
+								(-4, [
+									((SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), RangeConst [(SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L)))], SingleTop);
+								]);
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (97));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (98));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (99));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (100));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (101));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (102));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (103));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (104));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (105));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (106));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (107));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (108));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (109));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (110));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (111));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (112));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (113));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (114));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (115));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (116));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (117));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (118));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (119));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleTop);
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFB5";
+						pc = 6;
+						reg_type = 
+							[
+								SingleVar (17);
+								SingleVar (18);
+								SingleVar (19);
+								SingleVar (20);
+								SingleVar (21);
+								SingleVar (22);
+								SingleVar (23);
+								SingleVar (24);
+								SingleVar (25);
+								SingleVar (26);
+								SingleVar (27);
+								SingleVar (28);
+								SingleVar (29);
+								SingleVar (30);
+								SingleVar (31);
+								SingleVar (32);
+							]
+						;
+						mem_type = 
+							[
+								(-2, [
+									((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L))), RangeConst [(SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L)))], SingleVar (33));
+								]);
+								(-3, [
+									((SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), RangeConst [(SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L)))], SingleVar (34));
+								]);
+								(-4, [
+									((SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), RangeConst [(SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L)))], SingleVar (35));
+								]);
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (120));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (121));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (122));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (123));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (124));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (125));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (126));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (127));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (128));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (129));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (130));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (131));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (132));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (133));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (134));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (135));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (136));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (137));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (138));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (139));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (140));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (141));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (142));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (36));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [-4; -3; -2; 21];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".L24";
+						pc = 64;
+						reg_type = 
+							[
+								SingleVar (37);
+								SingleVar (38);
+								SingleVar (39);
+								SingleVar (40);
+								SingleVar (41);
+								SingleVar (42);
+								SingleVar (43);
+								SingleVar (44);
+								SingleVar (45);
+								SingleVar (46);
+								SingleVar (47);
+								SingleVar (48);
+								SingleVar (49);
+								SingleVar (50);
+								SingleVar (51);
+								SingleVar (52);
+							]
+						;
+						mem_type = 
+							[
+								(-2, [
+									((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L))), RangeConst [(SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L)))], SingleVar (53));
+								]);
+								(-3, [
+									((SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), RangeConst [(SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L)))], SingleVar (54));
+								]);
+								(-4, [
+									((SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), RangeConst [(SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L)))], SingleVar (55));
+								]);
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (143));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (144));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (145));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (146));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (147));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (148));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (149));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (150));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (151));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (152));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (153));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (154));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (155));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (156));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (157));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (158));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (159));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (160));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (161));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (162));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (163));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (164));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (165));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (56));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [-4; 37; 40; 41];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".LFE5";
+						pc = 77;
+						reg_type = 
+							[
+								SingleVar (57);
+								SingleVar (58);
+								SingleVar (59);
+								SingleVar (60);
+								SingleVar (61);
+								SingleVar (62);
+								SingleVar (63);
+								SingleVar (64);
+								SingleVar (65);
+								SingleVar (66);
+								SingleVar (67);
+								SingleVar (68);
+								SingleVar (69);
+								SingleVar (70);
+								SingleVar (71);
+								SingleVar (72);
+							]
+						;
+						mem_type = 
+							[
+								(-2, [
+									((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L))), RangeConst [(SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L)))], SingleVar (73));
+								]);
+								(-3, [
+									((SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), RangeConst [(SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L)))], SingleVar (74));
+								]);
+								(-4, [
+									((SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), RangeConst [(SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L)))], SingleVar (75));
+								]);
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (166));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (167));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (168));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (169));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (170));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (171));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (172));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (173));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (174));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (175));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (176));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (177));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (178));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (179));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (180));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (181));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (182));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (183));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (184));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (185));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (186));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (187));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (188));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (76));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+					{
+						label = ".Ret";
+						pc = 77;
+						reg_type = 
+							[
+								SingleVar (77);
+								SingleVar (78);
+								SingleVar (79);
+								SingleVar (80);
+								SingleVar (81);
+								SingleVar (82);
+								SingleVar (83);
+								SingleVar (84);
+								SingleVar (85);
+								SingleVar (86);
+								SingleVar (87);
+								SingleVar (88);
+								SingleVar (89);
+								SingleVar (90);
+								SingleVar (91);
+								SingleVar (92);
+							]
+						;
+						mem_type = 
+							[
+								(-2, [
+									((SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L))), RangeConst [(SingleVar (-2), SingleBExp (SingleAdd, SingleVar (-2), SingleConst (32L)))], SingleVar (93));
+								]);
+								(-3, [
+									((SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L))), RangeConst [(SingleVar (-3), SingleBExp (SingleAdd, SingleVar (-3), SingleConst (8L)))], SingleVar (94));
+								]);
+								(-4, [
+									((SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), RangeConst [(SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L)))], SingleVar (95));
+								]);
+								(4, [
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-240L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L))), RangeConst [], SingleVar (189));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-232L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L))), RangeConst [], SingleVar (190));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), RangeConst [], SingleVar (191));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L))), RangeConst [], SingleVar (192));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-208L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L))), RangeConst [], SingleVar (193));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-200L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L))), RangeConst [], SingleVar (194));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-192L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L))), RangeConst [], SingleVar (195));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-184L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L))), RangeConst [], SingleVar (196));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-176L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L))), RangeConst [], SingleVar (197));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-168L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L))), RangeConst [], SingleVar (198));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-160L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L))), RangeConst [], SingleVar (199));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-152L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L))), RangeConst [], SingleVar (200));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-144L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L))), RangeConst [], SingleVar (201));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L))), RangeConst [], SingleVar (202));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-128L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L))), RangeConst [], SingleVar (203));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L))), RangeConst [], SingleVar (204));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-112L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L))), RangeConst [], SingleVar (205));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-104L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L))), RangeConst [], SingleVar (206));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-96L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L))), RangeConst [], SingleVar (207));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-88L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L))), RangeConst [], SingleVar (208));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-80L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), RangeConst [], SingleVar (209));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), RangeConst [], SingleVar (210));
+									((SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L)), SingleVar (4)), RangeConst [], SingleVar (211));
+									((SingleVar (4), SingleVar (4)), RangeConst [], SingleVar (96));
+								]);
+							]
+						;
+						flag = (SingleTop, SingleTop);
+						branch_hist = [];
+						full_not_taken_hist = [];
+						constraint_list = [];
+						local_var_map = [];
+						useful_var = SingleExp.SingleVarSet.of_list [80; 81; 82; 89; 90; 91; 92; 93; 94; 95];
+						global_var = SingleExp.SingleVarSet.of_list [-4; -3; -2];
+						prop_mode = TypeInferDep;
+					}
+					;
+				]
+				;
+			single_subtype =
+				[
+					{ var_idx = (15, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (14, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (13, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (34, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (95, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 64); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (94, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (53, 64); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (93, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (52, 64); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 77); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 64); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 77); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 64); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (90, 77); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 64); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 77); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (42, 64); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (82, 77); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (81, 77); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (165, 64); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (80, 77); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 64); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-248L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 64); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (37, 64); sol = SolCond (69, Range (SingleConst (1L), SingleConst (63L), 1L), Range (SingleConst (1L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+				]
+				;
+			next_var = SingleTop;
+			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			smt_ctx = SmtEmitter.init_smt_ctx ();
+		}
+		;
+	]
+	
