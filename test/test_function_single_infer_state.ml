@@ -319,7 +319,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFB2";
-						pc = 6;
+						pc = 7;
 						reg_type = 
 							[
 								SingleVar (17);
@@ -383,7 +383,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L2";
-						pc = 45;
+						pc = 47;
 						reg_type = 
 							[
 								SingleVar (36);
@@ -447,7 +447,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFE2";
-						pc = 221;
+						pc = 224;
 						reg_type = 
 							[
 								SingleVar (55);
@@ -511,7 +511,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".Ret";
-						pc = 221;
+						pc = 225;
 						reg_type = 
 							[
 								SingleVar (74);
@@ -583,38 +583,38 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 7); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 7); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 7); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 7); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 7); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 7); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 7); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (54, 45); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (92, 221); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (91, 221); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (146, 45); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (89, 221); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (145, 45); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (88, 221); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (144, 45); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (87, 221); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (143, 45); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (86, 221); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (142, 45); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (79, 221); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (78, 221); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (141, 45); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (77, 221); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (140, 45); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (139, 45); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (40, 45); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 47); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 225); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 225); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (146, 47); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 225); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (145, 47); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 225); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (144, 47); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 225); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (143, 47); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 225); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (142, 47); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 225); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 225); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (141, 47); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 225); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 7); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (140, 47); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (139, 47); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 47); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-48L)))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 7); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 7); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
 				]
 				;
 			next_var = SingleTop;
@@ -744,7 +744,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFB3";
-						pc = 6;
+						pc = 7;
 						reg_type = 
 							[
 								SingleVar (17);
@@ -793,7 +793,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L7";
-						pc = 28;
+						pc = 30;
 						reg_type = 
 							[
 								SingleVar (36);
@@ -842,7 +842,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFE3";
-						pc = 43;
+						pc = 46;
 						reg_type = 
 							[
 								SingleVar (55);
@@ -891,7 +891,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".Ret";
-						pc = 43;
+						pc = 47;
 						reg_type = 
 							[
 								SingleVar (74);
@@ -948,38 +948,38 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 7); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 7); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 7); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 7); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 7); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 7); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 7); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (54, 28); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (92, 43); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (91, 43); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (51, 28); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (89, 43); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (50, 28); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (88, 43); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (49, 28); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (87, 43); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (48, 28); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (86, 43); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (41, 28); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (79, 43); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (78, 43); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (101, 28); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (77, 43); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (40, 28); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (39, 28); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (36, 28); sol = SolCond (39, Range (SingleConst (0L), SingleConst (63L), 1L), Range (SingleConst (0L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 30); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 47); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 47); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 30); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 47); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 30); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 47); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 30); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 47); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (48, 30); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 47); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 30); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 47); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 47); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (101, 30); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 47); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 7); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 30); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (39, 30); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (36, 30); sol = SolCond (41, Range (SingleConst (0L), SingleConst (63L), 1L), Range (SingleConst (0L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 7); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 7); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
 				]
 				;
 			next_var = SingleTop;
@@ -1140,7 +1140,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFB4";
-						pc = 6;
+						pc = 7;
 						reg_type = 
 							[
 								SingleVar (17);
@@ -1193,7 +1193,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L14";
-						pc = 22;
+						pc = 24;
 						reg_type = 
 							[
 								SingleVar (36);
@@ -1246,7 +1246,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L22";
-						pc = 39;
+						pc = 42;
 						reg_type = 
 							[
 								SingleVar (55);
@@ -1299,7 +1299,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L19";
-						pc = 59;
+						pc = 63;
 						reg_type = 
 							[
 								SingleVar (74);
@@ -1352,7 +1352,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFE4";
-						pc = 60;
+						pc = 65;
 						reg_type = 
 							[
 								SingleVar (93);
@@ -1405,7 +1405,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".Ret";
-						pc = 60;
+						pc = 66;
 						reg_type = 
 							[
 								SingleVar (112);
@@ -1467,64 +1467,64 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (2, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (34, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (35, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (19, 6); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (34, 7); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (35, 7); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 7); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 7); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 7); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 7); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 7); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 7); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (19, 7); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (7, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (54, 22); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (151, 22); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (150, 22); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (149, 22); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (148, 22); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (147, 22); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (146, 22); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (158, 39); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (157, 39); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (156, 39); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (155, 39); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (154, 39); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (153, 39); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (92, 59); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (130, 60); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (91, 59); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (129, 60); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (89, 59); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (127, 60); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (88, 59); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (126, 60); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (87, 59); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (125, 60); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (86, 59); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (124, 60); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (79, 59); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (117, 60); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (78, 59); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (116, 60); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (77, 59); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (115, 60); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (49, 22); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (68, 39); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (41, 22); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (60, 39); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (58, 39); sol = SolCond (50, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (24, 6); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (70, 39); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (51, 22); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (69, 39); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (50, 22); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (59, 39); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (40, 22); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (39, 22); sol = SolCond (30, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 24); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (151, 24); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (150, 24); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (149, 24); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (148, 24); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (147, 24); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (146, 24); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (158, 42); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (157, 42); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (156, 42); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (155, 42); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (154, 42); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (153, 42); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 63); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (130, 66); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 63); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (129, 66); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 63); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (127, 66); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (88, 63); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (126, 66); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (87, 63); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (125, 66); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (86, 63); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (124, 66); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (79, 63); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (117, 66); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (78, 63); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (116, 66); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (77, 63); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (115, 66); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 24); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (68, 42); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 24); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (60, 42); sol = SolSimple (Single (SingleVar (2))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (58, 42); sol = SolCond (53, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (24, 7); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (70, 42); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 24); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (69, 42); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 24); sol = SolSimple (Single (SingleVar (7))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (59, 42); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 24); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (39, 24); sol = SolCond (32, Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)), 1L), Range (SingleConst (0L), SingleBExp (SingleAdd, SingleVar (6), SingleConst (-2L)), 1L), Single (SingleBExp (SingleAdd, SingleVar (6), SingleConst (-1L)))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (6, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (23, 6); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (23, 7); sol = SolSimple (Single (SingleVar (6))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 7); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
 				]
 				;
 			next_var = SingleTop;
@@ -1711,7 +1711,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFB5";
-						pc = 6;
+						pc = 7;
 						reg_type = 
 							[
 								SingleVar (17);
@@ -1783,7 +1783,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".L24";
-						pc = 64;
+						pc = 66;
 						reg_type = 
 							[
 								SingleVar (37);
@@ -1855,7 +1855,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".LFE5";
-						pc = 77;
+						pc = 80;
 						reg_type = 
 							[
 								SingleVar (57);
@@ -1927,7 +1927,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					;
 					{
 						label = ".Ret";
-						pc = 77;
+						pc = 81;
 						reg_type = 
 							[
 								SingleVar (77);
@@ -2007,36 +2007,36 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 					{ var_idx = (12, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (5, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
 					{ var_idx = (3, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (20, 6); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (34, 6); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (32, 6); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (31, 6); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (30, 6); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (29, 6); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (22, 6); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (95, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (54, 64); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (94, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (53, 64); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (93, 77); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
-					{ var_idx = (52, 64); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (92, 77); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (51, 64); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (91, 77); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (50, 64); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (90, 77); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (49, 64); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (89, 77); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (42, 64); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (82, 77); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (81, 77); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (165, 64); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (80, 77); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (41, 64); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-248L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (40, 64); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)))); subtype_list = []; supertype_list = [] };
-					{ var_idx = (37, 64); sol = SolCond (69, Range (SingleConst (1L), SingleConst (63L), 1L), Range (SingleConst (1L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (20, 7); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (34, 7); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (32, 7); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (31, 7); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (30, 7); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (29, 7); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (22, 7); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (95, 81); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (54, 66); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (94, 81); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (53, 66); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (93, 81); sol = SolSimple (Top); subtype_list = []; supertype_list = [] };
+					{ var_idx = (52, 66); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (92, 81); sol = SolSimple (Single (SingleVar (15))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (51, 66); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (91, 81); sol = SolSimple (Single (SingleVar (14))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (50, 66); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (90, 81); sol = SolSimple (Single (SingleVar (13))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (49, 66); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (89, 81); sol = SolSimple (Single (SingleVar (12))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (42, 66); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (82, 81); sol = SolSimple (Single (SingleVar (5))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (81, 81); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (165, 66); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (80, 81); sol = SolSimple (Single (SingleVar (3))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (41, 66); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-248L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (40, 66); sol = SolSimple (Single (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (37, 66); sol = SolCond (71, Range (SingleConst (1L), SingleConst (63L), 1L), Range (SingleConst (1L), SingleConst (62L), 1L), Single (SingleConst (63L))); subtype_list = []; supertype_list = [] };
 					{ var_idx = (4, 5); sol = SolNone; subtype_list = []; supertype_list = [] };
-					{ var_idx = (21, 6); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
+					{ var_idx = (21, 7); sol = SolSimple (Single (SingleVar (4))); subtype_list = []; supertype_list = [] };
 				]
 				;
 			next_var = SingleTop;
@@ -2045,4 +2045,5 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 		}
 		;
 	]
+	
 	

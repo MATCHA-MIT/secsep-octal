@@ -75,7 +75,7 @@ module SingleTypeInfer = struct
     let (_, next_var), arch_type_list =
       List.fold_left_map (
         fun (start_pc, start_var) (bb: Isa.basic_block) ->
-          let next_pc = start_pc + List.length bb.insts in
+          let next_pc = start_pc + List.length bb.insts + 1 in
           if bb.label = func_name then begin
             Printf.printf "BB %s pc = %d\n" bb.label start_pc;
             (
