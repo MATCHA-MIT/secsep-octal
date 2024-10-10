@@ -1,3 +1,4 @@
+open Isa_basic
 open Single_entry_type
 open Mem_offset_new
 open Arch_type
@@ -179,6 +180,27 @@ module RangeSubtype = struct
       if find_not_val <> None then None
       else Some (RangeConst [])
     else None
+
+  (* let try_solve_non_val
+      (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
+      (find_type_pair: int -> int -> IsaBasic.imm_var_id -> SingleEntryType.t * (int -> SingleEntryType.t))
+      (tv_rel: type_rel) : MemRange.t option =
+    let find_non_empty =
+      List.find_map (
+        fun (sub, sub_pc) ->
+          let block_var_set = get_block_var sub in
+          if SingleEntryType.SingleVarSet.is_empty block_var_set then None
+          else Some (sub, sub_pc, block_var_set)
+      ) tv_rel.subtype_list
+    in
+    match find_non_empty with
+    | None -> None
+    | Some (sub_exp, sub_pc, block_var_set) ->
+      let block_var_list = SingleEntryType.SingleVarSet.to_list block_var_set in
+      let _, sup_pc = tv_rel.var_idx in
+      let map_info_list =
+        List.map (find_type_pair sup_pc sub_pc) block_var_list
+      in *)
 
   let solve_one_var
       (range_is_val: MemRange.t -> bool)
