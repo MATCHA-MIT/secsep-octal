@@ -161,7 +161,7 @@ module RangeSubtype = struct
     else Some (RangeConst [ tv_rel.off ])
 
   let try_solve_empty 
-      (range_is_val: MemRange.t -> bool) 
+      (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t) 
       (tv_rel: type_rel) : MemRange.t option =
     let find_empty =
       List.find_opt (
@@ -174,41 +174,89 @@ module RangeSubtype = struct
     if find_empty <> None then
       let find_not_val =
         List.find_opt (
-          fun (x, _) -> not (range_is_val x)
+          fun (x, _) -> not (SingleEntryType.SingleVarSet.is_empty (get_block_var x))
         ) tv_rel.subtype_list
       in
       if find_not_val <> None then None
       else Some (RangeConst [])
     else None
 
-  (* let try_solve_non_val
+  let try_solve_non_val
+      (smt_ctx: SmtEmitter.t)
       (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
-      (find_type_pair: int -> int -> IsaBasic.imm_var_id -> SingleEntryType.t * (int -> SingleEntryType.t))
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (* (find_type_pair: int -> int -> IsaBasic.imm_var_id -> SingleEntryType.t * SingleEntryType.t) *)
       (tv_rel: type_rel) : MemRange.t option =
-    let find_non_empty =
-      List.find_map (
-        fun (sub, sub_pc) ->
-          let block_var_set = get_block_var sub in
-          if SingleEntryType.SingleVarSet.is_empty block_var_set then None
-          else Some (sub, sub_pc, block_var_set)
-      ) tv_rel.subtype_list
+    let find_type_pair 
+        (sup_pc: int) (sub_pc: int) (sub_var_idx: IsaBasic.imm_var_id) :
+        (SingleEntryType.t * SingleEntryType.t) list =
+      let sup_block, sub_block_list = 
+        List.find (fun (entry: ArchType.block_subtype_t) -> let x, _ = entry in x.pc = sup_pc) block_subtype_list 
+      in
+      let sub_block =
+        List.find (fun (x: ArchType.t) -> x.pc = sub_pc) sub_block_list
+      in
+      let helper 
+          (acc: (SingleEntryType.t * SingleEntryType.t) list)
+          (entry1: SingleEntryType.t) (entry2: SingleEntryType.t) :
+          (SingleEntryType.t * SingleEntryType.t) list =
+        if SingleEntryType.SingleVarSet.is_empty 
+            (SingleEntryType.SingleVarSet.inter (SingleEntryType.get_vars entry1) sup_block.useful_var) then
+          acc
+        else
+          let entry2 = SingleEntryType.repl_local_var sub_block.local_var_map entry2 in
+          if SingleEntryType.SingleVarSet.mem sub_var_idx (SingleEntryType.get_vars entry2) && 
+              SingleEntryType.cmp (SingleVar sub_var_idx) entry2 <> 0 then
+            (entry1, entry2) :: acc
+          else acc
+      in
+      let find_list = List.fold_left2 helper [] sup_block.reg_type sub_block.reg_type in
+      ArchType.MemType.fold_left2 helper find_list sup_block.mem_type sub_block.mem_type
     in
-    match find_non_empty with
-    | None -> None
-    | Some (sub_exp, sub_pc, block_var_set) ->
-      let block_var_list = SingleEntryType.SingleVarSet.to_list block_var_set in
-      let _, sup_pc = tv_rel.var_idx in
-      let map_info_list =
-        List.map (find_type_pair sup_pc sub_pc) block_var_list
-      in *)
+    match tv_rel.subtype_list with
+    | [RangeConst base_range, _; RangeExp (_, [ add_off ]), br_pc]
+    | [RangeExp (_, [ add_off ]), br_pc; RangeConst base_range, _] ->
+      if SingleEntryType.SingleVarSet.is_empty (get_block_var (RangeConst base_range)) then begin
+        let block_var_list = SingleEntryType.SingleVarSet.to_list (get_block_var (RangeConst [ add_off ])) in
+        begin match block_var_list with
+        | [ br_var_idx ] ->
+          let _, sup_pc = tv_rel.var_idx in
+          let find_list = find_type_pair sup_pc br_pc br_var_idx in
+          begin match find_list with
+          | [ sup_exp, br_exp ] -> 
+            let off_l, off_r = add_off in
+            let full_l, full_r = tv_rel.off in
+            let map_to_next = (br_var_idx, br_exp) in
+            let map_to_sup = (br_var_idx, sup_exp) in
+            let off_l_next = SingleEntryType.eval (SingleEntryType.repl_var_exp off_l map_to_next) in
+            let off_r_next = SingleEntryType.eval (SingleEntryType.repl_var_exp off_r map_to_next) in
+            if SingleEntryType.cmp off_r off_l_next = 0 then
+              Some (MemRange.merge smt_ctx (RangeConst base_range)
+                (RangeConst [ full_l, SingleEntryType.eval (SingleEntryType.repl_var_exp off_l map_to_sup) ])
+              )
+            else if SingleEntryType.cmp off_l off_r_next = 0 then
+              Some (MemRange.merge smt_ctx (RangeConst base_range)
+                (RangeConst [ SingleEntryType.eval (SingleEntryType.repl_var_exp off_r map_to_sup), full_r ])
+              )
+            else
+              None
+          | _ -> None
+          end
+        | _ -> None
+        end
+      end else None
+    | _ -> None
 
   let solve_one_var
-      (range_is_val: MemRange.t -> bool)
+      (smt_ctx: SmtEmitter.t)
+      (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
       (new_sol_list: (var_idx_t * MemRange.t) list) (tv_rel: type_rel) : 
       ((var_idx_t * MemRange.t) list) * type_rel =
     let rule_list = [
       try_solve_full;
-      try_solve_empty range_is_val;
+      try_solve_empty get_block_var;
+      try_solve_non_val smt_ctx get_block_var block_subtype_list;
     ] in
     match tv_rel.sol with
     | Some _ -> new_sol_list, tv_rel
@@ -223,19 +271,20 @@ module RangeSubtype = struct
 
   let repl_range_val_sol
       (smt_ctx: SmtEmitter.t)
-      (range_is_val: MemRange.t -> bool)
+      (single_sol_repl_helper: (SingleEntryType.t * int) -> SingleEntryType.t)
+      (* (range_is_val: MemRange.t -> bool) *)
       (range_sol: ((MemRange.range_var_id * int) * MemRange.t) list)
       (tv_rel_list: t) : t =
-    let range_sol =
+    (* let range_sol =
       List.filter (
         fun (_, r) -> range_is_val r
       ) range_sol
-    in
+    in *)
     List.map (
       fun (x: type_rel) ->
         if x.sol = None then
           let subtype_list =
-            List.map (fun (sub, pc) -> MemRange.repl_range_sol smt_ctx range_sol sub, pc) x.subtype_list
+            List.map (fun (sub, pc) -> MemRange.repl_range_sol smt_ctx single_sol_repl_helper range_sol (sub, pc), pc) x.subtype_list
           in
           { x with subtype_list = subtype_list }
         else x
@@ -243,18 +292,29 @@ module RangeSubtype = struct
 
   let solve
       (smt_ctx: SmtEmitter.t)
-      (range_is_val: MemRange.t -> bool) 
+      (single_sol_repl_helper: (SingleEntryType.t * int) -> SingleEntryType.t)
+      (* (range_is_val: MemRange.t -> bool)  *)
+      (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t) (iter: int) : t =
     let rec helper (tv_rel_list: t) (iter: int) : t =
       if iter <= 0 then tv_rel_list
-      else
+      else begin
+        (* Printf.printf "===========%d===========" iter;
+        pp_range_subtype 0 tv_rel_list; *)
+        let tv_rel_list = 
+          simplify_subtype_range single_sol_repl_helper tv_rel_list 
+        in
         let new_sol, tv_rel_list =
-          List.fold_left_map (solve_one_var range_is_val) [] tv_rel_list
+          List.fold_left_map 
+            (solve_one_var smt_ctx get_block_var block_subtype_list) 
+            [] tv_rel_list
         in
         if List.length new_sol = 0 then tv_rel_list
         else
-          let tv_rel_list = repl_range_val_sol smt_ctx range_is_val new_sol tv_rel_list in
+          let tv_rel_list = repl_range_val_sol smt_ctx single_sol_repl_helper new_sol tv_rel_list in
           helper tv_rel_list (iter - 1)
+      end
     in
     helper tv_rel_list iter
 

@@ -345,9 +345,19 @@ module MemRange = struct
     | _ -> mem_range_error (Printf.sprintf "Cannot merge %s and %s" (to_string r1) (to_string r2))
     (* let _ = smt_ctx in r1 @ r2 *)
 
+  let repl
+      (repl_func: (SingleExp.t * int) -> SingleExp.t)
+      (pc: int) (r: t) : t =
+    match r with
+    | RangeConst off_list -> RangeConst (List.map (MemOffset.repl repl_func pc) off_list)
+    | RangeVar _ -> r
+    | RangeExp (v, off_list) -> RangeExp (v, List.map (MemOffset.repl repl_func pc) off_list)
+
   let repl_range_sol
       (smt_ctx: SmtEmitter.t)
-      (range_sol: ((range_var_id * int) * t) list) (r: t) : t =
+      (single_sol_repl_helper: (SingleExp.t * int) -> SingleExp.t)
+      (range_sol: ((range_var_id * int) * t) list) (r_pc: t * int) : t =
+    let r, pc = r_pc in
     let find_var =
       match r with
       | RangeConst _ -> None
@@ -364,16 +374,11 @@ module MemRange = struct
         ) range_sol
       in
       begin match find_sol with
-      | Some sol -> merge smt_ctx sol (RangeConst const_part)
+      | Some sol -> 
+        let sol = repl single_sol_repl_helper pc sol in
+        (* Printf.printf "!!! merge %s %s\n" (to_string sol) (to_string (RangeConst const_part)); *)
+        merge smt_ctx sol (RangeConst const_part)
       | None -> r
       end
-
-  let repl
-      (repl_func: (SingleExp.t * int) -> SingleExp.t)
-      (pc: int) (r: t) : t =
-    match r with
-    | RangeConst off_list -> RangeConst (List.map (MemOffset.repl repl_func pc) off_list)
-    | RangeVar _ -> r
-    | RangeExp (v, off_list) -> RangeExp (v, List.map (MemOffset.repl repl_func pc) off_list)
     
 end

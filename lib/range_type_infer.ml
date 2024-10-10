@@ -143,15 +143,24 @@ module RangeTypeInfer = struct
 
     (* 2. Range type infer *)
     let subtype_list = RangeSubtype.get_range_constraint block_subtype in
-    let subtype_list = 
-      RangeSubtype.simplify_subtype_range 
-        (SingleSubtype.subsititue_one_exp_subtype_list state.single_sol) 
-        subtype_list 
+    let subtype_list =
+      List.filter (
+        fun (x: RangeSubtype.type_rel) -> not (List.is_empty x.subtype_list)
+      ) subtype_list
     in
+    let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list state.single_sol in
     (* Printf.printf "================1\n";
     RangeSubtype.pp_range_subtype 0 subtype_list; *)
+    let range_get_block_var (r: MemRange.t) : SingleEntryType.SingleVarSet.t =
+      SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) state.input_single_var_set
+    in
     let subtype_list = 
-      RangeSubtype.solve state.smt_ctx (MemRange.is_val state.input_single_var_set) subtype_list 3 
+      RangeSubtype.solve 
+        state.smt_ctx 
+        single_sol_repl_helper
+        (* (MemRange.is_val state.input_single_var_set)  *)
+        range_get_block_var block_subtype 
+        subtype_list 3 
     in
     Printf.printf "Range subtype of func %s\n" state.func_name;
     RangeSubtype.pp_range_subtype 0 subtype_list;

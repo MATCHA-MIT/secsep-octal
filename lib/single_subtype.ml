@@ -719,6 +719,13 @@ module SingleSubtype = struct
       | SolSimple (Single e) -> 
         (* Printf.printf "subsititue_one_exp_single_sol %s %d %s" (SingleExp.to_string exp) idx (SingleExp.to_string e); *)
         SingleEntryType.eval (SingleEntryType.repl_var_exp exp (idx, e)), e_pc
+      | SolCond (pc, r_before_branch, r_taken, r_not_taken) ->
+        (* TODO: Double check this!!! *)
+        let r = if e_pc < pc then r_before_branch else if e_pc = pc then r_taken else r_not_taken in
+        begin match r with
+        | Single e -> SingleEntryType.eval (SingleEntryType.repl_var_exp exp (idx, e)), e_pc
+        | _ -> exp_pc
+        end
       | _ -> exp_pc
 
   let subsititue_one_exp_single_sol_list
