@@ -18,6 +18,12 @@ module MemOffset = struct
     | LOverlap | GOverlap
     | Other
 
+  type off_cmp_mode =
+    | CmpEqSubset
+    | CmpLeGe
+    | CmpAll (* cmp [a, b] [b, c] -> Le *)
+    | CmpOverlap (* cmp [a, b] [b, c] -> LOverlap *)
+
   let off_rel_t_to_string (x: off_rel_t) : string =
     match x with
     | Eq -> "Eq"
@@ -53,7 +59,7 @@ module MemOffset = struct
     SmtEmitter.expr_of_single_exp smt_ctx r true
 
   (* Semantically cmp helper*)
-  let offset_cmp_helper (is_quick: bool) (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: int) : off_rel_t =
+  let offset_cmp_helper (is_quick: bool) (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: off_cmp_mode) : off_rel_t =
     (* Printf.printf "offset_cmp (quick = %b) (mode = %d):\n%s\n%s\n" is_quick mode (to_string o1) (to_string o2); *)
     (* let stamp_beg = Unix.gettimeofday () in *)
 
@@ -92,17 +98,17 @@ module MemOffset = struct
 
     let result = begin
       match mode with
-      | 1 -> begin
+      | CmpEqSubset (*1*) -> begin
           if check eq_req = SatYes then Eq
           else if check subset_req = SatYes then Subset
           else Other
         end
-      | 2 -> begin
+      | CmpLeGe (*2*) -> begin
           if check le_req = SatYes then Le
           else if check ge_req = SatYes then Ge
           else Other
         end
-      | _ -> begin
+      | CmpAll -> begin
           if check eq_req = SatYes then Eq
           else if check le_req = SatYes then Le
           else if check ge_req = SatYes then Ge
@@ -110,6 +116,16 @@ module MemOffset = struct
           else if check supset_req = SatYes then Supset
           else if check loverlap_req = SatYes then LOverlap
           else if check goverlap_req = SatYes then GOverlap
+          else Other
+        end
+      | CmpOverlap -> begin
+          if check eq_req = SatYes then Eq
+          else if check subset_req = SatYes then Subset
+          else if check supset_req = SatYes then Supset
+          else if check loverlap_req = SatYes then LOverlap
+          else if check goverlap_req = SatYes then GOverlap
+          else if check le_req = SatYes then Le
+          else if check ge_req = SatYes then Ge
           else Other
         end
     end in
@@ -145,7 +161,8 @@ module MemOffset = struct
     let _ = SmtEmitter.expr_of_single_exp smt_ctx r true in
     () *)
 
-  let insert_new_offset_list
+  let insert_new_offset_list_helper
+      (prefer_to_merge: bool)
       (smt_ctx: SmtEmitter.t)
       (ob_list: (t * bool) list) (new_o_list: t list) : (t * bool) list =
     (* TODO: filter new_o_list, only focus on addresses involving rsp *)
@@ -161,7 +178,8 @@ module MemOffset = struct
       | [] -> [ (new_o, true) ]
       | (hd_o, hd_updated) :: tl ->
         (* We just need heuristic quick cmp here since we are going to assert no_overflow after inserting offsets*)
-        begin match offset_quick_cmp smt_ctx new_o hd_o 0 with
+        let cmp_mode = if prefer_to_merge then CmpOverlap else CmpAll in
+        begin match offset_quick_cmp smt_ctx new_o hd_o cmp_mode with
         | Eq | Subset -> (hd_o, hd_updated) :: tl
         | Supset -> insert_one_offset tl new_o
         | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
@@ -195,6 +213,9 @@ module MemOffset = struct
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 
+  let insert_new_offset_list = insert_new_offset_list_helper false
+  let insert_new_offset_list_merge = insert_new_offset_list_helper true
+
   let get_vars (o: t) : SingleExp.SingleVarSet.t =
     let l, r = o in
     SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
@@ -207,6 +228,11 @@ module MemOffset = struct
 
   let repl_context_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
     let l, r = o in SingleExp.repl_context_var local_var_map l, SingleExp.repl_context_var local_var_map r
+
+  let repl
+      (repl_func: (SingleExp.t * int) -> SingleExp.t)
+      (pc: int) (o: t) : t = 
+    let l, r = o in repl_func (l, pc), repl_func (r, pc)
 
   let add_base (base_ptr: SingleExp.t) (o: t) : t =
     let l, r = o in
@@ -309,7 +335,7 @@ module MemRange = struct
     (* TODO: re-implement this later!!! *)
     let helper (o1_list: MemOffset.t list) (o2_list: MemOffset.t list) : MemOffset.t list =
       let ob_list = List.map (fun x -> (x, false)) o1_list in
-      let ob_list = MemOffset.insert_new_offset_list smt_ctx ob_list (List.rev o2_list) in
+      let ob_list = MemOffset.insert_new_offset_list_merge smt_ctx ob_list (List.rev o2_list) in
       List.map (fun (x, _) -> x) ob_list
     in
     match r1, r2 with
@@ -342,4 +368,12 @@ module MemRange = struct
       | None -> r
       end
 
+  let repl
+      (repl_func: (SingleExp.t * int) -> SingleExp.t)
+      (pc: int) (r: t) : t =
+    match r with
+    | RangeConst off_list -> RangeConst (List.map (MemOffset.repl repl_func pc) off_list)
+    | RangeVar _ -> r
+    | RangeExp (v, off_list) -> RangeExp (v, List.map (MemOffset.repl repl_func pc) off_list)
+    
 end

@@ -293,9 +293,9 @@ module MemType (Entry: EntryType) = struct
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     List.find_map (
       fun (off, range, entry) ->
-        match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off 1 with
+        match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpEqSubset with
         | Eq | Subset ->
-          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off 1 with
+          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> Some (true, (off, range, entry)) (* full read *)
           | Subset -> 
             (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
@@ -386,7 +386,7 @@ module MemType (Entry: EntryType) = struct
       (ptr: IsaBasic.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
     if ptr = IsaBasic.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
-      match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) 2 with
+      match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) CmpLeGe with
       | Le -> false
       | Ge -> true
       | _ -> 
@@ -415,9 +415,9 @@ module MemType (Entry: EntryType) = struct
       | Some _, _ -> acc, entry
       | None, cons ->
         let off, range, entry_val = entry in
-        begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off 1 with
+        begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpEqSubset with
         | Eq | Subset ->
-          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off 1 with
+          begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> 
             let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if is_shared_mem_full_cmp smt_ctx ptr orig_addr_off then
@@ -426,7 +426,7 @@ module MemType (Entry: EntryType) = struct
               (Some (ptr, off, true), cons), (off, range, new_val)
           | Subset -> 
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [off]) range else range in
+            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
             (Some (ptr, off, false), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
           | _ -> acc, entry
           end
@@ -516,6 +516,7 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (update_init_range: bool)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
+      (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_val: entry_t) :
       (MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) = 
@@ -537,7 +538,7 @@ module MemType (Entry: EntryType) = struct
               Some [], (off, range, new_val)
           else 
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [off]) range else range in
+            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
             Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, Entry.mem_partial_write_val entry_val new_val)
         else
           None, entry
@@ -563,7 +564,7 @@ module MemType (Entry: EntryType) = struct
       match List.find_opt (fun (ptr, _) -> ptr = s_ptr) mem with
       | None -> mem_type_error (Printf.sprintf "set_slot_mem_type cannot find slot %s" (MemAnno.slot_to_string (Some slot_info)))
       | Some (_, part_mem) ->
-        let part_mem, constraints = set_slot_part_mem_type smt_ctx update_init_range part_mem slot_info new_type in
+        let part_mem, constraints = set_slot_part_mem_type smt_ctx update_init_range part_mem orig_addr_off slot_info new_type in
         List.map (fun (ptr, p_mem) -> if ptr = s_ptr then (ptr, part_mem) else (ptr, p_mem)) mem,
         constraints
 

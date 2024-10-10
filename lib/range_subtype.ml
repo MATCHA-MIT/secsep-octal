@@ -118,6 +118,15 @@ module RangeSubtype = struct
           { var_idx = (sup_idx, sup_pc); sol = None; off = off; subtype_list = sub_list } :: acc
     ) [] mem_subtype
 
+  
+  let simplify_subtype_range
+      (repl_helper: (SingleEntryType.t * int) -> SingleEntryType.t)
+      (tv_rel_list: t) : t =
+    let map_helper = fun (x, y) -> MemRange.repl repl_helper y x, y in
+    List.map (
+      fun (x: type_rel) ->
+        { x with subtype_list = List.map map_helper x.subtype_list }
+    ) tv_rel_list
 
   let get_range_constraint
       (block_subtype: ArchType.block_subtype_t list) : t =
@@ -227,5 +236,28 @@ module RangeSubtype = struct
     in
     helper tv_rel_list iter
 
+  let repl_sol_arch_type
+      (tv_rel_list: t)
+      (a_type: ArchType.t) : ArchType.t =
+    let helper (entry: MemOffset.t * MemRange.t * 'a) : MemOffset.t * MemRange.t * 'a =
+      let off, range, e_type = entry in
+      match range with
+      | RangeConst _ -> entry
+      | RangeVar v ->
+        let sol_opt =
+          List.find_map (
+            fun (x: type_rel) ->
+              let idx, _ = x.var_idx in
+              if v = idx then x.sol
+              else None
+          ) tv_rel_list
+        in
+        begin match sol_opt with
+        | Some sol -> off, sol, e_type
+        | _ -> entry
+        end
+      | _ -> range_subtype_error (Printf.sprintf "We do not support repl sol for range exp %s" (MemRange.to_string range))
+    in
+    { a_type with mem_type = ArchType.MemType.map_full helper a_type.mem_type }
 
 end

@@ -68,7 +68,7 @@ module FullMemAnno = struct
       (addr_off: MemOffset.t)
       (slot_info: slot_t) : bool =
     let _, s_off, is_full = slot_info in
-    match MemOffset.offset_full_cmp smt_ctx addr_off s_off 1 with
+    match MemOffset.offset_full_cmp smt_ctx addr_off s_off CmpEqSubset with
     | Eq -> true
     | Subset -> not is_full
     | _ -> false

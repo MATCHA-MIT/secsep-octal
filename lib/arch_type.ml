@@ -818,4 +818,36 @@ module ArchType (Entry: EntryType) = struct
       reg_type = List.map update_func a_type.reg_type;
       mem_type = MemType.map update_func a_type.mem_type }
 
+  let get_func_interface
+      (smt_ctx: SmtEmitter.t)
+      (func_name: Isa.label)
+      (func_type: t list)
+      (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
+    let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
+    let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
+
+    Z3.Solver.push (snd smt_ctx);
+    MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type;
+
+    (* let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
+      let r = 
+        SingleSubtype.sub_sol_single_to_range 
+          infer_state.single_subtype infer_state.input_var_set (e, pc) 
+      in
+      match r with
+      | Single exp -> exp
+      | _ -> SingleTop
+    in *)
+    let res: FuncInterface.t = {
+      func_name = func_name;
+      in_reg = in_state.reg_type;
+      in_mem = MemType.remove_local_mem_quick_cmp smt_ctx in_state.mem_type;
+      context = [];
+      out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
+      out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type)
+    }
+    in
+    Z3.Solver.pop (snd smt_ctx) 1;
+    res
+
 end

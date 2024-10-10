@@ -368,40 +368,40 @@ module SingleSubtype = struct
         else ()
     ) sol
 
+  let find_var_sol (tv_rel_list: t) (v: IsaBasic.imm_var_id) (v_pc: int) : RangeExp.t =
+    (* Printf.printf "find_var_sol: %d at %d\n" v v_pc; *)
+    match List.find_opt (fun (x: type_rel) -> let id, _ =  x.var_idx in v = id) tv_rel_list with
+    | Some tv_rel ->
+      let _, block_pc = tv_rel.var_idx in
+      begin match tv_rel.sol with
+      | SolNone -> Top
+      | SolSimple s -> s
+      | SolCond (cond_pc, exp, exp_taken, exp_not_taken) ->
+        (* Printf.printf "v_pc = %d, block_pc = %d, cond_pc = %d, exp_taken = %s, exp_not_taken = %s\n" v_pc block_pc cond_pc (RangeExp.to_string exp_taken) (RangeExp.to_string exp_not_taken); *)
+        if v_pc >= block_pc && v_pc < cond_pc then
+          begin
+            (* Printf.printf "Using %s\n" (RangeExp.to_string exp); *)
+            exp
+          end
+        else if v_pc == cond_pc then
+          begin
+            (* Printf.printf "Using %s\n" (RangeExp.to_string exp_taken); *)
+            Printf.printf "find_var_sol: WARNING, v_pc = cond_pc = %d\n" v_pc;
+            exp_taken
+          end
+        else if v_pc > cond_pc then
+          begin
+            (* Printf.printf "Using %s\n" (RangeExp.to_string exp_not_taken); *)
+            exp_not_taken
+          end
+        else single_subtype_error (Printf.sprintf "find_var_sol wrong exp pc var %d %d smaller than %d" v v_pc cond_pc)
+      end
+    | None -> Top
+
   let sub_sol_single_to_range
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_exp_t) : RangeExp.t =
-    let find_var_sol (v: IsaBasic.imm_var_id) (v_pc: int) : RangeExp.t =
-      (* Printf.printf "find_var_sol: %d at %d\n" v v_pc; *)
-      match List.find_opt (fun (x: type_rel) -> let id, _ =  x.var_idx in v = id) tv_rel_list with
-      | Some tv_rel ->
-        let _, block_pc = tv_rel.var_idx in
-        begin match tv_rel.sol with
-        | SolNone -> Top
-        | SolSimple s -> s
-        | SolCond (cond_pc, exp, exp_taken, exp_not_taken) ->
-          (* Printf.printf "v_pc = %d, block_pc = %d, cond_pc = %d, exp_taken = %s, exp_not_taken = %s\n" v_pc block_pc cond_pc (RangeExp.to_string exp_taken) (RangeExp.to_string exp_not_taken); *)
-          if v_pc >= block_pc && v_pc < cond_pc then
-            begin
-              (* Printf.printf "Using %s\n" (RangeExp.to_string exp); *)
-              exp
-            end
-          else if v_pc == cond_pc then
-            begin
-              (* Printf.printf "Using %s\n" (RangeExp.to_string exp_taken); *)
-              Printf.printf "find_var_sol: WARNING, v_pc = cond_pc = %d\n" v_pc;
-              exp_taken
-            end
-          else if v_pc > cond_pc then
-            begin
-              (* Printf.printf "Using %s\n" (RangeExp.to_string exp_not_taken); *)
-              exp_not_taken
-            end
-          else single_subtype_error (Printf.sprintf "find_var_sol wrong exp pc var %d %d smaller than %d" v v_pc cond_pc)
-        end
-      | None -> Top
-    in
     let e, e_pc = e in
     let rec helper (e: SingleEntryType.t) : RangeExp.t =
       match e with
@@ -409,7 +409,7 @@ module SingleSubtype = struct
       | SingleConst c -> Single (SingleConst c)
       | SingleVar v ->
         if SingleEntryType.SingleVarSet.mem v input_var_set then Single e
-        else begin match find_var_sol v e_pc with
+        else begin match find_var_sol tv_rel_list v e_pc with
         | Single e_sub -> helper e_sub
         | Range (l, r, step) ->
           if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
@@ -493,6 +493,17 @@ module SingleSubtype = struct
     if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then
       Some (sub_sol_single_to_range tv_rel_list input_var_set e)
     else None
+
+  let sub_sol_single_to_single_func_interface
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
+    let r = 
+      sub_sol_single_to_range tv_rel_list input_var_set (e, pc) 
+    in
+    match r with
+    | Single exp -> exp
+    | _ -> SingleTop
 
   let try_solve_one_var
       (* (smt_ctx: SmtEmitter.t) *) (* Maybe I need add_no_overflow later *)
@@ -714,6 +725,14 @@ module SingleSubtype = struct
       (idx_sol_list: (var_idx_t * SingleSol.t) list)
       (exp_pc: type_exp_t) : type_exp_t =
     List.fold_left subsititue_one_exp_single_sol exp_pc idx_sol_list
+
+  let subsititue_one_exp_subtype_list
+      (tv_rel_list: t) (exp_pc: type_exp_t) : SingleEntryType.t =
+    let idx_sol_list =
+      List.map (fun (x: type_rel) -> (x.var_idx, x.sol)) tv_rel_list
+    in
+    let exp, _ = subsititue_one_exp_single_sol_list idx_sol_list exp_pc in
+    exp
 
   let update_subtype_single_sol
       (tv_rel_list: t) (idx_sol_list: (var_idx_t * SingleSol.t) list) : t =

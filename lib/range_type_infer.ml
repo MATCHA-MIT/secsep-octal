@@ -20,11 +20,12 @@ module RangeTypeInfer = struct
   module FuncInterface = ArchType.FuncInterface
 
   type t = {
+    func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    range_sol: MemRange.local_var_map_t;
+    (* range_sol: MemRange.local_var_map_t; *)
     smt_ctx: SmtEmitter.t;
   }
 
@@ -65,11 +66,12 @@ module RangeTypeInfer = struct
     in
     let _, func_type = List.fold_left_map helper start_var single_infer_state.func_type in
     {
+      func_name = single_infer_state.func_name;
       func = single_infer_state.func;
       func_type = func_type;
       single_sol = single_infer_state.single_subtype;
       input_single_var_set = single_infer_state.input_var_set;
-      range_sol = [];
+      (* range_sol = []; *)
       smt_ctx = single_infer_state.smt_ctx;
     }
 
@@ -98,6 +100,18 @@ module RangeTypeInfer = struct
     let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
     { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
+
+  let get_func_interface
+      (infer_state: t) : FuncInterface.t =
+    let sub_sol =
+      SingleSubtype.sub_sol_single_to_single_func_interface
+        infer_state.single_sol infer_state.input_single_var_set
+    in
+    ArchType.get_func_interface
+      infer_state.smt_ctx
+      infer_state.func_name
+      infer_state.func_type
+      sub_sol
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
@@ -130,12 +144,41 @@ module RangeTypeInfer = struct
     (* 2. Range type infer *)
     let subtype_list = RangeSubtype.get_range_constraint block_subtype in
     let subtype_list = 
+      RangeSubtype.simplify_subtype_range 
+        (SingleSubtype.subsititue_one_exp_subtype_list state.single_sol) 
+        subtype_list 
+    in
+    (* Printf.printf "================1\n";
+    RangeSubtype.pp_range_subtype 0 subtype_list; *)
+    let subtype_list = 
       RangeSubtype.solve state.smt_ctx (MemRange.is_val state.input_single_var_set) subtype_list 3 
     in
+    Printf.printf "Range subtype of func %s\n" state.func_name;
     RangeSubtype.pp_range_subtype 0 subtype_list;
+    (* TODO: Write a function to check whether all solutions are found *)
+
+    (* 3. Substitute solution back to func type *)
+    let func_type =
+      List.map (RangeSubtype.repl_sol_arch_type subtype_list) state.func_type
+    in
 
     Z3.Solver.pop solver 1;
-    state
+    { state with func_type = func_type }
+    
+  let infer 
+      (single_infer_state_list: SingleTypeInfer.t list) : t list =
+    let helper
+        (acc: FuncInterface.t list) (entry: SingleTypeInfer.t) :
+        (FuncInterface.t list) * t =
+      let infer_state = infer_one_func acc entry in
+      let func_interface = get_func_interface infer_state in
+      Printf.printf "Infer state of func %s\n" infer_state.func_name;
+      pp_func_type 0 infer_state;
+      (* FuncInterface.pp_func_interface 0 func_interface; *)
+      func_interface :: acc, infer_state
+    in
+    let _, infer_result = List.fold_left_map helper [] single_infer_state_list in
+    infer_result
     
 
 end
