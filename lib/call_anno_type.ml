@@ -1,4 +1,7 @@
 open Isa_basic
+open Reg_type_new
+open Single_entry_type
+open Taint_entry_type
 open Mem_type_new
 open Mem_offset_new
 
@@ -6,6 +9,8 @@ module CallAnno = struct
 
   exception CallAnnoError of string
   let transform_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
+
+  module TaintRegType = RegType(TaintEntryType(SingleEntryType))
 
   (* which slot in parent's memory is this slot mapped to *)
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)
@@ -18,7 +23,10 @@ module CallAnno = struct
 
   type slot_t = (slot_info * base_info)
 
-  type t' = slot_t MemTypeBasic.mem_content
+  type t' = {
+    pr_reg: TaintRegType.t;
+    ch_mem: slot_t MemTypeBasic.mem_content;
+  }
   type t = t' option
 
   let cmp_base_info (x: base_info) (y: base_info) : int =
