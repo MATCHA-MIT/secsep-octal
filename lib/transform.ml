@@ -3,6 +3,7 @@ open Taint_exp
 open Taint_subtype
 open Taint_type_infer
 open Mem_type_new
+open Mem_offset_new
 open Full_mem_anno
 open Call_anno_type
 open Single_exp
@@ -112,19 +113,16 @@ module Transform = struct
 
   let delta: int64 = -0x100000L (* -1MB *)
 
-  let first_bb_state (func_state: func_state) : ArchType.t =
-    List.hd func_state.bb_types
-
   let mem_part_taint_counter
       (mem_part: 'a MemTypeBasic.mem_part)
-      (get_entry_taint: 'a -> TaintExp.t)
+      (get_entry_taint: Isa.imm_var_id -> MemOffset.t -> 'a -> TaintExp.t)
       : int * int * ((TaintExp.taint_var_id option) option) (* Counter for taint true, taint false, taint var *) =
-    let _, mem_slots = mem_part in
+    let mem_part_base, mem_slots = mem_part in
     List.fold_left(
       fun (acc: int * int * ((TaintExp.taint_var_id option) option)) (slot: 'a MemTypeBasic.mem_slot) ->
         let acc_t, acc_f, acc_var = acc in
-        let _, _, entry = slot in
-        match get_entry_taint entry with
+        let offset, _, entry = slot in
+        match get_entry_taint mem_part_base offset entry with
         | TaintConst true -> (acc_t + 1, acc_f, acc_var)
         | TaintConst false -> (acc_t, acc_f + 1, acc_var)
         | TaintVar id ->
@@ -143,7 +141,7 @@ module Transform = struct
 
   let get_mem_part_unity
       (mem_part: 'a MemTypeBasic.mem_part)
-      (get_entry_taint: 'a -> TaintExp.t)
+      (get_entry_taint: Isa.imm_var_id -> MemOffset.t -> 'a -> TaintExp.t)
       : unity =
     let base_id, slots = mem_part in
     let tot = List.length slots in
@@ -161,7 +159,7 @@ module Transform = struct
           let base_id, _ = mem_part in
           if base_id = rsp_var_id then (base_id, Ununified) else
           let unity =
-            get_mem_part_unity mem_part (fun (entry: MemType.entry_t) -> let (_, taint) = entry in taint)
+            get_mem_part_unity mem_part (fun _ _ (entry: MemType.entry_t) -> let (_, taint) = entry in taint)
           in
           (base_id, unity)
       ) mem
@@ -322,19 +320,32 @@ module Transform = struct
     in
     InstTransform.assign tf inst inst_pre inst_post
 
-  let get_parent_slot_taint (init_mem_type: MemType.t) (slot: CallAnno.slot_t) : TaintExp.t =
+  let get_parent_slot_taint (parent_mem_type: MemType.t) (slot: CallAnno.slot_t) : TaintExp.t =
     (* get taint of the parent slot to which the current slot is mapped *)
     let (parent_slot_base, parent_slot_off, _), _ = slot in
-    let _, taint = MemType.get_mem_type_strict init_mem_type (parent_slot_base, parent_slot_off) |> Option.get in
+    let _, taint = MemType.get_mem_type_strict parent_mem_type (parent_slot_base, parent_slot_off) |> Option.get in
     let _ = match taint with
     | TaintVar _ -> transform_error "Unexpected taint var when processing memory mapping in call"
     | _ -> ()
     in
     taint
 
-  let extract_bases_to_be_changed (func_state: func_state) (anno: CallAnno.t) (rsp_var_id: Isa.imm_var_id) : CallAnno.base_info list =
+  let get_child_slot_taint
+        (child_fi_in_mem: FuncInterface.MemType.t)
+        (base: Isa.imm_var_id)
+        (offset: MemOffset.t)
+        (_: 'a)
+        : TaintExp.t =
+    let _, taint = MemType.get_mem_type_strict child_fi_in_mem (base, offset) |> Option.get in
+    taint
+
+  let extract_bases_to_be_changed
+      (func_state: func_state)
+      (child_fi_in_mem: FuncInterface.MemType.t) (* wanna check taint type of slots the moment the call happens *)
+      (anno: CallAnno.t)
+      (rsp_var_id: Isa.imm_var_id)
+      : CallAnno.base_info list =
     let anno = Option.get anno in
-    let init_mem_type = (first_bb_state func_state).mem_type in
     let res = List.fold_left (
       fun (acc: CallAnno.base_info list) (mem_part: CallAnno.slot_t MemType.mem_part) : CallAnno.base_info list ->
         let child_base, slots = mem_part in
@@ -352,7 +363,7 @@ module Transform = struct
         (* do not transform, if parent mem is already unified or dealing with child's RSP *)
         if get_slot_unity func_state.init_mem_unity parent_base = Unified || child_base = rsp_var_id then acc else
         (* see if all slots are taint true or all slots are taint false *)
-        let unity = get_mem_part_unity mem_part (get_parent_slot_taint init_mem_type) in
+        let unity = get_mem_part_unity mem_part (get_child_slot_taint child_fi_in_mem) in
         if unity = Unified then parent_base_info :: acc else acc
     ) [] anno in
     List.sort_uniq CallAnno.cmp_base_info res
@@ -408,86 +419,41 @@ module Transform = struct
         )
       end
 
-  let single_exp_to_mem_addressing (func_state: func_state) (se: SingleExp.t) : Isa.mem_op =
-    let give_up () = transform_error (Printf.sprintf "cannot convert SingleExp to memory addressing mode: %s" (SingleExp.to_ocaml_string se)) in
-    let helper_which_reg (var: Isa.imm_var_id) : Isa.register option =
-      (* see if this variable is a register at function entry *)
-      (* TODO: should we care if the register is a memory slot's data at function entry? *)
-      List.find_mapi (
-        fun (idx: int) (taint_entry: TaintTypeInfer.ArchType.entry_t) ->
-          let se, _ = taint_entry in
-          match se with
-          | SingleVar var' when var = var' -> Some (Isa.get_full_reg_by_idx idx)
-          | _ -> None
-      ) (first_bb_state func_state).reg_type
-    in
-    let helper_is_global_var (var: Isa.imm_var_id) : bool =
-      SingleExp.SingleVarSet.mem var (first_bb_state func_state).global_var
-    in
-    let helper_find_op (var: Isa.imm_var_id) : (Isa.immediate, Isa.register) Either.t =
-      let res = helper_which_reg var in
-      if Option.is_some res then Right (Option.get res) else
-      let res = helper_is_global_var var in
-      if res then Left (Isa.ImmLabel var)
-      else give_up ()
-    in
-    match se with
-    | SingleConst x -> (Some (Isa.ImmNum x), None, None, None)
-    | SingleVar var_id -> begin
-        let op = helper_find_op var_id in
-        match op with
-        | Left imm -> (Some imm, None, None, None)
-        | Right reg -> (None, Some reg, None, None)
-      end
-    | SingleBExp (SingleAdd, SingleConst x, SingleVar var)
-    | SingleBExp (SingleAdd, SingleVar var, SingleConst x) -> begin
-        match helper_which_reg var with
-        | Some reg -> (Some (Isa.ImmNum x), Some reg, None, None)
-        | _ -> give_up ()
-      end
-    | SingleBExp (SingleAdd, SingleVar var1, SingleVar var2) -> begin
-        let op1 = helper_find_op var1 in
-        let op2 = helper_find_op var2 in
-        match op1, op2 with
-        | Right reg1, Left imm2 -> (Some imm2, Some reg1, None, None)
-        | Left imm1, Right reg2 -> (Some imm1, Some reg2, None, None)
-        | _ -> give_up ()
-      end
-    | _ -> give_up ()
-  
   let transform_basic_block_calls
       (func_state: func_state)
+      (func_interfaces: FuncInterface.t list)
       (bb: basic_block)
-      (_: ArchType.t)
       (rsp_var_id: Isa.imm_var_id)
       : basic_block =
     let insts' = List.fold_left (
       fun (acc_tf: InstTransform.t list) (* processed insts (all previous inst), reversed *)
           (tf: InstTransform.t) (* current inst *) ->
         match tf.orig with
-        | Call (_, anno) -> begin
-            let bases_to_change = extract_bases_to_be_changed func_state anno rsp_var_id in
+        | Call (child_label, anno) -> begin
+            let child_fi = FuncInterface.find_fi func_interfaces child_label |> Option.get in
+            let bases_to_change = extract_bases_to_be_changed func_state child_fi.in_mem anno rsp_var_id in
             let new_prev_tfs, bases_to_change = List.fold_left (
+              (* sweep (in reversed order) and find instructions that prepare bases *)
               fun (acc: (InstTransform.t list) * (CallAnno.base_info list)) (tf: InstTransform.t) ->
                 let acc_tf, bases_to_change = acc in
                 if List.length bases_to_change = 0 then (tf :: acc_tf, []) else
-              let result = List.find_map (
-                  fun (base_info: CallAnno.base_info) ->
-                    match base_info with
-                    | BaseAsReg reg -> begin
-                      let replaced = try_change_delta_of_dest_reg tf reg in
-                      match replaced with
-                      | Some tf' -> Some (tf', base_info)
-                      | None -> None
-                      end
-                    | BaseAsSlot _ -> None (* change/restore the slot just before/after the call *)
-                ) bases_to_change in
-                if Option.is_some result then begin
-                  let new_tf, base_info = Option.get result in
-                  let bases_to_change = List.filter (fun base_info' -> base_info' != base_info) bases_to_change in
-                  (new_tf :: acc_tf, bases_to_change)
-                end else
-                  (tf :: acc_tf, bases_to_change)
+                let result = List.find_map (
+                    fun (base_info: CallAnno.base_info) ->
+                      match base_info with
+                      | BaseAsReg reg -> begin
+                        let replaced = try_change_delta_of_dest_reg tf reg in
+                        match replaced with
+                        | Some tf' -> Some (tf', base_info)
+                        | None -> None
+                        end
+                      | BaseAsSlot _ -> None (* we will handle this later, see below *)
+                  ) bases_to_change in
+                  if Option.is_some result then begin
+                    let new_tf, handled_base = Option.get result in
+                    let bases_to_change = List.filter (fun base_info -> CallAnno.cmp_base_info handled_base base_info != 0) bases_to_change in
+                    (new_tf :: acc_tf, bases_to_change)
+                  end else
+                    (tf :: acc_tf, bases_to_change)
             ) ([], bases_to_change) acc_tf
             in
             if not (List.is_empty bases_to_change) then begin
@@ -503,19 +469,36 @@ module Transform = struct
                       (Isa.make_inst_add_i_r delta reg) :: acc_inst_pre,
                       acc_inst_post (* no need to restore, since the register is caller saved *)
                     )
-                  | BaseAsSlot (base_id, base_off) ->
+                  | BaseAsSlot (ch_base, ch_base_off) ->
+                    (* where it is in child's memory slot *)
                     (* sanity check: the slot is a full slot in parent's memory *)
-                    let init_mem_type = (first_bb_state func_state).mem_type in
-                    if not (Option.is_some (MemType.get_mem_type_strict init_mem_type (base_id, base_off))) then
-                      transform_error "sanity check failed: BaseAsSlot does not describe a full slot in parent's memory";
-                    if SingleExp.cmp (snd base_off) (SingleExp.SingleBExp (SingleAdd, (fst base_off), SingleConst (Isa.get_gpr_full_size ()))) <> 0 then
-                      transform_error "sanity check failed: BaseAsSlot does not access full slot";
+                    let ch_slot_anno = match MemType.get_mem_type_strict (Option.get anno) (ch_base, ch_base_off) with
+                    | None -> transform_error "sanity check failed: BaseAsSlot does not describe a full slot in child's memory";
+                    | Some anno -> anno
+                    in
+                    let (_, pa_base_off, is_full), base_info = ch_slot_anno in
+                    if not is_full then
+                      transform_error "sanity check failed: BaseAsSlot is not mapped to a full slot of parent";
+                    if SingleExp.cmp (snd pa_base_off) (SingleExp.SingleBExp (SingleAdd, (fst pa_base_off), SingleConst (Isa.get_gpr_full_size ()))) <> 0 then
+                      transform_error "sanity check failed: BaseAsSlot does not access slot of 8 bytes";
+                    let base_reg_of_base = match base_info with
+                    | BaseAsReg r -> r
+                    | BaseAsSlot (b, o) ->
+                      transform_error (Printf.sprintf
+                        "Unexpected recursive base: some base is passed in memory of base %d, which is still in memory of %d (%s)"
+                        ch_base
+                        b
+                        (MemOffset.to_string o)
+                      )
+                    in
+                    let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
+                    let mem_op = (Some (Isa.ImmNum off_of_base), Some base_reg_of_base, None, None) in
                     (* get the memory operand of the slot to be changed *)
-                    let mem_op = single_exp_to_mem_addressing func_state (fst base_off) in
-                    let mem_op = match get_parent_slot_taint init_mem_type ((base_id, base_off, true), BaseAsReg Isa.RAX (* just a dummy *)) with
+                    let mem_op = match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
                     | TaintConst true -> begin
-                        let d, b, i, s = mem_op in
-                        add_delta_on_disp (d, b, i, s)
+                        transform_error "we assert the base is untainted";
+                        (* let d, b, i, s = mem_op in     *)
+                        (* add_delta_on_disp (d, b, i, s) *)
                       end
                     | TaintConst false -> mem_op
                     | _ -> transform_error "Unexpected taint annotation for BaseAsSlot"
@@ -553,7 +536,7 @@ module Transform = struct
   let pp_func_state (func_state: func_state) =
     let buf = Buffer.create 1000 in
 
-    PP.bprint_lvl 0 buf "\nTransformed function %s\n" (first_bb_state func_state).label;
+    PP.bprint_lvl 0 buf "\nTransformed function %s\n" (List.hd func_state.bb_types).label;
     PP.bprint_lvl 0 buf "Program:\n";
     pp_ocaml_block_list 0 buf func_state.bbs;
     PP.bprint_lvl 0 buf "\nBB Types:\n";

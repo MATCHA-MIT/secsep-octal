@@ -14,7 +14,7 @@ module CallAnno = struct
   (* how is its base pointer passed during the call *)
   type base_info =
     | BaseAsReg of IsaBasic.register (* passed as an arg register *)
-    | BaseAsSlot of IsaBasic.imm_var_id * MemOffset.t (* passed as a (full) slot in parent's memory *)
+    | BaseAsSlot of IsaBasic.imm_var_id * MemOffset.t (* passed as a (full) slot in child's memory *)
 
   type slot_t = (slot_info * base_info)
 

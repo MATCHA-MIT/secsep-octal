@@ -223,9 +223,9 @@ module MemType (Entry: EntryType) = struct
 
   (* get the entry from memory type using strict comparison *)
   let get_mem_type_strict
-      (mem: entry_t mem_content)
+      (mem: 'a mem_content)
       (location: IsaBasic.imm_var_id * MemOffset.t)
-      : entry_t option =
+      : 'a option =
     let base, off = location in
     List.find_map (
       fun mem_part ->

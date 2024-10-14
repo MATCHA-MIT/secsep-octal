@@ -330,4 +330,7 @@ module FuncInterface (Entry: EntryType) = struct
         func_interface.out_reg func_interface.out_mem
         reg_type mem_type
 
+    let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
+      List.find_opt (fun fi -> fi.func_name = l) fi_list
+
 end
