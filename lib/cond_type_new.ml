@@ -10,13 +10,16 @@ module CondType (Entry: EntryTypeBasic) = struct
   let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  [@@deriving sexp]
 
   type cond = 
     | Eq | Ne
     | Le | Lt (* Signed comparison *)
     | Be | Bt (* Unsigned comparison *)
+  [@@deriving sexp]
 
   type t = cond * entry_t * entry_t
+  [@@deriving sexp]
 
   let not_cond_type (cond: t) : t =
     match cond with

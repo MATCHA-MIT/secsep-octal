@@ -2,13 +2,17 @@ open Isa_basic
 open Entry_type
 open Single_exp
 open Pretty_print
+open Sexplib.Std
 
 module RegType (Entry: EntryType) = struct
   exception RegTypeError of string
   let reg_type_error msg = raise (RegTypeError ("[Reg Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  [@@deriving sexp]
+
   type t = entry_t list
+  [@@deriving sexp]
 
   let pp_reg_type (lvl: int) (reg: t) =
     PP.print_lvl lvl "<RegType>\n";

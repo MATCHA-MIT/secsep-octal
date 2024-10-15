@@ -1,10 +1,13 @@
 open Isa_basic
 open Mem_offset_new
 open Taint_exp
+open Sexplib
 
 module type MemAnnoType = sig
 
   type t
+  val t_of_sexp : Sexp.t -> t
+  val sexp_of_t : t -> Sexp.t
 
   val make_empty : unit -> t
   val update_taint : t -> TaintExp.t -> t

@@ -8,12 +8,15 @@ open Reg_type_new
 open Mem_type_new
 open Smt_emitter
 open Pretty_print
+open Sexplib.Std
 
 module FuncInterface (Entry: EntryType) = struct
   exception FuncInterfaceError of string
   let func_interface_error msg = raise (FuncInterfaceError ("[Func Interface Error] " ^ msg))
 
   type entry_t = Entry.t
+  [@@deriving sexp]
+
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
   module CondType = CondType (Entry)
@@ -26,6 +29,7 @@ module FuncInterface (Entry: EntryType) = struct
     out_reg: RegType.t;
     out_mem: MemType.t
   }
+  [@@deriving sexp]
 
   let pp_func_interface (lvl: int) (interface: t) =
     Printf.printf "\n";
@@ -63,11 +67,14 @@ module FuncInterface (Entry: EntryType) = struct
     List.fold_left2 (Entry.add_context_map false) Entry.get_empty_var_map child_reg parent_reg
 
   type var_map_set_t = SingleExp.local_var_map_t * SingleExp.SingleVarSet.t * Entry.local_var_map_t
+  [@@deriving sexp]
+
   type read_hint_t =
     | Untrans of (MemOffset.t * MemRange.t * entry_t)
     | Unmapped of MemOffset.t
     | Mapped of (MemOffset.t * bool * MemRange.t * entry_t)
-  
+  [@@deriving sexp]
+
   let add_mem_var_map
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)

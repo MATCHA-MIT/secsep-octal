@@ -1,3 +1,6 @@
+open Sexplib
+open Sexplib.Std
+
 module IsaBasic = struct
   (* TODO: Other exception on isa side *)
   exception IsaError of string
@@ -18,13 +21,22 @@ module IsaBasic = struct
       map
 
   type label = string
+  [@@deriving sexp]
 
   let ret_label = ".Ret"
 
   type imm_var_id = int
+  [@@deriving sexp]
 
   module StrM = Map.Make(String)
   type imm_var_map = imm_var_id StrM.t
+  (* TODO: Fix this dirty implementation later!!! *)
+  type list_t = (string * imm_var_id) list
+  [@@deriving sexp]
+  let imm_var_map_of_sexp (s_exp: Sexp.t) : imm_var_map =
+    StrM.of_list (list_t_of_sexp s_exp)
+  let sexp_of_imm_var_map (s: imm_var_map) : Sexp.t =
+    sexp_of_list_t (StrM.to_list s)
 
   type register =
     |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
@@ -32,6 +44,7 @@ module IsaBasic = struct
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
     (* | R0 *)
+  [@@deriving sexp]
 
   let reg_map = [
     ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
@@ -234,6 +247,7 @@ module IsaBasic = struct
     | ImmNum of int64
     | ImmLabel of imm_var_id
     | ImmBExp of immediate * immediate
+  [@@deriving sexp]
 
   let rec string_of_immediate (i: immediate) : string =
     match i with
@@ -257,6 +271,7 @@ module IsaBasic = struct
     Printf.sprintf "ImmOp (%s)" (ocaml_string_of_immediate i)
 
   type scale = Scale1 | Scale2 | Scale4 | Scale8
+  [@@deriving sexp]
 
   let scale_val (s: scale) : int64 =
     match s with
@@ -300,6 +315,7 @@ module IsaBasic = struct
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
+  [@@deriving sexp]
 
   let bop_opcode_map = [
     ("add", Add); ("adc", Adc); ("sub", Sub);
@@ -321,6 +337,7 @@ module IsaBasic = struct
     | Mov | MovS | MovZ
     | Lea
     | Not | Bswap
+  [@@deriving sexp]
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
@@ -339,6 +356,7 @@ module IsaBasic = struct
   type branch_cond =
     | JNe | JE | JL | JLe | JG | JGe
     | JB | JBe | JA | JAe | JOther
+  [@@deriving sexp]
 
   let cond_jump_opcode_map = [
     ("jne", JNe); ("jnz", JNe);               (* <> *)

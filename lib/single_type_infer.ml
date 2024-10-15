@@ -8,6 +8,7 @@ open Single_subtype
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
+open Sexplib.Std
 
 module SingleTypeInfer = struct
   exception SingleTypeInferError of string
@@ -28,6 +29,7 @@ module SingleTypeInfer = struct
     input_var_set: SingleEntryType.SingleVarSet.t;
     smt_ctx: SmtEmitter.t
   }
+  [@@deriving sexp]
 
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type

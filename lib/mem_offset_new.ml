@@ -4,6 +4,7 @@ open Cond_type_new
 open Range_exp
 open Pretty_print
 open Smt_emitter
+open Sexplib.Std
 
 module MemOffset = struct
   exception MemOffsetError of string
@@ -11,6 +12,7 @@ module MemOffset = struct
   let mem_offset_error msg = raise (MemOffsetError ("[Mem Offset Error] " ^ msg))
 
   type t = SingleExp.t * SingleExp.t
+  [@@deriving sexp]
 
   type off_rel_t =
     | Eq 
@@ -18,12 +20,14 @@ module MemOffset = struct
     | Le | Ge 
     | LOverlap | GOverlap
     | Other
+  [@@deriving sexp]
 
   type off_cmp_mode =
     | CmpEqSubset
     | CmpLeGe
     | CmpAll (* cmp [a, b] [b, c] -> Le *)
     | CmpOverlap (* cmp [a, b] [b, c] -> LOverlap *)
+  [@@deriving sexp]
 
   let off_rel_t_to_string (x: off_rel_t) : string =
     match x with
@@ -264,13 +268,16 @@ module MemRange = struct
   let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
 
   type range_var_id = int
+  [@@deriving sexp]
 
   type t = 
     | RangeConst of MemOffset.t list
     | RangeVar of range_var_id
     | RangeExp of range_var_id * (MemOffset.t list)
+  [@@deriving sexp]
 
   type local_var_map_t = (range_var_id * (MemOffset.t list)) list
+  [@@deriving sexp]
 
   let to_ocaml_string (r: t) : string =
     match r with

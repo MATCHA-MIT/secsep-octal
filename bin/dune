@@ -1,4 +1,4 @@
-(executable
- (public_name type)
- (name main)
+(executables
+ (public_names type)
+ (names main)
  (libraries type))

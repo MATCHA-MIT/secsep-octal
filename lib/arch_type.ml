@@ -11,12 +11,15 @@ open Range_exp
 open Constraint
 open Func_interface
 open Full_mem_anno
+open Sexplib.Std
 
 module ArchType (Entry: EntryType) = struct
   exception ArchTypeError of string
   let arch_type_error msg = raise (ArchTypeError ("[Arch Type Error] " ^ msg))
 
   type entry_t = Entry.t
+  [@@deriving sexp]
+
   module MemAnno = FullMemAnno
 
   module Isa = Isa (MemAnno)
@@ -27,10 +30,11 @@ module ArchType (Entry: EntryType) = struct
   module FuncInterface = FuncInterface (Entry)
 
   type prop_mode_t =
-  | TypeInferDep
-  | TypeInferTaint
-  | TypeInferInit
-  | TypeCheck
+    | TypeInferDep
+    | TypeInferTaint
+    | TypeInferInit
+    | TypeCheck
+  [@@deriving sexp]
 
   type t = {
     label: Isa.label;
@@ -48,8 +52,10 @@ module ArchType (Entry: EntryType) = struct
     prop_mode: prop_mode_t;
     (* Maybe add constraint set here!!! *)
   }
+  [@@deriving sexp]
 
   type block_subtype_t = t * (t list)
+  [@@deriving sexp]
 
   let prop_mode_to_ocaml_string (prop_mode: prop_mode_t) : string =
     match prop_mode with

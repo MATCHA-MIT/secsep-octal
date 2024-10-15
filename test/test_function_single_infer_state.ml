@@ -654,7 +654,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, StOp(Some (ImmNum 52L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), RegOp RAX);
 							UInst (Mov, StOp(Some (ImmNum 40L), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 2036477234L));
 							UInst (Mov, StOp(Some (ImmNum 60L), Some (RSP), None, None, 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-136L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L))), false), None)), ImmOp (ImmNum 1797285236L));
-							Call "salsa20_words";
+							Call ("salsa20_words", None);
 							BInst (Xor, RegOp EAX, RegOp EAX, RegOp EAX);
 							Jmp ".L7";
 						]
@@ -1049,7 +1049,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, RegOp RDI, RegOp R13);
 							BInst (Sar, RegOp ECX, RegOp ECX, ImmOp (ImmNum 6L));
 							UInst (MovS, RegOp RCX, RegOp ECX);
-							Call "salsa20_block";
+							Call ("salsa20_block", None);
 							UInst (MovZ, RegOp EAX, LdOp(None, Some (RSP), None, None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), false), None)));
 							BInst (Xor, StOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), LdOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), RegOp AL);
 							BInst (Add, RegOp RBX, RegOp RBX, ImmOp (ImmNum 1L));
@@ -1597,7 +1597,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, RegOp ESI, ImmOp (ImmLabel (-2)));
 							UInst (Mov, RegOp RDI, RegOp RBX);
 							UInst (Mov, RegOp RAX, LdOp(Some (ImmNum 24L), Some (RSP), None, None, 8L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-224L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-216L))), true), None)));
-							Call "salsa20_block";
+							Call ("salsa20_block", None);
 							UInst (MovZ, RegOp EAX, LdOp(Some (ImmLabel (-4)), None, None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)));
 							BInst (Xor, RegOp AL, RegOp AL, LdOp(Some (ImmNum 176L), Some (RSP), None, None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), false), None)));
 							UInst (Mov, StOp(Some (ImmLabel (-4)), None, None, None, 1L, (Some (-4, (SingleVar (-4), SingleBExp (SingleAdd, SingleVar (-4), SingleConst (64L))), false), None)), RegOp AL);

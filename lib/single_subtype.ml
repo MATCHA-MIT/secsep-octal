@@ -5,6 +5,7 @@ open Range_exp
 open Arch_type
 open Smt_emitter
 open Pretty_print
+open Sexplib.Std
 
 module SingleSol = struct
   exception SingleSolError of string
@@ -17,6 +18,7 @@ module SingleSol = struct
     | SolCond of int * RangeExp.t * RangeExp.t * RangeExp.t
       (* cond_pc * (sol of pc < cond_pc) * (sol of pc = cond_pc (taken)) * (sol of pc > cond_pc (not taken)) *)
       (* This is used to simplify inference process, not for type check!!! *)
+  [@@deriving sexp]
 
   let to_string (e: t) : string =
     match e with
@@ -45,7 +47,9 @@ module SingleSubtype = struct
   let single_subtype_error msg = raise (SingleSubtypeError ("[Single Subtype Error] " ^ msg))
 
   type var_idx_t = IsaBasic.imm_var_id * int
+  [@@deriving sexp]
   type type_exp_t = SingleEntryType.t * int
+  [@@deriving sexp]
 
   type type_rel = {
     var_idx: var_idx_t;
@@ -53,8 +57,10 @@ module SingleSubtype = struct
     subtype_list: type_exp_t list; (* subtype, pc of the branch that jumps to var_idx's block *)
     supertype_list: var_idx_t list (* NOTE: I omit br hist here since I noticed that current implementation cannot use it anyway *)
   }
+  [@@deriving sexp]
 
   type t = type_rel list
+  [@@deriving sexp]
 
   module ArchType = ArchType (SingleEntryType)
 
@@ -184,6 +190,7 @@ module SingleSubtype = struct
           (SingleEntryType.to_string a) pc (SingleEntryType.to_string b_exp) b_pc)
 
   type useful_var_t = IsaBasic.label * SingleExp.SingleVarSet.t
+  [@@deriving sexp]
 
   let pp_useful_var (lvl: int) (useful_var: useful_var_t) =
     let label, vars = useful_var in

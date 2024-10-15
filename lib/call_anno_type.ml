@@ -4,6 +4,7 @@ open Single_entry_type
 open Taint_entry_type
 open Mem_type_new
 open Mem_offset_new
+open Sexplib.Std
 
 module CallAnno = struct
 
@@ -15,19 +16,25 @@ module CallAnno = struct
   (* which slot in parent's memory is this slot mapped to *)
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)
   type slot_info = IsaBasic.imm_var_id * MemOffset.t * bool
+  [@@deriving sexp]
 
   (* how is its base pointer passed during the call *)
   type base_info =
     | BaseAsReg of IsaBasic.register (* passed as an arg register *)
     | BaseAsSlot of IsaBasic.imm_var_id * MemOffset.t (* passed as a (full) slot in child's memory *)
+  [@@deriving sexp]
 
   type slot_t = (slot_info * base_info)
+  [@@deriving sexp]
 
   type t' = {
     pr_reg: TaintRegType.t;
     ch_mem: slot_t MemTypeBasic.mem_content;
   }
+  [@@deriving sexp]
+
   type t = t' option
+  [@@deriving sexp]
 
   let cmp_base_info (x: base_info) (y: base_info) : int =
     match x, y with

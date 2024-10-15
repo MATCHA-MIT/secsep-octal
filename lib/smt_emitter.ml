@@ -1,6 +1,7 @@
 open Z3
 open Single_exp_basic
 open Pretty_print
+open Sexplib
 
 module SmtEmitter = struct
   exception SmtEmitterError of string
@@ -25,6 +26,13 @@ module SmtEmitter = struct
     let ctx = mk_context [] in
     let solver = Solver.mk_solver ctx None in
     (ctx, solver)
+
+  (* TODO: Maybe we need this later!!! *)
+  let t_of_sexp (_: Sexp.t) : t =
+  init_smt_ctx ()
+
+  let sexp_of_t (_ : t) : Sexp.t =
+    List (Atom "smt_emitter" :: [])
 
   let mk_numeral (smt_ctx: t) (value: int64) : Expr.expr =
     let z3_ctx, _ = smt_ctx in

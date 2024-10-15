@@ -7,6 +7,8 @@ open Range_subtype
 open Single_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Sexplib.Std
+open Sexplib
 
 module RangeTypeInfer = struct
   exception RangeTypeInferError of string
@@ -28,6 +30,7 @@ module RangeTypeInfer = struct
     (* range_sol: MemRange.local_var_map_t; *)
     smt_ctx: SmtEmitter.t;
   }
+  [@@deriving sexp]
 
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
@@ -187,6 +190,8 @@ module RangeTypeInfer = struct
       func_interface :: acc, infer_state
     in
     let _, infer_result = List.fold_left_map helper [] single_infer_state_list in
+    (* Printf.printf "=========================\n";
+    Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
     infer_result
     
 

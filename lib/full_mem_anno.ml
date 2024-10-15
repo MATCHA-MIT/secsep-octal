@@ -2,16 +2,20 @@ open Isa_basic
 open Mem_offset_new
 open Taint_exp
 open Smt_emitter
+open Sexplib.Std
 
 module FullMemAnno = struct
 
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)
   type slot_t = IsaBasic.imm_var_id * MemOffset.t * bool
+  [@@deriving sexp]
 
   (* taint info of the slot *)
   type taint_t = TaintExp.t
+  [@@deriving sexp]
 
   type t = (slot_t option) * (taint_t option)
+  [@@deriving sexp]
 
   let make_empty () : t = (None, None)
 

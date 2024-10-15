@@ -11,13 +11,16 @@ module TaintEntryType (Entry: EntryType) = struct
   let taint_entry_type_error msg = raise (TaintEntryTypeError ("[Taint Single Type Error] " ^ msg))
 
   type t = Entry.t * TaintExp.t
+  [@@deriving sexp]
 
   type ext_t = 
     | SignExt
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
+  [@@deriving sexp]
 
   type local_var_map_t = Entry.local_var_map_t * TaintExp.local_var_map_t
+  [@@deriving sexp]
 
   let get_empty_var_map = Entry.get_empty_var_map, []
 

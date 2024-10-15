@@ -10,6 +10,7 @@ module Constraint = struct
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
     (* TODO: Add taint constraint later *)
+  [@@deriving sexp]
 
   let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =
     List.filter_map (

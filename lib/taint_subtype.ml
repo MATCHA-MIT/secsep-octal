@@ -4,6 +4,7 @@ open Taint_entry_type
 open Constraint
 open Arch_type
 open Pretty_print
+open Sexplib.Std
 
 module TaintSubtype = struct
   exception TaintSubtypeError of string
@@ -16,13 +17,16 @@ module TaintSubtype = struct
     subtype: TaintExp.t;
     suptype: TaintExp.TaintVarSet.t;
   }
+  [@@deriving sexp]
 
   type t = type_rel list
+  [@@deriving sexp]
 
   module TaintEntryType = TaintEntryType (SingleEntryType)
   module ArchType = ArchType (TaintEntryType)
 
   type sub_t = TaintExp.t * TaintExp.t
+  [@@deriving sexp]
 
   let pp_sub_t_list (lvl: int) (subtype_list: sub_t list) =
     PP.print_lvl lvl "<Subtype list>\n";

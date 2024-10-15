@@ -3,6 +3,7 @@ open Isa_basic
 open Pretty_print
 open Mem_anno_type
 open Call_anno_type
+open Sexplib.Std
 
 module Isa (MemAnno: MemAnnoType) = struct
 
@@ -10,6 +11,7 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   (* disp, base, index, scale *)
   type mem_op = immediate option * register option * register option * scale option
+  [@@deriving sexp]
 
   type operand =
     | ImmOp of immediate
@@ -18,6 +20,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | LdOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | LabelOp of label
+  [@@deriving sexp]
 
   let memop_to_mem_operand (op: mem_op) =
     let (disp, base, index, scale) = op in
@@ -119,26 +122,31 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop
     | Syscall
     | Hlt
+  [@@deriving sexp]
 
   type basic_block = {
     label: label;
     insts: instruction list;
   }
+  [@@deriving sexp]
 
   type func = {
     name: label;
     body: basic_block list;
   }
+  [@@deriving sexp]
 
   type prog = {
     funcs: func list;
     imm_var_map: imm_var_map;
   }
+  [@@deriving sexp]
 
   type program = {
     bbs: basic_block list;
     imm_var_map: imm_var_map;
   }
+  [@@deriving sexp]
 
   let get_func (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs

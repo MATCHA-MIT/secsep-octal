@@ -3,15 +3,21 @@ open Single_exp
 open Taint_exp
 open Constraint
 open Smt_emitter
+open Sexplib
 
 module type EntryType = sig
   type t
+  val t_of_sexp : Sexp.t -> t
+  val sexp_of_t : t -> Sexp.t
+
   type ext_t = 
     | SignExt
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
 
   type local_var_map_t
+  val local_var_map_t_of_sexp : Sexp.t -> local_var_map_t
+  val sexp_of_local_var_map_t : local_var_map_t -> Sexp.t
 
   val get_empty_var_map: local_var_map_t
 

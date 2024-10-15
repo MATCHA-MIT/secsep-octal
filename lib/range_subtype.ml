@@ -4,6 +4,7 @@ open Mem_offset_new
 open Arch_type
 open Pretty_print
 open Smt_emitter
+open Sexplib.Std
 
 module RangeSubtype = struct
   exception RangeSubtypeError of string
@@ -11,7 +12,10 @@ module RangeSubtype = struct
   let range_subtype_error msg = raise (RangeSubtypeError ("[Range Subtype Error] " ^ msg))
 
   type var_idx_t = MemRange.range_var_id * int
+  [@@deriving sexp]
+
   type type_exp_t = MemRange.t * int
+  [@@deriving sexp]
 
   type type_rel = {
     var_idx: var_idx_t;
@@ -20,8 +24,10 @@ module RangeSubtype = struct
     subtype_list: type_exp_t list;
     (* supertype_list: MemRange.range_var_id list; *)
   }
+  [@@deriving sexp]
 
   type t = type_rel list
+  [@@deriving sexp]
 
   module ArchType = ArchType (SingleEntryType)
 

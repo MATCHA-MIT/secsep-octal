@@ -5,9 +5,10 @@ open Mem_offset_new
 open Constraint
 open Single_subtype
 open Taint_subtype
-open Single_type_infer
+open Range_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Sexplib.Std
 
 module TaintTypeInfer = struct
   exception TaintTypeInferError of string
@@ -29,11 +30,12 @@ module TaintTypeInfer = struct
     taint_sol: TaintExp.local_var_map_t;
     smt_ctx: SmtEmitter.t;
   }
+  [@@deriving sexp]
 
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
 
-  let init (single_infer_state: SingleTypeInfer.t) : t =
+  let init (range_infer_state: RangeTypeInfer.t) : t =
     let start_var = TaintExp.TaintVar 1 in
     let helper_code
         (acc: TaintExp.t) (block: Isa.basic_block) :
@@ -47,7 +49,7 @@ module TaintTypeInfer = struct
       acc, { block with insts = new_insts }
     in
     let helper_arch
-        (acc: TaintExp.t) (block_single_type: SingleTypeInfer.ArchType.t) :
+        (acc: TaintExp.t) (block_single_type: RangeTypeInfer.ArchType.t) :
         TaintExp.t * ArchType.t =
       let inner_helper = fun acc single_entry -> TaintExp.next_var acc, (single_entry, acc) in
       let acc, new_reg_type =
@@ -71,13 +73,13 @@ module TaintTypeInfer = struct
         prop_mode = ArchType.TypeInferTaint;
       }
     in
-    let next_var, func_type = List.fold_left_map helper_arch start_var single_infer_state.func_type in
-    let _, func = List.fold_left_map helper_code next_var single_infer_state.func in
+    let next_var, func_type = List.fold_left_map helper_arch start_var range_infer_state.func_type in
+    let _, func = List.fold_left_map helper_code next_var range_infer_state.func in
     {
       func = func;
       func_type = func_type;
-      single_sol = single_infer_state.single_subtype;
-      input_single_var_set = single_infer_state.input_var_set;
+      single_sol = range_infer_state.single_sol;
+      input_single_var_set = range_infer_state.input_single_var_set;
       taint_sol = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
@@ -109,8 +111,8 @@ module TaintTypeInfer = struct
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
-      (single_infer_state: SingleTypeInfer.t) : t =
-    let state = init single_infer_state in
+      (range_infer_state: RangeTypeInfer.t) : t =
+    let state = init range_infer_state in
     Printf.printf "Before infer, func\n";
     let buf = Buffer.create 1000 in
     Isa.pp_ocaml_block_list 0 buf state.func;

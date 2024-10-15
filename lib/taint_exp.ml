@@ -1,18 +1,24 @@
 open Pretty_print
+open Set_sexp
+open Sexplib.Std
 
 module TaintExp = struct
   exception TaintExpError of string
   let taint_exp_error msg = raise (TaintExpError ("[Taint Type Error] " ^ msg))
 
   type taint_var_id = int
-  module TaintVarSet = Set.Make(Int)
+  [@@deriving sexp]
+
+  module TaintVarSet = IntSet
 
   type t = 
     | TaintConst of bool
     | TaintVar of taint_var_id
     | TaintExp of TaintVarSet.t
+  [@@deriving sexp]
 
   type local_var_map_t = (taint_var_id * t) list
+  [@@deriving sexp]
 
   let get_default_taint : t = TaintVar 0
 

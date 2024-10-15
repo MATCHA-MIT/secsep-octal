@@ -1,6 +1,7 @@
 open Isa_basic
 open Single_exp
 open Smt_emitter
+open Sexplib.Std
 
 module RangeExp = struct
   exception RangeExpError of string
@@ -12,6 +13,7 @@ module RangeExp = struct
     | Range of SingleExp.t * SingleExp.t * int64 (* begin, end, step *)
     | SingleSet of SingleExp.t list
     | Top
+  [@@deriving sexp]
 
   let to_string (e: t) : string =
     match e with

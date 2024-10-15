@@ -2,11 +2,13 @@ open Isa_basic
 open Single_exp_basic
 open Smt_emitter
 open Pretty_print
+open Sexplib.Std
 
 module SingleExp = struct
 include SingleExpBasic
 
   type local_var_map_t = (IsaBasic.imm_var_id * t) list
+  [@@deriving sexp]
 
   let get_empty_var_map : local_var_map_t = []
 

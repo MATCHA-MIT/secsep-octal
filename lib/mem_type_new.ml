@@ -8,6 +8,7 @@ open Full_mem_anno
 open Cond_type_new
 open Constraint
 (* open Arch_type *)
+open Sexplib.Std
 
 module MemKeySet = struct
 include Set.Make(Int)
@@ -48,8 +49,14 @@ module MemTypeBasic = struct
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
   type 'a mem_slot = MemOffset.t * MemRange.t * 'a
+  [@@deriving sexp]
+
   type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
+  [@@deriving sexp]
+
   type 'a mem_content = ('a mem_part) list
+  [@@deriving sexp]
+
 
   let map (func: 'a -> 'b) (mem: 'a mem_content) : 'b mem_content =
     let helper_inner 
@@ -215,7 +222,10 @@ module MemType (Entry: EntryType) = struct
   include MemTypeBasic
 
   type entry_t = Entry.t
+  [@@deriving sexp]
+
   type t = entry_t mem_content
+  [@@deriving sexp]
 
   module MemAnno = FullMemAnno
 

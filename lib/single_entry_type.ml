@@ -12,6 +12,7 @@ include SingleExp
   | SignExt
   | ZeroExt
   | OldExt of t (* Used for memory slot partial update *)
+  [@@deriving sexp]
 
   let partial_read_val (e: t) : t =
     match e with
