@@ -2,18 +2,26 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
+open Call_anno_type
 
 module Isa (MemAnno: MemAnnoType) = struct
 
   include IsaBasic
 
+  (* disp, base, index, scale *)
+  type mem_op = immediate option * register option * register option * scale option
+
   type operand =
     | ImmOp of immediate
     | RegOp of register
-    | MemOp of immediate option * register option * register option * scale option (* disp, base, index, scale *)
+    | MemOp of mem_op
     | LdOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
     | LabelOp of label
+
+  let memop_to_mem_operand (op: mem_op) =
+    let (disp, base, index, scale) = op in
+    MemOp (disp, base, index, scale)
 
   let rec string_of_operand (op: operand): string =
     match op with
@@ -107,7 +115,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | RepMovsq
     | Jmp of label
     | Jcond of branch_cond * label
-    | Call of label
+    | Call of label * CallAnno.t
     | Nop
     | Syscall
     | Hlt
@@ -211,7 +219,7 @@ module Isa (MemAnno: MemAnnoType) = struct
       | Some opcode -> Printf.sprintf "%s\t\t%s" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
       end
-    | Call label -> Printf.sprintf "call\t\t%s" label
+    | Call (label, call_anno) -> Printf.sprintf "call\t\t%s, %s" label (CallAnno.to_string call_anno)
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
@@ -259,7 +267,7 @@ module Isa (MemAnno: MemAnnoType) = struct
       | Some opcode -> Printf.sprintf "Jcond (%s, \"%s\")" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
       end
-    | Call label -> Printf.sprintf "Call \"%s\"" label
+    | Call (label, call_anno) -> Printf.sprintf "Call (\"%s\", %s)" label (CallAnno.to_ocaml_string call_anno)
     | Nop -> "Nop"
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
@@ -341,5 +349,35 @@ module Isa (MemAnno: MemAnnoType) = struct
   let update_block_list_taint 
       (update_func: MemAnno.t -> MemAnno.t) (block_list: basic_block list) : basic_block list =
     List.map (update_block_taint update_func) block_list
+
+  let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
+    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm))
+
+  let make_inst_add_i_m64 (imm: int64) (mem_op: mem_op) : instruction =
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm))
+
+  let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
+    if get_reg_offset_size reg != (0L, 8L) then
+      isa_error "make_inst_st_r64_m64: reg size does not match";
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
+
+  let make_inst_ld_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
+    if get_reg_offset_size reg != (0L, 8L) then
+      isa_error "make_inst_st_r64_m64: reg size does not match";
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    UInst (Mov, RegOp reg, LdOp (d, b, i, s, size, mem_anno))
+
+  let is_opr_callee_saved_reg (o: operand) : register option =
+    match o with
+    | RegOp r -> if is_reg_callee_saved r && get_reg_offset_size r = (0L, 8L) then Some r else None
+    | _ -> None
 
 end

@@ -1,3 +1,4 @@
+open Isa_basic
 open Single_exp
 open Cond_type_new
 open Range_exp
@@ -252,6 +253,9 @@ module MemOffset = struct
       fun (off, pc) ->
         PP.print_lvl (lvl + 1) "%d %s\n" pc (to_string off)
     ) unknown_list
+
+  let is_8byte_slot (o: t) : bool =
+    SingleExp.cmp (snd o) (SingleExp.SingleBExp (SingleAdd, (fst o), SingleConst (IsaBasic.get_gpr_full_size ()))) = 0
   
 end
 

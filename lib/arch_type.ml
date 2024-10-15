@@ -726,7 +726,7 @@ module ArchType (Entry: EntryType) = struct
       match inst with
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype, inst
-      | Call target_func_name ->
+      | Call (target_func_name, _ (* TODO: update the call annotation *)) ->
         (type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name,
         (* let _ = func_interface_list in
         let _ = target_func_name in

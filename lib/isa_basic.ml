@@ -164,6 +164,26 @@ module IsaBasic = struct
     | R15 | R15D | R15W | R15B -> 15
     (* | R0 -> 16 *)
 
+  let get_full_reg_by_idx (idx: int) : register =
+    match idx with
+    | 0 -> RAX
+    | 1 -> RCX
+    | 2 -> RDX
+    | 3 -> RBX
+    | 4 -> RSP
+    | 5 -> RBP
+    | 6 -> RSI
+    | 7 -> RDI
+    | 8 -> R8
+    | 9 -> R9
+    | 10 -> R10
+    | 11 -> R11
+    | 12 -> R12
+    | 13 -> R13
+    | 14 -> R14
+    | 15 -> R15
+    | _ -> isa_error "get_full_reg_by_idx: invalid idx"
+
   let get_reg_offset_size (r: register) : int64 * int64 =
     match r with
     | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> (0L, 8L)
@@ -175,6 +195,8 @@ module IsaBasic = struct
   let get_reg_full_size (r: register) : int64 =
     match r with
     | _ -> 8L (* Note: vector reg has different full sizes!!! *)
+  
+  let get_gpr_full_size () : int64 = get_reg_full_size RAX
 
   let reg_name_list = [
     "rax"; "rcx"; "rdx"; "rbx";
@@ -204,6 +226,9 @@ module IsaBasic = struct
       5; (* RBP *)
       12; 13; 14; 15
     ]
+
+  let is_reg_callee_saved (r: register) : bool =
+    is_reg_idx_callee_saved (get_reg_idx r)
 
   type immediate =
     | ImmNum of int64
@@ -305,7 +330,7 @@ module IsaBasic = struct
   ]
 
   let uop_opcode_ocaml_str_map = [
-    ("Mov", Mov); ("Mov", Mov);
+    ("Mov", Mov);
     ("MovS", MovS); ("MovZ", MovZ);
     ("Lea", Lea);
     ("Not", Not); ("Bswap", Bswap)

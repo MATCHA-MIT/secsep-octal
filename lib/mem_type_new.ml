@@ -43,42 +43,13 @@ include Set.Make(Int)
 
 end
 
-module MemType (Entry: EntryType) = struct
+module MemTypeBasic = struct
   exception MemTypeError of string
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
-  type entry_t = Entry.t
-  type 'a mem_content = (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) list
-  type t = entry_t mem_content
-
-  module MemAnno = FullMemAnno
-
-  let pp_mem_type (lvl: int) (mem: t) =
-    PP.print_lvl lvl "<MemType>\n";
-    List.iter (
-      fun (ptr, off_list) ->
-        PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
-        List.iter (
-          fun (off, r, entry) ->
-            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
-        ) off_list
-    ) mem
-
-  let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
-    PP.bprint_lvl lvl buf "[\n";
-    List.iter (
-      fun (ptr, off_list) ->
-        PP.bprint_lvl (lvl + 1) buf "(%d, [\n" ptr;
-        List.iter (
-          fun (off, range, entry) ->
-            PP.bprint_lvl (lvl + 2) buf "(%s, %s, %s);\n" 
-              (MemOffset.to_ocaml_string off) 
-              (MemRange.to_ocaml_string range) 
-              (Entry.to_ocaml_string entry)
-        ) off_list;
-        PP.bprint_lvl (lvl + 1) buf "]);\n"
-    ) mem;
-    PP.bprint_lvl lvl buf "]\n"
+  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
+  type 'a mem_part = IsaBasic.imm_var_id * (('a mem_slot) list)
+  type 'a mem_content = ('a mem_part) list
 
   let map (func: 'a -> 'b) (mem: 'a mem_content) : 'b mem_content =
     let helper_inner 
@@ -94,10 +65,10 @@ module MemType (Entry: EntryType) = struct
     in
     List.map helper_outer mem
 
-  let map_full 
+  let map_full
       (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b)
       (mem: 'a mem_content) : 'b mem_content =
-    let helper_outer 
+    let helper_outer
         (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
         IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list) =
       let ptr, part_mem = entry in
@@ -109,7 +80,7 @@ module MemType (Entry: EntryType) = struct
       (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b ->
               MemOffset.t * MemRange.t * 'c)
       (mem1: 'a mem_content) (mem2: 'b mem_content) : 'c mem_content =
-    let helper_outer 
+    let helper_outer
         (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
         (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) :
         IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'c) list) =
@@ -174,7 +145,7 @@ module MemType (Entry: EntryType) = struct
       (acc: 'acc)
       (mem: 'a mem_content) : 'acc * ('b mem_content) =
     let helper_outer
-        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) : 
+        (acc: 'acc) (entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list)) :
         'acc * (IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) =
       let id, l = entry in
       let acc, l = List.fold_left_map func acc l in
@@ -182,7 +153,7 @@ module MemType (Entry: EntryType) = struct
     in
     List.fold_left_map helper_outer acc mem
 
-  let fold_left2 
+  let fold_left2
       (func: 'acc -> 'a -> 'b -> 'acc)
       (acc: 'acc)
       (mem1: 'a mem_content)
@@ -213,7 +184,7 @@ module MemType (Entry: EntryType) = struct
       (mem1: 'a mem_content)
       (mem2: 'b mem_content) : 'acc =
     let helper_outer
-        (acc: 'acc) 
+        (acc: 'acc)
         (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
         (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) : 'acc =
       let v1, l1 = entry1 in
@@ -230,13 +201,50 @@ module MemType (Entry: EntryType) = struct
         List.map (
           fun (off, range, entry) ->
             MemOffset.add_base (SingleVar base) off,
-            (* (SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)), 
+            (* (SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, l)),
             SingleExp.eval (SingleBExp (SingleAdd, SingleVar base, r))), *)
-            MemRange.add_base (SingleVar base) range, 
+            MemRange.add_base (SingleVar base) range,
             entry
         ) off_list
         )
     ) mem_layout
+
+end
+
+module MemType (Entry: EntryType) = struct
+  include MemTypeBasic
+
+  type entry_t = Entry.t
+  type t = entry_t mem_content
+
+  module MemAnno = FullMemAnno
+
+  let pp_mem_type (lvl: int) (mem: t) =
+    PP.print_lvl lvl "<MemType>\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
+        List.iter (
+          fun (off, r, entry) ->
+            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
+        ) off_list
+    ) mem
+
+  let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (
+      fun (ptr, off_list) ->
+        PP.bprint_lvl (lvl + 1) buf "(%d, [\n" ptr;
+        List.iter (
+          fun (off, range, entry) ->
+            PP.bprint_lvl (lvl + 2) buf "(%s, %s, %s);\n"
+              (MemOffset.to_ocaml_string off)
+              (MemRange.to_ocaml_string range)
+              (Entry.to_ocaml_string entry)
+        ) off_list;
+        PP.bprint_lvl (lvl + 1) buf "]);\n"
+    ) mem;
+    PP.bprint_lvl lvl buf "]\n"
 
   let init_mem_type_from_layout
       (start_var: entry_t) (mem_layout: 'a mem_content) : entry_t * t =
@@ -284,6 +292,23 @@ module MemType (Entry: EntryType) = struct
 
   let get_part_mem (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : (MemOffset.t * MemRange.t * 'a) list =
     let _, part_mem = List.find (fun (x, _) -> x = ptr) mem in part_mem
+
+  (* get the entry from memory type using strict comparison *)
+  let get_mem_type_strict
+      (mem: 'a mem_content)
+      (location: IsaBasic.imm_var_id * MemOffset.t)
+      : 'a option =
+    let base, off = location in
+    List.find_map (
+      fun mem_part ->
+        let base', slots = mem_part in
+        if base' != base then None else
+        List.find_map (
+          fun (off', _, entry) ->
+            if MemOffset.cmp off' off = 0 then Some entry
+            else None
+        ) slots
+    ) mem
 
   let get_part_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -354,12 +379,12 @@ module MemType (Entry: EntryType) = struct
   let get_slot_mem_type
       (smt_ctx: SmtEmitter.t)
       (check_addr: bool)
-      (mem: t) 
+      (mem: t)
       (orig_addr_off: MemOffset.t)
-      (slot_info: MemAnno.slot_t) : 
+      (slot_info: MemAnno.slot_t) :
       MemOffset.t * MemRange.t * entry_t =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s" 
+      mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s"
         (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
     else
       let s_ptr, s_off, is_full = slot_info in
@@ -519,9 +544,9 @@ module MemType (Entry: EntryType) = struct
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_val: entry_t) :
-      (MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) = 
-    let helper 
-        (acc: (Constraint.t list) option) 
+      (MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) =
+    let helper
+        (acc: (Constraint.t list) option)
         (entry: MemOffset.t * MemRange.t * entry_t) :
         (Constraint.t list) option * (MemOffset.t * MemRange.t * entry_t) =
       match acc with
@@ -536,7 +561,7 @@ module MemType (Entry: EntryType) = struct
               Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, new_val)
             else
               Some [], (off, range, new_val)
-          else 
+          else
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
             let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
             Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, Entry.mem_partial_write_val entry_val new_val)
@@ -557,7 +582,7 @@ module MemType (Entry: EntryType) = struct
       (new_type: entry_t) :
       t * (Constraint.t list) =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s" 
+      mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s"
         (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
     else
       let s_ptr, _, _ = slot_info in

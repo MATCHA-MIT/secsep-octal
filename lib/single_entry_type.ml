@@ -46,11 +46,11 @@ include SingleExp
   let get_eq_taint_constraint (old_e: t) (new_e: t) : Constraint.t list = 
     let _ = old_e, new_e in []
 
-  let get_sub_taint_constraint (sub: t) (sup: t) : Constraint.t list = 
+  let get_sub_taint_constraint (sub: t) (sup: t) : Constraint.t list =
     let _ = sub, sup in []
 
   let get_untaint_constraint (e: t) : Constraint.t list =
-  let _ = e in []
+    let _ = e in []
 
   let update_ld_taint_constraint (_: t) (_: TaintExp.t option) : Constraint.t list = []
 
@@ -87,9 +87,9 @@ include SingleExp
   let get_top_type () : t = SingleTop
   let get_top_untaint_type () : t = SingleTop
 
-  let add_context_map 
+  let add_context_map
       (is_mem: bool)
-      (m: local_var_map_t) (e1: t) (e2: t) : 
+      (m: local_var_map_t) (e1: t) (e2: t) :
       local_var_map_t =
     let _ = is_mem in
     add_local_var m e1 e2

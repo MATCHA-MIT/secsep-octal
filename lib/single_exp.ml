@@ -510,4 +510,11 @@ include SingleExpBasic
   let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
     SmtEmitter.expr_of_single_exp smt_ctx e false
 
+  let match_const_offset (o: t) (base_id: IsaBasic.imm_var_id) : int64 option =
+    match o with
+    | SingleVar var when var = base_id -> Some 0L
+    | SingleBExp (SingleAdd, SingleVar var, SingleConst off) when var = base_id -> Some off
+    | SingleBExp (SingleAdd, SingleConst off, SingleVar var) when var = base_id -> Some off
+    | _ -> None
+
 end
