@@ -23,6 +23,7 @@ module TaintTypeInfer = struct
   module FuncInterface = ArchType.FuncInterface
 
   type t = {
+    func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
@@ -31,6 +32,17 @@ module TaintTypeInfer = struct
     smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
+
+  let state_list_to_file (filename: string) (infer_result: t list) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_list sexp_of_t infer_result)
+
+  let state_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    list_of_sexp t_of_sexp s_exp
 
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
@@ -76,6 +88,7 @@ module TaintTypeInfer = struct
     let next_var, func_type = List.fold_left_map helper_arch start_var range_infer_state.func_type in
     let _, func = List.fold_left_map helper_code next_var range_infer_state.func in
     {
+      func_name = range_infer_state.func_name;
       func = func;
       func_type = func_type;
       single_sol = range_infer_state.single_sol;
@@ -108,6 +121,22 @@ module TaintTypeInfer = struct
     let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
     { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
+
+  let get_func_interface
+      (infer_state: t) : FuncInterface.t =
+    let sub_sol =
+      SingleSubtype.sub_sol_single_to_single_func_interface
+        infer_state.single_sol infer_state.input_single_var_set
+    in
+    let sub_sol_for_taint (pc: int) (taint_entry: TaintEntryType.t) : TaintEntryType.t =
+      let single, taint = taint_entry in
+      sub_sol pc single, taint
+    in
+    ArchType.get_func_interface
+      infer_state.smt_ctx
+      infer_state.func_name
+      infer_state.func_type
+      sub_sol_for_taint
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
@@ -168,5 +197,22 @@ module TaintTypeInfer = struct
       func = func;
       func_type = func_type;
       taint_sol = taint_sol }
+
+  let infer 
+      (range_infer_state_list: RangeTypeInfer.t list) : t list =
+    let helper
+        (acc: FuncInterface.t list) (entry: RangeTypeInfer.t) :
+        (FuncInterface.t list) * t =
+      let infer_state = infer_one_func acc entry in
+      let func_interface = get_func_interface infer_state in
+      Printf.printf "Infer state of func %s\n" infer_state.func_name;
+      pp_func_type 0 infer_state;
+      (* FuncInterface.pp_func_interface 0 func_interface; *)
+      func_interface :: acc, infer_state
+    in
+    let _, infer_result = List.fold_left_map helper [] range_infer_state_list in
+    (* Printf.printf "=========================\n";
+    Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
+    infer_result
 
 end

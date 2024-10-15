@@ -31,6 +31,17 @@ module SingleTypeInfer = struct
   }
   [@@deriving sexp]
 
+  let state_list_to_file (filename: string) (infer_result: t list) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_list sexp_of_t infer_result)
+
+  let state_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    list_of_sexp t_of_sexp s_exp
+
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
 

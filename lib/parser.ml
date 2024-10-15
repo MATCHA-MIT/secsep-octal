@@ -550,3 +550,5 @@ module Parser = struct
     (* {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map} *)
 
 end
+
+let parse (source: string) = Parser.parse_program source
