@@ -40,6 +40,20 @@ module FuncInterface (Entry: EntryType) = struct
     MemType.pp_mem_type 0 interface.out_mem;
     Printf.printf "\n"
 
+  let pp_ocaml_func_interface (lvl: int) (buf: Buffer.t) (interface: t) =
+    PP.bprint_lvl lvl buf "{\n";
+    PP.bprint_lvl (lvl + 1) buf "func_name = \"%s\";\n" interface.func_name;
+    PP.bprint_lvl (lvl + 1) buf "in_reg =\n";
+    RegType.pp_ocaml_reg_type (lvl + 2) buf interface.in_reg;
+    PP.bprint_lvl (lvl + 1) buf "in_mem =\n";
+    MemType.pp_ocaml_mem_type (lvl + 2) buf interface.in_mem;
+    PP.bprint_lvl (lvl + 1) buf "context =\n";
+    CondType.pp_ocaml_cond_list (lvl + 2) buf interface.context;
+    PP.bprint_lvl (lvl + 1) buf "out_reg =\n";
+    RegType.pp_ocaml_reg_type (lvl + 2) buf interface.out_reg;
+    PP.bprint_lvl (lvl + 1) buf "out_mem =\n";
+    MemType.pp_ocaml_mem_type (lvl + 2) buf interface.out_mem
+
   let add_reg_var_map 
       (child_reg: RegType.t) (parent_reg: RegType.t) : 
       SingleExp.local_var_map_t * Entry.local_var_map_t =

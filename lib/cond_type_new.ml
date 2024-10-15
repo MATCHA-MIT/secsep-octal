@@ -37,6 +37,15 @@ module CondType (Entry: EntryTypeBasic) = struct
     Printf.sprintf "%s(%s,%s)" s (Entry.to_string l) (Entry.to_string r)
     (* s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")" *)
 
+  let to_ocaml_string (cond: t) =
+    let c, l, r = cond in
+    let s = match c with
+    | Eq -> "Eq" | Ne -> "Ne"
+    | Le -> "Le" | Lt -> "Lt"
+    | Be -> "Be" | Bt -> "Bt"
+    in
+    Printf.sprintf "(%s, %s, %s)" s (Entry.to_ocaml_string l) (Entry.to_ocaml_string r)
+
   let get_taken_type (cond: IsaBasic.branch_cond) (flag: entry_t * entry_t) : t option =
     let l, r = flag in
     match cond with
@@ -78,6 +87,13 @@ module CondType (Entry: EntryTypeBasic) = struct
   let pp_cond_list (lvl: int) (cond_list: t list) =
     PP.print_lvl lvl "<Cond list>\n";
     List.iter (fun x -> pp_cond (lvl + 1) x) (List.rev cond_list)
+
+  let pp_ocaml_cond_list (lvl: int) (buf: Buffer.t) (cond_list: t list) =
+    PP.bprint_lvl lvl buf "[\n";
+    List.iter (fun x ->
+      PP.bprint_lvl (lvl + 1) buf "%s;\n" (to_ocaml_string x)
+    ) cond_list;
+    PP.bprint_lvl lvl buf "]\n"
 
 end
 
