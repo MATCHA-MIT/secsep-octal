@@ -44,6 +44,7 @@ module type EntryType = sig
   val exe_uop_inst: IsaBasic.uop -> t -> t
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
+  val get_single_taint_exp: t -> (SingleExp.t * TaintExp.t)
   val get_single_local_var_map: local_var_map_t -> SingleExp.local_var_map_t
   val get_const_type: IsaBasic.immediate -> t
   val get_top_type: unit -> t

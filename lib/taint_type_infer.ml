@@ -8,6 +8,7 @@ open Taint_subtype
 open Range_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Call_anno_type
 open Sexplib.Std
 
 module TaintTypeInfer = struct
@@ -55,7 +56,7 @@ module TaintTypeInfer = struct
       let inner_helper
           (acc: TaintExp.t) (inst: Isa.instruction) :
           TaintExp.t * Isa.instruction =
-        TaintExp.next_var acc, Isa.update_inst_taint (fun anno -> MemAnno.update_taint anno acc) inst
+        TaintExp.next_var acc, Isa.update_inst_taint (fun anno -> MemAnno.update_taint anno acc) (fun x -> x) inst
       in
       let acc, new_insts = List.fold_left_map inner_helper acc block.insts in
       acc, { block with insts = new_insts }
@@ -179,11 +180,13 @@ module TaintTypeInfer = struct
     let taint_sol = TaintSubtype.solve_subtype_list input_var subtype_list in
     let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
-    let func = Isa.update_block_list_taint (fun t ->
-      match MemAnno.get_taint t with
-      | None -> t
-      | Some taint -> MemAnno.update_taint t (update_taint taint)
-    ) state.func in
+    let func = 
+      Isa.update_block_list_taint (fun t ->
+        match MemAnno.get_taint t with
+        | None -> t
+        | Some taint -> MemAnno.update_taint t (update_taint taint)
+      ) (CallAnno.update_taint update_taint) state.func 
+    in
     let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
 
     Printf.printf "After infer, func\n";

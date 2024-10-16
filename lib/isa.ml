@@ -332,7 +332,10 @@ module Isa (MemAnno: MemAnnoType) = struct
       StOp (disp, base, index, scale, size, update_func old_mem_anno)
     | _ -> op
   
-  let update_inst_taint (update_func: MemAnno.t -> MemAnno.t) (inst: instruction) : instruction =
+  let update_inst_taint 
+      (update_func: MemAnno.t -> MemAnno.t)
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (inst: instruction) : instruction =
     let update_helper = update_op_taint update_func in
     match inst with
     | BInst (bop, op1, op2, op3) ->
@@ -349,14 +352,21 @@ module Isa (MemAnno: MemAnnoType) = struct
       Push (update_helper op, update_func mem_anno)
     | Pop (op, mem_anno) ->
       Pop (update_helper op, update_func mem_anno)
+    | Call (op, call_anno) ->
+      Call (op, update_call_func call_anno)
     | _ -> inst
 
-  let update_block_taint (update_func: MemAnno.t -> MemAnno.t) (block: basic_block) : basic_block =
-    { block with insts = List.map (update_inst_taint update_func) block.insts }
+  let update_block_taint 
+      (update_func: MemAnno.t -> MemAnno.t) 
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (block: basic_block) : basic_block =
+    { block with insts = List.map (update_inst_taint update_func update_call_func) block.insts }
 
   let update_block_list_taint 
-      (update_func: MemAnno.t -> MemAnno.t) (block_list: basic_block list) : basic_block list =
-    List.map (update_block_taint update_func) block_list
+      (update_func: MemAnno.t -> MemAnno.t)
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (block_list: basic_block list) : basic_block list =
+    List.map (update_block_taint update_func update_call_func) block_list
 
   let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
     BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm))

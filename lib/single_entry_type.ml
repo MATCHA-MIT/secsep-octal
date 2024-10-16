@@ -79,6 +79,9 @@ include SingleExp
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
 
+  let get_single_taint_exp (_: t) : t * TaintExp.t =
+    single_exp_error "Cannot get single taint exp on a single entry type"
+
   let handle_mem_rw (_: t) (_: t) : Constraint.t list = []
 
   let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m

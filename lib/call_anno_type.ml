@@ -1,5 +1,6 @@
 open Isa_basic
 open Reg_type_new
+open Taint_exp
 open Single_entry_type
 open Taint_entry_type
 open Mem_type_new
@@ -11,7 +12,8 @@ module CallAnno = struct
   exception CallAnnoError of string
   let transform_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
 
-  module TaintRegType = RegType(TaintEntryType(SingleEntryType))
+  module TaintEntryType = TaintEntryType(SingleEntryType)
+  module TaintRegType = RegType(TaintEntryType)
 
   (* which slot in parent's memory is this slot mapped to *)
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)
@@ -52,5 +54,24 @@ module CallAnno = struct
     | Some _ -> "Some (call anno...)"
 
   let to_string (anno: t) : string = to_ocaml_string anno
+
+  let get_call_anno
+      (pr_reg: TaintRegType.t) 
+      (call_mem_read_hint: slot_info MemTypeBasic.mem_content)
+      (base_info: base_info MemTypeBasic.mem_content) : t =
+    Some {
+      pr_reg = pr_reg;
+      ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
+    }
+
+  let update_taint (update_taint: TaintExp.t -> TaintExp.t) (anno: t) : t =
+    let update_taint_entry (entry: TaintEntryType.t) : TaintEntryType.t =
+      let single, taint = entry in
+      single, update_taint taint
+    in
+    match anno with
+    | None -> None
+    | Some anno' ->
+      Some { anno' with pr_reg = List.map update_taint_entry anno'.pr_reg }
 
 end

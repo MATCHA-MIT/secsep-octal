@@ -6,6 +6,7 @@ open Cond_type_new
 open Constraint
 open Reg_type_new
 open Mem_type_new
+open Call_anno_type
 open Smt_emitter
 open Pretty_print
 open Sexplib.Std
@@ -27,7 +28,8 @@ module FuncInterface (Entry: EntryType) = struct
     in_mem: MemType.t;
     context: CondType.t list;
     out_reg: RegType.t;
-    out_mem: MemType.t
+    out_mem: MemType.t;
+    base_info: CallAnno.base_info MemType.mem_content;
   }
   [@@deriving sexp]
 
@@ -72,7 +74,7 @@ module FuncInterface (Entry: EntryType) = struct
   type read_hint_t =
     | Untrans of (MemOffset.t * MemRange.t * entry_t)
     | Unmapped of MemOffset.t
-    | Mapped of (MemOffset.t * bool * MemRange.t * entry_t)
+    | Mapped of (IsaBasic.imm_var_id * MemOffset.t * bool * MemRange.t * entry_t)
   [@@deriving sexp]
 
   let add_mem_var_map
@@ -105,7 +107,7 @@ module FuncInterface (Entry: EntryType) = struct
           | Some (m_off_l, _), Some (_, m_off_r) ->
             let simp_m_off = m_off_l, m_off_r in
             begin match MemType.get_mem_type smt_ctx parent_mem orig_m_off simp_m_off with
-            | Some (is_full, _, (p_off, _, p_entry)) ->
+            | Some (is_full, p_ptr, (p_off, _, p_entry)) ->
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
               ( (* acc *)
@@ -114,7 +116,7 @@ module FuncInterface (Entry: EntryType) = struct
                 (Entry.add_context_map true) var_map c_entry p_entry),
                 acc_useful
               ),
-              Mapped (p_off, is_full, m_range, c_entry)
+              Mapped (p_ptr, p_off, is_full, m_range, c_entry)
             | None -> 
               (* Printf.printf "Unmapped m_off %s c_off %s\n" (MemOffset.to_string m_off) (MemOffset.to_string c_off); *)
               (* SingleExp.pp_local_var 0 single_var_map; *)
@@ -241,7 +243,7 @@ module FuncInterface (Entry: EntryType) = struct
       | _, (Unmapped off) :: read_hint, _ :: write_mem ->
         helper finished_parent_entry ((Unknown off) :: constraint_list) useful_vars parent_entry read_hint write_mem
       | (p_off, p_range, p_entry) :: parent_entry_tl,
-        (Mapped (mp_off, is_full, m_in_range, c_in_entry)) :: read_hint_tl,
+        (Mapped (_, mp_off, is_full, m_in_range, c_in_entry)) :: read_hint_tl,
         write_entry :: write_mem_tl ->
         if MemOffset.cmp p_off mp_off = 0 then
           let new_entry, new_constraints, new_useful_vars = 
@@ -323,6 +325,25 @@ module FuncInterface (Entry: EntryType) = struct
         (Entry.get_eq_taint_constraint p_entry (Entry.repl_context_var var_map c_entry)) @ acc
     ) [] parent_mem child_mem
 
+  let get_slot_map_info
+      (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
+      (child_mem: MemType.t) : CallAnno.slot_info MemType.mem_content =
+    List.map2 (
+      fun (ptr1, part_hint) (ptr2, part_mem) ->
+        if ptr1 = ptr2 then
+          ptr1,
+          List.map2 (
+            fun (hint: read_hint_t) (entry: MemOffset.t * MemRange.t * entry_t) ->
+              match hint with
+              | Mapped (p_ptr, p_off, p_is_full, _, _) ->
+                let c_off, c_range, _ = entry in
+                c_off, c_range, (p_ptr, p_off, p_is_full)
+              | _ -> func_interface_error "get_slot_map_info read hint is not fully resolved"
+          ) part_hint part_mem
+        else 
+          func_interface_error "get_slot_map_info ptr does not match"
+    ) read_hint child_mem
+
   let func_call_helper
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
@@ -331,7 +352,9 @@ module FuncInterface (Entry: EntryType) = struct
       (child_reg: RegType.t) (child_mem: MemType.t)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
-      RegType.t * MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
+      RegType.t * MemType.t * 
+      (Constraint.t list) * SingleExp.SingleVarSet.t * 
+      CallAnno.slot_info MemType.mem_content =
     let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -363,27 +386,30 @@ module FuncInterface (Entry: EntryType) = struct
       *)
 
     (* TODO: Check context!!! *)
-    reg_type, mem_type, constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars
+    reg_type, mem_type, 
+    constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
+    (get_slot_map_info mem_read_hint child_mem)
 
   let func_call
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
-      (func_inferface_list: t list)
+      (func_interface: t)
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: Entry.local_var_map_t)
-      (reg_type: RegType.t) (mem_type: MemType.t)
-      (func_name: IsaBasic.label) :
-      RegType.t * MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
-    match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
+      (reg_type: RegType.t) (mem_type: MemType.t) :
+      RegType.t * MemType.t * 
+      (Constraint.t list) * SingleExp.SingleVarSet.t *
+      CallAnno.slot_info MemType.mem_content =
+    (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
-    | Some func_interface ->
+    | Some func_interface -> *)
       (* TODO: Check context!!! *)
-      func_call_helper smt_ctx sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
-        func_interface.in_reg func_interface.in_mem
-        func_interface.out_reg func_interface.out_mem
-        reg_type mem_type
+    func_call_helper smt_ctx sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
+      func_interface.in_reg func_interface.in_mem
+      func_interface.out_reg func_interface.out_mem
+      reg_type mem_type
 
-    let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
-      List.find_opt (fun fi -> fi.func_name = l) fi_list
+  let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
+    List.find_opt (fun fi -> fi.func_name = l) fi_list
 
 end

@@ -126,6 +126,9 @@ module TaintEntryType (Entry: EntryType) = struct
   let get_single_exp (e: t) : SingleExp.t =
     let single, _ = e in Entry.get_single_exp single
 
+  let get_single_taint_exp (e: t) : SingleExp.t * TaintExp.t =
+    let single, taint = e in Entry.get_single_exp single, taint
+
   let get_single_local_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
     let single_map, _ = map in Entry.get_single_local_var_map single_map
 

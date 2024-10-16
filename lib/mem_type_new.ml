@@ -83,6 +83,34 @@ module MemTypeBasic = struct
     in
     List.map helper_outer mem
 
+  let map2 
+      (func: 'a -> 'b -> 'c) 
+      (mem1: 'a mem_content) (mem2: 'b mem_content) : 
+      'c mem_content =
+    let helper_inner 
+        (entry1: MemOffset.t * MemRange.t * 'a)
+        (entry2: MemOffset.t * MemRange.t * 'b) : 
+        MemOffset.t * MemRange.t * 'c =
+      let off1, range, e1 = entry1 in
+      let off2, _, e2 = entry2 in
+      if MemOffset.cmp off1 off2 = 0 then
+        off1, range, func e1 e2
+      else
+        mem_type_error "[map2] off does not match"
+    in
+    let helper_outer 
+        (entry1: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'a) list))
+        (entry2: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'b) list)) :
+        IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * 'c) list) =
+      let ptr1, part_mem1 = entry1 in
+      let ptr2, part_mem2 = entry2 in
+      if ptr1 = ptr2 then
+        ptr1, List.map2 helper_inner part_mem1 part_mem2
+      else
+        mem_type_error "[map2] ptr does not match"
+    in
+    List.map2 helper_outer mem1 mem2
+
   let map2_full
       (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b ->
               MemOffset.t * MemRange.t * 'c)

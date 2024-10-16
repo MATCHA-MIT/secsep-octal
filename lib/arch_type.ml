@@ -11,6 +11,7 @@ open Range_exp
 open Constraint
 open Func_interface
 open Full_mem_anno
+open Call_anno_type
 open Sexplib.Std
 
 module ArchType (Entry: EntryType) = struct
@@ -695,7 +696,8 @@ module ArchType (Entry: EntryType) = struct
       (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
-      (target_func_name: Isa.label) : t =
+      (target_func_name: Isa.label)
+      (orig_call_anno: CallAnno.t) : t * CallAnno.t =
     Printf.printf "type_prop_call %s\n" target_func_name;
     (* Entry.pp_local_var 0 curr_type.local_var_map;
     pp_arch_type 0 curr_type; *)
@@ -704,18 +706,31 @@ module ArchType (Entry: EntryType) = struct
       | Some r -> RangeExp.to_mem_offset2 r
       | None -> None
     in
-    let new_reg, new_mem, new_constraints, new_useful_vars =
-      FuncInterface.func_call smt_ctx sub_sol_func func_interface_list
-        curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type target_func_name
-    in
-    let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
-    { curr_type with
-      reg_type = new_reg;
-      mem_type = new_mem;
-      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
-      constraint_list = new_constraints @ curr_type.constraint_list;
-      useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
-    }
+    match FuncInterface.find_fi func_interface_list target_func_name with
+    | Some func_interface ->
+      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info =
+        FuncInterface.func_call smt_ctx sub_sol_func func_interface
+          curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
+      in
+      let call_anno = (
+        match curr_type.prop_mode with
+        | TypeInferTaint ->
+          CallAnno.get_call_anno 
+            (List.map Entry.get_single_taint_exp curr_type.reg_type)
+            call_slot_info
+            func_interface.base_info
+        | _ -> orig_call_anno
+      ) in
+      let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
+      { curr_type with
+        reg_type = new_reg;
+        mem_type = new_mem;
+        flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+        constraint_list = new_constraints @ curr_type.constraint_list;
+        useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
+      },
+      call_anno
+    | _ -> arch_type_error (Printf.sprintf "[type_prop_call] Func %s interface not resolved yet" target_func_name)
 
   let type_prop_inst
       (smt_ctx: SmtEmitter.t)
@@ -732,14 +747,17 @@ module ArchType (Entry: EntryType) = struct
       match inst with
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype, inst
-      | Call (target_func_name, _ (* TODO: update the call annotation *)) ->
-        (type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name,
+      | Call (target_func_name, orig_call_anno (* TODO: update the call annotation *)) ->
+        let next_type, call_anno =
+          type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name orig_call_anno
+        in
+        (next_type,
         (* let _ = func_interface_list in
         let _ = target_func_name in
         Printf.printf "Warning: haven't implemented so far!\n";
         curr_type, *)
         block_subtype),
-        inst
+        Call (target_func_name, call_anno)
       | _ ->
         let next_type, inst = type_prop_non_branch smt_ctx sub_sol_func curr_type inst in
         (next_type, block_subtype), inst
@@ -824,6 +842,44 @@ module ArchType (Entry: EntryType) = struct
       reg_type = List.map update_func a_type.reg_type;
       mem_type = MemType.map update_func a_type.mem_type }
 
+  let find_one_base_info
+      (base: Isa.imm_var_id) (reg_type: RegType.t) (mem_type: MemType.t) :
+      CallAnno.base_info =
+    let find_reg_idx =
+      List.find_index (
+        fun (x: entry_t) -> SingleExp.cmp (Entry.get_single_exp x) (SingleVar base) = 0
+      ) reg_type
+    in
+    match find_reg_idx with
+    | Some reg_idx -> BaseAsReg (Isa.get_full_reg_by_idx reg_idx)
+    | None ->
+      let find_mem_entry =
+        List.find_map (
+          fun (ptr, part_mem) ->
+            List.find_map (
+              fun (off, _, entry) ->
+                if SingleExp.cmp (Entry.get_single_exp entry) (SingleVar base) = 0 then
+                  Some (ptr, off)
+                else None
+            ) part_mem
+        ) mem_type
+      in
+      begin match find_mem_entry with
+      | Some (ptr, off) -> BaseAsSlot (ptr, off)
+      | _ -> arch_type_error (Printf.sprintf "[find_base_info] cannot find base %d" base)
+      end
+
+  let find_all_base_info 
+      (reg_type: RegType.t) (mem_type: MemType.t) : CallAnno.base_info MemType.mem_content =
+    List.map (
+      fun (ptr, part_mem) ->
+        let base_info = find_one_base_info ptr reg_type mem_type in
+        ptr,
+        List.map (
+          fun (off, range, _) -> off, range, base_info
+        ) part_mem
+    ) mem_type
+
   let get_func_interface
       (smt_ctx: SmtEmitter.t)
       (func_name: Isa.label)
@@ -844,13 +900,15 @@ module ArchType (Entry: EntryType) = struct
       | Single exp -> exp
       | _ -> SingleTop
     in *)
+    let in_mem = MemType.remove_local_mem_quick_cmp smt_ctx in_state.mem_type in
     let res: FuncInterface.t = {
       func_name = func_name;
       in_reg = in_state.reg_type;
-      in_mem = MemType.remove_local_mem_quick_cmp smt_ctx in_state.mem_type;
+      in_mem = in_mem;
       context = [];
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
-      out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type)
+      out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type);
+      base_info = find_all_base_info in_state.reg_type in_mem;
     }
     in
     Z3.Solver.pop (snd smt_ctx) 1;
