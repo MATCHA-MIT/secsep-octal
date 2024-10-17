@@ -175,7 +175,10 @@ module FuncInterface (Entry: EntryType) = struct
     let helper (reg_out: entry_t) : entry_t =
       if Entry.is_val2 var_map reg_out then
         Entry.repl_context_var var_map reg_out
-      else Entry.get_top_type ()
+      else begin
+        Printf.printf "set_reg_type get_top_type for %s\n" (Entry.to_string reg_out);
+        Entry.get_top_type ()
+      end
     in
     List.map helper child_reg
 
@@ -327,22 +330,36 @@ module FuncInterface (Entry: EntryType) = struct
 
   let get_slot_map_info
       (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
-      (child_mem: MemType.t) : CallAnno.slot_info MemType.mem_content =
-    List.map2 (
-      fun (ptr1, part_hint) (ptr2, part_mem) ->
-        if ptr1 = ptr2 then
-          ptr1,
-          List.map2 (
-            fun (hint: read_hint_t) (entry: MemOffset.t * MemRange.t * entry_t) ->
+      (child_mem: MemType.t) : CallAnno.slot_info MemType.mem_content option =
+    let find_unresolved =
+      List.find_map (
+        fun (_, part_hint) ->
+          List.find_map (
+            fun (hint: read_hint_t) ->
               match hint with
-              | Mapped (p_ptr, p_off, p_is_full, _, _) ->
-                let c_off, c_range, _ = entry in
-                c_off, c_range, (p_ptr, p_off, p_is_full)
-              | _ -> func_interface_error "get_slot_map_info read hint is not fully resolved"
-          ) part_hint part_mem
-        else 
-          func_interface_error "get_slot_map_info ptr does not match"
-    ) read_hint child_mem
+              | Mapped _ -> None
+              | _ -> Some true
+          ) part_hint
+      ) read_hint
+    in
+    match find_unresolved with
+    | Some _ -> None
+    | None ->
+      Some (List.map2 (
+        fun (ptr1, part_hint) (ptr2, part_mem) ->
+          if ptr1 = ptr2 then
+            ptr1,
+            List.map2 (
+              fun (hint: read_hint_t) (entry: MemOffset.t * MemRange.t * entry_t) ->
+                match hint with
+                | Mapped (p_ptr, p_off, p_is_full, _, _) ->
+                  let c_off, c_range, _ = entry in
+                  c_off, c_range, (p_ptr, p_off, p_is_full)
+                | _ -> func_interface_error "get_slot_map_info read hint is not fully resolved"
+            ) part_hint part_mem
+          else 
+            func_interface_error "get_slot_map_info ptr does not match"
+      ) read_hint child_mem)
 
   let func_call_helper
       (smt_ctx: SmtEmitter.t)
@@ -354,7 +371,7 @@ module FuncInterface (Entry: EntryType) = struct
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
-      CallAnno.slot_info MemType.mem_content =
+      CallAnno.slot_info MemType.mem_content option =
     let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -366,7 +383,11 @@ module FuncInterface (Entry: EntryType) = struct
     let ((single_var_map, single_var_set, var_map), read_useful_vars), mem_read_hint =
       add_mem_var_map smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) child_mem parent_mem
     in
+    Printf.printf "!!! set_reg_type\n";
+    RegType.pp_reg_type 0 child_out_reg;
+    Entry.pp_local_var 0 var_map;
     let reg_type = set_reg_type var_map child_out_reg in
+    Printf.printf "!!! set_mem_type%!";
     let mem_type, constraint_list, write_useful_vars = 
       set_mem_type smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
 
@@ -399,7 +420,7 @@ module FuncInterface (Entry: EntryType) = struct
       (reg_type: RegType.t) (mem_type: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t *
-      CallAnno.slot_info MemType.mem_content =
+      CallAnno.slot_info MemType.mem_content option =
     (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)

@@ -103,9 +103,11 @@ module TaintSubtype = struct
       (subtype: sub_t) : sub_t option =
     let sub, sup = subtype in
     let sub = TaintExp.repl_untaint untaint_var sub in
-    match sub with
+    Some (sub, sup)
+    (* Remove this would preventing us from finding solution for vars who only has untaint subtype *)
+    (* match sub with
     | TaintConst false -> None
-    | _ -> Some (sub, sup)
+    | _ -> Some (sub, sup) *)
   
   let filter_untaint_helper
       (untaint_var: TaintExp.TaintVarSet.t)
@@ -378,7 +380,7 @@ module TaintSubtype = struct
       (* List.map (fun (x, x_sol) -> x, TaintExp.repl_taint new_taint_var x_sol) sol_list *)
     in
 
-    TaintExp.pp_local_var 0 sol_list;
+    (* TaintExp.pp_local_var 0 sol_list; *)
     (* sol_list *)
 
     (* Optional: Final check solution!!! *)

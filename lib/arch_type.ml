@@ -866,7 +866,9 @@ module ArchType (Entry: EntryType) = struct
       in
       begin match find_mem_entry with
       | Some (ptr, off) -> BaseAsSlot (ptr, off)
-      | _ -> arch_type_error (Printf.sprintf "[find_base_info] cannot find base %d" base)
+      | _ ->
+        if base < 0 then BaseAsGlobal
+        else arch_type_error (Printf.sprintf "[find_base_info] cannot find base %d" base)
       end
 
   let find_all_base_info 

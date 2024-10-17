@@ -487,6 +487,7 @@ module Transform = struct
                         | None -> None
                         end
                       | BaseAsSlot _ -> None (* we will handle this later, see below *)
+                      | BaseAsGlobal -> None (* TODO: Check whether this is correct *)
                   ) bases_to_change in
                   if Option.is_some result then begin
                     let new_tf, handled_base = Option.get result in
@@ -529,6 +530,7 @@ module Transform = struct
                       b
                       (MemOffset.to_string o)
                     )
+                  | BaseAsGlobal -> transform_error "TODO: Unimplemented case" (* TODO *)
                   in
                   let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
                   let mem_op = (Some (Isa.ImmNum off_of_base), Some base_reg_of_base, None, None) in
@@ -546,6 +548,7 @@ module Transform = struct
                     (Isa.make_inst_add_i_m64 delta mem_op) :: acc_inst_pre,
                     (Isa.make_inst_add_i_m64 (Int64.neg delta) mem_op) :: acc_inst_post
                   )
+                | BaseAsGlobal -> transform_error "TODO: unimplemented case" (* TODO *)
             ) ([], []) bases_to_change in
             (* save/restore active callee-saved registers in caller's scope *)
             let saves, restores = List.split (

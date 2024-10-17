@@ -1,4 +1,16 @@
 (executables
- (public_names type single_type_infer range_type_infer taint_type_infer)
- (names main single_type_infer range_type_infer taint_type_infer)
+ (public_names 
+  type 
+  gen_interface 
+  infer_single
+  infer_range
+  infer_taint
+  )
+ (names 
+  main 
+  gen_interface 
+  infer_single
+  infer_range
+  infer_taint
+  )
  (libraries core type))

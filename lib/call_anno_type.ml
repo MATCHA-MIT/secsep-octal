@@ -24,6 +24,7 @@ module CallAnno = struct
   type base_info =
     | BaseAsReg of IsaBasic.register (* passed as an arg register *)
     | BaseAsSlot of IsaBasic.imm_var_id * MemOffset.t (* passed as a (full) slot in child's memory *)
+    | BaseAsGlobal (* Base is a global variable, no need to pass through pointers *)
   [@@deriving sexp]
 
   type slot_t = (slot_info * base_info)
@@ -47,6 +48,9 @@ module CallAnno = struct
       else MemOffset.cmp o1 o2
     | BaseAsReg _, BaseAsSlot _ -> -1
     | BaseAsSlot _, BaseAsReg _ -> 1
+    | BaseAsGlobal, BaseAsGlobal -> 0
+    | _, BaseAsGlobal -> -1
+    | BaseAsGlobal, _ -> 1
 
   let to_ocaml_string (anno: t) : string =
     match anno with
@@ -57,12 +61,15 @@ module CallAnno = struct
 
   let get_call_anno
       (pr_reg: TaintRegType.t) 
-      (call_mem_read_hint: slot_info MemTypeBasic.mem_content)
+      (call_mem_read_hint_option: slot_info MemTypeBasic.mem_content option)
       (base_info: base_info MemTypeBasic.mem_content) : t =
-    Some {
-      pr_reg = pr_reg;
-      ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
-    }
+    match call_mem_read_hint_option with
+    | None -> None
+    | Some call_mem_read_hint ->
+      Some {
+        pr_reg = pr_reg;
+        ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
+      }
 
   let update_taint (update_taint: TaintExp.t -> TaintExp.t) (anno: t) : t =
     let update_taint_entry (entry: TaintEntryType.t) : TaintEntryType.t =

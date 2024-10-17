@@ -189,6 +189,8 @@ module TaintTypeInfer = struct
     in
     let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
 
+    Printf.printf "Taint Sol\n";
+    TaintExp.pp_local_var 0 taint_sol;
     Printf.printf "After infer, func\n";
     let buf = Buffer.create 1000 in
     Isa.pp_ocaml_block_list 0 buf func;
