@@ -1,7 +1,7 @@
 open Read_file
 open Type
 
-let usage_msg = "single_type_infer -asm <input_asm_file> -interface <input_interface_file> -name <proram_name>"
+let usage_msg = "infer_single -asm <input_asm_file> -interface <input_interface_file> -name <proram_name>"
 let input_asm_file = ref ""
 let input_interface_file = ref ""
 let program_name = ref ""

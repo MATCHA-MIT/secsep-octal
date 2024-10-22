@@ -24,6 +24,9 @@ module TaintEntryType (Entry: EntryType) = struct
 
   let get_empty_var_map = Entry.get_empty_var_map, []
 
+  let get_taint_var_map (map: local_var_map_t) : TaintExp.local_var_map_t option =
+    let _, taint_var_map = map in Some taint_var_map
+
   let partial_read_val (e: t) : t =
     let single, taint = e in
     Entry.partial_read_val single, TaintExp.partial_read_val taint
@@ -117,7 +120,10 @@ module TaintEntryType (Entry: EntryType) = struct
     let s1, t1 = e1 in
     let s2, t2 = e2 in
     Entry.exe_bop_inst isa_bop s1 s2,
-    TaintExp.merge t1 t2
+    if isa_bop = Xor && Entry.cmp s1 s2 = 0 then
+      TaintConst false
+    else
+      TaintExp.merge t1 t2
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     let single, taint = e in
@@ -128,6 +134,12 @@ module TaintEntryType (Entry: EntryType) = struct
 
   let get_single_taint_exp (e: t) : SingleExp.t * TaintExp.t =
     let single, taint = e in Entry.get_single_exp single, taint
+
+  let set_taint_with_other (x: t) (y: t) : t =
+    (* Set x's taint with y's taint*)
+    let s, _ = x in
+    let _, t = y in
+    s, t
 
   let get_single_local_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
     let single_map, _ = map in Entry.get_single_local_var_map single_map

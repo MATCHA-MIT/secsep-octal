@@ -20,6 +20,7 @@ module type EntryType = sig
   val sexp_of_local_var_map_t : local_var_map_t -> Sexp.t
 
   val get_empty_var_map: local_var_map_t
+  val get_taint_var_map: local_var_map_t -> TaintExp.local_var_map_t option
 
   (* TODO: Remove these two after finished updating memory type!!! *)
   val partial_read_val: t -> t
@@ -45,6 +46,7 @@ module type EntryType = sig
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
   val get_single_taint_exp: t -> (SingleExp.t * TaintExp.t)
+  val set_taint_with_other: t -> t -> t
   val get_single_local_var_map: local_var_map_t -> SingleExp.local_var_map_t
   val get_const_type: IsaBasic.immediate -> t
   val get_top_type: unit -> t

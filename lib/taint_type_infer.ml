@@ -103,24 +103,26 @@ module TaintTypeInfer = struct
       (infer_state: t) : t * (ArchType.block_subtype_t list) =
     let ctx, solver = infer_state.smt_ctx in
     let helper 
-        (block_subtype: ArchType.block_subtype_t list) 
-        (block: Isa.basic_block) 
-        (block_type: ArchType.t) : ArchType.block_subtype_t list =
+        (block_subtype: ArchType.block_subtype_t list)
+        (block_block_type: Isa.basic_block * ArchType.t) : ArchType.block_subtype_t list * Isa.basic_block =
       (* Prepare SMT context for the current block *)
+      let block, block_type = block_block_type in
       Z3.Solver.push solver;
       SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_sol block_type.useful_var;
-      let (_, block_subtype), _ =
+      let (_, block_subtype), new_block =
         ArchType.type_prop_block (ctx, solver) 
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
       Z3.Solver.pop solver 1;
-      block_subtype
+      block_subtype, { block with insts = new_block }
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
-    let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
-    { infer_state with func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
+    let block_subtype, new_func = List.fold_left_map helper block_subtype (List.combine infer_state.func infer_state.func_type) in
+    { infer_state with 
+      func = new_func;
+      func_type = ArchType.update_with_block_subtype block_subtype infer_state.func_type },
     block_subtype
 
   let get_func_interface
@@ -204,7 +206,7 @@ module TaintTypeInfer = struct
       taint_sol = taint_sol }
 
   let infer 
-      (range_infer_state_list: RangeTypeInfer.t list) : t list =
+      (range_infer_state_list: RangeTypeInfer.t list) : FuncInterface.t list * t list =
     let helper
         (acc: FuncInterface.t list) (entry: RangeTypeInfer.t) :
         (FuncInterface.t list) * t =
@@ -215,9 +217,10 @@ module TaintTypeInfer = struct
       (* FuncInterface.pp_func_interface 0 func_interface; *)
       func_interface :: acc, infer_state
     in
-    let _, infer_result = List.fold_left_map helper [] range_infer_state_list in
+    List.fold_left_map helper [] range_infer_state_list
+    (* let _, infer_result = List.fold_left_map helper [] range_infer_state_list in *)
     (* Printf.printf "=========================\n";
     Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
-    infer_result
+    (* infer_result *)
 
 end

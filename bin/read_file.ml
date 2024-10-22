@@ -16,3 +16,6 @@ let get_range_infer_filename (s: string) : string =
 
 let get_taint_infer_filename (s: string) : string =
   Printf.sprintf "./out/%s.taint_infer" s
+
+let get_interface_list_filename (s: string) : string =
+  Printf.sprintf "./out/%s.interface" s

@@ -1,7 +1,7 @@
 open Read_file
 open Type
 
-let usage_msg = "range_type_infer -name <proram_name>"
+let usage_msg = "infer_range -name <proram_name>"
 let program_name = ref ""
 
 let speclist = [

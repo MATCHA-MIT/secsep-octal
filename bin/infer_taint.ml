@@ -1,7 +1,7 @@
 open Read_file
 open Type
 
-let usage_msg = "range_type_infer -name <proram_name>"
+let usage_msg = "infer_taint -name <proram_name>"
 let program_name = ref ""
 
 let speclist = [
@@ -13,7 +13,8 @@ let () =
   let range_infer_result = 
     Range_type_infer.RangeTypeInfer.state_list_from_file (get_range_infer_filename !program_name) 
   in
-  let range_infer_result =
+  let func_interface_list, taint_infer_result =
     Taint_type_infer.TaintTypeInfer.infer range_infer_result
   in
-  Taint_type_infer.TaintTypeInfer.state_list_to_file (get_taint_infer_filename !program_name) range_infer_result
+  Taint_type_infer.TaintTypeInfer.state_list_to_file (get_taint_infer_filename !program_name) taint_infer_result;
+  Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_interface_list_filename !program_name) func_interface_list

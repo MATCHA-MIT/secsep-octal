@@ -596,13 +596,13 @@ module MemType (Entry: EntryType) = struct
           if is_full then
             let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if is_shared_mem_full_cmp smt_ctx s_ptr s_off then
-              Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, new_val)
+              Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, Entry.set_taint_with_other new_val entry_val)
             else
               Some [], (off, range, new_val)
           else
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
             let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
-            Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, Entry.mem_partial_write_val entry_val new_val)
+            Some (Entry.get_eq_taint_constraint entry_val new_val), (off, range, Entry.set_taint_with_other (Entry.mem_partial_write_val entry_val new_val) entry_val)
         else
           None, entry
     in

@@ -33,6 +33,7 @@ module CallAnno = struct
   type t' = {
     pr_reg: TaintRegType.t;
     ch_mem: slot_t MemTypeBasic.mem_content;
+    taint_var_map: TaintExp.local_var_map_t;
   }
   [@@deriving sexp]
 
@@ -62,13 +63,15 @@ module CallAnno = struct
   let get_call_anno
       (pr_reg: TaintRegType.t) 
       (call_mem_read_hint_option: slot_info MemTypeBasic.mem_content option)
+      (taint_map_option: TaintExp.local_var_map_t option)
       (base_info: base_info MemTypeBasic.mem_content) : t =
-    match call_mem_read_hint_option with
-    | None -> None
-    | Some call_mem_read_hint ->
+    match call_mem_read_hint_option, taint_map_option with
+    | None, _ | _, None -> None
+    | Some call_mem_read_hint, Some taint_var_map ->
       Some {
         pr_reg = pr_reg;
         ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
+        taint_var_map = taint_var_map;
       }
 
   let update_taint (update_taint: TaintExp.t -> TaintExp.t) (anno: t) : t =
@@ -76,9 +79,17 @@ module CallAnno = struct
       let single, taint = entry in
       single, update_taint taint
     in
+    let update_taint_map (entry: TaintExp.taint_var_id * TaintExp.t) : TaintExp.taint_var_id * TaintExp.t =
+      let id, taint = entry in
+      id, update_taint taint
+    in
     match anno with
     | None -> None
     | Some anno' ->
-      Some { anno' with pr_reg = List.map update_taint_entry anno'.pr_reg }
+      Some { 
+        anno' with 
+        pr_reg = List.map update_taint_entry anno'.pr_reg;
+        taint_var_map = List.map update_taint_map anno'.taint_var_map;
+      }
 
 end

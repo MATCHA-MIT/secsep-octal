@@ -708,7 +708,7 @@ module ArchType (Entry: EntryType) = struct
     in
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
-      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info =
+      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, taint_var_map =
         FuncInterface.func_call smt_ctx sub_sol_func func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
       in
@@ -718,6 +718,7 @@ module ArchType (Entry: EntryType) = struct
           CallAnno.get_call_anno 
             (List.map Entry.get_single_taint_exp curr_type.reg_type)
             call_slot_info
+            taint_var_map
             func_interface.base_info
         | _ -> orig_call_anno
       ) in
@@ -751,6 +752,8 @@ module ArchType (Entry: EntryType) = struct
         let next_type, call_anno =
           type_prop_call smt_ctx sub_sol_func func_interface_list curr_type target_func_name orig_call_anno
         in
+        (* let open Sexplib in
+        Sexp.output_hum stdout (CallAnno.sexp_of_t call_anno); *)
         (next_type,
         (* let _ = func_interface_list in
         let _ = target_func_name in

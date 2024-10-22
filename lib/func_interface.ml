@@ -1,5 +1,6 @@
 open Isa_basic
 open Single_exp
+open Taint_exp
 open Entry_type
 open Mem_offset_new
 open Cond_type_new
@@ -32,6 +33,11 @@ module FuncInterface (Entry: EntryType) = struct
     base_info: CallAnno.base_info MemType.mem_content;
   }
   [@@deriving sexp]
+
+  let interface_list_to_file (filename: string) (interface_list: t list) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_list sexp_of_t interface_list)
 
   let pp_func_interface (lvl: int) (interface: t) =
     Printf.printf "\n";
@@ -371,7 +377,8 @@ module FuncInterface (Entry: EntryType) = struct
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
-      CallAnno.slot_info MemType.mem_content option =
+      CallAnno.slot_info MemType.mem_content option *
+      TaintExp.local_var_map_t option =
     let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -383,11 +390,11 @@ module FuncInterface (Entry: EntryType) = struct
     let ((single_var_map, single_var_set, var_map), read_useful_vars), mem_read_hint =
       add_mem_var_map smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) child_mem parent_mem
     in
-    Printf.printf "!!! set_reg_type\n";
+    (* Printf.printf "!!! set_reg_type\n"; *)
     RegType.pp_reg_type 0 child_out_reg;
     Entry.pp_local_var 0 var_map;
     let reg_type = set_reg_type var_map child_out_reg in
-    Printf.printf "!!! set_mem_type%!";
+    (* Printf.printf "!!! set_mem_type\n"; *)
     let mem_type, constraint_list, write_useful_vars = 
       set_mem_type smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
 
@@ -409,7 +416,8 @@ module FuncInterface (Entry: EntryType) = struct
     (* TODO: Check context!!! *)
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
-    (get_slot_map_info mem_read_hint child_mem)
+    get_slot_map_info mem_read_hint child_mem,
+    Entry.get_taint_var_map var_map
 
   let func_call
       (smt_ctx: SmtEmitter.t)
@@ -420,7 +428,8 @@ module FuncInterface (Entry: EntryType) = struct
       (reg_type: RegType.t) (mem_type: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t *
-      CallAnno.slot_info MemType.mem_content option =
+      CallAnno.slot_info MemType.mem_content option *
+      TaintExp.local_var_map_t option =
     (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)

@@ -14,6 +14,8 @@ include SingleExp
   | OldExt of t (* Used for memory slot partial update *)
   [@@deriving sexp]
 
+  let get_taint_var_map (_: local_var_map_t) : TaintExp.local_var_map_t option = None
+
   let partial_read_val (e: t) : t =
     match e with
     | _ -> SingleTop
@@ -81,6 +83,8 @@ include SingleExp
 
   let get_single_taint_exp (_: t) : t * TaintExp.t =
     single_exp_error "Cannot get single taint exp on a single entry type"
+
+  let set_taint_with_other (x: t) (_: t) : t = x
 
   let handle_mem_rw (_: t) (_: t) : Constraint.t list = []
 
