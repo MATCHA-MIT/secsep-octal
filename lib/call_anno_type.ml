@@ -56,7 +56,7 @@ module CallAnno = struct
   let to_ocaml_string (anno: t) : string =
     match anno with
     | None -> "None"
-    | Some _ -> "Some (call anno...)"
+    | Some _ -> Printf.sprintf "Some (%s)" (sexp_of_t anno |> Sexplib.Sexp.to_string)
 
   let to_string (anno: t) : string = to_ocaml_string anno
 

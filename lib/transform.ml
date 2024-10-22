@@ -1,4 +1,5 @@
 open Isa
+open Parser
 open Taint_exp
 open Taint_subtype
 open Taint_type_infer
@@ -393,8 +394,11 @@ module Transform = struct
               transform_error "Different parent base in the same child memory part"
         ) (List.tl slots);
 
-        (* do not transform, if parent mem is already unified or dealing with child's RSP *)
-        if get_slot_unity func_state.init_mem_unity parent_base = Unified || child_base = rsp_var_id then acc else
+        (* do not transform, if dealing with child's RSP or global base, or parent mem is already unified *)
+        if child_base = rsp_var_id ||
+           parent_base_info = BaseAsGlobal ||
+           get_slot_unity func_state.init_mem_unity parent_base = Unified 
+        then acc else
         (* see if all slots are taint true or all slots are taint false *)
         let unity = get_mem_part_unity mem_part (get_child_slot_taint child_fi_in_mem) in
         if unity = Unified then parent_base_info :: acc else acc
@@ -487,7 +491,7 @@ module Transform = struct
                         | None -> None
                         end
                       | BaseAsSlot _ -> None (* we will handle this later, see below *)
-                      | BaseAsGlobal -> None (* TODO: Check whether this is correct *)
+                      | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
                   ) bases_to_change in
                   if Option.is_some result then begin
                     let new_tf, handled_base = Option.get result in
@@ -516,13 +520,14 @@ module Transform = struct
                   | None -> transform_error "sanity check failed: BaseAsSlot does not describe a full slot in child's memory";
                   | Some x -> x
                   in
-                  let (_, pa_base_off, is_full), base_info = ch_slot_anno in
+                  let (pa_base, pa_base_off, is_full), base_info = ch_slot_anno in
                   if not is_full then
                     transform_error "sanity check failed: BaseAsSlot is not mapped to a full slot of parent";
                   if not (MemOffset.is_8byte_slot pa_base_off) then
                     transform_error "sanity check failed: BaseAsSlot does not access slot of 8 bytes";
-                  let base_reg_of_base = match base_info with
-                  | BaseAsReg r -> r
+                  let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
+                  let mem_op = match base_info with
+                  | BaseAsReg r -> (Some (Isa.ImmNum off_of_base), Some r, None, None)
                   | BaseAsSlot (b, o) ->
                     transform_error (Printf.sprintf
                       "Unexpected recursive base: some base is passed in memory of base %d, which is still in memory of %d (%s)"
@@ -530,10 +535,11 @@ module Transform = struct
                       b
                       (MemOffset.to_string o)
                     )
-                  | BaseAsGlobal -> transform_error "TODO: Unimplemented case" (* TODO *)
+                  | BaseAsGlobal ->
+                    if pa_base >= Parser.imm_var_unset then
+                      transform_error "Invalid var id for global label";
+                    (Some (Isa.ImmBExp (Isa.ImmLabel pa_base, Isa.ImmNum off_of_base)), None, None, None)
                   in
-                  let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
-                  let mem_op = (Some (Isa.ImmNum off_of_base), Some base_reg_of_base, None, None) in
                   (* get the memory operand of the slot to be changed *)
                   let mem_op = match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
                   | TaintConst true -> begin
@@ -548,7 +554,7 @@ module Transform = struct
                     (Isa.make_inst_add_i_m64 delta mem_op) :: acc_inst_pre,
                     (Isa.make_inst_add_i_m64 (Int64.neg delta) mem_op) :: acc_inst_post
                   )
-                | BaseAsGlobal -> transform_error "TODO: unimplemented case" (* TODO *)
+                | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
             ) ([], []) bases_to_change in
             (* save/restore active callee-saved registers in caller's scope *)
             let saves, restores = List.split (
@@ -650,4 +656,13 @@ module Transform = struct
 
     pp_func_state func_state;
     func_state
+
+  let transform_functions
+      (fi_list: FuncInterface.t list)
+      (taint_infer_states: TaintTypeInfer.t list)
+      : func_state list =
+    List.map (
+      fun taint_infer_state -> transform_one_function fi_list taint_infer_state
+    ) taint_infer_states
+
 end

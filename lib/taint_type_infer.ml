@@ -206,7 +206,7 @@ module TaintTypeInfer = struct
       taint_sol = taint_sol }
 
   let infer 
-      (range_infer_state_list: RangeTypeInfer.t list) : FuncInterface.t list * t list =
+      (range_infer_state_list: RangeTypeInfer.t list) : (FuncInterface.t list) * (t list) =
     let helper
         (acc: FuncInterface.t list) (entry: RangeTypeInfer.t) :
         (FuncInterface.t list) * t =

@@ -439,6 +439,17 @@ module FuncInterface (Entry: EntryType) = struct
       func_interface.out_reg func_interface.out_mem
       reg_type mem_type
 
+  let fi_list_to_file (filename: string) (fi_list: t list) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_list sexp_of_t fi_list)
+
+  let fi_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    list_of_sexp t_of_sexp s_exp
+
   let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
     List.find_opt (fun fi -> fi.func_name = l) fi_list
 

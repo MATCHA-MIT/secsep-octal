@@ -5,6 +5,7 @@
   infer_single
   infer_range
   infer_taint
+  prog_transform
   )
  (names 
   main 
@@ -12,5 +13,6 @@
   infer_single
   infer_range
   infer_taint
+  prog_transform
   )
  (libraries core type))
