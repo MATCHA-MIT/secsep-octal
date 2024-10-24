@@ -673,7 +673,9 @@ module ArchType (Entry: EntryType) = struct
       let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
       curr_type, block_subtype
     | Jcond (cond, label) ->
-      (* TODO: Add constraint: branch cond is untainted!!! *)
+      (* Add constraint: branch cond is untainted!!! *)
+      let cond_l, cond_r = curr_type.flag in
+      let cond_untaint_constraint = (Entry.get_untaint_constraint cond_l) @ (Entry.get_untaint_constraint cond_r) in
       let taken_type, not_taken_type, not_taken_cond = 
         update_branch_hist_get_not_taken_cond smt_ctx cond curr_type 
       in
@@ -688,6 +690,7 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp l_flag))
           (SingleExp.get_vars (Entry.get_single_exp r_flag))
       in
+      let not_taken_type = add_constraints not_taken_type cond_untaint_constraint in
       {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var}, block_subtype
     | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
 

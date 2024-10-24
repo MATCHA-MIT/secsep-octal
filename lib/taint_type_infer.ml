@@ -141,6 +141,22 @@ module TaintTypeInfer = struct
       infer_state.func_type
       sub_sol_for_taint
 
+  let update_with_taint_sol
+      (taint_sol: TaintExp.local_var_map_t)
+      (state: t) : t =
+    let update_taint = TaintExp.repl_context_var_no_error taint_sol in
+    let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
+    let func = 
+      Isa.update_block_list_taint (fun t ->
+        match MemAnno.get_taint t with
+        | None -> t
+        | Some taint -> MemAnno.update_taint t (update_taint taint)
+      ) (CallAnno.update_taint update_taint) state.func 
+    in
+    let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
+    { state with func = func; func_type = func_type }
+  
+
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
       (range_infer_state: RangeTypeInfer.t) : t =
@@ -180,7 +196,8 @@ module TaintTypeInfer = struct
     Printf.printf "Input var: %s\n" (TaintExp.to_string (TaintExp.TaintExp input_var));
 
     let taint_sol = TaintSubtype.solve_subtype_list input_var subtype_list in
-    let update_taint = TaintExp.repl_context_var_no_error taint_sol in
+    update_with_taint_sol taint_sol { state with taint_sol = taint_sol }
+    (* let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
     let func = 
       Isa.update_block_list_taint (fun t ->
@@ -203,7 +220,7 @@ module TaintTypeInfer = struct
     { state with 
       func = func;
       func_type = func_type;
-      taint_sol = taint_sol }
+      taint_sol = taint_sol } *)
 
   let infer 
       (range_infer_state_list: RangeTypeInfer.t list) : (FuncInterface.t list) * (t list) =
@@ -217,10 +234,10 @@ module TaintTypeInfer = struct
       (* FuncInterface.pp_func_interface 0 func_interface; *)
       func_interface :: acc, infer_state
     in
-    List.fold_left_map helper [] range_infer_state_list
-    (* let _, infer_result = List.fold_left_map helper [] range_infer_state_list in *)
+    (* List.fold_left_map helper [] range_infer_state_list *)
+    let func_interface_list, infer_result = List.fold_left_map helper [] range_infer_state_list in
     (* Printf.printf "=========================\n";
     Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
-    (* infer_result *)
+    List.rev func_interface_list, infer_result
 
 end

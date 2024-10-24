@@ -1,5 +1,7 @@
 open Taint_exp
+open Taint_api
 open Taint_type_infer
+open Sexplib.Std
 
 
 module TaintInstantiate = struct
@@ -11,7 +13,10 @@ module TaintInstantiate = struct
   module FuncInterface = TaintTypeInfer.FuncInterface
 
   type call_site_map_t = (Isa.label * TaintExp.TaintVarSet.t * ((Isa.label * TaintExp.local_var_map_t) list)) list
+  [@@deriving sexp]
+
   type instance_map_t = (Isa.label * TaintExp.local_var_map_t) list
+  [@@deriving sexp]
 
   (* 1. Init taint var map only contains taint var that are not used for callee saved register type *)
   let get_one_func_taint_instantiate_set
@@ -41,9 +46,9 @@ module TaintInstantiate = struct
       TaintExp.local_var_map_t =
     let helper
         (map: TaintExp.local_var_map_t)
-        (entry: int * TaintExp.t) :
+        (instance_entry: int * TaintExp.t) :
         TaintExp.local_var_map_t =
-      let var_idx, var_instance = entry in
+      let var_idx, var_instance = instance_entry in
       if TaintExp.TaintVarSet.mem var_idx instantiate_set then
         let found, map =
           List.fold_left_map (
@@ -71,12 +76,13 @@ module TaintInstantiate = struct
     List.fold_left helper map instance_map
 
   let gen_call_site_map
-      (prog: Isa.prog) (func_interface_list: FuncInterface.t list) : call_site_map_t =
+      (func_interface_list: FuncInterface.t list)
+      (infer_state_list: TaintTypeInfer.t list) : call_site_map_t =
     let map =
       List.map2 (
-        fun (x: Isa.func) (interface: FuncInterface.t) ->
-        x.name, get_one_func_taint_instantiate_set interface, []
-      ) prog.funcs func_interface_list
+        fun (x: TaintTypeInfer.t) (interface: FuncInterface.t) ->
+        x.func_name, get_one_func_taint_instantiate_set interface, []
+      ) infer_state_list func_interface_list
     in
     let helper
         (caller_name: Isa.label)
@@ -98,13 +104,39 @@ module TaintInstantiate = struct
       | _ -> acc
     in
     List.fold_left (
-      fun (acc: call_site_map_t) (func: Isa.func) ->
+      fun (acc: call_site_map_t) (infer_state: TaintTypeInfer.t) ->
         List.fold_left (
           fun (acc: call_site_map_t) (block: Isa.basic_block) ->
-            List.fold_left (helper func.name) acc block.insts
-        ) acc func.body
-    ) map prog.funcs
+            List.fold_left (helper infer_state.func_name) acc block.insts
+        ) acc infer_state.func
+    ) map infer_state_list
   
+  let gen_call_site_map_from_taint_api
+      (func_interface_list: FuncInterface.t list)
+      (taint_api: TaintApi.t) : call_site_map_t =
+    let helper 
+        (acc: TaintExp.local_var_map_t) 
+        (entry: TaintTypeInfer.TaintEntryType.t) 
+        (instance: bool option) : TaintExp.local_var_map_t =
+      let _, taint = entry in
+      match taint, instance with
+      | TaintExp _, Some _ -> acc (* TODO: Double check!!! *)
+        (* List.fold_left (
+          fun acc x -> TaintExp.add_local_var acc (TaintVar x) (TaintConst b)
+        ) acc (TaintExp.TaintVarSet.to_list var_set) *)
+      | _, Some b -> TaintExp.add_local_var acc taint (TaintConst b) 
+      | _ -> acc
+    in
+    List.map (
+      fun (func_name, reg_api, mem_api) ->
+        let interface = 
+          List.find (fun (x: FuncInterface.t) -> x.func_name = func_name) func_interface_list 
+        in
+        let map = List.fold_left2 helper [] interface.in_reg reg_api in
+        let map = TaintTypeInfer.ArchType.MemType.fold_left2 helper map interface.in_mem (TaintTypeInfer.ArchType.MemType.add_base_to_offset mem_api) in
+        func_name, get_one_func_taint_instantiate_set interface, [ "", map ]
+    ) taint_api
+
   let merge_call_site_map
       (map1: call_site_map_t) (map2: call_site_map_t) : call_site_map_t =
     List.fold_left (
@@ -135,7 +167,8 @@ module TaintInstantiate = struct
     match map_opt with
     | Some map -> map
     | None -> 
-      Printf.printf "Warning: get_instance_map cannot find map for instance %s" func_name;
+      if func_name = "" then () else
+      Printf.printf "Warning: get_instance_map cannot find map for instance %s\n" func_name;
       []
 
   let gen_instance_map
@@ -168,9 +201,33 @@ module TaintInstantiate = struct
     List.fold_left (
       fun (acc: instance_map_t) (func_name, instantiate_set, call_site_list) ->
         (func_name, (gen_instance_map acc instantiate_set call_site_list)) :: acc
-    ) [] call_site_map
+    ) [] (List.rev call_site_map)
 
-    
+  let update_all
+      (instance_map_list: instance_map_t)
+      (infer_state_list: TaintTypeInfer.t list) :
+      (FuncInterface.t list) * (TaintTypeInfer.t list) =
+    List.map2 (
+      fun (_, map) (infer_state: TaintTypeInfer.t) ->
+      let state = TaintTypeInfer.update_with_taint_sol map infer_state in
+      TaintTypeInfer.get_func_interface state, state
+    ) instance_map_list infer_state_list |> List.split
+
+  let instantiate
+      (taint_api: TaintApi.t)
+      (func_interface_list: FuncInterface.t list)
+      (infer_state_list: TaintTypeInfer.t list) :
+      (FuncInterface.t list) * (TaintTypeInfer.t list) =
+    let open Sexplib in
+    let call_site_map_api = gen_call_site_map_from_taint_api func_interface_list taint_api in
+    let call_site_map = gen_call_site_map func_interface_list infer_state_list in
+    let call_site_map = merge_call_site_map call_site_map call_site_map_api in
+    Sexp.output_hum stdout (sexp_of_call_site_map_t call_site_map);
+    Printf.printf "\n";
+    let instance_map_list = get_all_instance_map call_site_map in
+    Sexp.output_hum stdout (sexp_of_instance_map_t instance_map_list);
+    Printf.printf "\n";
+    update_all instance_map_list infer_state_list
 
 end
 

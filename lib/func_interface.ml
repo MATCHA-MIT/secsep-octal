@@ -39,6 +39,12 @@ module FuncInterface (Entry: EntryType) = struct
     let channel = open_out filename in
     Sexp.output_hum channel (sexp_of_list sexp_of_t interface_list)
 
+  let interface_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    list_of_sexp t_of_sexp s_exp
+
   let pp_func_interface (lvl: int) (interface: t) =
     Printf.printf "\n";
     PP.print_lvl lvl "Func interface of func %s\n" interface.func_name;
