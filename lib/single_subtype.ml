@@ -434,6 +434,10 @@ module SingleSubtype = struct
         | SingleAdd, Single e, Range (e1, e2, s)
         | SingleAdd, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleAdd, e, e1)), SingleEntryType.eval (SingleBExp (SingleAdd, e, e2)), s)
+        | SingleAdd, Range (e11, e12, s1), Range (e21, e22, s2) ->
+          (* TODO: Double check this!!! *)
+          let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
+          Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
         | SingleAdd, Single e, SingleSet e_list
         | SingleAdd, SingleSet e_list, Single e ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list)
@@ -483,7 +487,10 @@ module SingleSubtype = struct
           else Top
         | SingleSal, SingleSet e_list, Single (SingleConst c) ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list)
-        | _ -> Printf.printf "sub_sol_single_to_range: WARNING! %s not handled\n" (SingleExp.to_string e); Top (* TODO: maybe need to handle more cases here *)
+        | _, r1, r2 -> 
+          Printf.printf "sub_sol_single_to_range: WARNING! %s not handled l %s r %s\n" 
+            (SingleExp.to_string e) (RangeExp.to_string r1) (RangeExp.to_string r2); 
+          Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
     in
@@ -682,10 +689,19 @@ module SingleSubtype = struct
                             if Int64.rem step v_step = 0L then
                               Some (SingleEntryType.eval (
                                 SingleBExp (
+                                  SingleAdd,
+                                  SingleBExp (
+                                    SingleMul, 
+                                    SingleBExp (SingleSub, SingleVar v_idx, v_base),
+                                    SingleConst (Int64.div step v_step)
+                                  ),
+                                  base
+                                )
+                                (* SingleBExp (
                                   SingleMul,
                                   SingleBExp (SingleAdd, SingleBExp (SingleSub, SingleVar v_idx, v_base), base),
                                   SingleConst (Int64.div step v_step)
-                                )
+                                ) *)
                               ))
                             else single_subtype_error (Printf.sprintf "cannot represent range of symimm %d with symimm %d" target_idx v_idx)
                           else None
