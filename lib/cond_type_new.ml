@@ -192,7 +192,7 @@ include (CondType (SingleExp))
     | SatNo -> Some false
     | _ -> None
 
-  let check_trivial_or_assert
+  let check_or_assert
       (smt_ctx: SmtEmitter.t) (cond_list: t list) : (t list) option =
     (* If some cond in cond_list is SatNo, return None
       If all cond in cond_list is SatYes, return Some [], no constraint is added to smt_ctx 

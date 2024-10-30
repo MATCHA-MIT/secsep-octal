@@ -244,13 +244,14 @@ module SingleTypeInfer = struct
     let init_infer_state = init prog func_name func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
-        state
+        { state with context = state.context @ (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
         let solver = snd state.smt_ctx in
         Z3.Solver.push solver;
-        ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
+        (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
+        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type);
         SingleCondType.add_assertions state.smt_ctx state.context;
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
@@ -284,7 +285,7 @@ module SingleTypeInfer = struct
         if unknown_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d\n\n" func_name curr_iter;
-          state
+          { state with context = state.context @ (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type) }
         end else begin
           helper (clean_up_func_type state) (iter_left - 1)
         end

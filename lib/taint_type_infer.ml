@@ -176,7 +176,7 @@ module TaintTypeInfer = struct
     (* Prepare SMT context *)
     let solver = snd state.smt_ctx in
     Z3.Solver.push solver;
-    ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
+    (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
     SingleCondType.add_assertions state.smt_ctx state.context;
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
     Z3.Solver.pop solver 1;

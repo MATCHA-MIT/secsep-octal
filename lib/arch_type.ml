@@ -898,7 +898,8 @@ module ArchType (Entry: EntryType) = struct
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
 
     Z3.Solver.push (snd smt_ctx);
-    MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type;
+    (* MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type; *)
+    SingleCondType.add_assertions smt_ctx context;
 
     (* let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
       let r = 
