@@ -443,6 +443,36 @@ module MemType (Entry: EntryType) = struct
         | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
         end
 
+  let get_heuristic_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (mem: t)
+      (addr_off: MemOffset.t) :
+      (MemOffset.t, SingleCondType.t list) Either.t =
+    (* Note: this function might add additional constraints to smt_ctx, please do push/pop outside! *)
+    let ptr_set = get_ptr_set mem in
+    let l, r = addr_off in
+    match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    | Some b_l, Some b_r ->
+      if b_l <> b_r then Left addr_off
+      else
+        let part_mem = get_part_mem mem b_l in
+        begin match part_mem with
+        | [ (off_l, off_r), _, _ ] ->
+          let cond_list = [
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, off_l, l)), SingleExp.SingleConst 0L;
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, l, r)), SingleExp.SingleConst 0L;
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, r, off_r)), SingleExp.SingleConst 0L;
+          ] in
+          (* TODO: Check, sat or add, one by one *)
+          begin match SingleCondType.check_trivial_or_assert smt_ctx cond_list with
+          | None -> Left addr_off (* addr_off does not belongs to this entry *)
+          | Some cond_list -> Right cond_list
+          end
+          (* Left addr_off *)
+        | _ -> Left addr_off
+        end
+    | _ -> Left addr_off
+        
   let is_shared_mem_helper
       (is_quick: bool)
       (smt_ctx: SmtEmitter.t)
@@ -705,7 +735,7 @@ module MemType (Entry: EntryType) = struct
     ) SingleExp.SingleVarSet.empty shared_mem *)
 
   let gen_implicit_mem_constraints (smt_ctx: SmtEmitter.t) (mem_type: t) : unit =
-    let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
+    (* let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
       match offset_list with
       | [] -> []
       | ((l, r), _, _) :: [] ->
@@ -720,7 +750,19 @@ module MemType (Entry: EntryType) = struct
         fun (acc: SmtEmitter.exp_t list) (_, part_mem) ->
           (helper part_mem) @ acc
       ) [] mem_type
+    in *)
+    let helper (acc: SmtEmitter.exp_t list) (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) : SmtEmitter.exp_t list =
+      let _, offset_list = part_mem in
+      match offset_list with
+      | [] -> acc
+      | ((l, r), _, _) :: [] ->
+        if SingleExp.cmp l r = 0 then acc 
+        else (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
+      | ((l, _), _, _) :: tl ->
+        let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
     in
+    let exps = List.fold_left helper [] mem_type in
     SmtEmitter.add_assertions smt_ctx exps
 
 end

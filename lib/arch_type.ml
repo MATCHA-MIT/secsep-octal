@@ -892,6 +892,7 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (func_name: Isa.label)
       (func_type: t list)
+      (context: SingleCondType.t list)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
@@ -913,7 +914,7 @@ module ArchType (Entry: EntryType) = struct
       func_name = func_name;
       in_reg = in_state.reg_type;
       in_mem = in_mem;
-      context = [];
+      context = context;
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
       out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type);
       base_info = find_all_base_info in_state.reg_type in_mem;

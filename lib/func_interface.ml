@@ -21,13 +21,13 @@ module FuncInterface (Entry: EntryType) = struct
 
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
-  module CondType = CondType (Entry)
+  (* module CondType = CondType (Entry) *)
 
   type t = {
     func_name: IsaBasic.label;
     in_reg: RegType.t;
     in_mem: MemType.t;
-    context: CondType.t list;
+    context: SingleCondType.t list;
     out_reg: RegType.t;
     out_mem: MemType.t;
     base_info: CallAnno.base_info MemType.mem_content;
@@ -52,7 +52,7 @@ module FuncInterface (Entry: EntryType) = struct
     RegType.pp_reg_type 0 interface.in_reg;
     MemType.pp_mem_type 0 interface.in_mem;
     PP.print_lvl lvl "Context\n";
-    CondType.pp_cond_list 0 interface.context;
+    SingleCondType.pp_cond_list 0 interface.context;
     PP.print_lvl lvl "Output\n";
     RegType.pp_reg_type 0 interface.out_reg;
     MemType.pp_mem_type 0 interface.out_mem;
@@ -66,7 +66,7 @@ module FuncInterface (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "in_mem =\n";
     MemType.pp_ocaml_mem_type (lvl + 2) buf interface.in_mem;
     PP.bprint_lvl (lvl + 1) buf "context =\n";
-    CondType.pp_ocaml_cond_list (lvl + 2) buf interface.context;
+    SingleCondType.pp_ocaml_cond_list (lvl + 2) buf interface.context;
     PP.bprint_lvl (lvl + 1) buf "out_reg =\n";
     RegType.pp_ocaml_reg_type (lvl + 2) buf interface.out_reg;
     PP.bprint_lvl (lvl + 1) buf "out_mem =\n";

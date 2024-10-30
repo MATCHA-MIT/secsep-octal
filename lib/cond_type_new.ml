@@ -144,6 +144,9 @@ include (CondType (SingleExp))
     | Be -> Z3.BitVector.mk_ule z3_ctx l r
     | Bt -> Z3.BitVector.mk_ult z3_ctx l r
 
+  let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
+    SmtEmitter.add_assertions smt_ctx (List.map (get_z3_mk smt_ctx) cond_list)
+
   let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 
     (* choose from one of two versions below *)
@@ -188,5 +191,25 @@ include (CondType (SingleExp))
     | SatYes -> Some true
     | SatNo -> Some false
     | _ -> None
+
+  let check_trivial_or_assert
+      (smt_ctx: SmtEmitter.t) (cond_list: t list) : (t list) option =
+    (* If some cond in cond_list is SatNo, return None
+      If all cond in cond_list is SatYes, return Some [], no constraint is added to smt_ctx 
+      If some cond in cond_list is Unknown, assert it to be true in smt_ctx, return Some list contain it;
+      We return the list of minimal extra assertions need to add to smt_ctx to make cond_list hold *)
+    let helper (acc: (t list) option) (cond: t) : (t list) option =
+      match acc with
+      | None -> None
+      | Some acc_cond_list ->
+        begin match check true smt_ctx [cond] with
+        | SatYes -> acc
+        | SatNo -> None
+        | _ -> 
+          SmtEmitter.add_assertions smt_ctx [get_z3_mk smt_ctx cond];
+          Some (cond :: acc_cond_list)
+        end
+    in
+    List.fold_left helper (Some []) cond_list
 
 end

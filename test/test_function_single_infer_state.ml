@@ -619,6 +619,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 				;
 			next_var = SingleTop;
 			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			context = [];
 			smt_ctx = SmtEmitter.init_smt_ctx ();
 		}
 		;
@@ -984,6 +985,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 				;
 			next_var = SingleTop;
 			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			context = [];
 			smt_ctx = SmtEmitter.init_smt_ctx ();
 		}
 		;
@@ -1529,6 +1531,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 				;
 			next_var = SingleTop;
 			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			context = [];
 			smt_ctx = SmtEmitter.init_smt_ctx ();
 		}
 		;
@@ -2041,6 +2044,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 				;
 			next_var = SingleTop;
 			input_var_set = SingleExp.SingleVarSet.of_list [-4; -3; -2; -1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16];
+			context = [];
 			smt_ctx = SmtEmitter.init_smt_ctx ();
 		}
 		;

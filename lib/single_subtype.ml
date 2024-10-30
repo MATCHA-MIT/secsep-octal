@@ -579,6 +579,7 @@ module SingleSubtype = struct
       end
     in
     let find_base_step 
+        (supertype_list: var_idx_t list)
         (subtype_list: type_exp_t list) (v_idx: IsaBasic.imm_var_id) : 
         (SingleEntryType.t * type_exp_t * int64) option =
       let find_base = 
@@ -594,6 +595,9 @@ module SingleSubtype = struct
             | SingleBExp (SingleAdd, SingleVar v, SingleConst s)
             | SingleBExp (SingleAdd, SingleConst s, SingleVar v) ->
               if v = v_idx then
+                if s = 0L then single_subtype_error "try_solve_loop_cond: step should be non-zero"
+                else Some (x_pc, s)
+              else if List.find_opt (fun (sup_idx, _) -> v = sup_idx) supertype_list <> None then
                 if s = 0L then single_subtype_error "try_solve_loop_cond: step should be non-zero"
                 else Some (x_pc, s)
               else None
@@ -623,8 +627,8 @@ module SingleSubtype = struct
       (* does not match *)
       | _ -> false, false
     in
-    let try_solve_loop_cond (subtype_list: type_exp_t list) : SingleSol.t =
-      match find_base_step subtype_list target_idx with
+    let try_solve_loop_cond (supertype_list: var_idx_t list) (subtype_list: type_exp_t list) : SingleSol.t =
+      match find_base_step supertype_list subtype_list target_idx with
       | Some (_, _, 0L) -> single_subtype_error "try_solve_loop_cond: find step 0" 
       | Some (base, (var_step, branch_pc), step) ->
         begin match ArchType.get_branch_cond block_subtype branch_pc with
@@ -641,7 +645,8 @@ module SingleSubtype = struct
           | Some (on_left, bound) -> let inc = (step > 0L) in
             (* TODO: Need to repl bound here!!! *)
             let bound = (
-              begin match sub_sol_single_to_range_opt tv_rel_list input_var_set (bound, branch_pc) with
+              (* Very imporant: here bound comes from the branch condition, which should be evaluated in the context of branch_pc - 1!!! *)
+              begin match sub_sol_single_to_range_opt tv_rel_list input_var_set (bound, branch_pc - 1) with
               | Some (Single e) -> e
               | Some _ -> bound
               | None -> SingleTop
@@ -678,7 +683,7 @@ module SingleSubtype = struct
                   let v_idx, v_pc = tv.var_idx in
                   if v_pc <> target_pc then None
                   else begin
-                    match find_base_step tv.subtype_list v_idx with
+                    match find_base_step tv.supertype_list tv.subtype_list v_idx with
                     | Some (_, _, 0L) -> None
                     | Some (_, (other_step, _), _) ->
                       (* NOTE: Must ensure the other_var is indeed in the cond!!! *)
@@ -722,8 +727,8 @@ module SingleSubtype = struct
     in
     let solve_rules = [
       try_solve_top;
+      try_solve_loop_cond tv_rel.supertype_list;
       try_solve_single_sub_val;
-      try_solve_loop_cond
     ] in
     List.fold_left 
       (fun acc rule -> if acc = SingleSol.SolNone then rule tv_rel.subtype_list else acc) 

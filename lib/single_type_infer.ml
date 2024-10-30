@@ -2,6 +2,7 @@ open Isa
 open Single_exp
 open Single_entry_type
 open Mem_offset_new
+open Cond_type_new
 open Constraint
 (* open Constraint *)
 open Single_subtype
@@ -27,6 +28,7 @@ module SingleTypeInfer = struct
     single_subtype: SingleSubtype.t;
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
+    context: SingleCondType.t list;
     smt_ctx: SmtEmitter.t
   }
   [@@deriving sexp]
@@ -116,6 +118,7 @@ module SingleTypeInfer = struct
       single_subtype = [];
       next_var = next_var;
       input_var_set = input_var_set;
+      context = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
@@ -169,8 +172,18 @@ module SingleTypeInfer = struct
     } *)
 
   let update_mem (infer_state: t) : t =
-    let update_list = ArchType.MemType.init_stack_update_list (List.nth infer_state.func_type 0).mem_type in
-    let helper (acc: (MemOffset.t * bool) list) (a_type: ArchType.t) : (MemOffset.t * bool) list =
+    (* For each unknown offset, we do two things in this function:
+      1. Check whether the offset belongs to some memory slot if adding some extra context (heuristic);
+      2. Check whether the offset refers to a new local stack slot and update local stack if needed. *)
+    let solver = snd infer_state.smt_ctx in
+    Z3.Solver.push solver;
+    let mem_type = (List.nth infer_state.func_type 0).mem_type in
+    let update_list = ArchType.MemType.init_stack_update_list mem_type in
+    let helper 
+        (acc: ((MemOffset.t * bool) list) * (SingleCondType.t list)) 
+        (a_type: ArchType.t) : 
+        ((MemOffset.t * bool) list) * (SingleCondType.t list) =
+      let acc_update_list, acc_context = acc in
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
       let unknown_range = 
@@ -181,11 +194,18 @@ module SingleTypeInfer = struct
         ) unknown_list
       in
       let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
+      (* Check whether the each offset belongs to some memory slot if add some contraints *)
+      let is_val_offset_list, not_val_offset_list = List.partition (MemOffset.is_val infer_state.input_var_set) new_offset_list in
+      let is_val_offset_list, new_context_list_list =
+        List.partition_map (ArchType.MemType.get_heuristic_mem_type infer_state.smt_ctx mem_type) is_val_offset_list
+      in
+      let new_offset_list = is_val_offset_list @ not_val_offset_list in
       (* Printf.printf "update_mem\n";
       MemOffset.pp_off_list 0 new_offset_list;  *)
-      MemOffset.insert_new_offset_list infer_state.smt_ctx acc new_offset_list
+      MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
+      List.flatten (acc_context :: new_context_list_list)
     in
-    let update_list = List.fold_left helper update_list infer_state.func_type in
+    let update_list, new_context_list = List.fold_left helper (update_list, []) infer_state.func_type in
     let next_var, func_type =
       List.fold_left_map (
         fun (acc: SingleEntryType.t) (a_type: ArchType.t) ->
@@ -200,10 +220,12 @@ module SingleTypeInfer = struct
       ) SingleExp.SingleVarSet.empty func_type
     in
     let single_subtype = SingleSubtype.filter_entry infer_state.single_subtype local_var_set in
+    Z3.Solver.pop solver 1;
     { infer_state with
       func_type = func_type;
       single_subtype = single_subtype;
-      next_var = next_var
+      next_var = next_var;
+      context = new_context_list @ infer_state.context;
     }
     (* TODO: Also remove removed vars in single_subtype *)
 
@@ -229,6 +251,7 @@ module SingleTypeInfer = struct
         let solver = snd state.smt_ctx in
         Z3.Solver.push solver;
         ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type;
+        SingleCondType.add_assertions state.smt_ctx state.context;
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks\n\n" curr_iter;
@@ -279,6 +302,7 @@ module SingleTypeInfer = struct
       infer_state.smt_ctx
       infer_state.func_name
       infer_state.func_type
+      infer_state.context
       sub_sol
 
   (* let get_func_interface
@@ -319,7 +343,6 @@ module SingleTypeInfer = struct
     PP.bprint_lvl lvl buf "]\n"
 
   let infer
-      (prog_name: Isa.label)
       (prog: Isa.prog)
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
       (iter: int)
@@ -341,10 +364,10 @@ module SingleTypeInfer = struct
       func_interface :: acc, infer_state
     in
     let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
-    let buf = Buffer.create 1000 in
+    (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;
     Printf.printf "let %s_single_infer_state : SingleTypeInfer.t list =\n" prog_name;
-    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
+    Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
     infer_result
 
 end
