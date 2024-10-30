@@ -344,7 +344,7 @@ module SingleSubtype = struct
     Printf.printf "after init useful var\n";
     pp_useful_var_list 0 useful_var_list;
     let useful_var_map_list =
-      List.map (
+      List.concat_map (
         fun (block_subtype: ArchType.block_subtype_t) ->
           let a_type, _ = block_subtype in
           List.map (fun x -> (x, a_type.pc)) (SingleExp.SingleVarSet.to_list (ArchType.get_local_var_set a_type)) 
@@ -357,7 +357,7 @@ module SingleSubtype = struct
           )
       ) block_subtype_list
     in
-    add_all_useful_var_block_subtype (List.concat useful_var_map_list) block_subtype_list useful_var_list [] 10
+    add_all_useful_var_block_subtype useful_var_map_list block_subtype_list useful_var_list [] 10
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in

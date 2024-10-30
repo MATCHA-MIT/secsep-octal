@@ -448,7 +448,7 @@ module Parser = struct
 
   let split_on_chars sep_list (s: string) : string list =
     let helper (s: string list) sep : string list =
-      List.concat (List.map (String.split_on_char sep) s)
+      List.concat_map (String.split_on_char sep) s
     in
     List.fold_left helper [ s ] sep_list
 
