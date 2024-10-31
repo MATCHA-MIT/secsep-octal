@@ -282,6 +282,7 @@ module Transform = struct
         let inst' = Isa.UInst (uop, o1', o2') in
         (inst', [], []), css'
       end
+    | TInst _ -> transform_error "not implemented yet" (* TODO *)
     | Xchg (o1, o2, o3, o4) -> begin
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in

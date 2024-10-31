@@ -2,6 +2,7 @@
  (public_names 
   type 
   gen_interface 
+  parse_prog
   infer_single
   infer_range
   infer_taint
@@ -11,6 +12,7 @@
  (names 
   main 
   gen_interface 
+  parse_prog
   infer_single
   infer_range
   infer_taint

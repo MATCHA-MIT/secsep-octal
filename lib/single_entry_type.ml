@@ -74,12 +74,16 @@ include SingleExp
     | Xor -> if cmp e1 e2 = 0 then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))
     | And -> eval (SingleBExp (SingleAnd, e1, e2))
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
+    | Punpck 
+    | Pxor | Pand | Por
+    | Psll | Psrl -> SingleTop
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     match isa_uop with
     | Mov | MovS | MovZ | Lea -> e
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
+    | Neg -> SingleTop
 
   let get_single_taint_exp (_: t) : t * TaintExp.t =
     single_exp_error "Cannot get single taint exp on a single entry type"

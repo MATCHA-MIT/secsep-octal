@@ -95,7 +95,9 @@ module Isa (MemAnno: MemAnnoType) = struct
   let get_reg_op_size (op_list: operand list) : int64 option =
     let helper (acc: int64 option) (op: operand) : int64 option =
       match op, acc with
-      | RegOp _, Some size -> Some size (* Note: this result should not be used when operand size does not match!!! *)
+      | RegOp r, Some size ->
+        if is_xmm r then Some size else Some (get_reg_size r)
+        (* Note: the following note might be staled Note: this result should not be used when operand size does not match!!! *)
         (* if get_reg_size r = size then acc else isa_error "reg size does not match" *)
       | RegOp r, None -> Some (get_reg_size r)
       | _, _ -> acc
@@ -109,6 +111,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Lea of operand * operand *)
     | BInst of bop * operand * operand * operand
     | UInst of uop * operand * operand
+    | TInst of top * operand * (operand list)
     | Xchg of operand * operand * operand * operand
     | Cmp of operand * operand
     | Test of operand * operand
@@ -148,6 +151,11 @@ module Isa (MemAnno: MemAnnoType) = struct
   }
   [@@deriving sexp]
 
+  let prog_to_file (filename: string) (p: prog) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_prog p)
+
   let get_func (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
 
@@ -171,6 +179,11 @@ module Isa (MemAnno: MemAnnoType) = struct
       begin match opcode_of_uinst uop with
       | Some s -> s
       | None -> isa_error "cannot find opcode for a uop"
+      end
+    | TInst (top, _, _) ->
+      begin match opcode_of_tinst top with
+      | Some s -> s
+      | None -> isa_error "cannot find opcode for a top"
       end
     | Cmp _ -> "cmp"
     | Test _ -> "test"
@@ -210,6 +223,14 @@ module Isa (MemAnno: MemAnnoType) = struct
             "%s%s%s\t<-\t%s" 
             opcode (get_tab opcode) (string_of_operand dst) (string_of_operand src)
       | None -> isa_error "cannot find opcode for a uop"
+      end
+    | TInst (top, dst, src_list) ->
+      begin match opcode_of_tinst top with
+      | Some opcode ->
+        Printf.sprintf 
+            "%s%s%s\t<-\t%s" 
+            opcode (get_tab opcode) (string_of_operand dst) (String.concat ",\t" (List.map string_of_operand src_list))
+      | None -> isa_error "cannot find opcode for a top"
       end
     | Cmp (src2, src1) ->
       Printf.sprintf "cmp\t\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
@@ -251,6 +272,15 @@ module Isa (MemAnno: MemAnnoType) = struct
           opcode
           (ocaml_string_of_operand dst)
           (ocaml_string_of_operand src)
+      | None -> isa_error "cannot find opcode for a uop"
+      end
+    | TInst (top, dst, src_list) ->
+      begin match ocaml_opcode_of_tinst top with
+      | Some opcode ->
+        Printf.sprintf "UInst (%s, %s, [%s])"
+          opcode
+          (ocaml_string_of_operand dst)
+          (String.concat "; " (List.map ocaml_string_of_operand src_list))
       | None -> isa_error "cannot find opcode for a uop"
       end
     | Cmp (src2, src1) ->

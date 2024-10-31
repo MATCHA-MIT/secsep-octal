@@ -43,6 +43,7 @@ module IsaBasic = struct
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7
     (* | R0 *)
   [@@deriving sexp]
 
@@ -52,7 +53,7 @@ module IsaBasic = struct
     ("rdx", RDX); ("edx", EDX); ("dx", DX); ("dh", DH); ("dl", DL);
     ("rbx", RBX); ("ebx", EBX); ("bx", BX); ("bh", BH); ("bl", BL);
     ("rsp", RSP); ("esp", ESP); ("sp", SP); ("spl", SPL);
-    ("rbp", RBP); ("ebp", EBP); ("bp", BP); ("sbl", BPL);
+    ("rbp", RBP); ("ebp", EBP); ("bp", BP); ("bpl", BPL);
     ("rsi", RSI); ("esi", ESI); ("si", SI); ("sil", SIL);
     ("rdi", RDI); ("edi", EDI); ("di", DI); ("dil", DIL);
     ("r8", R8); ("r8d", R8D); ("r8w", R8W); ("r8b", R8B);
@@ -63,6 +64,8 @@ module IsaBasic = struct
     ("r13", R13); ("r13d", R13D); ("r13w", R13W); ("r13b", R13B);
     ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
     ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
+    ("xmm0", XMM0); ("xmm1", XMM1); ("xmm2", XMM2); ("xmm3", XMM3); 
+    ("xmm4", XMM4); ("xmm5", XMM5); ("xmm6", XMM6); ("xmm7", XMM7); 
   ]
 
   let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
@@ -96,6 +99,15 @@ module IsaBasic = struct
       | R13 | R13D | R13W | R13B -> R13B
       | R14 | R14D | R14W | R14B -> R14B
       | R15 | R15D | R15W | R15B -> R15B
+      (* TODO: Check *)
+      | XMM0 -> XMM0
+      | XMM1 -> XMM1
+      | XMM2 -> XMM2
+      | XMM3 -> XMM3
+      | XMM4 -> XMM4
+      | XMM5 -> XMM5
+      | XMM6 -> XMM6
+      | XMM7 -> XMM7
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 2L then
       match r with
@@ -115,6 +127,14 @@ module IsaBasic = struct
       | R13 | R13D | R13W | R13B -> R13W
       | R14 | R14D | R14W | R14B -> R14W
       | R15 | R15D | R15W | R15B -> R15W
+      | XMM0 -> XMM0
+      | XMM1 -> XMM1
+      | XMM2 -> XMM2
+      | XMM3 -> XMM3
+      | XMM4 -> XMM4
+      | XMM5 -> XMM5
+      | XMM6 -> XMM6
+      | XMM7 -> XMM7
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 4L then
       match r with
@@ -134,6 +154,14 @@ module IsaBasic = struct
       | R13 | R13D | R13W | R13B -> R13D
       | R14 | R14D | R14W | R14B -> R14D
       | R15 | R15D | R15W | R15B -> R15D
+      | XMM0 -> XMM0
+      | XMM1 -> XMM1
+      | XMM2 -> XMM2
+      | XMM3 -> XMM3
+      | XMM4 -> XMM4
+      | XMM5 -> XMM5
+      | XMM6 -> XMM6
+      | XMM7 -> XMM7
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 8L then
       match r with
@@ -153,6 +181,14 @@ module IsaBasic = struct
       | R13 | R13D | R13W | R13B -> R13
       | R14 | R14D | R14W | R14B -> R14
       | R15 | R15D | R15W | R15B -> R15
+      | XMM0 -> XMM0
+      | XMM1 -> XMM1
+      | XMM2 -> XMM2
+      | XMM3 -> XMM3
+      | XMM4 -> XMM4
+      | XMM5 -> XMM5
+      | XMM6 -> XMM6
+      | XMM7 -> XMM7
       | _ -> isa_error "should not use high 1-byte reg"
     else
       isa_error "invalid register size"
@@ -175,6 +211,14 @@ module IsaBasic = struct
     | R13 | R13D | R13W | R13B -> 13
     | R14 | R14D | R14W | R14B -> 14
     | R15 | R15D | R15W | R15B -> 15
+    | XMM0 -> 16
+    | XMM1 -> 17
+    | XMM2 -> 18
+    | XMM3 -> 19
+    | XMM4 -> 20
+    | XMM5 -> 21
+    | XMM6 -> 22
+    | XMM7 -> 23
     (* | R0 -> 16 *)
 
   let get_full_reg_by_idx (idx: int) : register =
@@ -195,6 +239,14 @@ module IsaBasic = struct
     | 13 -> R13
     | 14 -> R14
     | 15 -> R15
+    | 16 -> XMM0
+    | 17 -> XMM1
+    | 18 -> XMM2
+    | 19 -> XMM3
+    | 20 -> XMM4
+    | 21 -> XMM5
+    | 22 -> XMM6
+    | 23 -> XMM7
     | _ -> isa_error "get_full_reg_by_idx: invalid idx"
 
   let get_reg_offset_size (r: register) : int64 * int64 =
@@ -204,9 +256,11 @@ module IsaBasic = struct
     | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> (0L, 2L)
     | AH | CH | DH | BH -> (1L, 1L)
     | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> isa_error "should not get_reg_offset_size for xmm registers"
 
   let get_reg_full_size (r: register) : int64 =
     match r with
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> 16L
     | _ -> 8L (* Note: vector reg has different full sizes!!! *)
   
   let get_gpr_full_size () : int64 = get_reg_full_size RAX
@@ -215,7 +269,9 @@ module IsaBasic = struct
     "rax"; "rcx"; "rdx"; "rbx";
     "rsp"; "rbp"; "rsi"; "rdi";
     "r8"; "r9"; "r10"; "r11";
-    "r12"; "r13"; "r14"; "r15"
+    "r12"; "r13"; "r14"; "r15";
+    "xmm0"; "xmm1"; "xmm2"; "xmm3";
+    "xmm4"; "xmm5"; "xmm6"; "xmm7";
   ]
 
   let string_of_reg_idx (idx: int) : string =
@@ -231,6 +287,7 @@ module IsaBasic = struct
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4L
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> 16L
 
   let is_reg_idx_callee_saved (r_idx: int) : bool =
     List.mem r_idx [
@@ -242,6 +299,11 @@ module IsaBasic = struct
 
   let is_reg_callee_saved (r: register) : bool =
     is_reg_idx_callee_saved (get_reg_idx r)
+
+  let is_xmm (r: register) : bool =
+    match r with
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> true
+    | _ -> false
 
   type immediate =
     | ImmNum of int64
@@ -302,11 +364,15 @@ module IsaBasic = struct
   let common_opcode_list = [
     "movabs"; "mov"; "movs"; "movz"; "lea";
     "xchg";
-    "add"; "adc"; "sub"; "mul"; "imul"; 
+    "add"; "adc"; "sub"; "mul"; "imul";
+    "shrd";
     "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
-    "xor"; "and"; "or"; "not"; "bswap";
+    "xor"; "and"; "or"; "not"; "bswap"; "neg";
     "cmp"; "test";
-    "push"; "pop"
+    "push"; "pop";
+    "punpck"; 
+    "pxor"; "pand"; "por";
+    "psll"; "psrl";
   ]
 
   type bop =
@@ -315,6 +381,9 @@ module IsaBasic = struct
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
+    | Punpck 
+    | Pxor | Pand | Por
+    | Psll | Psrl
   [@@deriving sexp]
 
   let bop_opcode_map = [
@@ -322,7 +391,10 @@ module IsaBasic = struct
     ("mul", Mul); ("imul", Imul);
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
-    ("xor", Xor); ("and", And); ("or", Or)
+    ("xor", Xor); ("and", And); ("or", Or);
+    ("punpck", Punpck); 
+    ("pxor", Pxor); ("pand", Pand); ("por", Por);
+    ("psll", Psll); ("psrl", Psrl);
   ]
 
   let bop_opcode_ocaml_str_map = [
@@ -330,27 +402,45 @@ module IsaBasic = struct
     ("Mul", Mul); ("Imul", Imul);
     ("Sal", Sal); ("Sar", Sar); ("Shl", Shl); ("Shr", Shr);
     ("Rol", Rol); ("Ror", Ror);
-    ("Xor", Xor); ("And", And); ("Or", Or)
+    ("Xor", Xor); ("And", And); ("Or", Or);
+    ("Punpck", Punpck); 
+    ("Pxor", Pxor); ("Pand", Pand); ("Por", Por);
+    ("Psll", Psll); ("Psrl", Psrl);
   ]
   
   type uop =
     | Mov | MovS | MovZ
     | Lea
     | Not | Bswap
+    | Neg
   [@@deriving sexp]
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
     ("movs", MovS); ("movz", MovZ);
     ("lea", Lea);
-    ("not", Not); ("bswap", Bswap)
+    ("not", Not); ("bswap", Bswap);
+    ("neg", Neg);
   ]
 
   let uop_opcode_ocaml_str_map = [
     ("Mov", Mov);
     ("MovS", MovS); ("MovZ", MovZ);
     ("Lea", Lea);
-    ("Not", Not); ("Bswap", Bswap)
+    ("Not", Not); ("Bswap", Bswap);
+    ("Neg", Neg);
+  ]
+
+  type top =
+    | Shrd
+  [@@deriving sexp]
+
+  let top_opcode_map = [
+    ("shrd", Shrd);
+  ]
+
+  let top_opcode_ocaml_str_map = [
+    ("Shrd", Shrd);
   ]
 
   type branch_cond =
@@ -391,18 +481,22 @@ module IsaBasic = struct
 
   let opcode_is_binst = string_is_sth bop_opcode_map
   let opcode_is_uinst = string_is_sth uop_opcode_map
+  let opcode_is_tinst = string_is_sth top_opcode_map
   let opcode_is_cond_jump = string_is_sth cond_jump_opcode_map
   
   let opcode_of_binst = string_of_sth bop_opcode_map
   let opcode_of_uinst = string_of_sth uop_opcode_map
+  let opcode_of_tinst = string_of_sth top_opcode_map
   let opcode_of_cond_jump = string_of_sth cond_jump_opcode_map
 
   let ocaml_opcode_of_binst = string_of_sth bop_opcode_ocaml_str_map
   let ocaml_opcode_of_uinst = string_of_sth uop_opcode_ocaml_str_map
+  let ocaml_opcode_of_tinst = string_of_sth top_opcode_ocaml_str_map
   let ocaml_opcode_of_cond_jump = string_of_sth cond_jump_opcode_ocaml_str_map
   
   let op_of_binst = string_to_sth bop_opcode_map
   let op_of_uinst = string_to_sth uop_opcode_map
+  let op_of_tinst = string_to_sth top_opcode_map
   let op_of_cond_jump = string_to_sth cond_jump_opcode_map
 
   let is_label_function_entry (l: label) = l.[0] <> '.'
