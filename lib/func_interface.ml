@@ -375,10 +375,12 @@ module FuncInterface (Entry: EntryType) = struct
 
   let func_call_helper
       (smt_ctx: SmtEmitter.t)
+      (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (child_mem: MemType.t)
+      (child_context: SingleCondType.t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
@@ -420,6 +422,37 @@ module FuncInterface (Entry: EntryType) = struct
       *)
 
     (* TODO: Check context!!! *)
+
+    let check_context_helper () : Constraint.t =
+      (* TODO: Fix this!!! *)
+      let p_context, unknown_context =
+        List.partition_map (
+          fun (x: SingleCondType.t) ->
+            if SingleCondType.is_val (SingleExp.is_val single_var_set) x then
+              let orig_cond = SingleCondType.repl (fun x -> SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map x)) x in
+              match SingleCondType.try_sub_sol sub_sol_func orig_cond with
+              | Some simp_cond -> Left (orig_cond, simp_cond)
+              | None -> Right None (* Sol for single var in this cond is not resolved *)
+            else
+              (* Context map to parent var is not resolved *)
+              Right None
+        ) child_context
+      in
+      if List.is_empty unknown_context then
+        (* We do not do quick check to avoid missing overflow constraints, but this might be slow!!! *)
+        match SingleCondType.sub_check_or_filter false smt_ctx p_context with
+        (* Note simp_context is simplified with solution, 
+          but to be used for check_or_assert, we need to filter out cond that is_val. *)
+        | Left simp_context ->
+          (Constraint.CalleeContext simp_context)
+        | Right unsat_cond ->
+          func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (SingleCondType.to_string unsat_cond))
+      else
+        Constraint.CalleeUnknownContext
+    in
+
+    let constraint_list = if check_context then (check_context_helper ()) :: constraint_list else constraint_list in
+
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
     get_slot_map_info mem_read_hint child_mem,
@@ -427,6 +460,7 @@ module FuncInterface (Entry: EntryType) = struct
 
   let func_call
       (smt_ctx: SmtEmitter.t)
+      (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (func_interface: t)
       (global_var_set: SingleExp.SingleVarSet.t)
@@ -440,8 +474,9 @@ module FuncInterface (Entry: EntryType) = struct
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)
       (* TODO: Check context!!! *)
-    func_call_helper smt_ctx sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
+    func_call_helper smt_ctx check_context sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
       func_interface.in_reg func_interface.in_mem
+      func_interface.context
       func_interface.out_reg func_interface.out_mem
       reg_type mem_type
 

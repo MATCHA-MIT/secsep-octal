@@ -1,5 +1,7 @@
 open Mem_offset_new
+open Cond_type_new
 open Taint_exp
+open Sexplib.Std
 
 module Constraint = struct
   exception ConstraintError of string
@@ -9,7 +11,8 @@ module Constraint = struct
     | Unknown of MemOffset.t
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
-    (* TODO: Add taint constraint later *)
+    | CalleeContext of (SingleCondType.t list)
+    | CalleeUnknownContext
   [@@deriving sexp]
 
   let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =
@@ -32,5 +35,21 @@ module Constraint = struct
     match sub_range with
     | RangeConst o -> List.map (fun x -> Subset (x, range, off)) o
     | _ -> constraint_error (Printf.sprintf "Cannot gen range constraint for %s" (MemRange.to_string sub_range))
+
+  let get_callee_context (constraint_list: (t * int) list) : SingleCondType.t list =
+    List.concat (
+      List.filter_map (
+        fun (x, _) ->
+          match x with
+          | CalleeContext context ->
+            Some context
+          | _ -> None
+      ) constraint_list
+    )
+
+  let has_callee_unknown_context (constraint_list: (t * int) list) : bool =
+    List.find_opt (
+      fun (x, _) -> x = CalleeUnknownContext
+    ) constraint_list <> None
 
 end

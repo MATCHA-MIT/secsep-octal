@@ -705,14 +705,25 @@ module ArchType (Entry: EntryType) = struct
     (* Entry.pp_local_var 0 curr_type.local_var_map;
     pp_arch_type 0 curr_type; *)
     let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
+      (* Only return None if no solution is found. If cannot convert to mem offset, use [e, e]. *)
       match sub_sol_func (e, curr_type.pc) with
-      | Some r -> RangeExp.to_mem_offset2 r
+      | Some r -> (* RangeExp.to_mem_offset2 r *)
+        begin match RangeExp.to_mem_offset2 r with
+        | Some off -> Some off
+        | None -> Some (e, e)
+        end
       | None -> None
     in
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
+      let check_callee_context =
+        begin match curr_type.prop_mode with
+        | TypeInferDep | TypeCheck -> true
+        | _ -> false
+        end
+      in
       let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, taint_var_map =
-        FuncInterface.func_call smt_ctx sub_sol_func func_interface
+        FuncInterface.func_call smt_ctx check_callee_context sub_sol_func func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
       in
       let call_anno = (

@@ -229,6 +229,30 @@ module SingleTypeInfer = struct
     }
     (* TODO: Also remove removed vars in single_subtype *)
 
+  let check_or_assert_callee_context (infer_state: t) : bool * t =
+    (* Return resolved, context list*)
+    let has_callee_unknwon_context =
+      List.find_opt (
+        fun (x: ArchType.t) -> Constraint.has_callee_unknown_context x.constraint_list
+      ) infer_state.func_type <> None
+    in
+    if has_callee_unknwon_context then false, infer_state
+    else
+      let context_list = List.concat_map (
+        fun (x: ArchType.t) -> Constraint.get_callee_context x.constraint_list
+      ) infer_state.func_type
+      in
+      let val_context_list = List.filter (SingleCondType.is_val (SingleExp.is_val infer_state.input_var_set)) context_list in
+      let solver = snd infer_state.smt_ctx in
+      Z3.Solver.push solver;
+      let assert_list = 
+        match SingleCondType.check_or_assert infer_state.smt_ctx val_context_list with
+        | Some assert_list -> assert_list
+        | None -> single_type_infer_error "check_or_assert_callee_context unsat context"
+      in
+      Z3.Solver.pop solver 1;
+      List.is_empty context_list, { infer_state with context = assert_list @ infer_state.context }
+
   let clean_up_func_type (infer_state: t) : t =
     { infer_state with
       func_type = List.map ArchType.clean_up infer_state.func_type
@@ -273,6 +297,10 @@ module SingleTypeInfer = struct
         let state = update_mem state in
         Printf.printf "\n\nInfer iter %d after update_mem\n\n" curr_iter;
         pp_func_type 0 state;
+
+        (* 2.5. Check or assert func call context *)
+        let callee_context_resolved, state = check_or_assert_callee_context state in
+
         (* 3. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
@@ -282,7 +310,7 @@ module SingleTypeInfer = struct
 
         Printf.printf "After infer, single subtype\n";
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
-        if unknown_resolved then begin
+        if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d\n\n" func_name curr_iter;
           { state with context = state.context @ (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type) }
