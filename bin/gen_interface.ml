@@ -11,17 +11,17 @@ let r = Isa_basic.IsaBasic.get_reg_idx
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
 let standalone_salsa20 : Base_func_interface.t = [
   "salsa20_words", [
-    r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
   "salsa20_block", [
-    r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
   "salsa20", [
-    r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
     r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
@@ -63,8 +63,187 @@ let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
 let demo : Base_func_interface.t = [
   "table_select", [
     -2, [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], SingleTop) ];
-    r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ];
+    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
   ];
+]
+
+let bench_ed25519_plain : Base_func_interface.t = [
+  "fiat_25519_carry_mul", [
+    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
+  "sc_muladd", [
+    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    r RDX, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    r RCX, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+  ];
+  "sha512_block_data_order", [
+    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
+    -2 (* K512 *),  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
+  ];
+  "sha512_final_impl", [
+    r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop ];
+    r RDX, [ 
+      (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+      (* (SingleConst 0L, SingleConst 216L), RangeConst [(SingleConst 0L, SingleConst 216L)], SingleTop  *)
+    ];
+    -2 (* K512 *),  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
+  ];
+  "table_select", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+    ];
+    -3 (* k25519Precomp *), [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], SingleTop) ];
+  ];
+  "ge_madd", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
+    ];
+    r RDX, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+    ];
+  ];
+  "ge_p2_dbl", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+    ];
+  ];
+  "SHA512_Init", [
+    r RDI, [ 
+      (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [], SingleTop;
+      (SingleConst 72L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [], SingleTop;
+      (SingleConst 212L, SingleConst 216L), RangeConst [], SingleTop;
+    ];
+    -4 (* .LC0 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -5 (* .LC4 *), [ (SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop ];
+    -6 (* .LC1 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -7 (* .LC2 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -8 (* .LC3 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+  ];
+  "SHA512_Final", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+    ];
+  ];
+  "OPENSSL_cleanse", [
+    r RDI, [
+      (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop;
+    ];
+  ];
+  "x25519_ge_p1p1_to_p2", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
+    ];
+  ];
+  "x25519_ge_p1p1_to_p3", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
+    ];
+  ];
+  "CRYPTO_memcmp", [
+    r RDI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+  ];
+  "SHA512_Update", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+    ];
+    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+  ];
+  "SHA512", [
+    r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
+    r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+  ];
+  "x25519_sc_reduce", [
+    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+  ];
+  "x25519_ge_scalarmult_base", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    -9 (* .LC6 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+  ];
+  "ED25519_sign", [
+    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    -4 (* .LC0 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -6 (* .LC1 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -7 (* .LC2 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -8 (* .LC3 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+    -10 (* .LC8 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+  ];
+  "main", [
+    -11, [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], SingleTop ];
+    -12, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    -13, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+  ]
 ]
 
 
@@ -75,7 +254,8 @@ let () =
   let channel = open_out "./interface/standalone_salsa20.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
   let channel = open_out "./interface/demo" in
-  Sexp.output_hum channel (Base_func_interface.sexp_of_t demo)
-
+  Sexp.output_hum channel (Base_func_interface.sexp_of_t demo);
+  let channel = open_out "./interface/bench_ed25519_plain" in
+  Sexp.output_hum channel (Base_func_interface.sexp_of_t bench_ed25519_plain)
 
 

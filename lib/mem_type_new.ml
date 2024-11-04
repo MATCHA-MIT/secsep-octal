@@ -293,6 +293,26 @@ module MemType (Entry: EntryType) = struct
     fold_left_map helper start_var mem_layout
     (* let _ = mem_layout in start_var, [] *)
 
+  let add_dummy_stack_slot
+      (mem: t) : t =
+    (* let found, mem =
+      List.fold_left_map (
+        fun (acc: bool) (ptr, part_mem) ->
+          if acc then acc, (ptr, part_mem)
+          else if ptr = IsaBasic.rsp_idx then
+            true, (ptr, ((SingleExp.SingleConst 0L, SingleExp.SingleConst 0L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) :: part_mem)
+          else
+            acc, (ptr, part_mem)
+      ) false mem
+    in *)
+    let found =
+      List.find_opt (
+        fun (ptr, _) -> ptr = IsaBasic.rsp_idx
+      ) mem <> None
+    in
+    if found then mem
+    else (IsaBasic.rsp_idx, [ ((SingleExp.SingleConst 0L, SingleExp.SingleConst 0L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) ]) :: mem
+
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)
       (mem: (MemOffset.t * MemRange.t * 'a) list)

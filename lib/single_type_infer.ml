@@ -71,6 +71,7 @@ module SingleTypeInfer = struct
     in
     let start_pc = 1 - min_global_var in
     (* I am still not sure whether to use offset or ptr+offset in MemType, but just add base here :) *)
+    let func_mem_interface = ArchType.MemType.add_dummy_stack_slot func_mem_interface in
     let func_mem_interface = ArchType.MemType.add_base_to_offset func_mem_interface in
     let max_var =
       ArchType.MemType.fold_left (

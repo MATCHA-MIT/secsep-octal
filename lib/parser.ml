@@ -505,7 +505,7 @@ module Parser = struct
           else begin
             List.filter_map (
               fun (line: string) ->
-                Printf.printf "%s\n" line;
+                (* Printf.printf "%s\n" line; *)
                 let first_sharp = String.index_opt line '#' in
                 let line = if first_sharp <> None then
                   String.sub line 0 (Option.get first_sharp)

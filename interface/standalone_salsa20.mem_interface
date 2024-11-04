@@ -1,18 +1,15 @@
 ((salsa20_words
-  ((4 ((((SingleConst 0) (SingleConst 0)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+  ((7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
    (6
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))))
  (salsa20_block
-  ((4 ((((SingleConst 0) (SingleConst 0)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+  ((7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
    (6
     ((((SingleConst 0) (SingleConst 32))
       (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))))
  (salsa20
-  ((4 ((((SingleConst 0) (SingleConst 0)) (RangeConst ()) SingleTop)))
-   (7
+  ((7
     ((((SingleConst 0) (SingleVar 6))
       (RangeConst (((SingleConst 0) (SingleVar 6)))) SingleTop)))
    (2

@@ -1,0 +1,241 @@
+((fiat_25519_carry_mul
+  ((7 ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)))
+   (2
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)))))
+ (sc_muladd
+  ((7 ((((SingleConst 0) (SingleConst 32)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
+   (2
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
+   (1
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))))
+ (sha512_block_data_order
+  ((7
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
+   (6
+    ((((SingleConst 0)
+       (SingleBExp SingleMul (SingleConst 128) (SingleVar 2)))
+      (RangeConst
+       (((SingleConst 0)
+         (SingleBExp SingleMul (SingleConst 128) (SingleVar 2)))))
+      SingleTop)))
+   (-2
+    ((((SingleConst 0) (SingleConst 640))
+      (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))))
+ (sha512_final_impl
+  ((7 ((((SingleConst 0) (SingleVar 6)) (RangeConst ()) SingleTop)))
+   (2
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)
+     (((SingleConst 64) (SingleConst 72))
+      (RangeConst (((SingleConst 64) (SingleConst 72)))) SingleTop)
+     (((SingleConst 72) (SingleConst 80))
+      (RangeConst (((SingleConst 72) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 208))
+      (RangeConst (((SingleConst 80) (SingleConst 208)))) SingleTop)
+     (((SingleConst 208) (SingleConst 212))
+      (RangeConst (((SingleConst 208) (SingleConst 212)))) SingleTop)
+     (((SingleConst 212) (SingleConst 216))
+      (RangeConst (((SingleConst 212) (SingleConst 216)))) SingleTop)))
+   (-2
+    ((((SingleConst 0) (SingleConst 640))
+      (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))))
+ (table_select
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)))
+   (-3
+    ((((SingleConst 0) (SingleConst 24576))
+      (RangeConst (((SingleConst 0) (SingleConst 24576)))) SingleTop)))))
+ (ge_madd
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
+     (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
+     (((SingleConst 40) (SingleConst 80))
+      (RangeConst (((SingleConst 40) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 120))
+      (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)
+     (((SingleConst 120) (SingleConst 160))
+      (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop)))
+   (2
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
+     (((SingleConst 40) (SingleConst 80))
+      (RangeConst (((SingleConst 40) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 120))
+      (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)))))
+ (ge_p2_dbl
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
+     (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
+     (((SingleConst 40) (SingleConst 80))
+      (RangeConst (((SingleConst 40) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 120))
+      (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)))))
+ (SHA512_Init
+  ((7
+    ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)
+     (((SingleConst 64) (SingleConst 72)) (RangeConst ()) SingleTop)
+     (((SingleConst 72) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 208)) (RangeConst ()) SingleTop)
+     (((SingleConst 208) (SingleConst 212)) (RangeConst ()) SingleTop)
+     (((SingleConst 212) (SingleConst 216)) (RangeConst ()) SingleTop)))
+   (-4
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-5
+    ((((SingleConst 0) (SingleConst 8))
+      (RangeConst (((SingleConst 0) (SingleConst 8)))) SingleTop)))
+   (-6
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-7
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-8
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))))
+ (SHA512_Final
+  ((7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)
+     (((SingleConst 64) (SingleConst 72))
+      (RangeConst (((SingleConst 64) (SingleConst 72)))) SingleTop)
+     (((SingleConst 72) (SingleConst 80))
+      (RangeConst (((SingleConst 72) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 208))
+      (RangeConst (((SingleConst 80) (SingleConst 208)))) SingleTop)
+     (((SingleConst 208) (SingleConst 212))
+      (RangeConst (((SingleConst 208) (SingleConst 212)))) SingleTop)
+     (((SingleConst 212) (SingleConst 216))
+      (RangeConst (((SingleConst 212) (SingleConst 216)))) SingleTop)))))
+ (OPENSSL_cleanse
+  ((7 ((((SingleConst 0) (SingleVar 6)) (RangeConst ()) SingleTop)))))
+ (x25519_ge_p1p1_to_p2
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
+     (((SingleConst 40) (SingleConst 80))
+      (RangeConst (((SingleConst 40) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 120))
+      (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)
+     (((SingleConst 120) (SingleConst 160))
+      (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop)))))
+ (x25519_ge_p1p1_to_p3
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
+     (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 40))
+      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
+     (((SingleConst 40) (SingleConst 80))
+      (RangeConst (((SingleConst 40) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 120))
+      (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)
+     (((SingleConst 120) (SingleConst 160))
+      (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop)))))
+ (CRYPTO_memcmp
+  ((7
+    ((((SingleConst 0) (SingleVar 2))
+      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleVar 2))
+      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))))
+ (SHA512_Update
+  ((7
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)
+     (((SingleConst 64) (SingleConst 72))
+      (RangeConst (((SingleConst 64) (SingleConst 72)))) SingleTop)
+     (((SingleConst 72) (SingleConst 80))
+      (RangeConst (((SingleConst 72) (SingleConst 80)))) SingleTop)
+     (((SingleConst 80) (SingleConst 208))
+      (RangeConst (((SingleConst 80) (SingleConst 208)))) SingleTop)
+     (((SingleConst 208) (SingleConst 212))
+      (RangeConst (((SingleConst 208) (SingleConst 212)))) SingleTop)
+     (((SingleConst 212) (SingleConst 216))
+      (RangeConst (((SingleConst 212) (SingleConst 216)))) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleVar 2))
+      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))))
+ (SHA512
+  ((7
+    ((((SingleConst 0) (SingleVar 6))
+      (RangeConst (((SingleConst 0) (SingleVar 6)))) SingleTop)))
+   (2 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))))
+ (x25519_sc_reduce
+  ((7
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))))
+ (x25519_ge_scalarmult_base
+  ((7
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
+     (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
+     (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
+     (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
+   (-9
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))))
+ (ED25519_sign
+  ((7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+   (6
+    ((((SingleConst 0) (SingleVar 2))
+      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))
+   (1
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
+   (-4
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-6
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-7
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-8
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+   (-10
+    ((((SingleConst 0) (SingleConst 16))
+      (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))))
+ (main
+  ((-11
+    ((((SingleConst 0) (SingleConst 256))
+      (RangeConst (((SingleConst 0) (SingleConst 256)))) SingleTop)))
+   (-12
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
+   (-13
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))))
