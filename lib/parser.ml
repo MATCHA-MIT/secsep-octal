@@ -329,11 +329,27 @@ module Parser = struct
     (* | RegOp r -> if Isa.get_reg_size r = size then opr else parse_error "dst reg size does not match opcode size" *)
     | opr, _ -> opr
 
+  let get_binst_with_one_operand (op: Isa.bop) (opr: Isa.operand * (int64 option)) (default_size: int64 option) : Isa.instruction =
+    match op with
+    | Sal | Sar | Shr | Shl | Rol | Ror -> BInst (op, dst opr, src opr, src (ImmOp (ImmNum 1L), default_size))
+    | Mul ->
+      let default_opr : Isa.operand * (int64 option) = begin match default_size with
+      | Some 1L -> RegOp AL, default_size
+      | Some 2L -> RegOp AX, default_size
+      | Some 4L -> RegOp EAX, default_size
+      | Some 8L -> RegOp RAX, default_size
+      | Some x -> parse_error ("cannot get default op with size " ^ (Int64.to_string x))
+      | None -> parse_error "cannot get default op when size is unknown"
+      end in
+      BInst (op, dst default_opr, src default_opr, src opr)
+    | _ -> parse_error (Printf.sprintf "Cannot get default op for op %s" (Sexplib.Sexp.to_string (Isa.sexp_of_bop op)))
+
   let get_binst (op: Isa.bop) (operands: (Isa.operand * (int64 option)) list) (default_size: int64 option) : Isa.instruction =
     match operands with
     | [opr1] -> 
-      let default_opr = get_default_operand default_size in
-      BInst (op, dst default_opr, src default_opr, src opr1)
+      get_binst_with_one_operand op opr1 default_size
+      (* let default_opr = get_default_operand default_size in
+      BInst (op, dst default_opr, src default_opr, src opr1) *)
     | [opr1; opr2] ->
       BInst (op, dst opr2, src opr2, src opr1)
     | [opr0; opr1; opr2] ->

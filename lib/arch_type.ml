@@ -331,12 +331,15 @@ module ArchType (Entry: EntryType) = struct
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
     let addr_exp = Entry.get_single_exp addr_type in
     let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-    if addr_exp = SingleTop then
+    if addr_exp = SingleTop then begin
+      (* Printf.printf "St op %s\n" (Isa.string_of_operand (StOp (disp, base, index, scale, size, (None, None))));
+      RegType.pp_reg_type 0 curr_type.reg_type;
+      Printf.printf "Top addr_exp for orign addr_type %s pc %d\n" (Entry.to_string addr_type) curr_type.pc; *)
       curr_type, 
       Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
       SingleExp.SingleVarSet.empty,
       None
-    else
+    end else
       let useful_vars = SingleExp.get_vars addr_exp in
       match sub_sol_func (addr_exp, curr_type.pc) with
       | Some opt_exp ->
@@ -469,11 +472,6 @@ module ArchType (Entry: EntryType) = struct
       StOp (disp, base, index, scale, size, (slot_anno, taint_anno))
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
 
-  let constriant_list_add_pc
-      (constraint_list: Constraint.t list) (pc: int) :
-      (Constraint.t * int) list =
-    List.map (fun x -> x, pc) constraint_list
-
   let add_constraints
       (curr_type: t) (new_constraints: Constraint.t list) : t =
     {
@@ -496,35 +494,10 @@ module ArchType (Entry: EntryType) = struct
       let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
-      let ldst_bind_constraint = begin
-        if Isa.is_ld_st_related src0 dest then begin
-          Entry.handle_mem_rw src0_type dest_type
-        end else if Isa.is_ld_st_related src1 dest then begin
-          Entry.handle_mem_rw src1_type dest_type
-        end else
-          []
-      end in
+      let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
       let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
       { next_type with local_var_map = new_local_var },
       BInst (bop, dest, src0, src1)
-    (* | UInst (Mov, dest, src)
-    | UInst (Lea, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map src_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
-    | UInst (MovS, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let dest_type = Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
-    | UInst (MovZ, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let dest_type = Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint *)
     | UInst (uop, dest, src) ->
       let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
       let dest_type = 
@@ -536,15 +509,36 @@ module ArchType (Entry: EntryType) = struct
       in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
-      let next_type = add_constraints next_type (src_constraint @ dest_constraint) in
+      let ldst_bind_constraint = Isa.get_ld_st_related_taint_constraint dest src in
+      let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
+    | TInst (top, dest, src_list) ->
+      let curr_type, src_op_type_list =
+        List.fold_left_map (
+          fun (curr_type: t) (src: Isa.operand) ->
+            let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
+            add_constraints curr_type src_constraint,
+            (src_type, src)
+        ) curr_type src_list
+      in
+      let src_type_list, src_list = List.split src_op_type_list in
+      let dest_type = Entry.exe_top_inst top src_type_list in
+      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
+      let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
+      let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) src_list in
+      let next_type = add_constraints next_type (dest_constraint @ ldst_bind_constraint) in
+      { next_type with local_var_map = new_local_var },
+      TInst (top, dest, src_list)
     | Xchg (dest0, dest1, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
       let next_type, dest0_constraint, dest0 = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest0 src1_type in
       let next_type, dest1_constraint, dest1 = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type dest1 src0_type in
-      add_constraints next_type (src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint),
+      let ldst_bind_constraint =
+        (Isa.get_ld_st_related_taint_constraint dest0 src0) @ (Isa.get_ld_st_related_taint_constraint dest1 src1)
+      in
+      add_constraints next_type (src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint @ ldst_bind_constraint),
       Xchg (dest0, dest1, src0, src1)
       (* next_type, 
       src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint *)
@@ -608,7 +602,7 @@ module ArchType (Entry: EntryType) = struct
       end
       (* next_type, src_constraint @ dest_constraint *)
     | Nop | Syscall | Hlt -> curr_type, inst
-    | _ -> arch_type_error "inst not implemented"
+    | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
 
   let add_block_subtype
       (label: Isa.label)

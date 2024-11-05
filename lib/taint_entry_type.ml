@@ -129,6 +129,11 @@ module TaintEntryType (Entry: EntryType) = struct
     let single, taint = e in
     Entry.exe_uop_inst isa_uop single, taint
 
+  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) : t =
+    let single_list, t_list = List.split e_list in
+    Entry.exe_top_inst isa_top single_list,
+    List.fold_left TaintExp.merge (TaintConst false) t_list
+
   let get_single_exp (e: t) : SingleExp.t =
     let single, _ = e in Entry.get_single_exp single
 
@@ -162,14 +167,6 @@ module TaintEntryType (Entry: EntryType) = struct
     let s_index, t_index = split_option index in
     Entry.get_mem_op_type disp s_base s_index scale,
     TaintExp.merge_opt t_base t_index
-
-  let handle_mem_rw (t1: t) (t2: t) : (Constraint.t list) =
-    (* for instruction that loads from then stores to a memory location, establish necessary conditions *)
-    let s1, t1 = t1 in
-    let s2, t2 = t2 in
-    (Entry.handle_mem_rw s1 s2) @
-    (* Taint annotation for the LdOp and StOp should be equal *)
-    [ TaintSub (t1, t2); TaintSub (t2, t1) ]
     
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     let single_map, taint_map = map in

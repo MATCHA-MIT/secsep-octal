@@ -85,12 +85,14 @@ include SingleExp
     | Bswap -> SingleTop
     | Neg -> SingleTop
 
+  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) : t =
+    match isa_top with
+    | _ -> SingleTop
+
   let get_single_taint_exp (_: t) : t * TaintExp.t =
     single_exp_error "Cannot get single taint exp on a single entry type"
 
   let set_taint_with_other (x: t) (_: t) : t = x
-
-  let handle_mem_rw (_: t) (_: t) : Constraint.t list = []
 
   let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
 

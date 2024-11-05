@@ -785,7 +785,7 @@ module MemType (Entry: EntryType) = struct
     let exps = List.fold_left helper [] mem_type in
     SmtEmitter.add_assertions smt_ctx exps *)
 
-  let get_mem_constraints (mem_type: t) : SingleCondType.t list =
+  let get_mem_constraints (add_non_overlap_constraint: bool) (mem_type: t) : SingleCondType.t list =
     let helper 
         (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) :
         MemOffset.t option =
@@ -821,6 +821,9 @@ module MemType (Entry: EntryType) = struct
               SingleExp.SingleConst 0L) :: acc
           ) acc tl
     in
-    get_non_overlap_constraint boundary_constraint_list boundary_list
+    if add_non_overlap_constraint then
+      get_non_overlap_constraint boundary_constraint_list boundary_list
+    else
+      boundary_constraint_list
 
 end

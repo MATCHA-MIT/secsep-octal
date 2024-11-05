@@ -43,6 +43,7 @@ module type EntryType = sig
 
   val exe_bop_inst: IsaBasic.bop -> t -> t -> t
   val exe_uop_inst: IsaBasic.uop -> t -> t
+  val exe_top_inst: IsaBasic.top -> t list -> t
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
   val get_single_taint_exp: t -> (SingleExp.t * TaintExp.t)
@@ -52,7 +53,6 @@ module type EntryType = sig
   val get_top_type: unit -> t
   val get_top_untaint_type: unit -> t
   val get_mem_op_type: IsaBasic.immediate option -> t option -> t option -> int64 -> t
-  val handle_mem_rw: t -> t -> Constraint.t list
 
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)
   val update_local_var: local_var_map_t -> t -> int -> (local_var_map_t * t)

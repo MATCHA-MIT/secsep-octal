@@ -269,18 +269,18 @@ module SingleTypeInfer = struct
     let init_infer_state = init prog func_name func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
-        { state with context = state.context @ (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type) }
+        { state with context = state.context @ (ArchType.MemType.get_mem_constraints true (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
         let solver = snd state.smt_ctx in
         Z3.Solver.push solver;
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type);
+        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_constraints false (List.hd state.func_type).mem_type);
         SingleCondType.add_assertions state.smt_ctx state.context;
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
-        Printf.printf "\n\nInfer iter %d type_prop_all_blocks\n\n" curr_iter;
+        Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         (* 2. Insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
@@ -294,9 +294,9 @@ module SingleTypeInfer = struct
             Printf.printf "%s\n" x.label;
             MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
         ) state.func_type;
-        Printf.printf "\n\n%s: Infer iter %d update_mem\n\n" func_name curr_iter;
+        Printf.printf "\n\n%s: Infer iter %d update_mem%!\n\n" func_name curr_iter;
         let state = update_mem state in
-        Printf.printf "\n\nInfer iter %d after update_mem\n\n" curr_iter;
+        Printf.printf "\n\nInfer iter %d after update_mem%!\n\n" curr_iter;
         pp_func_type 0 state;
 
         (* 2.5. Check or assert func call context *)
@@ -309,12 +309,12 @@ module SingleTypeInfer = struct
 
         Z3.Solver.pop solver 1;
 
-        Printf.printf "After infer, single subtype\n";
+        Printf.printf "After infer, single subtype%!\n";
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
-          Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d\n\n" func_name curr_iter;
-          { state with context = state.context @ (ArchType.MemType.get_mem_constraints (List.hd state.func_type).mem_type) }
+          Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
+          { state with context = state.context @ (ArchType.MemType.get_mem_constraints true (List.hd state.func_type).mem_type) }
         end else begin
           helper (clean_up_func_type state) (iter_left - 1)
         end
@@ -393,6 +393,8 @@ module SingleTypeInfer = struct
       Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
+    (* let func_mem_interface_list = List.filteri (fun i _ -> i < 1) func_mem_interface_list in *)
+    (* let func_mem_interface_list = [List.nth func_mem_interface_list 1 ] in *)
     let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;

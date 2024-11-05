@@ -279,7 +279,7 @@ module IsaBasic = struct
 
   let rsp_idx = get_reg_idx RSP
 
-  let total_reg_num : int = 16
+  let total_reg_num : int = 24
 
   let get_reg_size (r: register) : int64 =
     match r with

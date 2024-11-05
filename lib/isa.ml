@@ -3,6 +3,7 @@ open Isa_basic
 open Pretty_print
 open Mem_anno_type
 open Call_anno_type
+open Constraint
 open Sexplib.Std
 
 module Isa (MemAnno: MemAnnoType) = struct
@@ -85,6 +86,19 @@ module Isa (MemAnno: MemAnnoType) = struct
         d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
     | LabelOp l1, LabelOp l2 -> l1 = l2
     | _ -> false
+
+  let get_ld_st_related_taint_constraint
+      (op1: operand) (op2: operand) : Constraint.t list =
+    match op1, op2 with
+    | LdOp (d1, b1, i1, s1, size1, anno1), StOp (d2, b2, i2, s2, size2, anno2)
+    | StOp (d2, b2, i2, s2, size2, anno2), LdOp (d1, b1, i1, s1, size1, anno1) ->
+      if d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2 then
+        begin match MemAnno.get_taint anno1, MemAnno.get_taint anno2 with
+        | Some t1, Some t2 -> [ TaintSub (t1, t2); TaintSub (t2, t1) ]
+        | _ -> []
+        end
+      else []
+    | _ -> []
 
   let is_ld_st_related (ld_op: operand) (st_op: operand) : bool = (* true if both operand operates on the same address *)
     match ld_op, st_op with
