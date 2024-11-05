@@ -12,8 +12,7 @@ let speclist = [
   ("-name", Arg.Set_string program_name, "Set program name")
 ]
 
-let () =
-  Arg.parse speclist (fun _ -> ()) usage_msg;
+let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
   let p = Parser.Parser.parse_program (read_file !input_asm_file) in
   let interface_list = Base_func_interface.parse (read_file !input_interface_file) in
   let single_infer_result = Single_type_infer.SingleTypeInfer.infer p interface_list 5 10 in

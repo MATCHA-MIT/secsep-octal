@@ -127,13 +127,12 @@ module SingleTypeInfer = struct
     (func_interface_list: FuncInterface.t list)
     (* (infer_state: t) : t * (ArchType.block_subtype_t list) = *)
     (infer_state: t) (iter_left: int) : t * (ArchType.block_subtype_t list) =
-    let ctx, solver = infer_state.smt_ctx in
     let helper 
         (acc: (ArchType.block_subtype_t list) * (Isa.instruction list list)) 
         (block: Isa.basic_block) (block_type: ArchType.t) : 
         (ArchType.block_subtype_t list) * (Isa.instruction list list) =
-      Z3.Solver.push solver;
-      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_subtype block_type.useful_var;
+      SmtEmitter.push infer_state.smt_ctx;
+      SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _ = iter_left in
@@ -143,12 +142,12 @@ module SingleTypeInfer = struct
           Printf.printf "skip prop %s\n" block.label;
           block_type, block_subtype
         end else *)
-        ArchType.type_prop_block (ctx, solver) 
+        ArchType.type_prop_block infer_state.smt_ctx 
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set) 
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
-      Z3.Solver.pop solver 1;
+      SmtEmitter.pop infer_state.smt_ctx 1;
       block_subtype, block :: update_block_list
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
@@ -176,8 +175,7 @@ module SingleTypeInfer = struct
     (* For each unknown offset, we do two things in this function:
       1. Check whether the offset belongs to some memory slot if adding some extra context (heuristic);
       2. Check whether the offset refers to a new local stack slot and update local stack if needed. *)
-    let solver = snd infer_state.smt_ctx in
-    Z3.Solver.push solver;
+    SmtEmitter.push infer_state.smt_ctx;
     let mem_type = (List.nth infer_state.func_type 0).mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
     let helper 
@@ -221,7 +219,7 @@ module SingleTypeInfer = struct
       ) SingleExp.SingleVarSet.empty func_type
     in
     let single_subtype = SingleSubtype.filter_entry infer_state.single_subtype local_var_set in
-    Z3.Solver.pop solver 1;
+    SmtEmitter.pop infer_state.smt_ctx 1;
     { infer_state with
       func_type = func_type;
       single_subtype = single_subtype;
@@ -244,14 +242,13 @@ module SingleTypeInfer = struct
       ) infer_state.func_type
       in
       let val_context_list = List.filter (SingleCondType.is_val (SingleExp.is_val infer_state.input_var_set)) context_list in
-      let solver = snd infer_state.smt_ctx in
-      Z3.Solver.push solver;
+      SmtEmitter.push infer_state.smt_ctx;
       let assert_list = 
         match SingleCondType.check_or_assert infer_state.smt_ctx val_context_list with
         | Some assert_list -> assert_list
         | None -> single_type_infer_error "check_or_assert_callee_context unsat context"
       in
-      Z3.Solver.pop solver 1;
+      SmtEmitter.pop infer_state.smt_ctx 1;
       List.is_empty context_list, { infer_state with context = assert_list @ infer_state.context }
 
   let clean_up_func_type (infer_state: t) : t =
@@ -273,8 +270,7 @@ module SingleTypeInfer = struct
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
-        let solver = snd state.smt_ctx in
-        Z3.Solver.push solver;
+        SmtEmitter.push state.smt_ctx;
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
         SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_constraints false (List.hd state.func_type).mem_type);
         SingleCondType.add_assertions state.smt_ctx state.context;
@@ -307,7 +303,7 @@ module SingleTypeInfer = struct
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
         let state = { state with single_subtype = single_subtype } in
 
-        Z3.Solver.pop solver 1;
+        SmtEmitter.pop state.smt_ctx 1;
 
         Printf.printf "After infer, single subtype%!\n";
         SingleSubtype.pp_single_subtype 0 state.single_subtype;
@@ -334,34 +330,6 @@ module SingleTypeInfer = struct
       infer_state.func_type
       infer_state.context
       sub_sol
-
-  (* let get_func_interface
-      (func_name: Isa.label)
-      (infer_state: t) : FuncInterface.t =
-    Z3.Solver.push (snd infer_state.smt_ctx);
-    ArchType.MemType.gen_implicit_mem_constraints infer_state.smt_ctx (List.hd infer_state.func_type).mem_type;
-    let in_state = List.find (fun (x: ArchType.t) -> x.label = func_name) infer_state.func_type in
-    let out_state = List.find (fun (x: ArchType.t) -> x.label = Isa.ret_label) infer_state.func_type in
-    let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
-      let r = 
-        SingleSubtype.sub_sol_single_to_range 
-          infer_state.single_subtype infer_state.input_var_set (e, pc) 
-      in
-      match r with
-      | Single exp -> exp
-      | _ -> SingleTop
-    in
-    let res: FuncInterface.t = {
-      func_name = func_name;
-      in_reg = in_state.reg_type;
-      in_mem = ArchType.MemType.remove_local_mem_quick_cmp infer_state.smt_ctx in_state.mem_type;
-      context = [];
-      out_reg = List.map (helper out_state.pc) out_state.reg_type;
-      out_mem = ArchType.MemType.map (helper out_state.pc) (ArchType.MemType.remove_local_mem_quick_cmp infer_state.smt_ctx out_state.mem_type)
-    }
-    in
-    Z3.Solver.pop (snd infer_state.smt_ctx) 1;
-    res *)
 
   let pp_ocaml_infer_result (lvl: int) (buf: Buffer.t) (func_type_list: t list) =
     PP.bprint_lvl lvl buf "[\n";
@@ -394,7 +362,7 @@ module SingleTypeInfer = struct
       func_interface :: acc, infer_state
     in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i < 1) func_mem_interface_list in *)
-    (* let func_mem_interface_list = [List.nth func_mem_interface_list 1 ] in *)
+    let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in
     let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;

@@ -902,7 +902,7 @@ module ArchType (Entry: EntryType) = struct
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
 
-    Z3.Solver.push (snd smt_ctx);
+    SmtEmitter.push smt_ctx;
     (* MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type; *)
     SingleCondType.add_assertions smt_ctx context;
 
@@ -926,7 +926,7 @@ module ArchType (Entry: EntryType) = struct
       base_info = find_all_base_info in_state.reg_type in_mem;
     }
     in
-    Z3.Solver.pop (snd smt_ctx) 1;
+    SmtEmitter.pop smt_ctx 1;
     res
 
 end

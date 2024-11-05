@@ -104,21 +104,20 @@ module TaintTypeInfer = struct
   let type_prop_all_blocks
       (func_interface_list: FuncInterface.t list)
       (infer_state: t) : t * (ArchType.block_subtype_t list) =
-    let ctx, solver = infer_state.smt_ctx in
     let helper 
         (block_subtype: ArchType.block_subtype_t list)
         (block_block_type: Isa.basic_block * ArchType.t) : ArchType.block_subtype_t list * Isa.basic_block =
       (* Prepare SMT context for the current block *)
       let block, block_type = block_block_type in
-      Z3.Solver.push solver;
-      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_sol block_type.useful_var;
+      SmtEmitter.push infer_state.smt_ctx;
+      SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
       let (_, block_subtype), new_block =
-        ArchType.type_prop_block (ctx, solver) 
+        ArchType.type_prop_block infer_state.smt_ctx 
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
-      Z3.Solver.pop solver 1;
+      SmtEmitter.pop infer_state.smt_ctx 1;
       block_subtype, { block with insts = new_block }
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
@@ -174,12 +173,11 @@ module TaintTypeInfer = struct
   
     (* 1. Type prop *)
     (* Prepare SMT context *)
-    let solver = snd state.smt_ctx in
-    Z3.Solver.push solver;
+    SmtEmitter.push state.smt_ctx;
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
     SingleCondType.add_assertions state.smt_ctx state.context;
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
-    Z3.Solver.pop solver 1;
+    SmtEmitter.pop state.smt_ctx 1;
 
     Printf.printf "After infer, unknown list:\n";
     List.iter (

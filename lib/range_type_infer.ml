@@ -96,21 +96,20 @@ module RangeTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (infer_state: t) : t * (ArchType.block_subtype_t list) =
     (* TODO: This is the same as the one in TaintTypeInfer. Consider to remove duplicate code. *)
-    let ctx, solver = infer_state.smt_ctx in
     let helper 
         (block_subtype: ArchType.block_subtype_t list) 
         (block: Isa.basic_block) 
         (block_type: ArchType.t) : ArchType.block_subtype_t list =
       (* Prepare SMT context for the current block *)
-      Z3.Solver.push solver;
-      SingleSubtype.update_block_smt_ctx (ctx, solver) infer_state.single_sol block_type.useful_var;
+      SmtEmitter.push infer_state.smt_ctx;
+      SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
       let (_, block_subtype), _ =
-        ArchType.type_prop_block (ctx, solver) 
+        ArchType.type_prop_block infer_state.smt_ctx 
           (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
-      Z3.Solver.pop solver 1;
+      SmtEmitter.pop infer_state.smt_ctx 1;
       block_subtype
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
@@ -145,8 +144,7 @@ module RangeTypeInfer = struct
     ArchType.pp_arch_type_list 0 state.func_type;
 
     (* Prepare SMT context *)
-    let solver = snd state.smt_ctx in
-    Z3.Solver.push solver;
+    SmtEmitter.push state.smt_ctx;
 
     (* 1. Type prop *)
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
@@ -190,7 +188,7 @@ module RangeTypeInfer = struct
       List.map (RangeSubtype.repl_sol_arch_type subtype_list) state.func_type
     in
 
-    Z3.Solver.pop solver 1;
+    SmtEmitter.pop state.smt_ctx 1;
     { state with func_type = func_type }
     
   let infer 
