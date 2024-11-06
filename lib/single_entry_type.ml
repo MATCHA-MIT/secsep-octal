@@ -80,7 +80,7 @@ include SingleExp
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     match isa_uop with
-    | Mov | MovS | MovZ | Lea -> e
+    | Mov | MovZ | Lea -> e
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
     | Neg -> SingleTop

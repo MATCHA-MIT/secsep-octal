@@ -281,13 +281,13 @@ module Parser = struct
     let list_merge_helper = List.map2 (fun x y -> (x, y)) in
     match mnemonic with
     (* Handle special cases where operand sizes are not the same first *)
-    | "movsbq" -> "movs", (list_merge_helper operands [Some 1L; Some 8L]), None
-    | "movswq" -> "movs", (list_merge_helper operands [Some 2L; Some 8L]), None
-    | "movslq" -> "movs", (list_merge_helper operands [Some 4L; Some 8L]), None
-    | "movsbl" -> "movs", (list_merge_helper operands [Some 1L; Some 4L]), None
-    | "movswl" -> "movs", (list_merge_helper operands [Some 2L; Some 4L]), None
-    | "movsbw" -> "movs", (list_merge_helper operands [Some 1L; Some 2L]), None
-    | "cltq" -> "movs", (list_merge_helper [RegOp EAX; RegOp RAX] [Some 4L; Some 8L]), None
+    | "movsbq" -> "mov", (list_merge_helper operands [Some 1L; Some 8L]), None
+    | "movswq" -> "mov", (list_merge_helper operands [Some 2L; Some 8L]), None
+    | "movslq" -> "mov", (list_merge_helper operands [Some 4L; Some 8L]), None
+    | "movsbl" -> "mov", (list_merge_helper operands [Some 1L; Some 4L]), None
+    | "movswl" -> "mov", (list_merge_helper operands [Some 2L; Some 4L]), None
+    | "movsbw" -> "mov", (list_merge_helper operands [Some 1L; Some 2L]), None
+    | "cltq" -> "mov", (list_merge_helper [RegOp EAX; RegOp RAX] [Some 4L; Some 8L]), None
     | "movzbq" -> "movz", (list_merge_helper operands [Some 1L; Some 8L]), None
     | "movzwq" -> "movz", (list_merge_helper operands [Some 2L; Some 8L]), None
     | "movzlq" -> "movz", (list_merge_helper operands [Some 4L; Some 8L]), None
@@ -429,12 +429,21 @@ module Parser = struct
     let inst: Isa.instruction = 
       match (mnemonic, operands) with
       | ("rep", [LabelOp label]) ->
-        if label = "stosq" then RepStosq 
+        begin match split_opcode_size label None with
+        | "movs", Some size ->
+          RepMovs (size, MemAnno.make_empty (), MemAnno.make_empty ())
+        | "lods", Some size ->
+          RepLods (size, MemAnno.make_empty ())
+        | "stos", Some size ->
+          RepLods (size, MemAnno.make_empty ())
+        | _ -> parse_error (Printf.sprintf "Cannot parse rep op for %s" label)
+        end
+        (* if label = "stosq" then RepStosq 
         else if label = "movsq" then RepMovsq 
         else begin
           Printf.printf "rep %s\n" label;
           parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
-        end
+        end *)
       | ("jmp", [LabelOp lb]) -> Jmp (lb)
       | ("call", [LabelOp lb]) -> Call (lb, None)
       | (_, [LabelOp lb]) ->

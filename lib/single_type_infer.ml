@@ -266,13 +266,13 @@ module SingleTypeInfer = struct
     let init_infer_state = init prog func_name func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
-        { state with context = state.context @ (ArchType.MemType.get_mem_constraints true (List.hd state.func_type).mem_type) }
+        { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
         SmtEmitter.push state.smt_ctx;
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_constraints false (List.hd state.func_type).mem_type);
+        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type);
         SingleCondType.add_assertions state.smt_ctx state.context;
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
@@ -310,7 +310,7 @@ module SingleTypeInfer = struct
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
-          { state with context = state.context @ (ArchType.MemType.get_mem_constraints true (List.hd state.func_type).mem_type) }
+          { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
         end else begin
           helper (clean_up_func_type state) (iter_left - 1)
         end
@@ -361,8 +361,8 @@ module SingleTypeInfer = struct
       Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
-    (* let func_mem_interface_list = List.filteri (fun i _ -> i < 1) func_mem_interface_list in *)
-    let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in
+    let func_mem_interface_list = List.filteri (fun i _ -> i >= 2 && i <= 3) func_mem_interface_list in
+    (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;

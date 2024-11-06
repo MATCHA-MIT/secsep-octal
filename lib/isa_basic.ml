@@ -362,7 +362,7 @@ module IsaBasic = struct
     | None -> "None"
 
   let common_opcode_list = [
-    "movabs"; "mov"; "movs"; "movz"; "lea";
+    "movabs"; "mov"; "movz"; "lea";
     "xchg";
     "add"; "adc"; "sub"; "mul"; "imul";
     "shrd";
@@ -373,6 +373,7 @@ module IsaBasic = struct
     "punpck"; 
     "pxor"; "pand"; "por";
     "psll"; "psrl";
+    "movs"; "lods"; "stos";
   ]
 
   type bop =
@@ -409,7 +410,10 @@ module IsaBasic = struct
   ]
   
   type uop =
-    | Mov | MovS | MovZ
+    | Mov 
+    (* | MovS *) 
+    (* NOTE: MovS is not simply mov sign, it also updates rsi and rdi. Removed and may need to be handled later*)
+    | MovZ
     | Lea
     | Not | Bswap
     | Neg
@@ -417,7 +421,8 @@ module IsaBasic = struct
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
-    ("movs", MovS); ("movz", MovZ);
+    (* ("movs", MovS);  *)
+    ("movz", MovZ);
     ("lea", Lea);
     ("not", Not); ("bswap", Bswap);
     ("neg", Neg);
@@ -425,7 +430,8 @@ module IsaBasic = struct
 
   let uop_opcode_ocaml_str_map = [
     ("Mov", Mov);
-    ("MovS", MovS); ("MovZ", MovZ);
+    (* ("MovS", MovS);  *)
+    ("MovZ", MovZ);
     ("Lea", Lea);
     ("Not", Not); ("Bswap", Bswap);
     ("Neg", Neg);

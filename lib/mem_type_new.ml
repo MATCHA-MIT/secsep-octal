@@ -785,7 +785,7 @@ module MemType (Entry: EntryType) = struct
     let exps = List.fold_left helper [] mem_type in
     SmtEmitter.add_assertions smt_ctx exps *)
 
-  let get_mem_constraints (add_non_overlap_constraint: bool) (mem_type: t) : SingleCondType.t list =
+  let get_mem_boundary_list (mem_type: t) : MemOffset.t list =
     let helper 
         (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) :
         MemOffset.t option =
@@ -799,31 +799,38 @@ module MemType (Entry: EntryType) = struct
         let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
         Some (l, r)
     in
-    let boundary_list = List.filter_map helper mem_type in
-    let boundary_constraint_list = 
-      List.map (
+    List.filter_map helper mem_type
+
+  let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleCondType.t list =
+    List.map (
         fun (l, r) -> 
           SingleCondType.Lt, l, r
       ) boundary_list
-    in
-    let rec get_non_overlap_constraint
-        (acc: SingleCondType.t list)
-        (boundary_list: MemOffset.t list) :
-        SingleCondType.t list =
-      match boundary_list with
-      | [] -> acc
-      | (hd_l, hd_r) :: tl ->
-        let acc = get_non_overlap_constraint acc tl in
-        List.fold_left (
-            fun (acc: SingleCondType.t list) (l, r) ->
-              (SingleCondType.Le,
-              SingleExp.SingleBExp (SingleMul, SingleBExp (SingleSub, hd_r, l), SingleBExp (SingleSub, r, hd_l)),
-              SingleExp.SingleConst 0L) :: acc
-          ) acc tl
-    in
-    if add_non_overlap_constraint then
-      get_non_overlap_constraint boundary_constraint_list boundary_list
-    else
-      boundary_constraint_list
+
+  let rec get_mem_non_overlap_constraint_helper
+      (acc: SingleCondType.t list)
+      (boundary_list: MemOffset.t list) :
+      SingleCondType.t list =
+    match boundary_list with
+    | [] -> acc
+    | (hd_l, hd_r) :: tl ->
+      let acc = get_mem_non_overlap_constraint_helper acc tl in
+      List.fold_left (
+          fun (acc: SingleCondType.t list) (l, r) ->
+            (SingleCondType.Le,
+            SingleExp.SingleBExp (SingleMul, SingleBExp (SingleSub, hd_r, l), SingleBExp (SingleSub, r, hd_l)),
+            SingleExp.SingleConst 0L) :: acc
+        ) acc tl
+
+  let get_mem_boundary_constraint (mem_type: t) : SingleCondType.t list =
+    get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type)
+
+  let get_mem_non_overlap_constraint (mem_type: t) : SingleCondType.t list =
+    get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type)
+
+  let get_all_mem_constraint (mem_type: t) : SingleCondType.t list =
+    let boundary_list = get_mem_boundary_list mem_type in
+    let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
+    get_mem_non_overlap_constraint_helper boundary_constraint boundary_list
 
 end

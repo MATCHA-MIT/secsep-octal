@@ -351,8 +351,11 @@ module Transform = struct
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> transform_error "Call unimplemented"
-    | RepStosq -> transform_error "RepStosq unimplemented"
-    | RepMovsq -> transform_error "RepStosq unimplemented"
+    | RepMovs _ -> transform_error "RepMovs unimplemented"
+    | RepLods _ -> transform_error "RepLods unimplemented"
+    | RepStos _ -> transform_error "RepStos unimplemented"
+    (* | RepStosq -> transform_error "RepStosq unimplemented"
+    | RepMovsq -> transform_error "RepStosq unimplemented" *)
     in
     (InstTransform.assign tf inst inst_pre inst_post), css
 

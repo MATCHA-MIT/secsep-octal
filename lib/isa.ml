@@ -131,8 +131,9 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Test of operand * operand
     | Push of operand * MemAnno.t
     | Pop of operand * MemAnno.t
-    | RepStosq
-    | RepMovsq
+    | RepMovs of (int64 * MemAnno.t * MemAnno.t)
+    | RepLods of (int64 * MemAnno.t)
+    | RepStos of (int64 * MemAnno.t)
     | Jmp of label
     | Jcond of branch_cond * label
     | Call of label * CallAnno.t
@@ -204,8 +205,9 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Push _ -> "push"
     | Pop _ -> "pop"
     | Xchg _ -> "xchg"
-    | RepStosq -> "rep stosq"
-    | RepMovsq -> "rep movsq"
+    | RepMovs _ -> "rep movs"
+    | RepLods _ -> "rep lods"
+    | RepStos _ -> "rep stos"
     | Jmp _ -> "jmp"
     | Jcond (cond, _) ->
       begin match opcode_of_cond_jump cond with
@@ -254,8 +256,12 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Pop (src, mem_anno) -> Printf.sprintf "pop\t\t%s # %s" (string_of_operand src) (MemAnno.to_string mem_anno)
     | Xchg (dst2, dst1, _, _) -> 
       Printf.sprintf "xchg\t%s,\t%s" (string_of_operand dst2) (string_of_operand dst1)
-    | RepStosq -> "rep stosq"
-    | RepMovsq -> "rep movsq"
+    | RepMovs (size, anno1, anno2) ->
+      Printf.sprintf "rep movs(%Ld)\t # %s # %s" size (MemAnno.to_string anno1) (MemAnno.to_string anno2)
+    | RepLods (size, anno) ->
+      Printf.sprintf "rep lods(%Ld)\t # %s" size (MemAnno.to_string anno)
+    | RepStos (size, anno) ->
+      Printf.sprintf "rep stos(%Ld)\t # %s" size (MemAnno.to_string anno)
     | Jmp label -> Printf.sprintf "jmp\t\t%s" label
     | Jcond (cond, label) ->
       begin match opcode_of_cond_jump cond with
@@ -311,8 +317,12 @@ module Isa (MemAnno: MemAnnoType) = struct
         (ocaml_string_of_operand dst1)
         (ocaml_string_of_operand o3)
         (ocaml_string_of_operand o4)
-    | RepStosq -> "RepStosq"
-    | RepMovsq -> "RepMovsq"
+    | RepMovs (size, anno1, anno2) ->
+      Printf.sprintf "RepMovs (%Ld, %s, %s)" size (MemAnno.to_ocaml_string anno1) (MemAnno.to_ocaml_string anno2)
+    | RepLods (size, anno) ->
+      Printf.sprintf "RepLods (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
+    | RepStos (size, anno) ->
+      Printf.sprintf "RepStos (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
     | Jmp label -> Printf.sprintf "Jmp \"%s\"" label
     | Jcond (cond, label) ->
       begin match ocaml_opcode_of_cond_jump cond with

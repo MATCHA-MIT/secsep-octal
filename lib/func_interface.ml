@@ -438,16 +438,19 @@ module FuncInterface (Entry: EntryType) = struct
               Right None
         ) child_context
       in
-      if List.is_empty unknown_context then
+      if List.is_empty unknown_context then begin
         (* We do not do quick check to avoid missing overflow constraints, but this might be slow!!! *)
-        match SingleCondType.sub_check_or_filter false smt_ctx p_context with
+        SmtEmitter.push smt_ctx;
+        let check_result = SingleCondType.sub_check_or_filter false smt_ctx p_context in
+        SmtEmitter.pop smt_ctx 1;
+        match check_result with
         (* Note simp_context is simplified with solution, 
           but to be used for check_or_assert, we need to filter out cond that is_val. *)
         | Left simp_context ->
           (Constraint.CalleeContext simp_context)
         | Right unsat_cond ->
           func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (SingleCondType.to_string unsat_cond))
-      else
+        end else
         Constraint.CalleeUnknownContext
     in
 

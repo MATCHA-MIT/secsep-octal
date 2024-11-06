@@ -667,7 +667,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, RegOp ECX, RegOp EAX);
 							BInst (Sar, RegOp EDX, RegOp EDX, ImmOp (ImmNum 2L));
 							BInst (And, RegOp ECX, RegOp ECX, ImmOp (ImmNum 3L));
-							UInst (MovS, RegOp RDX, RegOp EDX);
+							UInst (Mov, RegOp RDX, RegOp EDX);
 							BInst (Sal, RegOp ECX, RegOp ECX, ImmOp (ImmNum 3L));
 							UInst (Mov, RegOp EDX, LdOp(Some (ImmNum 64L), Some (RSP), Some (RDX), Some (Scale4), 4L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-72L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-8L))), false), None)));
 							BInst (Shr, RegOp EDX, RegOp EDX, RegOp CL);
@@ -1026,7 +1026,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, RegOp EAX, RegOp EBX);
 							BInst (And, RegOp EAX, RegOp EAX, ImmOp (ImmNum 63L));
 							Jcond (JE, ".L22");
-							UInst (MovS, RegOp RAX, RegOp EAX);
+							UInst (Mov, RegOp RAX, RegOp EAX);
 							UInst (MovZ, RegOp EAX, LdOp(None, Some (RSP), Some (RAX), None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), false), None)));
 							BInst (Xor, StOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), LdOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), RegOp AL);
 							BInst (Add, RegOp RBX, RegOp RBX, ImmOp (ImmNum 1L));
@@ -1050,7 +1050,7 @@ let standalone_salsa20_single_infer_state : SingleTypeInfer.t list =
 							UInst (Mov, RegOp RSI, RegOp RBP);
 							UInst (Mov, RegOp RDI, RegOp R13);
 							BInst (Sar, RegOp ECX, RegOp ECX, ImmOp (ImmNum 6L));
-							UInst (MovS, RegOp RCX, RegOp ECX);
+							UInst (Mov, RegOp RCX, RegOp ECX);
 							Call ("salsa20_block", None);
 							UInst (MovZ, RegOp EAX, LdOp(None, Some (RSP), None, None, 1L, (Some (4, (SingleBExp (SingleAdd, SingleVar (4), SingleConst (-120L)), SingleBExp (SingleAdd, SingleVar (4), SingleConst (-56L))), false), None)));
 							BInst (Xor, StOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), LdOp(None, Some (R14), Some (RBX), None, 1L, (Some (7, (SingleVar (7), SingleBExp (SingleAdd, SingleVar (7), SingleVar (6))), false), None)), RegOp AL);
