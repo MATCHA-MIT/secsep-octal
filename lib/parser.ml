@@ -248,7 +248,7 @@ module Parser = struct
       end
     | _ -> parse_error "convert_imm_to_label"
 
-  let split_opcode_size (mnemonic: string) (dirty_op_size: int64 option) : string * (int64 option) =
+  let split_opcode_size (opcode_list: string list) (mnemonic: string) (dirty_op_size: int64 option) : string * (int64 option) =
     let suffix_to_size (opcode: string) (s: string) : int64 option =
       match s with
       | "" -> dirty_op_size
@@ -270,7 +270,7 @@ module Parser = struct
         Some (opcode, suffix_to_size opcode (String.sub mnemonic (String.length opcode) (String.length mnemonic - String.length opcode)))
       else None
     in
-    match List.find_map helper Isa.common_opcode_list with
+    match List.find_map helper opcode_list with
     | Some result -> result
     | None -> parse_error ("split_opcode_size cannot parse " ^ mnemonic)
 
@@ -295,7 +295,7 @@ module Parser = struct
     | "movzwl" -> "movz", (list_merge_helper operands [Some 2L; Some 4L]), None
     | "movzbw" -> "movz", (list_merge_helper operands [Some 1L; Some 2L]), None
     | _ -> 
-      let opcode, op_size = split_opcode_size mnemonic dirty_op_size in
+      let opcode, op_size = split_opcode_size Isa.common_opcode_list mnemonic dirty_op_size in
       opcode, (List.map (fun x -> (x, op_size)) operands), op_size
 
   let get_default_operand (op_size: int64 option) : Isa.operand * (int64 option) =
@@ -429,13 +429,13 @@ module Parser = struct
     let inst: Isa.instruction = 
       match (mnemonic, operands) with
       | ("rep", [LabelOp label]) ->
-        begin match split_opcode_size label None with
+        begin match split_opcode_size IsaBasic.rep_opcode_list label None with
         | "movs", Some size ->
           RepMovs (size, MemAnno.make_empty (), MemAnno.make_empty ())
         | "lods", Some size ->
           RepLods (size, MemAnno.make_empty ())
         | "stos", Some size ->
-          RepLods (size, MemAnno.make_empty ())
+          RepStos (size, MemAnno.make_empty ())
         | _ -> parse_error (Printf.sprintf "Cannot parse rep op for %s" label)
         end
         (* if label = "stosq" then RepStosq 

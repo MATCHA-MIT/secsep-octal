@@ -529,7 +529,7 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
-      let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
+      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
@@ -604,6 +604,7 @@ module ArchType (Entry: EntryType) = struct
       let rcx_type = get_reg_type curr_type RCX in
       let dest_addr_type = get_reg_type curr_type RDI in
       let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
+      Printf.printf "RepStos rcx %s rdi %s size %s\n" (Entry.to_string rcx_type) (Entry.to_string dest_addr_type) (Entry.to_string size_type);
       let src_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) (get_reg_type curr_type RAX) in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint src_type dest_taint_anno in
       let next_type, dest_constraint, dest_useful, dest_slot_anno =
@@ -642,7 +643,7 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
-      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst Isa.And src0_type src1_type) in
+      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type) in
       let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
       { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
@@ -653,7 +654,7 @@ module ArchType (Entry: EntryType) = struct
       let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
-          (Entry.exe_bop_inst Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+          (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
       let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
       let src_type, curr_type, src_constraint, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
@@ -674,7 +675,7 @@ module ArchType (Entry: EntryType) = struct
       let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
-          (Entry.exe_bop_inst Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+          (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
       let next_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type (Isa.RegOp Isa.RSP) new_rsp_type in
       begin match new_ld_op with

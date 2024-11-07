@@ -469,6 +469,23 @@ module MemType (Entry: EntryType) = struct
       (addr_off: MemOffset.t) :
       (MemOffset.t, SingleCondType.t list) Either.t =
     (* Note: this function might add additional constraints to smt_ctx, please do push/pop outside! *)
+    let check_or_assert_helper
+        (lookup_offset: MemOffset.t) (target_offset: MemOffset.t) :
+        (MemOffset.t, SingleCondType.t list) Either.t =
+      let l, r = lookup_offset in
+      let off_l, off_r = target_offset in
+      let cond_list = [
+        SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, off_l, l)), SingleExp.SingleConst 0L;
+        (* TODO: Think about whether this should be Lt or Le!!! *)
+        SingleCondType.Lt, SingleExp.eval (SingleExp.SingleBExp (SingleSub, l, r)), SingleExp.SingleConst 0L;
+        SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, r, off_r)), SingleExp.SingleConst 0L;
+      ] in
+      (* TODO: Check, sat or add, one by one *)
+      begin match SingleCondType.check_or_assert smt_ctx cond_list with
+      | None -> Left addr_off (* addr_off does not belongs to this entry *)
+      | Some cond_list -> Right cond_list
+      end
+    in
     let ptr_set = get_ptr_set mem in
     let l, r = addr_off in
     match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
@@ -477,8 +494,9 @@ module MemType (Entry: EntryType) = struct
       else
         let part_mem = get_part_mem mem b_l in
         begin match part_mem with
-        | [ (off_l, off_r), _, _ ] ->
-          let cond_list = [
+        | [ target_offset, _, _ ] ->
+          check_or_assert_helper addr_off target_offset
+          (* let cond_list = [
             SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, off_l, l)), SingleExp.SingleConst 0L;
             SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, l, r)), SingleExp.SingleConst 0L;
             SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, r, off_r)), SingleExp.SingleConst 0L;
@@ -487,9 +505,20 @@ module MemType (Entry: EntryType) = struct
           begin match SingleCondType.check_or_assert smt_ctx cond_list with
           | None -> Left addr_off (* addr_off does not belongs to this entry *)
           | Some cond_list -> Right cond_list
+          end *)
+          (* Left addr_off *)
+        | _ -> 
+          let other_var_set = SingleExp.SingleVarSet.remove b_l (MemOffset.get_vars addr_off) in
+          let other_var_to_zero_map = List.map (fun x -> (x, SingleExp.SingleConst 0L)) (SingleExp.SingleVarSet.to_list other_var_set) in
+          let other_zero_addr_off = MemOffset.repl_local_var other_var_to_zero_map addr_off in
+          Printf.printf "get_heuristic_mem_type orig off %s heuristic off %s\n" (MemOffset.to_string addr_off) (MemOffset.to_string other_zero_addr_off);
+          let lookup_part_mem = get_part_mem_type smt_ctx part_mem other_zero_addr_off other_zero_addr_off in
+          begin match lookup_part_mem with
+          | Some (_, (target_offset, _, _)) ->
+            check_or_assert_helper addr_off target_offset
+          | None -> Left addr_off
           end
           (* Left addr_off *)
-        | _ -> Left addr_off
         end
     | _ -> Left addr_off
         

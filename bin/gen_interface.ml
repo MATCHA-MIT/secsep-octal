@@ -7,6 +7,7 @@ let salsa20_global : Single_type_infer.SingleTypeInfer.ArchType.MemType.t = [
 ]
 
 let r = Isa_basic.IsaBasic.get_reg_idx
+let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
 let standalone_salsa20 : Base_func_interface.t = [
@@ -88,11 +89,11 @@ let bench_ed25519_plain : Base_func_interface.t = [
     r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop ];
     r RDX, [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
-      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
-      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
       (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
-      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
-      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
       (* (SingleConst 0L, SingleConst 216L), RangeConst [(SingleConst 0L, SingleConst 216L)], SingleTop  *)
     ];
     -2 (* K512 *),  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
@@ -140,11 +141,11 @@ let bench_ed25519_plain : Base_func_interface.t = [
   "SHA512_Init", [
     r RDI, [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
-      (SingleConst 64L, SingleConst 72L), RangeConst [], SingleTop;
-      (SingleConst 72L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [], SingleVar (total_reg_num + 1);
+      (SingleConst 72L, SingleConst 80L), RangeConst [], SingleVar (total_reg_num + 2);
       (SingleConst 80L, SingleConst 208L), RangeConst [], SingleTop;
-      (SingleConst 208L, SingleConst 212L), RangeConst [], SingleTop;
-      (SingleConst 212L, SingleConst 216L), RangeConst [], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [], SingleVar (total_reg_num + 3);
+      (SingleConst 212L, SingleConst 216L), RangeConst [], SingleVar (total_reg_num + 4);
     ];
     -4 (* .LC0 *), [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
     -5 (* .LC4 *), [ (SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop ];
@@ -158,11 +159,11 @@ let bench_ed25519_plain : Base_func_interface.t = [
     ];
     r RSI, [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
-      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
-      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
       (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
-      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
-      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
   ];
   "OPENSSL_cleanse", [
@@ -204,11 +205,11 @@ let bench_ed25519_plain : Base_func_interface.t = [
   "SHA512_Update", [
     r RDI, [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
-      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleTop;
-      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleTop;
+      (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
+      (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
       (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
-      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleTop;
-      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleTop;
+      (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
+      (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
     r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
   ];

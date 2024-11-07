@@ -41,7 +41,7 @@ module type EntryType = sig
   val update_ld_taint_constraint: t -> TaintExp.t option -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t option -> t * Constraint.t list
 
-  val exe_bop_inst: IsaBasic.bop -> t -> t -> t
+  val exe_bop_inst: bool -> IsaBasic.bop -> t -> t -> t
   val exe_uop_inst: IsaBasic.uop -> t -> t
   val exe_top_inst: IsaBasic.top -> t list -> t
 

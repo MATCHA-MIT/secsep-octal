@@ -116,10 +116,10 @@ module TaintEntryType (Entry: EntryType) = struct
       (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
     | None -> e, []
   
-  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
+  let exe_bop_inst (is_check: bool)  (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
     let s1, t1 = e1 in
     let s2, t2 = e2 in
-    Entry.exe_bop_inst isa_bop s1 s2,
+    Entry.exe_bop_inst is_check isa_bop s1 s2,
     if isa_bop = Xor && Entry.cmp s1 s2 = 0 then
       TaintConst false
     else

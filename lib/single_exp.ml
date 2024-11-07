@@ -381,10 +381,13 @@ include SingleExpBasic
       match e with
       | SingleTop | SingleConst _ -> e
       | SingleVar v ->
-        if v > 0 then (* input/block var *)
+        (* if only_repl_local && v > 0 then (* input/block var *)
            e (* Here is dirty since it will also lookup global var *)
-        else begin 
+        else  *)
+        begin (* TODO: Double check this change!!! *)
           match find_local_var_map map v with
+          | Some (SingleVar v') -> (* Prevent infinite rec call *)
+            if v = v' then SingleVar v' else repl_helper (SingleVar v')
           | Some e -> repl_helper e
           | None -> e
         end

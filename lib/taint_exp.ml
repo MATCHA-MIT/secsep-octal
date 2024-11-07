@@ -179,10 +179,12 @@ module TaintExp = struct
       match e with
       | TaintConst _ -> e
       | TaintVar v ->
-        if v > 0 then (* input/block var *)
+        (* if v > 0 then (* input/block var *)
           e (* Here is dirty since it will also lookup global var *)
-        else begin
+        else  *)
+        begin (* TODO: Double check this change!!! *)
           match find_local_var_map map v with
+          | Some (TaintVar v') -> if v = v' then TaintVar v' else repl_helper (TaintVar v')
           | Some e -> repl_helper e
           | None -> e
         end

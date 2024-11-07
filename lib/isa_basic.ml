@@ -373,6 +373,9 @@ module IsaBasic = struct
     "punpck"; 
     "pxor"; "pand"; "por";
     "psll"; "psrl";
+  ]
+
+  let rep_opcode_list = [
     "movs"; "lods"; "stos";
   ]
 

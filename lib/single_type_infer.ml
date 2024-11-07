@@ -266,7 +266,8 @@ module SingleTypeInfer = struct
     let init_infer_state = init prog func_name func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
-        { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
+        (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
+        { state with context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
@@ -284,12 +285,22 @@ module SingleTypeInfer = struct
             (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 
             0 state.func_type = 0
         in
-        Printf.printf "After infer, unknown list:\n";
+
+        let num_unknown, label_unknown_list = 
+          List.fold_left_map (
+            fun (acc: int) (x: ArchType.t) -> 
+              let unknown_list = Constraint.get_unknown x.constraint_list in
+              acc + List.length unknown_list,
+              (x.label, unknown_list)
+          ) 0 state.func_type 
+        in
+        Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
         List.iter (
-          fun (x: ArchType.t) -> 
-            Printf.printf "%s\n" x.label;
-            MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
-        ) state.func_type;
+          fun (label, unknown_list) -> 
+            Printf.printf "%s\n" label;
+            MemOffset.pp_unknown_list 0 unknown_list
+        ) label_unknown_list;
+        
         Printf.printf "\n\n%s: Infer iter %d update_mem%!\n\n" func_name curr_iter;
         let state = update_mem state in
         Printf.printf "\n\nInfer iter %d after update_mem%!\n\n" curr_iter;
@@ -310,7 +321,8 @@ module SingleTypeInfer = struct
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
-          { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
+          (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
+          { state with context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
         end else begin
           helper (clean_up_func_type state) (iter_left - 1)
         end

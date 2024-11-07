@@ -31,16 +31,25 @@ module RegType (Entry: EntryType) = struct
 
   let get_reg_type (reg_type: t) (r: IsaBasic.register) : entry_t =
     let reg_idx = IsaBasic.get_reg_idx r in
-    let off, size = IsaBasic.get_reg_offset_size r in
-    Entry.read_val off size (List.nth reg_type reg_idx)
+    if IsaBasic.is_xmm r then
+      Entry.set_taint_with_other (Entry.get_top_untaint_type ()) (List.nth reg_type reg_idx)
+    else
+      let off, size = IsaBasic.get_reg_offset_size r in
+      Entry.read_val off size (List.nth reg_type reg_idx)
 
   let set_reg_type (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in
-    let off, write_size = IsaBasic.get_reg_offset_size r in
-    let full_size = IsaBasic.get_reg_full_size r in
-    let new_type = Entry.read_val 0L write_size new_type in
-    let new_type = Entry.ext_val Entry.ZeroExt off full_size new_type in
-    List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
+    if IsaBasic.is_xmm r then
+      (* Note: taint of xmm reg should only depends on the incoming new val!!!
+        e.g. movq rdx xmm, the new taint of xmm should be taint of rdx, xmm is overwrite by zero extended value of rdx. *)
+      let new_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) new_type in
+      List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
+    else
+      let off, write_size = IsaBasic.get_reg_offset_size r in
+      let full_size = IsaBasic.get_reg_full_size r in
+      let new_type = Entry.read_val 0L write_size new_type in
+      let new_type = Entry.ext_val Entry.ZeroExt off full_size new_type in
+      List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
 
   let init_reg_type (start_var: entry_t) : entry_t * t =
     let rec helper (var: entry_t) (r_type: t) (idx: int) : entry_t * t =
