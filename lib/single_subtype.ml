@@ -569,30 +569,31 @@ module SingleSubtype = struct
       (tv_rel: type_rel)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
-      (input_var_set: SingleEntryType.SingleVarSet.t) : SingleSol.t =
-    let target_idx, target_pc = tv_rel.var_idx in
-    let try_solve_top (subtype_list: type_pc_list_t list) : SingleSol.t =
-      match List.find_opt (fun (x, _) -> x = SingleEntryType.SingleTop) subtype_list with
-      | Some _ -> SolSimple Top
-      | None -> SolNone
+      (input_var_set: SingleEntryType.SingleVarSet.t) : 
+      type_rel =
+    (* let target_idx, target_pc = tv_rel.var_idx in *)
+    let try_solve_top (tv_rel: type_rel) : type_rel =
+      match List.find_opt (fun (x, _) -> x = SingleEntryType.SingleTop) tv_rel.subtype_list with
+      | Some _ -> { tv_rel with sol = SolSimple Top }
+      | None -> tv_rel
     in
-    let try_solve_single_sub_val (subtype_list: type_pc_list_t list) : SingleSol.t =
+    let try_solve_single_sub_val (tv_rel: type_rel) : type_rel =
       let subtype_list = (* remove non-input SingleVar *)
         List.filter (
           fun (e, _) ->
             match e with
             | SingleEntryType.SingleVar _ -> SingleEntryType.is_val input_var_set e
             | _ -> true
-        ) subtype_list
+        ) tv_rel.subtype_list
       in
       if List.find_opt (fun (x, _) -> not (SingleEntryType.is_val input_var_set x)) subtype_list = None then
         match List.map (fun (x, pc_list) -> x, List.rev pc_list) subtype_list with
-        | [] -> SolNone
-        | (hd, _) :: [] -> SolSimple (Single hd)
+        | [] -> tv_rel
+        | (hd, _) :: [] -> { tv_rel with sol = SolSimple (Single hd) }
         | single_pc_list -> (* SolSimple (SingleSet single_list) *)
           begin match List.sort_uniq (fun (x1, _) (x2, _) -> SingleExp.cmp x1 x2) single_pc_list with
           | [] -> single_subtype_error "sub range list is empty"
-          | (hd, _) :: [] -> SolSimple (Single hd)
+          | (hd, _) :: [] -> { tv_rel with sol = SolSimple (Single hd)}
           | _ ->
             let single_pc_list = 
               List.sort (
@@ -601,15 +602,18 @@ module SingleSubtype = struct
                   if pc_cmp = 0 then SingleExp.cmp x1 x2 else pc_cmp
               ) single_pc_list
             in
-            find_other_sol_set_correlation target_idx target_pc single_pc_list tv_rel_list input_var_set
+            let sol, _ = List.split single_pc_list in
+            { tv_rel with sol = SolSimple (SingleSet sol); set_sol = single_pc_list }
+            (* Printf.printf "Set sol for SymImm %d pc %d %s\n" target_idx target_pc (Sexplib.Sexp.to_string (sexp_of_list sexp_of_type_pc_list_t single_pc_list));
+            find_other_sol_set_correlation target_idx target_pc single_pc_list tv_rel_list input_var_set *)
             (* SolSimple (SingleSet single_list) *)
           end
       else begin 
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
-        if List.length sub_range_opt_list <> List.length sub_range_list then SolNone
-        else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then SolSimple (Top)
+        if List.length sub_range_opt_list <> List.length sub_range_list then tv_rel
+        else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then { tv_rel with sol = SolSimple (Top) }
         else begin
           let rec helper 
               (range_list: RangeExp.t list) : 
@@ -626,7 +630,7 @@ module SingleSubtype = struct
               end
           in
           match helper sub_range_list with
-          | single_list, [] -> SolSimple (SingleSet single_list)
+          | single_list, [] -> { tv_rel with sol = SolSimple (SingleSet single_list) }
             (* TODO: I cannot resolve correlation between vars with this solution format!!! *)
             (* Printf.printf "!!! single list %s\n" (Sexplib.Sexp.to_string (sexp_of_list SingleEntryType.sexp_of_t single_list)); *)
             (* begin match List.sort_uniq SingleExp.cmp single_list with
@@ -636,11 +640,11 @@ module SingleSubtype = struct
             end *)
           | s :: [], (l, r, step) :: [] ->
             if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst step))) = 0 then
-              SolSimple (Range (l, s, step))
+              { tv_rel with sol = SolSimple (Range (l, s, step)) }
             else if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleSub, l, SingleConst step))) = 0 then
-              SolSimple (Range (s, r, step))
-            else SolNone
-          | _ -> SolNone (* TODO: Maybe need to improve this!!! *)
+              { tv_rel with sol = SolSimple (Range (s, r, step))}
+            else tv_rel
+          | _ -> tv_rel (* TODO: Maybe need to improve this!!! *)
         end
       end
     in
@@ -693,14 +697,15 @@ module SingleSubtype = struct
       (* does not match *)
       | _ -> false, false
     in
-    let try_solve_loop_cond (supertype_list: var_pc_list_t list) (subtype_list: type_pc_list_t list) : SingleSol.t =
-      match find_base_step supertype_list subtype_list target_idx with
+    let try_solve_loop_cond (tv_rel: type_rel) : type_rel =
+      let target_idx, target_pc = tv_rel.var_idx in
+      match find_base_step tv_rel.supertype_list tv_rel.subtype_list target_idx with
       | Some (_, _, 0L) -> single_subtype_error "try_solve_loop_cond: find step 0" 
       | Some (base, (var_step, branch_pc), step) ->
         begin match ArchType.get_branch_cond block_subtype (List.hd branch_pc) with
         | None -> 
           Printf.printf "Warning: try_solve_loop_cond found a uncond jump\n";
-          SolNone
+          tv_rel
         | Some (cond, l, r) ->
           let find_cond_var_step = 
             if SingleEntryType.cmp l var_step = 0 then Some (true, r)
@@ -723,23 +728,23 @@ module SingleSubtype = struct
               let bound_2 = SingleEntryType.eval (SingleBExp (SingleSub, bound_1, SingleConst step)) in
               begin match bound_match on_left inc cond, inc with
               | (true, true), true -> 
-                SolCond (List.hd branch_pc, Range (base, bound, step), Range (base, bound_1, step), Single bound)
+                { tv_rel with sol = SolCond (List.hd branch_pc, Range (base, bound, step), Range (base, bound_1, step), Single bound) }
               | (true, true), false -> 
-                SolCond (List.hd branch_pc, Range (bound, base, Int64.neg step), Range (bound_1, base, Int64.neg step), Single bound)
+                { tv_rel with sol = SolCond (List.hd branch_pc, Range (bound, base, Int64.neg step), Range (bound_1, base, Int64.neg step), Single bound) }
               | (true, false), true ->
-                SolCond (List.hd branch_pc, Range (base, bound_1, step), Range (base, bound_2, step), Single bound_1)
+                { tv_rel with sol = SolCond (List.hd branch_pc, Range (base, bound_1, step), Range (base, bound_2, step), Single bound_1) }
               | (true, false), false ->
-                SolCond (List.hd branch_pc, Range (bound_1, base, Int64.neg step), Range (bound_2, base, Int64.neg step), Single bound_1)
+                { tv_rel with sol = SolCond (List.hd branch_pc, Range (bound_1, base, Int64.neg step), Range (bound_2, base, Int64.neg step), Single bound_1) }
               | _ -> 
                 Printf.printf "Bound match cannot find sol %s bound %s\n" (ArchType.CondType.to_string (cond, l, r)) (SingleExp.to_string bound);
-                SolNone
+                tv_rel
               end
             else begin
               (* Printf.printf "!!!\n";
               pp_single_subtype 0 tv_rel_list;
               Printf.printf "!!!\n"; *)
               Printf.printf "Bound is not val %s bound %s\n" (ArchType.CondType.to_string (cond, l, r)) (SingleExp.to_string bound);
-              SolNone
+              tv_rel
             end
           | None ->
             (* Represent sol with the actual loop counter *)
@@ -783,22 +788,34 @@ module SingleSubtype = struct
               ) tv_rel_list
             in
             begin match find_other with
-            | Some sol -> SolSimple (Single sol)
+            | Some sol -> { tv_rel with sol = SolSimple (Single sol) }
             | None -> 
               Printf.printf "Warning: cannot find sol for var %d with find loop cond\n" target_idx;
-              SolNone
+              tv_rel
             end
           end
-      | None -> SolNone
+      | None -> tv_rel
     in
     let solve_rules = [
       try_solve_top;
-      try_solve_loop_cond tv_rel.supertype_list;
+      try_solve_loop_cond;
       try_solve_single_sub_val;
     ] in
-    List.fold_left 
-      (fun acc rule -> if acc = SingleSol.SolNone then rule tv_rel.subtype_list else acc) 
-      tv_rel.sol solve_rules
+    let tv_rel_opt = 
+      List.find_map (
+        fun rule ->
+          let tv_rel = rule tv_rel in
+          if tv_rel.sol = SingleSol.SolNone then None
+          else Some tv_rel
+      ) solve_rules
+    in
+    match tv_rel_opt with
+    | Some tv_rel -> tv_rel
+    | None -> tv_rel
+    (* List.fold_left (
+      fun acc_tv_rel rule -> 
+        if acc_tv_rel.sol = SingleSol.SolNone then rule tv_rel else tv_rel
+    ) tv_rel solve_rules *)
 
   let subsititue_one_exp_single_sol
       (exp_pc: type_pc_list_t)
@@ -874,9 +891,9 @@ module SingleSubtype = struct
             ) tv_rel.subtype_list)
           in
           let tv_rel = { tv_rel with subtype_list = subtype_list } in
-          let sol = try_solve_one_var tv_rel tv_rel_list block_subtype input_var_set in
-          if sol = SolNone then acc, tv_rel
-          else (tv_rel.var_idx, sol) :: acc, { tv_rel with sol = sol}
+          let tv_rel = try_solve_one_var tv_rel tv_rel_list block_subtype input_var_set in
+          if tv_rel.sol = SolNone then acc, tv_rel
+          else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel
     ) [] tv_rel_list
     in
     (* Printf.printf "Update subtype_single_sol with new sol\n";
