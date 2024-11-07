@@ -539,7 +539,12 @@ module SingleSubtype = struct
         match List.map (fun (x, _ ) -> x) subtype_list with
         | [] -> SolNone
         | hd :: [] -> SolSimple (Single hd)
-        | subtype_list -> SolSimple (SingleSet subtype_list)
+        | single_list -> (* SolSimple (SingleSet single_list) *)
+          begin match List.sort_uniq SingleExp.cmp single_list with
+          | [] -> single_subtype_error "sub range list is empty"
+          | hd :: [] -> SolSimple (Single hd)
+          | _ -> SolSimple (SingleSet single_list)
+          end
       else begin 
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt tv_rel_list input_var_set (x, fst pc_list)) subtype_list in
@@ -563,6 +568,12 @@ module SingleSubtype = struct
           in
           match helper sub_range_list with
           | single_list, [] -> SolSimple (SingleSet single_list)
+            (* Printf.printf "!!! single list %s\n" (Sexplib.Sexp.to_string (sexp_of_list SingleEntryType.sexp_of_t single_list)); *)
+            (* begin match List.sort_uniq SingleExp.cmp single_list with
+            | [] -> single_subtype_error "sub range list is empty"
+            | hd :: [] -> SolSimple (Single hd)
+            | _ -> SolSimple (SingleSet single_list)
+            end *)
           | s :: [], (l, r, step) :: [] ->
             if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst step))) = 0 then
               SolSimple (Range (l, s, step))
