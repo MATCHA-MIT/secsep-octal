@@ -1,5 +1,7 @@
 open Isa_basic
 open Reg_type_new
+open Single_exp
+open Range_exp
 open Taint_exp
 open Single_entry_type
 open Taint_entry_type
@@ -53,6 +55,12 @@ module CallAnno = struct
     | _, BaseAsGlobal -> -1
     | BaseAsGlobal, _ -> 1
 
+  let base_info_to_string (x: base_info) : string =
+    match x with
+    | BaseAsReg r -> Printf.sprintf "BaseAsReg %s" (IsaBasic.string_of_reg r)
+    | BaseAsSlot (v, o) -> Printf.sprintf "BaseAsSlot (%d, %s)" v (MemOffset.to_string o)
+    | BaseAsGlobal -> "BaseAsGlobal"
+
   let to_ocaml_string (anno: t) : string =
     match anno with
     | None -> "None"
@@ -63,8 +71,17 @@ module CallAnno = struct
   let get_call_anno
       (pr_reg: TaintRegType.t) 
       (call_mem_read_hint_option: slot_info MemTypeBasic.mem_content option)
+      (single_local_map: SingleExp.local_var_map_t)
+      (sub_sol_func: SingleExp.t -> RangeExp.t option)
       (taint_map_option: TaintExp.local_var_map_t option)
       (base_info: base_info MemTypeBasic.mem_content) : t =
+    (* CallAnno is responsible for replacing local variables & applying solutions for SE in reg types *)
+    let pr_reg = List.map (fun (se, te) ->
+      let se = SingleExp.repl_local_var single_local_map se in
+      match sub_sol_func se with
+      | Some (Single se') -> (se', te)
+      | _ -> (se, te)
+    ) pr_reg in
     match call_mem_read_hint_option, taint_map_option with
     | None, _ | _, None -> None
     | Some call_mem_read_hint, Some taint_var_map ->

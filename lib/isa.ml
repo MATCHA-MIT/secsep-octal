@@ -378,7 +378,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm))
 
   let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg != (0L, 8L) then
+    if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
     let d, b, i, s = mem_op in
@@ -386,7 +386,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
 
   let make_inst_ld_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg != (0L, 8L) then
+    if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
     let d, b, i, s = mem_op in

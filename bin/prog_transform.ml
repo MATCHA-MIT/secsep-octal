@@ -11,13 +11,15 @@ let speclist = [
 let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
   let taint_infer_result_fi = 
-    Taint_type_infer.TaintTypeInfer.FuncInterface.fi_list_from_file (get_interface_list_filename  !program_name) 
+    Taint_type_infer.TaintTypeInfer.FuncInterface.fi_list_from_file (get_interface_list_filename !program_name) 
   in
   let taint_infer_result_states = 
     Taint_type_infer.TaintTypeInfer.state_list_from_file (get_taint_infer_filename !program_name) 
   in
+  let test_func_state = List.hd taint_infer_result_states in
+  let init_mem_unity = Transform.Transform.get_func_init_mem_unity test_func_state in
   let _ =
-    Transform.Transform.transform_functions taint_infer_result_fi taint_infer_result_states
+    Transform.Transform.transform_one_function taint_infer_result_fi test_func_state init_mem_unity
   in
   ()
   (* in

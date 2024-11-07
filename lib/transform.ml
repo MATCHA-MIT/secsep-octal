@@ -14,6 +14,7 @@ module MemAnno = FullMemAnno
 module Isa = Isa (MemAnno)
 
 module ArchType = TaintTypeInfer.ArchType
+module RegType = ArchType.RegType
 module MemType = ArchType.MemType
 module FuncInterface = ArchType.FuncInterface
 
@@ -106,17 +107,35 @@ module Transform = struct
     insts: InstTransform.t list;
   }
 
+  (* Unity of memory of each base in a function *)
+  type mem_unity_t = (Isa.imm_var_id * unity) list
+
   (* function may uses some stack slot to save callee-saved registers *)
   type callee_slot = Isa.register * MemOffset.t
 
   type func_state = {
+    func_name: string;
     bbs: basic_block list;
     bb_types: ArchType.t list;
-    init_mem_unity: (Isa.imm_var_id * unity) list;
+    init_mem_unity: mem_unity_t;
+    init_rsp_var_id: Isa.imm_var_id;
     callee_saving_slots: callee_slot list;
   }
 
   let delta: int64 = -0x100000L (* -1MB *)
+
+  let get_rsp_var_from_reg_type (reg_type: RegType.t) : Isa.imm_var_id =
+    let rsp_var_id = match TaintSubtype.TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP) with
+    | SingleVar var_id -> var_id
+    | _ -> transform_error "Unexpected single expression for RSP"
+    in
+    rsp_var_id
+
+  let get_func_init_rsp_var (ti_state: TaintTypeInfer.t) : Isa.imm_var_id =
+    let first_bb_state = List.hd ti_state.func_type in
+    if not (Isa.is_label_function_entry first_bb_state.label) then
+      transform_error "First basic block is not function entry";
+    get_rsp_var_from_reg_type first_bb_state.reg_type
 
   let mem_part_taint_counter
       (mem_part: 'a MemTypeBasic.mem_part)
@@ -158,37 +177,48 @@ module Transform = struct
     | _, _, None -> Ununified
     | _ -> transform_error (Printf.sprintf "Transformation rejected due to mem part of %d" base_id)
 
-  let init_func_state (ti_state: TaintTypeInfer.t) : func_state * Isa.imm_var_id =
-    let helper_get_unity (mem: MemType.t) (rsp_var_id: Isa.imm_var_id) : (Isa.imm_var_id * unity) list =
-        List.map (fun (mem_part: (MemType.entry_t MemType.mem_part)) ->
-          let base_id, _ = mem_part in
-          if base_id = rsp_var_id then (base_id, Ununified) else
-          let unity =
-            get_mem_part_unity mem_part (fun _ _ (entry: MemType.entry_t) -> let (_, taint) = entry in taint)
-          in
-          (base_id, unity)
-      ) mem
+  (* were used to mocking the real instantiate step 
+
+  let get_taint_var_instantiate_map (func_name: string) : TaintExp.local_var_map_t =
+    let helper (untaint_list: TaintExp.taint_var_id list) (taint_list: TaintExp.taint_var_id list) =
+      List.map (fun x -> (x, TaintExp.TaintConst false)) untaint_list @
+      List.map (fun x -> (x, TaintExp.TaintConst true)) taint_list
     in
-    let first_bb_state = List.hd ti_state.func_type in
-    if not (Isa.is_label_function_entry first_bb_state.label) then
-      transform_error "First basic block is not function entry";
-    let rsp_var_id = match TaintSubtype.TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type first_bb_state.reg_type Isa.RSP) with
-    | SingleVar var_id -> var_id
-    | _ -> transform_error "Unexpected single expression for RSP"
-    in
+    match func_name with
+    | "salsa20_words" -> helper [] [4; 6; 13; 14; 15; 16; 37]
+    | "salsa20_block" -> helper [] [2; 3; 4; 22]
+    | "salsa20" -> helper [2] [4; 6; 13; 14; 15; 16; 26]
+    | "_start" -> helper [] [4; 17; 18]
+    | _ -> []
+
+  (* TODO: Use it to handle callee-saved registers, init them as TaintConst false *)
+  let instantiate_taint_vars
+      (_: TaintExp.local_var_map_t)
+      (ti_state: TaintTypeInfer.t)
+      : TaintTypeInfer.t =
+    (* TODO: instantiate TV in program (i.e. all MemAnno and CallAnno) *) 
+    ti_state
+
+  *)
+
+  let init_func_state
+      (ti_state: TaintTypeInfer.t)
+      (init_mem_unity: mem_unity_t)
+      : func_state =
     let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
       {
         label = bb.label;
         insts = List.map (fun inst -> InstTransform.init inst) bb.insts;
       }
-    ) ti_state.func
-    in
+    ) ti_state.func in
     {
+      func_name = ti_state.func_name;
       bbs = extended_bbs;
       bb_types = ti_state.func_type;
-      init_mem_unity = helper_get_unity first_bb_state.mem_type rsp_var_id;
+      init_mem_unity = init_mem_unity;
+      init_rsp_var_id = get_func_init_rsp_var ti_state;
       callee_saving_slots = []
-    }, rsp_var_id
+    }
 
   let get_slot_unity (mem_unity: (Isa.imm_var_id * unity) list) (base_id: Isa.imm_var_id) : unity =
     let result = List.find_map (fun (id, unity) ->
@@ -218,7 +248,6 @@ module Transform = struct
   let transform_instruction
       (func_state: func_state)
       (tf: InstTransform.t)
-      (rsp_var_id: Isa.imm_var_id)
       (css: callee_slot list) (* css == callee_saving_slots *)
       : InstTransform.t * (callee_slot list) =
     let helper_add_callee_saving_slot (l: callee_slot list) (reg: Isa.register) (offset: MemOffset.t) : callee_slot list =
@@ -271,7 +300,7 @@ module Transform = struct
         | Isa.Mov, Isa.StOp(_, _, _, _, _, (slot_info, taint_info)), Isa.RegOp reg when Isa.is_reg_callee_saved reg ->
           (* TODO: is this enough to cover all cases? *)
           let (slot_base, slot_offset, slot_full), taint_info = Option.get slot_info, Option.get taint_info in
-          if slot_base = rsp_var_id && slot_full && MemOffset.is_8byte_slot slot_offset && taint_info = TaintConst true then
+          if slot_base = func_state.init_rsp_var_id && slot_full && MemOffset.is_8byte_slot slot_offset && taint_info = TaintConst true then
             helper_add_callee_saving_slot css reg slot_offset
           else
             css
@@ -314,7 +343,7 @@ module Transform = struct
           transform_error "Memory annotation missing information";
         (* sanity check on stack access *)
         let (slot_base, slot_offset, slot_is_full) = Option.get slot_anno in
-        if slot_base != rsp_var_id then
+        if slot_base != func_state.init_rsp_var_id then
           transform_error "Push/Pop not accessing stack memory";
         if not slot_is_full then
           transform_error "Push/Pop not accessing full slot";
@@ -322,7 +351,8 @@ module Transform = struct
         let offset_as_disp = match taint_anno with
         | TaintConst true -> Some (Isa.ImmNum delta)
         | TaintConst false -> None
-        | TaintVar _ -> transform_error "TaintVar not expected for Push/Pop simulation"
+        | TaintVar x ->
+          transform_error (Printf.sprintf "func=%s, taint_var=%d: TaintVar not expected for Push/Pop simulation: " func_state.func_name x)
         | _ -> transform_error "Unexpected taint annotation for Push/Pop simulation"
         in
         let o' = helper_prepare_memop o in
@@ -349,41 +379,32 @@ module Transform = struct
           (inst_ld, [], [inst_rsp_add]), css
         | _ -> transform_error "Expecting only Push/Pop here"
       end
-    | Call _ -> transform_error "Call unimplemented"
+    | Call _ -> (orig, [], []), css (* handled in another pass *)
     | RepStosq -> transform_error "RepStosq unimplemented"
     | RepMovsq -> transform_error "RepStosq unimplemented"
     in
     (InstTransform.assign tf inst inst_pre inst_post), css
 
-  let get_parent_slot_taint (parent_mem_type: MemType.t) (slot: CallAnno.slot_t) : TaintExp.t =
-    (* get taint of the parent slot to which the current slot is mapped *)
-    let (parent_slot_base, parent_slot_off, _), _ = slot in
-    let _, taint = MemType.get_mem_type_strict parent_mem_type (parent_slot_base, parent_slot_off) |> Option.get in
-    let _ = match taint with
-    | TaintVar _ -> transform_error "Unexpected taint var when processing memory mapping in call"
-    | _ -> ()
-    in
-    taint
-
   let get_child_slot_taint
-        (child_fi_in_mem: FuncInterface.MemType.t)
-        (base: Isa.imm_var_id)
-        (offset: MemOffset.t)
-        (_: 'a)
-        : TaintExp.t =
+      (child_fi_in_mem: FuncInterface.MemType.t)
+      (base: Isa.imm_var_id)
+      (offset: MemOffset.t)
+      (_: 'a)
+      : TaintExp.t =
     let _, taint = MemType.get_mem_type_strict child_fi_in_mem (base, offset) |> Option.get in
     taint
 
   let extract_bases_to_be_changed
       (func_state: func_state)
-      (child_fi_in_mem: FuncInterface.MemType.t) (* wanna check taint type of slots the moment the call happens *)
+      (child_fi: FuncInterface.t) (* wanna check taint type of slots the moment the call happens *)
       (anno: CallAnno.t')
-      (rsp_var_id: Isa.imm_var_id)
       : CallAnno.base_info list =
+    let child_rsp_var_id = get_rsp_var_from_reg_type child_fi.in_reg in
     let res = List.fold_left (
       fun (acc: CallAnno.base_info list) (mem_part: CallAnno.slot_t MemType.mem_part) : CallAnno.base_info list ->
         let child_base, slots = mem_part in
-        if List.length slots = 0 then transform_error "Empty memory part";
+        if List.length slots = 0 && child_base != child_rsp_var_id then transform_error "Empty memory part";
+        if List.length slots = 0 then acc else
 
         (* sample the first slot to get info of base pointer, should be the same accross all slots *)
         let _, _, ((parent_base, _, _), parent_base_info) = (List.hd slots) in
@@ -395,12 +416,12 @@ module Transform = struct
         ) (List.tl slots);
 
         (* do not transform, if dealing with child's RSP or global base, or parent mem is already unified *)
-        if child_base = rsp_var_id ||
+        if child_base = func_state.init_rsp_var_id ||
            parent_base_info = BaseAsGlobal ||
            get_slot_unity func_state.init_mem_unity parent_base = Unified 
         then acc else
         (* see if all slots are taint true or all slots are taint false *)
-        let unity = get_mem_part_unity mem_part (get_child_slot_taint child_fi_in_mem) in
+        let unity = get_mem_part_unity mem_part (get_child_slot_taint child_fi.in_mem) in
         if unity = Unified then parent_base_info :: acc else acc
     ) [] anno.ch_mem in
     List.sort_uniq CallAnno.cmp_base_info res
@@ -458,6 +479,11 @@ module Transform = struct
 
   let get_stack_slot_dyn_offset (rsp_var_id: Isa.imm_var_id) (slot: MemOffset.t) (curr_rsp: SingleExp.t) : int64 =
     let addr_beg, _ = slot in
+    (*
+    PP.print_lvl 0 "get_stack_slot_dyn_offset\n";
+    PP.print_lvl 1 "addr_beg: %s\n" (SingleExp.to_string addr_beg);
+    PP.print_lvl 1 "curr_rsp: %s\n" (SingleExp.to_string curr_rsp);
+    *)
     let offset1 = SingleExp.match_const_offset addr_beg rsp_var_id |> Option.get in
     let offset2 = SingleExp.match_const_offset curr_rsp rsp_var_id |> Option.get in
     Int64.sub offset1 offset2
@@ -466,7 +492,6 @@ module Transform = struct
       (func_state: func_state)
       (func_interfaces: FuncInterface.t list)
       (bb: basic_block)
-      (rsp_var_id: Isa.imm_var_id)
       : basic_block =
     let insts' = List.fold_left (
       fun (acc_tf: InstTransform.t list) (* processed insts (all previous inst), reversed *)
@@ -475,7 +500,7 @@ module Transform = struct
         | Call (child_label, anno) -> begin
             let child_fi = FuncInterface.find_fi func_interfaces child_label |> Option.get in
             let anno = Option.get anno in
-            let bases_to_change = extract_bases_to_be_changed func_state child_fi.in_mem anno rsp_var_id in
+            let bases_to_change = extract_bases_to_be_changed func_state child_fi anno in
             let new_prev_tfs, bases_to_change = List.fold_left (
               (* sweep (in reversed order) and find instructions that prepare bases *)
               fun (acc: (InstTransform.t list) * (CallAnno.base_info list)) (tf: InstTransform.t) ->
@@ -484,11 +509,14 @@ module Transform = struct
                 let result = List.find_map (
                     fun (base_info: CallAnno.base_info) ->
                       match base_info with
-                      | BaseAsReg reg -> begin
-                        let replaced = try_change_delta_of_dest_reg tf reg in
-                        match replaced with
-                        | Some tf' -> Some (tf', base_info)
-                        | None -> None
+                      | BaseAsReg _ (* reg *) -> begin
+                          (*
+                          let replaced = try_change_delta_of_dest_reg tf reg in
+                          match replaced with
+                          | Some tf' -> Some (tf', base_info)
+                          | None -> None
+                          *)
+                          None (* do not use this logic for now, since it may modify reg's value before some other instructions use it *)
                         end
                       | BaseAsSlot _ -> None (* we will handle this later, see below *)
                       | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
@@ -563,7 +591,7 @@ module Transform = struct
                 let (curr_rsp, curr_rsp_taint) = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
                 (* no conservative here, as the register is confirmed tainted *)
                 if curr_rsp_taint = TaintConst true then None else
-                let disp = get_stack_slot_dyn_offset rsp_var_id offset curr_rsp in
+                let disp = get_stack_slot_dyn_offset func_state.init_rsp_var_id offset curr_rsp in
                 let disp = if disp != 0L then Some (Isa.ImmNum disp) else None in
                 let mem_op = (disp, Some Isa.RSP, None, None) in
                 let inst_save = Isa.make_inst_st_r64_m64 reg mem_op in
@@ -578,7 +606,7 @@ module Transform = struct
             tf :: (List.rev new_prev_tfs)
           end
         | _ -> tf :: acc_tf
-    ) [] bb.insts
+    ) [] bb.insts |> List.rev
     in
     { bb with insts = insts' }
 
@@ -613,28 +641,49 @@ module Transform = struct
   let transform_basic_block_basic
       (func_state: func_state)
       (bb: basic_block)
-      (rsp_var_id: Isa.imm_var_id)
       (css: callee_slot list)
       : basic_block * (callee_slot list) =
     let new_insts, css' = List.fold_left (
       fun (acc: (InstTransform.t list) * (callee_slot list)) (trans: InstTransform.t) ->
         let acc_insts, acc_css = acc in
-        let tf, css = transform_instruction func_state trans rsp_var_id acc_css in
+        let tf, css = transform_instruction func_state trans acc_css in
         tf :: acc_insts, css
     ) ([], css) bb.insts in
     { bb with insts = List.rev new_insts }, css'
 
+  (* Step 2 *)
+  let get_func_init_mem_unity (ti_state: TaintTypeInfer.t) : mem_unity_t =
+    let rsp_var_id = get_func_init_rsp_var ti_state in
+    List.map (fun (mem_part: (MemType.entry_t MemType.mem_part)) ->
+      let base_id, _ = mem_part in
+      if base_id = rsp_var_id then (base_id, Ununified) else
+      let unity =
+        get_mem_part_unity mem_part (fun _ _ (entry: MemType.entry_t) -> let (_, taint) = entry in taint)
+      in
+      (base_id, unity)
+    ) (List.hd ti_state.func_type).mem_type
+
+  (* Step 3 *)
+  let get_func_instantiate_requests
+      (ti_state: TaintTypeInfer.t)
+      (init_mem_unity: mem_unity_t)
+      : TaintExp.taint_var_id list =
+    let _, _ = ti_state, init_mem_unity in
+    [] (* TODO *)
+
+  (* Step 5 *)
   let transform_one_function
       (fi_list: FuncInterface.t list)
-      (taint_infer_state: TaintTypeInfer.t)
+      (ti_state: TaintTypeInfer.t)
+      (init_mem_unity: mem_unity_t)
       : func_state =
-    let func_state, rsp_var_id = init_func_state taint_infer_state in
+    let func_state = init_func_state ti_state init_mem_unity in
 
     (* basic pass *)
     let bbs, css = List.fold_left (
       fun acc (bb: basic_block) ->
         let acc_bbs, acc_css = acc in
-        let bb', css = transform_basic_block_basic func_state bb rsp_var_id acc_css in
+        let bb', css = transform_basic_block_basic func_state bb acc_css in
         bb' :: acc_bbs, css
     ) ([], []) func_state.bbs in
     let func_state = {
@@ -646,7 +695,7 @@ module Transform = struct
 
     (* call handling pass *)
     let bbs = List.map (
-      fun bb -> transform_basic_block_calls func_state fi_list bb rsp_var_id
+      fun bb -> transform_basic_block_calls func_state fi_list bb
     ) func_state.bbs in
     let func_state = {
       func_state with
@@ -657,6 +706,7 @@ module Transform = struct
     pp_func_state func_state;
     func_state
 
+  (* was use to call transformation on single function benchmark
   let transform_functions
       (fi_list: FuncInterface.t list)
       (taint_infer_states: TaintTypeInfer.t list)
@@ -665,4 +715,5 @@ module Transform = struct
       fun taint_infer_state -> transform_one_function fi_list taint_infer_state
     ) taint_infer_states
 
+  *)
 end

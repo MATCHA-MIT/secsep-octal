@@ -701,7 +701,7 @@ module ArchType (Entry: EntryType) = struct
     Printf.printf "type_prop_call %s\n" target_func_name;
     (* Entry.pp_local_var 0 curr_type.local_var_map;
     pp_arch_type 0 curr_type; *)
-    let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
+    let sub_sol_func' (e: SingleExp.t) : MemOffset.t option =
       match sub_sol_func (e, curr_type.pc) with
       | Some r -> RangeExp.to_mem_offset2 r
       | None -> None
@@ -709,7 +709,7 @@ module ArchType (Entry: EntryType) = struct
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
       let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, taint_var_map =
-        FuncInterface.func_call smt_ctx sub_sol_func func_interface
+        FuncInterface.func_call smt_ctx sub_sol_func' func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
       in
       let call_anno = (
@@ -718,6 +718,8 @@ module ArchType (Entry: EntryType) = struct
           CallAnno.get_call_anno 
             (List.map Entry.get_single_taint_exp curr_type.reg_type)
             call_slot_info
+            (Entry.get_single_local_var_map curr_type.local_var_map)
+            (fun (x: SingleExp.t) -> sub_sol_func (x, curr_type.pc))
             taint_var_map
             func_interface.base_info
         | _ -> orig_call_anno
