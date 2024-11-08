@@ -82,7 +82,8 @@ module SingleSubtype = struct
     List.iter (fun (sub, pc) -> PP.print_lvl (lvl + 2) "%s, (%s);\n" (SingleEntryType.to_string sub) (Sexplib.Sexp.to_string (sexp_of_list sexp_of_int pc))) x.subtype_list;
     PP.print_lvl (lvl + 1) "]\n";
     PP.print_lvl (lvl + 1) "Supertype: [%s]\n" 
-      (String.concat "; " (List.map (fun (v, pc) -> Printf.sprintf "%d,(%s)" v (Sexplib.Sexp.to_string (sexp_of_list sexp_of_int pc))) x.supertype_list))
+      (String.concat "; " (List.map (fun (v, pc) -> Printf.sprintf "%d,(%s)" v (Sexplib.Sexp.to_string (sexp_of_list sexp_of_int pc))) x.supertype_list));
+    PP.print_lvl (lvl + 1) "Sol set: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_list_t x.set_sol))
 
   let pp_single_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
@@ -545,24 +546,33 @@ module SingleSubtype = struct
     | _, false -> None
     | invariance_opt, true -> invariance_opt
 
-  let find_other_sol_set_correlation
-      (var_idx: IsaBasic.imm_var_id) (var_pc: int)
-      (set_sol: type_pc_list_t list)
+  let update_sol_set_correlation
       (tv_rel_list: t)
-      (input_var_set: SingleEntryType.SingleVarSet.t) : SingleSol.t =
-    let var_sol_len = List.length set_sol in
-    let helper (tv_rel: type_rel) : SingleSol.t option =
-      let other_idx, other_pc = tv_rel.var_idx in
-      if other_idx <> var_idx && other_pc = var_pc && List.length tv_rel.set_sol = var_sol_len then begin
-        match find_list_correlation input_var_set SingleExp.SingleAdd set_sol tv_rel.set_sol with
-        | Some invariance ->
-          Some (SolSimple (Single (SingleExp.eval (SingleBExp (SingleSub, invariance, SingleVar other_idx)))))
-        | None -> None
-      end else None
+      (input_var_set: SingleEntryType.SingleVarSet.t) : t =
+    let rec helper_outer (tv_rel_list: t) : t =
+      match tv_rel_list with
+      | [] -> []
+      | hd :: tl ->
+        let hd_sol_len = List.length hd.set_sol in
+        if hd_sol_len > 0 then
+          let hd_idx, hd_pc = hd.var_idx in
+          let helper_inner (tv_rel: type_rel) : type_rel =
+            let other_idx, other_pc = tv_rel.var_idx in
+            (* Printf.printf "!!! SymImm %d pc %d SymImm %d pc %d\n" hd_idx hd_pc other_idx other_pc; *)
+            if other_idx <> hd_idx && other_pc = hd_pc && List.length tv_rel.set_sol = hd_sol_len then begin
+              match find_list_correlation input_var_set SingleExp.SingleAdd hd.set_sol tv_rel.set_sol with
+              | Some invariance ->
+                (* Printf.printf "!!! find_list_correlation SymImm %d and SymImm %d with invariance %s\n" other_idx hd_idx (SingleEntryType.to_string invariance); *)
+                { tv_rel with 
+                  sol = SolSimple (Single (SingleExp.eval (SingleBExp (SingleSub, invariance, SingleVar hd_idx))));
+                  set_sol = [] }
+              | None -> tv_rel
+            end else tv_rel
+          in
+          hd :: helper_outer (List.map helper_inner tl)
+        else hd :: helper_outer tl
     in
-    match List.find_map helper tv_rel_list with
-    | Some sol -> sol
-    | None -> SolSimple (SingleSet (List.map (fun (x, _) -> x) set_sol))
+    helper_outer tv_rel_list
 
   let try_solve_one_var
       (* (smt_ctx: SmtEmitter.t) *) (* Maybe I need add_no_overflow later *)
@@ -812,10 +822,6 @@ module SingleSubtype = struct
     match tv_rel_opt with
     | Some tv_rel -> tv_rel
     | None -> tv_rel
-    (* List.fold_left (
-      fun acc_tv_rel rule -> 
-        if acc_tv_rel.sol = SingleSol.SolNone then rule tv_rel else tv_rel
-    ) tv_rel solve_rules *)
 
   let subsititue_one_exp_single_sol
       (exp_pc: type_pc_list_t)
@@ -913,11 +919,11 @@ module SingleSubtype = struct
     let rec helper
         (tv_rel_list: t)
         (num_iter: int) : t =
-      if num_iter = 0 then tv_rel_list
+      if num_iter = 0 then update_sol_set_correlation tv_rel_list input_var_set
       else begin
         let new_subtype, found_new_sol = try_solve_vars tv_rel_list block_subtype input_var_set in
         if found_new_sol then helper new_subtype (num_iter - 1)
-        else new_subtype
+        else update_sol_set_correlation new_subtype input_var_set
       end
     in
     helper tv_rel_list num_iter
