@@ -440,10 +440,12 @@ module MemType (Entry: EntryType) = struct
       (mem: t)
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t) :
-      MemOffset.t * MemRange.t * entry_t =
+      (MemOffset.t * MemRange.t * entry_t) * bool =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s"
-        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
+      ((SingleExp.SingleTop, SingleExp.SingleTop), RangeConst [], Entry.get_top_untaint_type ()),
+      false
+      (* mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s"
+        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off)) *)
     else
       let s_ptr, s_off, is_full = slot_info in
       match List.find_opt (fun (ptr, _) -> ptr = s_ptr) mem with
@@ -459,7 +461,7 @@ module MemType (Entry: EntryType) = struct
           ) part_mem
         in
         begin match lookup with
-        | Some result -> result
+        | Some result -> result, true
         | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
         end
 
@@ -697,10 +699,11 @@ module MemType (Entry: EntryType) = struct
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_type: entry_t) :
-      t * (Constraint.t list) =
+      t * (Constraint.t list) * bool =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s"
-        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
+      mem, [], false
+      (* mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s"
+        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off)) *)
     else
       let s_ptr, _, _ = slot_info in
       match List.find_opt (fun (ptr, _) -> ptr = s_ptr) mem with
@@ -708,7 +711,8 @@ module MemType (Entry: EntryType) = struct
       | Some (_, part_mem) ->
         let part_mem, constraints = set_slot_part_mem_type smt_ctx update_init_range part_mem orig_addr_off slot_info new_type in
         List.map (fun (ptr, p_mem) -> if ptr = s_ptr then (ptr, part_mem) else (ptr, p_mem)) mem,
-        constraints
+        constraints,
+        true
 
   let init_stack_update_list (mem: t) : (MemOffset.t * bool) list =
     let find_stack = 

@@ -224,10 +224,11 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
-      (addr_type: entry_t) (size_type: entry_t) :
+      (addr_type: entry_t) (size_type: entry_t)
       (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64) : *)
+      (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     (* TODO: Add constriant: addr_type is untainted *)
     (* TODO: ld/st op taint is not handled!!! *)
@@ -245,37 +246,52 @@ module ArchType (Entry: EntryType) = struct
       None
     end else
       let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
-      match sub_sol_func addr_exp, sub_sol_func size_exp with
-      | Some (simp_l, simp_r), Some (_, simp_size) ->
-        let orig_addr_offset =
-          addr_exp, 
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
-        in
-        let simp_addr_offset = 
-          simp_l,
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
-        in
-        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
-        | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
-          e_t, 
-          Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
-          useful_vars,
-          Some (ptr, off_w, is_full)
-        | None -> 
-          Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
-          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+      let orig_addr_offset =
+        addr_exp, 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
+      in
+      let try_get_slot_type =
+        match anno_opt with
+        | None -> None
+        | Some slot_info -> Some (MemType.get_slot_mem_type smt_ctx true curr_type.mem_type orig_addr_offset slot_info)
+      in
+      match try_get_slot_type with
+      | Some ((off_w, off_r, e_t), true) ->
+        e_t, 
+        Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+        useful_vars,
+        anno_opt
+        (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
+        (* Some (ptr, off_w, is_full) *)
+      | _ -> (* Annotation not pass check or no annotation *)
+        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+        | Some (simp_l, simp_r), Some (_, simp_size) ->
+          let simp_addr_offset = 
+            simp_l,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+          in
+          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+          begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
+          | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
+            e_t, 
+            Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+            useful_vars,
+            Some (ptr, off_w, is_full)
+          | None -> 
+            Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
+            (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+            Entry.get_top_type (), 
+            Unknown simp_addr_offset :: addr_untaint_cons, 
+            useful_vars,
+            None
+          end
+        | _ -> 
+          Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
           Entry.get_top_type (), 
-          Unknown simp_addr_offset :: addr_untaint_cons, 
+          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
           useful_vars,
           None
         end
-      | _ -> 
-        Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
-        Entry.get_top_type (), 
-        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-        useful_vars,
-        None
 
   let get_ld_op_type_slot
       (smt_ctx: SmtEmitter.t)
@@ -301,8 +317,12 @@ module ArchType (Entry: EntryType) = struct
         (addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))) 
       in
-      let off, range, entry = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
-      entry, Subset (orig_addr_offset, range, off) :: addr_untaint_cons, useful_vars
+      let (off, range, entry), pass_check = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
+      if pass_check then
+        entry, Subset (orig_addr_offset, range, off) :: addr_untaint_cons, useful_vars
+      else
+        arch_type_error (Printf.sprintf "get_ld_op_type_slot: Annotation %s does not match memory slot %s"
+          (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))
 
   let get_ld_op_type
       (smt_ctx: SmtEmitter.t)
@@ -316,7 +336,7 @@ module ArchType (Entry: EntryType) = struct
       (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     match prop_mode with
-    | TypeInferDep -> get_ld_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type
+    | TypeInferDep -> get_ld_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type anno_opt
     | TypeInferTaint | TypeInferInit -> 
       let e, cons, useful_var = get_ld_op_type_slot smt_ctx false curr_type addr_type size_type anno_opt in
       e, cons, useful_var, anno_opt
@@ -330,6 +350,7 @@ module ArchType (Entry: EntryType) = struct
       (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
       (size: int64)  *)
+      (anno_opt: MemAnno.slot_t option)
       (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     (* TODO: Add constriant: addr_type is untainted *)
@@ -351,37 +372,50 @@ module ArchType (Entry: EntryType) = struct
       None
     end else
       let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
-      match sub_sol_func addr_exp, sub_sol_func size_exp with
-      | Some (simp_l, simp_r), Some (_, simp_size) ->
-        let orig_addr_offset =
-          addr_exp, 
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
-        in
-        let simp_addr_offset = 
-          simp_l,
-          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
-        in
-        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
-        | Some (new_mem, write_constraints, slot_anno) -> 
-          { curr_type with mem_type = new_mem }, 
-          write_constraints @ addr_untaint_cons, 
-          useful_vars,
-          Some slot_anno
-        | None -> 
-          (* Printf.printf "set_st_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset); *)
-          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+      let orig_addr_offset =
+        addr_exp, 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
+      in
+      let try_set_slot_type =
+        match anno_opt with
+        | None -> None
+        | Some slot_info -> Some (MemType.set_slot_mem_type smt_ctx true false curr_type.mem_type orig_addr_offset slot_info new_type)
+      in
+      match try_set_slot_type with
+      | Some (new_mem, write_constraints, true) ->
+        { curr_type with mem_type = new_mem }, 
+        write_constraints @ addr_untaint_cons, 
+        useful_vars,
+        anno_opt
+      | _ -> (* Annotation not pass check or no annotation *)
+        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+        | Some (simp_l, simp_r), Some (_, simp_size) ->
+          let simp_addr_offset = 
+            simp_l,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+          in
+          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+          begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
+          | Some (new_mem, write_constraints, slot_anno) -> 
+            { curr_type with mem_type = new_mem }, 
+            write_constraints @ addr_untaint_cons, 
+            useful_vars,
+            Some slot_anno
+          | None -> 
+            (* Printf.printf "set_st_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset); *)
+            (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+            curr_type, 
+            Unknown simp_addr_offset :: addr_untaint_cons, 
+            useful_vars,
+            None
+          end
+        | _ -> 
+          (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
           curr_type, 
-          Unknown simp_addr_offset :: addr_untaint_cons, 
+          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
           useful_vars,
           None
         end
-      | _ -> 
-        (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
-        curr_type, 
-        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-        useful_vars,
-        None
     
   let set_st_op_type_slot
       (smt_ctx: SmtEmitter.t)
@@ -409,12 +443,16 @@ module ArchType (Entry: EntryType) = struct
         (addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))) 
       in
-      let new_mem, write_constraints = 
+      let new_mem, write_constraints, pass_check = 
         MemType.set_slot_mem_type smt_ctx check_addr update_init_range curr_type.mem_type orig_addr_offset slot_info new_type
       in
-      { curr_type with mem_type = new_mem }, 
-      write_constraints @ addr_untaint_cons, 
-      useful_vars
+      if pass_check then
+        { curr_type with mem_type = new_mem }, 
+        write_constraints @ addr_untaint_cons, 
+        useful_vars
+      else
+        arch_type_error (Printf.sprintf "set_st_op_type_slot: Annotation %s does not match memory slot %s"
+          (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -429,7 +467,7 @@ module ArchType (Entry: EntryType) = struct
       (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     match prop_mode with
-    | TypeInferDep -> set_st_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type new_type
+    | TypeInferDep -> set_st_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type anno_opt new_type
     | TypeInferTaint | TypeInferInit ->
       let new_mem, cons, useful_var = 
         set_st_op_type_slot smt_ctx false (prop_mode = TypeInferInit) curr_type addr_type size_type anno_opt new_type
