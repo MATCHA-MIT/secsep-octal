@@ -745,13 +745,13 @@ module ArchType (Entry: EntryType) = struct
       t * (block_subtype_t list) =
     let _ = smt_ctx in
     match inst with
-    | Jmp label ->
+    | Jmp (label, _) ->
       (* 1. Add curr_type to target block's subtype *)
       let block_subtype = (add_block_subtype label curr_type block_subtype) in
       (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)
       let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
       curr_type, block_subtype
-    | Jcond (cond, label) ->
+    | Jcond (cond, label, _) ->
       (* Add constraint: branch cond is untainted!!! *)
       let cond_l, cond_r = curr_type.flag in
       let cond_untaint_constraint = (Entry.get_untaint_constraint cond_l) @ (Entry.get_untaint_constraint cond_r) in
@@ -791,7 +791,7 @@ module ArchType (Entry: EntryType) = struct
         | _ -> false
         end
       in
-      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, taint_var_map =
+      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, var_map =
         FuncInterface.func_call smt_ctx check_callee_context sub_sol_func func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
       in
@@ -801,7 +801,8 @@ module ArchType (Entry: EntryType) = struct
           CallAnno.get_call_anno 
             (List.map Entry.get_single_taint_exp curr_type.reg_type)
             call_slot_info
-            taint_var_map
+            (Entry.get_single_var_map var_map)
+            (Entry.get_taint_var_map var_map)
             func_interface.base_info
         | _ -> orig_call_anno
       ) in
@@ -1013,5 +1014,40 @@ module ArchType (Entry: EntryType) = struct
     in
     SmtEmitter.pop smt_ctx 1;
     res
+
+  let get_branch_target_type
+      (block_subtype_list: block_subtype_t list)
+      (branch_block_label: Isa.label)
+      (branch_block_idx: int)
+      (branch_target_label: Isa.label) :
+      t * t =
+    let find_result =
+      List.fold_left (
+        fun (acc: int option * block_subtype_t option) (entry: block_subtype_t) ->
+          let acc_pc, acc_block = acc in
+          let block, _ = entry in
+          (
+            match acc_pc with
+            | Some _ -> acc_pc
+            | None ->
+              if block.label = branch_block_label then Some (block.pc + branch_block_idx)
+              else acc_pc
+          ), (
+            match acc_block with
+            | Some _ -> acc_block
+            | None ->
+              if block.label = branch_target_label then Some entry
+              else acc_block
+          )
+      ) (None, None) block_subtype_list
+    in
+    match find_result with
+    | Some branch_pc, Some (target_block, target_sub_list) ->
+      List.find (fun (x: t) -> x.pc = branch_pc) target_sub_list, target_block
+    | _ -> 
+      arch_type_error (
+        Printf.sprintf "cannot find block for branch at block %s (idx: %d) to target block %s" 
+          branch_block_label branch_block_idx branch_target_label
+      )
 
 end

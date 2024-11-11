@@ -24,6 +24,9 @@ module TaintEntryType (Entry: EntryType) = struct
 
   let get_empty_var_map = Entry.get_empty_var_map, []
 
+  let get_single_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
+    let single_map, _ = map in Entry.get_single_var_map single_map
+
   let get_taint_var_map (map: local_var_map_t) : TaintExp.local_var_map_t option =
     let _, taint_var_map = map in Some taint_var_map
 
@@ -145,9 +148,6 @@ module TaintEntryType (Entry: EntryType) = struct
     let s, _ = x in
     let _, t = y in
     s, t
-
-  let get_single_local_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
-    let single_map, _ = map in Entry.get_single_local_var_map single_map
 
   let get_const_type (imm: IsaBasic.immediate) : t =
     Entry.get_const_type imm, TaintConst false

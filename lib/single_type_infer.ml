@@ -9,6 +9,7 @@ open Single_subtype
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
+open Branch_anno_type
 open Sexplib.Std
 
 module SingleTypeInfer = struct
@@ -256,6 +257,36 @@ module SingleTypeInfer = struct
       func_type = List.map ArchType.clean_up infer_state.func_type
     }
 
+  let update_branch_anno (block_subtype: ArchType.block_subtype_t list) (func: Isa.basic_block list) : Isa.basic_block list =
+    let helper (block_label: Isa.label) (idx: int) (inst: Isa.instruction) : Isa.instruction =
+      match inst with
+      | Jcond (cond, target, _) ->
+        let branch_block_type, target_block_type = 
+          ArchType.get_branch_target_type block_subtype block_label idx target
+        in
+        let anno = 
+          BranchAnno.get_branch_anno 
+            branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
+            target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
+        in
+        Jcond (cond, target, Some anno)
+      | Jmp (target, _) ->
+        let branch_block_type, target_block_type = 
+          ArchType.get_branch_target_type block_subtype block_label idx target
+        in
+        let anno = 
+          BranchAnno.get_branch_anno 
+            branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
+            target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
+        in
+        Jmp (target, Some anno)
+      | _ -> inst
+    in
+    List.map (
+      fun (x: Isa.basic_block) ->
+        {x with insts = List.mapi (helper x.label) x.insts}
+    ) func
+
   let infer_one_func
       (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
@@ -267,6 +298,7 @@ module SingleTypeInfer = struct
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
         (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
+        (* NOTE: Since we do not have block subtype here, we cannot update branch anno here. We update when iter_left = 1 (see below) *)
         { state with context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
@@ -322,8 +354,11 @@ module SingleTypeInfer = struct
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
           (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
-          { state with context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
+          { state with 
+            func = update_branch_anno block_subtype state.func;
+            context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
         end else begin
+          let state = if iter_left = 1 then { state with func = update_branch_anno block_subtype state.func } else state in
           helper (clean_up_func_type state) (iter_left - 1)
         end
       end

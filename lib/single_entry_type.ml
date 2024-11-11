@@ -95,7 +95,7 @@ include SingleExp
 
   let set_taint_with_other (x: t) (_: t) : t = x
 
-  let get_single_local_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
+  let get_single_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
 
   let get_const_type = get_imm_type
 

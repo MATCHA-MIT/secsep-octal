@@ -444,14 +444,14 @@ module Parser = struct
           Printf.printf "rep %s\n" label;
           parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
         end *)
-      | ("jmp", [LabelOp lb]) -> Jmp (lb)
+      | ("jmp", [LabelOp lb]) -> Jmp (lb, None)
       | ("call", [LabelOp lb]) -> Call (lb, None)
       | (_, [LabelOp lb]) ->
         begin match Isa.op_of_cond_jump mnemonic with
-        | Some op -> Jcond (op, lb)
+        | Some op -> Jcond (op, lb, None)
         | None -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
         end
-      | ("ret", []) -> Jmp (Isa.ret_label) 
+      | ("ret", []) -> Jmp (Isa.ret_label, None) 
       | ("syscall", []) -> Syscall
       | ("hlt", []) -> Hlt
       | _ -> let opcode, opread_size_list, op_size = get_operand_size mnemonic operands in
@@ -601,7 +601,7 @@ module Parser = struct
       | bb1 :: bb2 :: bbs ->
           let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_uncond_jump (List.hd (List.rev bb1.insts))
             then bb1
-            else {bb1 with insts = bb1.insts @ [Jmp bb2.label]}
+            else {bb1 with insts = bb1.insts @ [Jmp (bb2.label, None)]}
           in
           add_jmp_for_adj_bb (bb2 :: bbs) (bb1 :: acc)
     in

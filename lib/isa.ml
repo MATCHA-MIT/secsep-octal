@@ -2,6 +2,7 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
+open Branch_anno_type
 open Call_anno_type
 open Constraint
 open Sexplib.Std
@@ -134,8 +135,8 @@ module Isa (MemAnno: MemAnnoType) = struct
     | RepMovs of (int64 * MemAnno.t * MemAnno.t)
     | RepLods of (int64 * MemAnno.t)
     | RepStos of (int64 * MemAnno.t)
-    | Jmp of label
-    | Jcond of branch_cond * label
+    | Jmp of label * BranchAnno.t
+    | Jcond of branch_cond * label * BranchAnno.t
     | Call of label * CallAnno.t
     | Nop
     | Syscall
@@ -209,7 +210,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | RepLods _ -> "rep lods"
     | RepStos _ -> "rep stos"
     | Jmp _ -> "jmp"
-    | Jcond (cond, _) ->
+    | Jcond (cond, _, _) ->
       begin match opcode_of_cond_jump cond with
       | Some s -> s
       | None -> isa_error "cannot find opcode for a cond jump"
@@ -262,8 +263,8 @@ module Isa (MemAnno: MemAnnoType) = struct
       Printf.sprintf "rep lods(%Ld)\t # %s" size (MemAnno.to_string anno)
     | RepStos (size, anno) ->
       Printf.sprintf "rep stos(%Ld)\t # %s" size (MemAnno.to_string anno)
-    | Jmp label -> Printf.sprintf "jmp\t\t%s" label
-    | Jcond (cond, label) ->
+    | Jmp (label, _) -> Printf.sprintf "jmp\t\t%s" label
+    | Jcond (cond, label, _) ->
       begin match opcode_of_cond_jump cond with
       | Some opcode -> Printf.sprintf "%s\t\t%s" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
@@ -323,8 +324,8 @@ module Isa (MemAnno: MemAnnoType) = struct
       Printf.sprintf "RepLods (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
     | RepStos (size, anno) ->
       Printf.sprintf "RepStos (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
-    | Jmp label -> Printf.sprintf "Jmp \"%s\"" label
-    | Jcond (cond, label) ->
+    | Jmp (label, _) -> Printf.sprintf "Jmp \"%s\"" label
+    | Jcond (cond, label, _) ->
       begin match ocaml_opcode_of_cond_jump cond with
       | Some opcode -> Printf.sprintf "Jcond (%s, \"%s\")" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"

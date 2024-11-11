@@ -1,6 +1,5 @@
 open Isa_basic
 open Single_exp
-open Taint_exp
 open Entry_type
 open Mem_offset_new
 open Single_context
@@ -389,7 +388,7 @@ module FuncInterface (Entry: EntryType) = struct
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
       CallAnno.slot_info MemType.mem_content option *
-      TaintExp.local_var_map_t option =
+      Entry.local_var_map_t =
     let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -462,7 +461,7 @@ module FuncInterface (Entry: EntryType) = struct
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
     get_slot_map_info mem_read_hint child_mem,
-    Entry.get_taint_var_map var_map
+    var_map
 
   let func_call
       (smt_ctx: SmtEmitter.t)
@@ -475,12 +474,12 @@ module FuncInterface (Entry: EntryType) = struct
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t *
       CallAnno.slot_info MemType.mem_content option *
-      TaintExp.local_var_map_t option =
+      Entry.local_var_map_t =
     (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)
       (* TODO: Check context!!! *)
-    func_call_helper smt_ctx check_context sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
+    func_call_helper smt_ctx check_context sub_sol_func global_var_set (Entry.get_single_var_map local_var_map) 
       func_interface.in_reg func_interface.in_mem
       func_interface.context
       func_interface.out_reg func_interface.out_mem
