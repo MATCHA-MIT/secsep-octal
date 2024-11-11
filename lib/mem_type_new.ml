@@ -5,7 +5,7 @@ open Single_exp
 open Entry_type
 open Mem_offset_new
 open Full_mem_anno
-open Cond_type_new
+open Single_context
 open Constraint
 (* open Arch_type *)
 open Sexplib.Std
@@ -467,21 +467,21 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (mem: t)
       (addr_off: MemOffset.t) :
-      (MemOffset.t, SingleCondType.t list) Either.t =
+      (MemOffset.t, SingleContext.t list) Either.t =
     (* Note: this function might add additional constraints to smt_ctx, please do push/pop outside! *)
     let check_or_assert_helper
         (lookup_offset: MemOffset.t) (target_offset: MemOffset.t) :
-        (MemOffset.t, SingleCondType.t list) Either.t =
+        (MemOffset.t, SingleContext.t list) Either.t =
       let l, r = lookup_offset in
       let off_l, off_r = target_offset in
-      let cond_list = [
-        SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, off_l, l)), SingleExp.SingleConst 0L;
+      let cond_list: SingleContext.t list = [
+        Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
         (* TODO: Think about whether this should be Lt or Le!!! *)
-        SingleCondType.Lt, SingleExp.eval (SingleExp.SingleBExp (SingleSub, l, r)), SingleExp.SingleConst 0L;
-        SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, r, off_r)), SingleExp.SingleConst 0L;
+        Cond (Lt, SingleExp.eval (SingleBExp (SingleSub, l, r)), SingleConst 0L);
+        Cond (Le, SingleExp.eval (SingleBExp (SingleSub, r, off_r)), SingleConst 0L);
       ] in
       (* TODO: Check, sat or add, one by one *)
-      begin match SingleCondType.check_or_assert smt_ctx cond_list with
+      begin match SingleContext.check_or_assert smt_ctx cond_list with
       | None -> Left addr_off (* addr_off does not belongs to this entry *)
       | Some cond_list -> Right cond_list
       end
@@ -830,34 +830,35 @@ module MemType (Entry: EntryType) = struct
     in
     List.filter_map helper mem_type
 
-  let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleCondType.t list =
+  let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
     List.map (
         fun (l, r) -> 
-          SingleCondType.Lt, l, r
+          SingleContext.Cond (Lt, l, r)
       ) boundary_list
 
   let rec get_mem_non_overlap_constraint_helper
-      (acc: SingleCondType.t list)
+      (acc: SingleContext.t list)
       (boundary_list: MemOffset.t list) :
-      SingleCondType.t list =
+      SingleContext.t list =
     match boundary_list with
     | [] -> acc
     | (hd_l, hd_r) :: tl ->
       let acc = get_mem_non_overlap_constraint_helper acc tl in
       List.fold_left (
-          fun (acc: SingleCondType.t list) (l, r) ->
-            (SingleCondType.Le,
-            SingleExp.SingleBExp (SingleMul, SingleBExp (SingleSub, hd_r, l), SingleBExp (SingleSub, r, hd_l)),
-            SingleExp.SingleConst 0L) :: acc
+          fun (acc: SingleContext.t list) (l, r) ->
+            (SingleContext.Or [
+              Cond (Lt, hd_r, l);
+              Cond (Lt, r, hd_l);
+            ]) :: acc
         ) acc tl
 
-  let get_mem_boundary_constraint (mem_type: t) : SingleCondType.t list =
+  let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
     get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type)
 
-  let get_mem_non_overlap_constraint (mem_type: t) : SingleCondType.t list =
+  let get_mem_non_overlap_constraint (mem_type: t) : SingleContext.t list =
     get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type)
 
-  let get_all_mem_constraint (mem_type: t) : SingleCondType.t list =
+  let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
     let boundary_list = get_mem_boundary_list mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
     get_mem_non_overlap_constraint_helper boundary_constraint boundary_list

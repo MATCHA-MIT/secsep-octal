@@ -1,6 +1,7 @@
 open Pretty_print
 open Entry_type
 open Cond_type_new
+open Single_context
 open Reg_type_new
 open Mem_offset_new
 open Mem_type_new
@@ -981,14 +982,14 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (func_name: Isa.label)
       (func_type: t list)
-      (context: SingleCondType.t list)
+      (context: SingleContext.t list)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
 
     SmtEmitter.push smt_ctx;
     (* MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type; *)
-    SingleCondType.add_assertions smt_ctx context;
+    SingleContext.add_assertions smt_ctx context;
 
     (* let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
       let r = 

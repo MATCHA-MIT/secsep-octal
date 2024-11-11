@@ -35,4 +35,144 @@ module SingleContext = struct
     | Or c_list -> Or (List.map (repl repl_func) c_list)
     | And c_list -> And (List.map (repl repl_func) c_list)
 
+  let rec naive_check (cond: t) : (bool, t) Either.t =
+    match cond with
+    | Cond c -> 
+      begin match SingleCondType.naive_check c with
+      | Left b -> Left b
+      | Right r -> Right (Cond r)
+      end
+    | Or c_list ->
+      List.fold_left (
+        fun (acc: (bool, t) Either.t) (x: t) ->
+          match acc with
+          | Left true -> Left true
+          | _ ->
+            begin match naive_check x with
+            | Left true -> Left true
+            | Left false -> acc
+            | Right _ -> Right cond
+            end
+      ) (Left false) c_list
+    | And c_list ->
+      List.fold_left (
+        fun (acc: (bool, t) Either.t) (x: t) ->
+          match acc with
+          | Left false -> Left false
+          | _ ->
+            begin match naive_check x with
+            | Left true -> acc
+            | Left false -> Left false
+            | Right _ -> Right cond
+            end
+      ) (Left true) c_list
+
+  let rec get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+    match cond with
+    | Cond c -> SingleCondType.get_z3_mk smt_ctx c
+    | Or c_list -> 
+      let z3_ctx, _ = smt_ctx in
+      Z3.Boolean.mk_or z3_ctx (List.map (get_z3_mk smt_ctx) c_list)
+    | And c_list -> 
+      let z3_ctx, _ = smt_ctx in
+      Z3.Boolean.mk_and z3_ctx (List.map (get_z3_mk smt_ctx) c_list)
+
+  let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
+    SmtEmitter.add_assertions smt_ctx (List.map (get_z3_mk smt_ctx) cond_list)
+
+  let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
+
+    (* choose from one of two versions below *)
+
+    let res: SmtEmitter.sat_result_t = begin
+    (* if List.find_opt (fun x -> naive_check_impossible x) cond_list <> None then
+      SatNo *)
+
+    
+    let known_list, unknown_list = List.partition_map naive_check cond_list in
+    if List.find_opt (fun x -> not x) known_list <> None then
+      SatNo (* If any no is found, then it is definitely not satisfied *)
+    
+
+    else begin
+
+      (* choose from one of two versions below *)
+
+      (* is_quick = true -> accept quick check, but may ignore overflow/underflow *)
+      let exp_list = List.map (get_z3_mk smt_ctx) (if is_quick then unknown_list else cond_list) in
+
+      (* let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in *)
+
+      if List.length exp_list = 0 then
+        SatYes
+      else begin
+        (* Printf.printf "check call smt %s\n" (String.concat "; " (List.map to_string unknown_list)); *)
+        SmtEmitter.check_compliance smt_ctx exp_list
+      end
+    end
+    end in
+    (* Printf.printf ">>>\n";
+    Printf.printf "check\ninputs:\n";
+    List.iter (fun x -> Printf.printf "  %s\n" (to_string x)) cond_list;
+    Printf.printf "output: %s\n" (match res with SatYes -> "SatYes" | SatNo -> "SatNo" | SatUnknown -> "SatUnknown");
+    Printf.printf "<<<\n"; *)
+    res
+
+  let check_or_assert
+      (smt_ctx: SmtEmitter.t) (cond_list: t list) : (t list) option =
+    (* If some cond in cond_list is SatNo, return None
+      If all cond in cond_list is SatYes, return Some [], no constraint is added to smt_ctx 
+      If some cond in cond_list is Unknown, assert it to be true in smt_ctx, return Some list contain it;
+      We return the list of minimal extra assertions need to add to smt_ctx to make cond_list hold *)
+    let helper (acc: (t list) option) (cond: t) : (t list) option =
+      match acc with
+      | None -> None
+      | Some acc_cond_list ->
+        begin match check true smt_ctx [cond] with
+        | SatYes -> acc
+        | SatNo -> None
+        | _ -> 
+          SmtEmitter.add_assertions smt_ctx [get_z3_mk smt_ctx cond];
+          Some (cond :: acc_cond_list)
+        end
+    in
+    List.fold_left helper (Some []) cond_list
+
+  let rec try_sub_sol
+      (sub_sol_func: (SingleExp.t) -> (SingleExp.t * SingleExp.t) option)
+      (cond: t) : t option =
+    match cond with
+    | Cond c ->
+      begin match SingleCondType.try_sub_sol sub_sol_func c with
+      | Some c_sub -> Some (Cond c_sub)
+      | None -> None
+      end
+    | Or c_list ->
+      let sub_c_list = List.filter_map (try_sub_sol sub_sol_func) c_list in
+      if List.length sub_c_list < List.length c_list then None
+      else Some (Or c_list)
+    | And c_list ->
+      let sub_c_list = List.filter_map (try_sub_sol sub_sol_func) c_list in
+      if List.length sub_c_list < List.length c_list then None
+      else Some (And c_list)
+
+  let sub_check_or_filter
+      (is_quick: bool)
+      (smt_ctx: SmtEmitter.t) 
+      (cond_list: (t * t) list) : (t list, t) Either.t =
+    (* If cond_list might be sat, return Left (list of unknown cond)
+      else, return Right (unsat cond)*)
+    let helper (acc: (t list, t) Either.t) (cond_pair: t * t) : (t list, t) Either.t =
+      let cond, simp_cond = cond_pair in
+      match acc with
+      | Left acc_cond_list ->
+        begin match check is_quick smt_ctx [cond] with
+        | SatYes -> acc
+        | SatNo -> Right cond
+        | _ -> Left (simp_cond :: acc_cond_list)
+        end
+      | Right _ -> acc
+    in
+    List.fold_left helper (Left []) cond_list
+
 end

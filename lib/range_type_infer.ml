@@ -2,7 +2,7 @@ open Isa
 open Single_entry_type
 open Mem_offset_new
 open Constraint
-open Cond_type_new
+open Single_context
 open Single_subtype
 open Range_subtype
 open Single_type_infer
@@ -28,7 +28,7 @@ module RangeTypeInfer = struct
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    context: SingleCondType.t list;
+    context: SingleContext.t list;
     (* range_sol: MemRange.local_var_map_t; *)
     smt_ctx: SmtEmitter.t;
   }
@@ -148,7 +148,7 @@ module RangeTypeInfer = struct
 
     (* 1. Type prop *)
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-    SingleCondType.add_assertions state.smt_ctx state.context;
+    SingleContext.add_assertions state.smt_ctx state.context;
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
 
     Printf.printf "After infer, unknown list:\n";

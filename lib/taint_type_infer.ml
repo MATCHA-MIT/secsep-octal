@@ -2,7 +2,7 @@ open Isa
 open Taint_exp
 open Single_entry_type
 open Mem_offset_new
-open Cond_type_new
+open Single_context
 open Constraint
 open Single_subtype
 open Taint_subtype
@@ -30,7 +30,7 @@ module TaintTypeInfer = struct
     func_type: ArchType.t list;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    context: SingleCondType.t list;
+    context: SingleContext.t list;
     taint_sol: TaintExp.local_var_map_t;
     smt_ctx: SmtEmitter.t;
   }
@@ -175,7 +175,7 @@ module TaintTypeInfer = struct
     (* Prepare SMT context *)
     SmtEmitter.push state.smt_ctx;
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-    SingleCondType.add_assertions state.smt_ctx state.context;
+    SingleContext.add_assertions state.smt_ctx state.context;
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
     SmtEmitter.pop state.smt_ctx 1;
 

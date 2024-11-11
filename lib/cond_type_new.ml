@@ -191,13 +191,6 @@ include (CondType (SingleExp))
     Printf.printf "<<<\n"; *)
     res
 
-  let check_trivial (cond: t) : bool option =
-    (* Use quick check *)
-    match check true (SmtEmitter.init_smt_ctx ()) [cond] with
-    | SatYes -> Some true
-    | SatNo -> Some false
-    | _ -> None
-
   let check_or_assert
       (smt_ctx: SmtEmitter.t) (cond_list: t list) : (t list) option =
     (* If some cond in cond_list is SatNo, return None

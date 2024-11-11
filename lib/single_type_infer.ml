@@ -2,7 +2,7 @@ open Isa
 open Single_exp
 open Single_entry_type
 open Mem_offset_new
-open Cond_type_new
+open Single_context
 open Constraint
 (* open Constraint *)
 open Single_subtype
@@ -28,7 +28,7 @@ module SingleTypeInfer = struct
     single_subtype: SingleSubtype.t;
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
-    context: SingleCondType.t list;
+    context: SingleContext.t list;
     smt_ctx: SmtEmitter.t
   }
   [@@deriving sexp]
@@ -179,9 +179,9 @@ module SingleTypeInfer = struct
     let mem_type = (List.nth infer_state.func_type 0).mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
     let helper 
-        (acc: ((MemOffset.t * bool) list) * (SingleCondType.t list)) 
+        (acc: ((MemOffset.t * bool) list) * (SingleContext.t list)) 
         (a_type: ArchType.t) : 
-        ((MemOffset.t * bool) list) * (SingleCondType.t list) =
+        ((MemOffset.t * bool) list) * (SingleContext.t list) =
       let acc_update_list, acc_context = acc in
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
@@ -241,10 +241,10 @@ module SingleTypeInfer = struct
         fun (x: ArchType.t) -> Constraint.get_callee_context x.constraint_list
       ) infer_state.func_type
       in
-      let val_context_list = List.filter (SingleCondType.is_val (SingleExp.is_val infer_state.input_var_set)) context_list in
+      let val_context_list = List.filter (SingleContext.is_val (SingleExp.is_val infer_state.input_var_set)) context_list in
       SmtEmitter.push infer_state.smt_ctx;
       let assert_list = 
-        match SingleCondType.check_or_assert infer_state.smt_ctx val_context_list with
+        match SingleContext.check_or_assert infer_state.smt_ctx val_context_list with
         | Some assert_list -> assert_list
         | None -> single_type_infer_error "check_or_assert_callee_context unsat context"
       in
@@ -273,8 +273,8 @@ module SingleTypeInfer = struct
         (* Prepare SMT context *)
         SmtEmitter.push state.smt_ctx;
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-        SingleCondType.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type);
-        SingleCondType.add_assertions state.smt_ctx state.context;
+        SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type);
+        SingleContext.add_assertions state.smt_ctx state.context;
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;

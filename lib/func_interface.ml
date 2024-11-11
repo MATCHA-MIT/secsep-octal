@@ -3,7 +3,7 @@ open Single_exp
 open Taint_exp
 open Entry_type
 open Mem_offset_new
-open Cond_type_new
+open Single_context
 open Constraint
 open Reg_type_new
 open Mem_type_new
@@ -27,7 +27,7 @@ module FuncInterface (Entry: EntryType) = struct
     func_name: IsaBasic.label;
     in_reg: RegType.t;
     in_mem: MemType.t;
-    context: SingleCondType.t list;
+    context: SingleContext.t list;
     out_reg: RegType.t;
     out_mem: MemType.t;
     base_info: CallAnno.base_info MemType.mem_content;
@@ -52,7 +52,8 @@ module FuncInterface (Entry: EntryType) = struct
     RegType.pp_reg_type 0 interface.in_reg;
     MemType.pp_mem_type 0 interface.in_mem;
     PP.print_lvl lvl "Context\n";
-    SingleCondType.pp_cond_list 0 interface.context;
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    (* SingleContext.pp_cond_list 0 interface.context; *)
     PP.print_lvl lvl "Output\n";
     RegType.pp_reg_type 0 interface.out_reg;
     MemType.pp_mem_type 0 interface.out_mem;
@@ -66,7 +67,9 @@ module FuncInterface (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "in_mem =\n";
     MemType.pp_ocaml_mem_type (lvl + 2) buf interface.in_mem;
     PP.bprint_lvl (lvl + 1) buf "context =\n";
-    SingleCondType.pp_ocaml_cond_list (lvl + 2) buf interface.context;
+    (* Note that this function is deprecated, so I didn't support print the correct context here. *)
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    (* SingleCondType.pp_ocaml_cond_list (lvl + 2) buf interface.context; *)
     PP.bprint_lvl (lvl + 1) buf "out_reg =\n";
     RegType.pp_ocaml_reg_type (lvl + 2) buf interface.out_reg;
     PP.bprint_lvl (lvl + 1) buf "out_mem =\n";
@@ -380,7 +383,7 @@ module FuncInterface (Entry: EntryType) = struct
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (child_mem: MemType.t)
-      (child_context: SingleCondType.t list)
+      (child_context: SingleContext.t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
@@ -427,10 +430,10 @@ module FuncInterface (Entry: EntryType) = struct
       (* TODO: Fix this!!! *)
       let p_context, unknown_context =
         List.partition_map (
-          fun (x: SingleCondType.t) ->
-            if SingleCondType.is_val (SingleExp.is_val single_var_set) x then
-              let orig_cond = SingleCondType.repl (fun x -> SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map x)) x in
-              match SingleCondType.try_sub_sol sub_sol_func orig_cond with
+          fun (x: SingleContext.t) ->
+            if SingleContext.is_val (SingleExp.is_val single_var_set) x then
+              let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map x)) x in
+              match SingleContext.try_sub_sol sub_sol_func orig_cond with
               | Some simp_cond -> Left (orig_cond, simp_cond)
               | None -> Right None (* Sol for single var in this cond is not resolved *)
             else
@@ -441,7 +444,7 @@ module FuncInterface (Entry: EntryType) = struct
       if List.is_empty unknown_context then begin
         (* We do not do quick check to avoid missing overflow constraints, but this might be slow!!! *)
         SmtEmitter.push smt_ctx;
-        let check_result = SingleCondType.sub_check_or_filter false smt_ctx p_context in
+        let check_result = SingleContext.sub_check_or_filter false smt_ctx p_context in
         SmtEmitter.pop smt_ctx 1;
         match check_result with
         (* Note simp_context is simplified with solution, 
@@ -449,7 +452,7 @@ module FuncInterface (Entry: EntryType) = struct
         | Left simp_context ->
           (Constraint.CalleeContext simp_context)
         | Right unsat_cond ->
-          func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (SingleCondType.to_string unsat_cond))
+          func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (Sexplib.Sexp.to_string (SingleContext.sexp_of_t unsat_cond)))
         end else
         Constraint.CalleeUnknownContext
     in
