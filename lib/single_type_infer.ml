@@ -408,7 +408,7 @@ module SingleTypeInfer = struct
       Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
-    let func_mem_interface_list = List.filteri (fun i _ -> i >= 2 && i <= 3) func_mem_interface_list in
+    (* let func_mem_interface_list = List.filteri (fun i _ -> i >= 2 && i <= 3) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
     (* let buf = Buffer.create 1000 in

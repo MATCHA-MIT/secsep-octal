@@ -254,9 +254,9 @@ let () =
   Sexp.output_hum channel (Base_func_interface.sexp_of_t standalone_salsa20);
   let channel = open_out "./interface/standalone_salsa20.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
-  let channel = open_out "./interface/demo" in
+  let channel = open_out "./interface/demo.mem_interface" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t demo);
-  let channel = open_out "./interface/bench_ed25519_plain" in
+  let channel = open_out "./interface/bench_ed25519_plain.mem_interface" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t bench_ed25519_plain)
 
 
