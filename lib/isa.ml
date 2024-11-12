@@ -134,7 +134,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     label: label;
     insts: instruction list;
     mnemonics: string list; (* same length as insts *)
-    orig_asm: string list; (* same length as insts *)
+    orig_asm: string option list; (* same length as insts, None if the instruction is added for auxilary purpose, like jmp at the end of BB *)
   }
   [@@deriving sexp]
 

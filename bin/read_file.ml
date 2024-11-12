@@ -19,3 +19,6 @@ let get_taint_infer_filename (s: string) : string =
 
 let get_interface_list_filename (s: string) : string =
   Printf.sprintf "./out/%s.interface" s
+
+let get_parsed_program_filename (s: string) : string =
+  Printf.sprintf "./out/%s.prog" s

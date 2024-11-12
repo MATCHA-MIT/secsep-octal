@@ -21,7 +21,7 @@ module InstTransform = struct
   type t = {
     (* was *)
     mnemonic: string;
-    orig_asm: string;
+    orig_asm: string option;
     orig: Isa.instruction;
 
     (* now *)
@@ -31,9 +31,10 @@ module InstTransform = struct
 
     (* extra info *)
     changed: bool;
+    use_orig_mne: bool; (* when output, whether to use t.mnemonic as mnemonic or let t.inst to decide *)
   }
 
-  let init (orig: Isa.instruction) (mnemonic: string) (orig_asm: string) : t =
+  let init (orig: Isa.instruction) (mnemonic: string) (orig_asm: string option) : t =
     {
       mnemonic = mnemonic;
       orig_asm = orig_asm;
@@ -42,10 +43,11 @@ module InstTransform = struct
       inst_pre = [];
       inst_post = [];
       changed = false;
+      use_orig_mne = true;
     }
 
   (* make sure to set values through this function, so that extra info can be updated *)
-  let assign (t: t) (inst: Isa.instruction) (inst_pre: Isa.instruction list) (inst_post: Isa.instruction list) : t =
+  let assign (t: t) (inst: Isa.instruction) (inst_pre: Isa.instruction list) (inst_post: Isa.instruction list) (use_orig_mne: bool) : t =
     if t.changed then transform_error "Change a changed instruction not supported yet";
     let changed =
       not (List.is_empty inst_pre) ||
@@ -58,6 +60,7 @@ module InstTransform = struct
       inst_pre = inst_pre;
       inst_post = inst_post;
       changed = changed;
+      use_orig_mne = use_orig_mne;
     }
 
   let get_res_rev (t: t) : Isa.instruction list =
@@ -129,6 +132,8 @@ module Transform = struct
     callee_saving_slots: callee_slot list;
   }
 
+  type tv_ittt = TaintExp.t -> TaintExp.t
+
   let delta: int64 = -0x100000L (* -1MB *)
 
   let is_bb_transformed (bb: basic_block) : bool =
@@ -190,7 +195,7 @@ module Transform = struct
     | _, _, None -> Ununified
     | _ -> transform_error (Printf.sprintf "Transformation rejected due to mem part of %d" base_id)
 
-  (* were used to mocking the real instantiate step 
+  (* mock the real instantiate step *)
 
   let get_taint_var_instantiate_map (func_name: string) : TaintExp.local_var_map_t =
     let helper (untaint_list: TaintExp.taint_var_id list) (taint_list: TaintExp.taint_var_id list) =
@@ -204,6 +209,20 @@ module Transform = struct
     | "_start" -> helper [] [4; 17; 18]
     | _ -> []
 
+  let taint_var_ittt (ittt_map: TaintExp.local_var_map_t) (taint_exp: TaintExp.t) : TaintExp.t =
+    match taint_exp with
+    | TaintVar tv -> begin
+        let sub = List.find_map (fun (id, taint) ->
+          if id = tv then Some taint
+          else None
+        ) ittt_map in
+        match sub with
+        | Some x -> x
+        | None -> taint_exp
+      end
+    | _ -> taint_exp
+
+  (*
   (* TODO: Use it to handle callee-saved registers, init them as TaintConst false *)
   let instantiate_taint_vars
       (_: TaintExp.local_var_map_t)
@@ -211,17 +230,19 @@ module Transform = struct
       : TaintTypeInfer.t =
     (* TODO: instantiate TV in program (i.e. all MemAnno and CallAnno) *) 
     ti_state
-
   *)
+
+  (* mock the real instantiate step *)
 
   let init_func_state
       (ti_state: TaintTypeInfer.t)
       (init_mem_unity: mem_unity_t)
       : func_state =
     let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
+      Printf.printf "bb name: %s" bb.label;
       if (List.length bb.mnemonics) != (List.length bb.insts) ||
          (List.length bb.orig_asm) != (List.length bb.insts)  then
-        transform_error "Mismatch between mnemonics/orig_asm and instructions";
+        transform_error (Printf.sprintf "Mismatch between mnemonics/orig_asm and instructions %d %d %d" (List.length bb.mnemonics) (List.length bb.orig_asm) (List.length bb.insts));
       {
         label = bb.label;
         insts = List.map2 (
@@ -265,6 +286,7 @@ module Transform = struct
 
   let transform_instruction
       (func_state: func_state)
+      (tv_ittt: tv_ittt)
       (tf: InstTransform.t)
       (css: callee_slot list) (* css == callee_saving_slots *)
       : InstTransform.t * (callee_slot list) =
@@ -284,6 +306,7 @@ module Transform = struct
             transform_error "Memory annotation missing information";
           let (slot_base, _, _) = Option.get slot_anno in
           let taint_anno = Option.get taint_anno in
+          let taint_anno = tv_ittt taint_anno in (* mocking *)
           match get_slot_unity func_state.init_mem_unity slot_base with
           | Unified -> operand
           | Ununified -> begin
@@ -304,20 +327,21 @@ module Transform = struct
       | _ -> operand
     in
     let orig = tf.orig in
-    let (inst, inst_pre, inst_post), css = match orig with
+    let (inst, inst_pre, inst_post, use_orig_mnemonic), css = match orig with
     | BInst (bop, o1, o2, o3) -> begin
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in
         let o3' = helper_prepare_memop o3 in
         let inst' = Isa.BInst (bop, o1', o2', o3') in
-        (inst', [], []), css
+        (inst', [], [], true), css
       end
     | UInst (uop, o1, o2) -> begin
         (* find potential instrucitons saving callee-saved registers *)
         let css' = match uop, o1, o2 with
-        | Isa.Mov, Isa.StOp(_, _, _, _, _, (slot_info, taint_info)), Isa.RegOp reg when Isa.is_reg_callee_saved reg ->
+        | Isa.Mov, Isa.StOp(_, _, _, _, _, (slot_info, taint_info)), Isa.RegOp reg when Isa.is_reg_callee_saved reg && (String.starts_with ~prefix:"push" tf.mnemonic) ->
           (* TODO: is this enough to cover all cases? *)
           let (slot_base, slot_offset, slot_full), taint_info = Option.get slot_info, Option.get taint_info in
+          let taint_info = tv_ittt taint_info in (* mocking *)
           if slot_base = func_state.init_rsp_var_id && slot_full && MemOffset.is_8byte_slot slot_offset && taint_info = TaintConst true then
             helper_add_callee_saving_slot css reg slot_offset
           else
@@ -327,7 +351,7 @@ module Transform = struct
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in
         let inst' = Isa.UInst (uop, o1', o2') in
-        (inst', [], []), css'
+        (inst', [], [], true), css'
       end
     | Xchg (o1, o2, o3, o4) -> begin
         let o1' = helper_prepare_memop o1 in
@@ -335,25 +359,25 @@ module Transform = struct
         let o3' = helper_prepare_memop o3 in
         let o4' = helper_prepare_memop o4 in
         let inst' = Isa.Xchg (o1', o2', o3', o4') in
-        (inst', [], []), css
+        (inst', [], [], true), css
       end
     | Cmp (o1, o2) -> begin
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in
         let inst' = Isa.Cmp (o1', o2') in
-        (inst', [], []), css
+        (inst', [], [], true), css
       end
     | Test (o1, o2) -> begin
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in
         let inst' = Isa.Test (o1', o2') in
-        (inst', [], []), css
+        (inst', [], [], true), css
       end
     | Jmp _
     | Jcond _
     | Nop
     | Syscall
-    | Hlt -> (orig, [], []), css
+    | Hlt -> (orig, [], [], true), css
     | Push (o, mem_anno)
     | Pop (o, mem_anno) -> begin
         let slot_anno, taint_anno = mem_anno in
@@ -366,6 +390,7 @@ module Transform = struct
         if not slot_is_full then
           transform_error "Push/Pop not accessing full slot";
         let taint_anno = Option.get taint_anno in
+        let taint_anno = tv_ittt taint_anno in (* mocking *)
         let offset_as_disp = match taint_anno with
         | TaintConst true -> Some (Isa.ImmNum delta)
         | TaintConst false -> None
@@ -390,18 +415,18 @@ module Transform = struct
           else
             css
           in
-          (inst_st, [inst_rsp_sub], []), css'
+          (inst_st, [inst_rsp_sub], [], false), css'
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
-          (inst_ld, [], [inst_rsp_add]), css
+          (inst_ld, [], [inst_rsp_add], false), css
         | _ -> transform_error "Expecting only Push/Pop here"
       end
-    | Call _ -> (orig, [], []), css (* handled in another pass *)
+    | Call _ -> (orig, [], [], true), css (* handled in another pass *)
     | RepStosq -> transform_error "RepStosq unimplemented"
     | RepMovsq -> transform_error "RepStosq unimplemented"
     in
-    (InstTransform.assign tf inst inst_pre inst_post), css
+    (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css
 
   let get_child_slot_taint
       (child_fi_in_mem: FuncInterface.MemType.t)
@@ -469,6 +494,7 @@ module Transform = struct
               (BInst (Add, dst, src1', src2'))
               []
               []
+              true
           )
       end
     | UInst (Lea, dst, src) -> begin
@@ -478,6 +504,7 @@ module Transform = struct
               (UInst (Lea, dst, add_delta_on_disp (d, b, i, s) |> Isa.memop_to_mem_operand))
               []
               []
+              true
           )
         | _ -> None
       end
@@ -492,6 +519,7 @@ module Transform = struct
             tf.orig
             []
             [Isa.make_inst_add_i_r delta reg]
+            true
         )
       end
 
@@ -508,6 +536,7 @@ module Transform = struct
 
   let transform_basic_block_calls
       (func_state: func_state)
+      (tv_ittt: tv_ittt)
       (func_interfaces: FuncInterface.t list)
       (bb: basic_block)
       : basic_block =
@@ -603,12 +632,13 @@ module Transform = struct
                 | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
             ) ([], []) bases_to_change in
             (* save/restore active callee-saved registers in caller's scope *)
+            let (curr_rsp, curr_rsp_taint) = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
+            let curr_rsp_taint = tv_ittt curr_rsp_taint in (* mocking *)
+            if curr_rsp_taint = TaintConst true then
+              transform_error "RSP is tainted, not expected";
             let saves, restores = List.split (
               List.filter_map (fun (slot: callee_slot) ->
                 let reg, offset = slot in
-                let (curr_rsp, curr_rsp_taint) = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
-                (* no conservative here, as the register is confirmed tainted *)
-                if curr_rsp_taint = TaintConst true then None else
                 let disp = get_stack_slot_dyn_offset func_state.init_rsp_var_id offset curr_rsp in
                 let disp = if disp != 0L then Some (Isa.ImmNum disp) else None in
                 let mem_op = (disp, Some Isa.RSP, None, None) in
@@ -620,7 +650,7 @@ module Transform = struct
             let inst_pre = saves @ inst_pre in
             let inst_post = inst_post @ restores in
             (* transformation done *)
-            let tf = InstTransform.assign tf tf.orig inst_pre inst_post in
+            let tf = InstTransform.assign tf tf.orig inst_pre inst_post true in
             tf :: (List.rev new_prev_tfs)
           end
         | _ -> tf :: acc_tf
@@ -658,13 +688,14 @@ module Transform = struct
 
   let transform_basic_block_basic
       (func_state: func_state)
+      (tv_ittt: tv_ittt)
       (bb: basic_block)
       (css: callee_slot list)
       : basic_block * (callee_slot list) =
     let new_insts, css' = List.fold_left (
       fun (acc: (InstTransform.t list) * (callee_slot list)) (trans: InstTransform.t) ->
         let acc_insts, acc_css = acc in
-        let tf, css = transform_instruction func_state trans acc_css in
+        let tf, css = transform_instruction func_state tv_ittt trans acc_css in
         tf :: acc_insts, css
     ) ([], css) bb.insts in
     { bb with insts = List.rev new_insts }, css'
@@ -697,11 +728,15 @@ module Transform = struct
       : func_state =
     let func_state = init_func_state ti_state init_mem_unity in
 
+    (* mocking tv ittt *)
+    let ittt_map = get_taint_var_instantiate_map func_state.func_name in
+    let tv_ittt = taint_var_ittt ittt_map in
+
     (* basic pass *)
     let bbs, css = List.fold_left (
       fun acc (bb: basic_block) ->
         let acc_bbs, acc_css = acc in
-        let bb', css = transform_basic_block_basic func_state bb acc_css in
+        let bb', css = transform_basic_block_basic func_state tv_ittt bb acc_css in
         bb' :: acc_bbs, css
     ) ([], []) func_state.bbs in
     let func_state = {
@@ -713,7 +748,7 @@ module Transform = struct
 
     (* call handling pass *)
     let bbs = List.map (
-      fun bb -> transform_basic_block_calls func_state fi_list bb
+      fun bb -> transform_basic_block_calls func_state tv_ittt fi_list bb
     ) func_state.bbs in
     let func_state = {
       func_state with

@@ -440,7 +440,7 @@ module Parser = struct
       label = label; 
       insts = insts;
       mnemonics = mnemonics;
-      orig_asm = List.tl lines
+      orig_asm = List.map (fun x -> Some x) (List.tl lines)
     }
 
   let filter_compiler_annotation (source: string) : bool =
@@ -455,6 +455,16 @@ module Parser = struct
     in
     List.fold_left helper [ s ] sep_list
 
+  (* Printf.printf "Remain len %d\n" (List.length lines);
+  List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
+  let is_label (line: string) : bool =
+    not (String.exists (fun c -> c = ':' || c = ' ') (String.sub line 0 (String.length line - 1))) &&
+    line.[(String.length line) - 1] = ':'
+
+  (* We assume function label does not start with "."! *)
+  let is_func_label (line: string) : bool =
+    (is_label line) && line.[0] <> '.'
+
   let line_processor (annotation: bool) (trim: bool) (line: string) : string option =
     if filter_compiler_annotation line && not annotation then None 
     else begin
@@ -467,20 +477,19 @@ module Parser = struct
       in
       let line' = String.trim line in
       if line' = "" then None
-      else Some(if trim then line' else line)
+      else Some(
+        if trim then
+          line'
+        else
+          if is_label line' then
+            line'
+          else
+            "\t" ^ line'
+      )
     end
 
   let preprocess_lines (processor: string -> string option) (lines: string list) : string list =
     lines |> List.filter_map processor
-
-  (* Printf.printf "Remain len %d\n" (List.length lines);
-  List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
-  let is_label (line: string) : bool =
-    line.[(String.length line) - 1] = ':'
-
-  (* We assume function label does not start with "."! *)
-  let is_func_label (line: string) : bool =
-    (is_label line) && line.[0] <> '.'
 
   let rec spliter_helper is_start bb acc_bb lines =
     match lines with
@@ -536,7 +545,7 @@ module Parser = struct
       | bb1 :: bb2 :: bbs ->
           let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_uncond_jump (List.hd (List.rev bb1.insts))
             then bb1
-            else {bb1 with insts = bb1.insts @ [Jmp bb2.label]}
+            else {bb1 with insts = bb1.insts @ [Jmp bb2.label]; mnemonics = bb1.mnemonics @ ["jmp"]; orig_asm = bb1.orig_asm @ [None] }
           in
           add_jmp_for_adj_bb (bb2 :: bbs) (bb1 :: acc)
     in
@@ -554,6 +563,17 @@ module Parser = struct
     in
     { funcs = func_list; imm_var_map = imm_var_map; orig_lines = orig_lines }
     (* {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map} *)
+
+  let prog_to_file (filename: string) (prog: Isa.prog) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (Isa.sexp_of_prog prog)
+
+  let prog_from_file (filename: string) : Isa.prog =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    Isa.prog_of_sexp s_exp
 
 end
 

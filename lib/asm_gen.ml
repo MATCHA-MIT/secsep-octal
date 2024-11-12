@@ -33,17 +33,17 @@ module AsmGen = struct
       | Some d -> str_of_immediate ctx false d
     in
     match d, b, i, s with
-    | _, Some base, None, None -> Printf.sprintf "%s(%s)" (str_of_disp d) (Isa.string_of_reg base)
-    | None, Some base, Some index, Some scale -> Printf.sprintf "(%s, %s, %s)" (Isa.string_of_reg base) (Isa.string_of_reg index) (Isa.scale_to_string scale)
+    | _, Some base, None, None -> Printf.sprintf "%s(%%%s)" (str_of_disp d) (Isa.string_of_reg base)
+    | None, Some base, Some index, Some scale -> Printf.sprintf "(%%%s, %%%s, %s)" (Isa.string_of_reg base) (Isa.string_of_reg index) (Isa.scale_to_string scale)
     | Some _, None, None, None -> Printf.sprintf "%s" (str_of_disp d)
-    | Some _, None, Some index, Some scale -> Printf.sprintf "%s(, %s, %s)" (str_of_disp d) (Isa.string_of_reg index) (Isa.scale_to_string scale)
+    | Some _, None, Some index, Some scale -> Printf.sprintf "%s(, %%%s, %s)" (str_of_disp d) (Isa.string_of_reg index) (Isa.scale_to_string scale)
     (* TODO: support more cases *)
     | _ -> asm_gen_error "str_of_memop: not implemented"
 
   let str_of_operand (ctx: context) (op: Isa.operand) : string =
     match op with
     | ImmOp imm -> str_of_immediate ctx true imm
-    | RegOp reg -> Isa.string_of_reg reg
+    | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
     | LdOp (d, b, i, s, _, _)
     | StOp (d, b, i, s, _, _) -> str_of_memop ctx d b i s
     | LabelOp label -> label
@@ -52,17 +52,20 @@ module AsmGen = struct
   let str_of_binst_operands (ctx: context) (_: Isa.bop) (dst: Isa.operand) (src2: Isa.operand) (src1: Isa.operand) : string =
     let str_of_operand' = str_of_operand ctx in
     if is_src_same_as_dst dst src1 then
-      Printf.sprintf "%s, %s" (str_of_operand' dst) (str_of_operand' src2)
+      Printf.sprintf "%s, %s" (str_of_operand' src2) (str_of_operand' dst)
     else if is_src_same_as_dst dst src2 then
-      Printf.sprintf "%s, %s" (str_of_operand' dst) (str_of_operand' src1)
+      Printf.sprintf "%s, %s" (str_of_operand' src1) (str_of_operand' dst)
     else
       asm_gen_error "str_of_binst_operands: dst is not the same as src1 or src2" (* may have 3 distinct operands? *)
 
   let str_of_uinst_operands (ctx: context) (_: Isa.uop) (dst: Isa.operand) (src: Isa.operand) : string =
-    Printf.sprintf "%s, %s" (str_of_operand ctx dst) (str_of_operand ctx src)
+    Printf.sprintf "%s, %s" (str_of_operand ctx src) (str_of_operand ctx dst)
   
   let str_of_operands (ctx: context) (oprs: Isa.operand list) : string =
     String.concat ", " (List.map (str_of_operand ctx) oprs) (* TODO: check if need reverse *)
+
+  let get_tab (opcode: string): string =
+    if String.length opcode <= 3 then "\t\t" else "\t"
 
   let asm_of_inst (ctx: context) (inst: Isa.instruction) (mnemonic: string option) : string =
     let get_tab (opcode: string): string =
@@ -101,27 +104,32 @@ module AsmGen = struct
 
     Printf.sprintf "\t%s%s%s" mnemonic (get_tab mnemonic) str_operands
 
-  let asm_of_inst_tf (ctx: context) (it: InstTransform.t) : string list =
-    if it.changed then
-      let lines = [""] in
-      let lines = ("#" ^ it.orig_asm ^ "\t; <==was now==>") :: lines in
-      let lines = List.fold_left (fun acc_lines inst ->
-        (asm_of_inst ctx inst None) :: acc_lines
-      ) lines it.inst_pre in
-      let lines = (asm_of_inst ctx it.inst (Some it.mnemonic)) :: lines in
-      let lines = List.fold_left (fun acc_lines inst ->
-        (asm_of_inst ctx inst None) :: acc_lines
-      ) lines it.inst_post in
-      let lines = "" :: lines in
-      lines
-    else
-      [it.orig_asm]
+  let asm_of_inst_tf (ctx: context) (it: InstTransform.t) (last_changed: bool): bool * (string list) =
+    match it.orig_asm with
+    | None -> (false, [])
+    | Some orig_asm ->
+      if it.changed then
+        let lines = if last_changed then [] else [""] in
+        let lines = ("#   " ^ orig_asm) :: lines in
+        let lines = List.fold_left (fun acc_lines inst ->
+          (asm_of_inst ctx inst None) :: acc_lines
+        ) lines it.inst_pre in
+        let lines = (asm_of_inst ctx it.inst (if it.use_orig_mne then Some it.mnemonic else None)) :: lines in
+        let lines = List.fold_left (fun acc_lines inst ->
+          (asm_of_inst ctx inst None) :: acc_lines
+        ) lines it.inst_post in
+        let lines = "" :: lines in
+        (true, lines)
+      else
+        (false, ["\t" ^ orig_asm])
 
   let asm_of_basic_block (ctx: context) (bb: Transform.basic_block) : string list =
     let lines = [ Printf.sprintf "%s:" bb.label ] in
-    let lines = List.fold_left (fun acc_lines it ->
-      (asm_of_inst_tf ctx it) @ acc_lines
-    ) lines bb.insts in
+    let lines, _ = List.fold_left (fun acc it ->
+      let acc_lines, changed = acc in
+      let changed', lines = asm_of_inst_tf ctx it changed in
+      lines @ acc_lines, changed'
+    ) (lines, true) bb.insts in
     (* top list where lines are still reversed *)
     List.rev lines
 
@@ -139,19 +147,29 @@ module AsmGen = struct
 
     prog.orig_lines
     |> Parser.preprocess_lines (Parser.line_processor true false) (* format preserved, a line must be trimmed before use *)
-    |> Parser.spliter_helper Parser.is_label [] []
+    |> Parser.spliter_helper Parser.is_func_label [] []
     |> List.map (fun (func_lines: string list) : string list ->
-      let func_name = Parser.parse_label (List.hd func_lines |> String.trim) in
+      Printf.printf "processing lines: %s\n" (String.concat "\n" func_lines);
+      let first_line = List.hd func_lines |> String.trim in
+      if not (Parser.is_label first_line) then func_lines else (* probably a starter "block" filled with annotations, without label *)
+      let func_name = Parser.parse_label first_line in
       if not (Isa.is_label_function_entry func_name) then
         asm_gen_error (Printf.sprintf "expecting a function entry label, got %s" func_name);
-      let func_states = List.find (fun (fs: Transform.func_state) -> fs.func_name = func_name) tf_func_states in
-      if not (Transform.is_func_transformed func_states) then
+      let func_state = List.find_opt (fun (fs: Transform.func_state) -> fs.func_name = func_name) tf_func_states in
+      if func_state = None then begin
+        Printf.printf "Warning: function %s not found in transformed states, skipping\n" func_name;
+        func_lines
+      end else if not (Transform.is_func_transformed (Option.get func_state)) then
         func_lines
       else
+        let func_state = Option.get func_state in
         let lines_of_bbs = Parser.spliter_helper Parser.is_label [] [] func_lines in
         List.map (fun (bb_lines: string list) : string list ->
-          let bb_label = Parser.parse_label (List.hd bb_lines |> String.trim) in
-          let bb_state = List.find (fun (bb: Transform.basic_block) -> bb.label = bb_label) func_states.bbs in
+          let first_line = List.hd bb_lines |> String.trim in
+          if not (Parser.is_label first_line) then
+            asm_gen_error (Printf.sprintf "expecting a basic block label, got %s" first_line);
+          let bb_label = Parser.parse_label first_line in
+          let bb_state = List.find (fun (bb: Transform.basic_block) -> bb.label = bb_label) func_state.bbs in
           if not (Transform.is_bb_transformed bb_state) then
             bb_lines
           else
