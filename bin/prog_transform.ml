@@ -16,7 +16,7 @@ let () =
   let taint_infer_result_states = 
     Taint_type_infer.TaintTypeInfer.state_list_from_file (get_taint_infer_filename !program_name) 
   in
-  let test_func_state = List.hd taint_infer_result_states in
+  let test_func_state = List.hd taint_infer_result_states in (* FIXME: only transforming the first function, for test purpose *)
   let init_mem_unity = Transform.Transform.get_func_init_mem_unity test_func_state in
   let _ =
     Transform.Transform.transform_one_function taint_infer_result_fi test_func_state init_mem_unity

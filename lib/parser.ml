@@ -327,7 +327,7 @@ module Parser = struct
     | _, [opr] -> UInst (op, dst opr, src opr)
     | _ -> parse_error ("get_uinst: invalid number of operands " ^ (string_of_int (List.length operands)))
 
-  let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * Isa.instruction =
+  let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * (Isa.instruction * string (* mnemonic *))=
     let (mnemonic, ts) = match ts with
     | MneTok mnemonic :: ts -> (mnemonic, ts)
     | _ -> parse_error ("parse_tokens: unexpected end of input: " ^ (String.concat ", " (List.map string_of_token ts)))
@@ -419,9 +419,9 @@ module Parser = struct
           end
         end
     in
-    imm_var_map, inst
+    imm_var_map, (inst, mnemonic)
 
-  let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : Isa.imm_var_map * Isa.instruction =
+  let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : Isa.imm_var_map * (Isa.instruction * string) (* mnemonic *) =
     (* print_endline ("Parsing " ^ line); *)
     let tokens = tokenize_line line in
     (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
@@ -432,12 +432,15 @@ module Parser = struct
     let imm_var_map, func = info in
     let label = parse_label (List.hd lines) in
     let func = if Isa.is_label_function_entry label then Some label else func in
-    let imm_var_map, insts = List.fold_left_map (
+    let imm_var_map, insts_with_mne = List.fold_left_map (
       fun imm_var_map line -> parse_instr imm_var_map line
     ) imm_var_map (List.tl lines) in
+    let insts, mnemonics = List.split insts_with_mne in
     (imm_var_map, func), {
       label = label; 
-      insts = insts
+      insts = insts;
+      mnemonics = mnemonics;
+      orig_asm = List.tl lines
     }
 
   let filter_compiler_annotation (source: string) : bool =
@@ -452,45 +455,48 @@ module Parser = struct
     in
     List.fold_left helper [ s ] sep_list
 
+  let line_processor (annotation: bool) (trim: bool) (line: string) : string option =
+    if filter_compiler_annotation line && not annotation then None 
+    else begin
+      (* get rid of comments *)
+      let first_sharp = String.index_opt line '#' in
+      let line = if first_sharp <> None then
+        String.sub line 0 (Option.get first_sharp)
+      else
+        line
+      in
+      let line' = String.trim line in
+      if line' = "" then None
+      else Some(if trim then line' else line)
+    end
+
+  let preprocess_lines (processor: string -> string option) (lines: string list) : string list =
+    lines |> List.filter_map processor
+
+  (* Printf.printf "Remain len %d\n" (List.length lines);
+  List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
+  let is_label (line: string) : bool =
+    line.[(String.length line) - 1] = ':'
+
+  (* We assume function label does not start with "."! *)
+  let is_func_label (line: string) : bool =
+    (is_label line) && line.[0] <> '.'
+
+  let rec spliter_helper is_start bb acc_bb lines =
+    match lines with
+    | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
+    | line :: lines ->
+        if is_start line then
+          spliter_helper is_start [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb) lines
+        else
+          spliter_helper is_start (line :: bb) acc_bb lines
+
   let parse_program (source: string) : Isa.prog =
-    let lines = source
-      (* Split lines *)
-      (* |> String.split_on_char '\n' *)
-      |> split_on_chars [ '\n'; ';' ]
-      (* Remove empty lines and comment lines *)
-      |> List.filter_map (fun line ->
-          if filter_compiler_annotation line then None 
-          else begin
-            let first_sharp = String.index_opt line '#' in
-            let line = if first_sharp <> None then
-              String.sub line 0 (Option.get first_sharp)
-            else
-              line
-            in
-            let line = String.trim line in
-            if line = "" then None
-            else Some(line)
-          end
-         )
-    in
-    (* Printf.printf "Remain len %d\n" (List.length lines);
-    List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
-    let is_label (line: string) : bool =
-      line.[(String.length line) - 1] = ':'
-    in
-    (* We assume function label does not start with "."! *)
-    let is_func_label (line: string) : bool =
-      (is_label line) && line.[0] <> '.'
-    in
-    let rec spliter_helper is_start bb acc_bb lines =
-      match lines with
-      | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
-      | line :: lines ->
-          if is_start line then
-            spliter_helper is_start [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb) lines
-          else
-            spliter_helper is_start (line :: bb) acc_bb lines
-    in
+    (* Split lines *)
+    (* |> String.split_on_char '\n' *)
+    let orig_lines = source |> split_on_chars [ '\n'; ';' ] in
+
+    let lines = preprocess_lines (line_processor false true) orig_lines in
     (* Split lines into basic blocks *)
     let bb_spliter = spliter_helper is_label in
     let func_spliter lines =
@@ -540,13 +546,13 @@ module Parser = struct
     ) func_list in
     (* let bbs = add_jmp_for_adj_bb bbs [] in *)
     let get_ret_bb : Isa.basic_block =
-      { label = Isa.ret_label; insts = [] } in
+      { label = Isa.ret_label; insts = []; mnemonics = []; orig_asm = [] } in
     let func_list = List.map (
       fun (func: Isa.func) ->
         { func with body = func.body @ [get_ret_bb] }
     ) func_list
     in
-    { funcs = func_list; imm_var_map = imm_var_map }
+    { funcs = func_list; imm_var_map = imm_var_map; orig_lines = orig_lines }
     (* {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map} *)
 
 end

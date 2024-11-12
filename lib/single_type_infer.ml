@@ -27,7 +27,7 @@ module SingleTypeInfer = struct
     single_subtype: SingleSubtype.t;
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
-    smt_ctx: SmtEmitter.t
+    smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
 

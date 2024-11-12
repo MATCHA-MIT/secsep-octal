@@ -10,21 +10,18 @@ open Call_anno_type
 open Single_exp
 open Pretty_print
 
-module MemAnno = FullMemAnno
-module Isa = Isa (MemAnno)
-
-module ArchType = TaintTypeInfer.ArchType
-module RegType = ArchType.RegType
-module MemType = ArchType.MemType
-module FuncInterface = ArchType.FuncInterface
-
 exception TransformError of string
 let transform_error msg = raise (TransformError ("[Transform Error] " ^ msg))
 
 module InstTransform = struct
 
+  module MemAnno = FullMemAnno
+  module Isa = Isa (MemAnno)
+
   type t = {
     (* was *)
+    mnemonic: string;
+    orig_asm: string;
     orig: Isa.instruction;
 
     (* now *)
@@ -36,8 +33,10 @@ module InstTransform = struct
     changed: bool;
   }
 
-  let init (orig: Isa.instruction) : t =
+  let init (orig: Isa.instruction) (mnemonic: string) (orig_asm: string) : t =
     {
+      mnemonic = mnemonic;
+      orig_asm = orig_asm;
       orig = orig;
       inst = orig;
       inst_pre = [];
@@ -98,6 +97,14 @@ end
 
 module Transform = struct
 
+  module MemAnno = FullMemAnno
+  module Isa = Isa (MemAnno)
+  
+  module ArchType = TaintTypeInfer.ArchType
+  module RegType = ArchType.RegType
+  module MemType = ArchType.MemType
+  module FuncInterface = ArchType.FuncInterface
+
   type unity =
     | Unified
     | Ununified
@@ -123,6 +130,12 @@ module Transform = struct
   }
 
   let delta: int64 = -0x100000L (* -1MB *)
+
+  let is_bb_transformed (bb: basic_block) : bool =
+    List.exists (fun (tf: InstTransform.t) -> tf.changed) bb.insts
+  
+  let is_func_transformed (func_state: func_state) : bool =
+    List.exists is_bb_transformed func_state.bbs
 
   let get_rsp_var_from_reg_type (reg_type: RegType.t) : Isa.imm_var_id =
     let rsp_var_id = match TaintSubtype.TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP) with
@@ -206,9 +219,14 @@ module Transform = struct
       (init_mem_unity: mem_unity_t)
       : func_state =
     let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
+      if (List.length bb.mnemonics) != (List.length bb.insts) ||
+         (List.length bb.orig_asm) != (List.length bb.insts)  then
+        transform_error "Mismatch between mnemonics/orig_asm and instructions";
       {
         label = bb.label;
-        insts = List.map (fun inst -> InstTransform.init inst) bb.insts;
+        insts = List.map2 (
+          fun inst (mnemonic, orig_asm) -> InstTransform.init inst mnemonic orig_asm
+        ) bb.insts (List.combine bb.mnemonics bb.orig_asm);
       }
     ) ti_state.func in
     {
@@ -217,7 +235,7 @@ module Transform = struct
       bb_types = ti_state.func_type;
       init_mem_unity = init_mem_unity;
       init_rsp_var_id = get_func_init_rsp_var ti_state;
-      callee_saving_slots = []
+      callee_saving_slots = [];
     }
 
   let get_slot_unity (mem_unity: (Isa.imm_var_id * unity) list) (base_id: Isa.imm_var_id) : unity =

@@ -26,6 +26,12 @@ module Isa (MemAnno: MemAnnoType) = struct
     let (disp, base, index, scale) = op in
     MemOp (disp, base, index, scale)
 
+  let extract_memop_of_ldst (op: operand) =
+    match op with
+    | LdOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
+    | StOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
+    | _ -> op
+
   let rec string_of_operand (op: operand): string =
     match op with
     | ImmOp imm -> string_of_immediate imm
@@ -127,6 +133,8 @@ module Isa (MemAnno: MemAnnoType) = struct
   type basic_block = {
     label: label;
     insts: instruction list;
+    mnemonics: string list; (* same length as insts *)
+    orig_asm: string list; (* same length as insts *)
   }
   [@@deriving sexp]
 
@@ -139,6 +147,7 @@ module Isa (MemAnno: MemAnnoType) = struct
   type prog = {
     funcs: func list;
     imm_var_map: imm_var_map;
+    orig_lines: string list;
   }
   [@@deriving sexp]
 
