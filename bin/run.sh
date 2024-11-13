@@ -76,7 +76,7 @@ fi
 
 echo
 echo "instantiating taint var for $BENCH"
-time dune exec instantiate_taint 1>$OUT_DIR/$INTER_NAME.taint_infer.log 2>&1 -- -name $INTER_NAME
+time dune exec instantiate_taint 1>$OUT_DIR/$INTER_NAME.instantiate.log 2>&1 -- -name $INTER_NAME
 if [ $? -ne 0 ]; then
     echo
     echo "failed to instantiate taint var for $BENCH"

@@ -257,16 +257,22 @@ module MemType (Entry: EntryType) = struct
 
   module MemAnno = FullMemAnno
 
-  let pp_mem_type (lvl: int) (mem: t) =
+  let pp_mem_type_generic (lvl: int) (mem: 'a mem_content) (str_of_entry: ('a -> string) option) =
     PP.print_lvl lvl "<MemType>\n";
     List.iter (
       fun (ptr, off_list) ->
         PP.print_lvl (lvl + 1) "<Ptr %d>\n" ptr;
         List.iter (
           fun (off, r, entry) ->
-            PP.print_lvl (lvl + 2) "%s\t%s\t%s\n" (MemOffset.to_string off) (MemRange.to_string r) (Entry.to_string entry)
+            let entry_str = match str_of_entry with
+            | None ->  ""
+            | Some f -> Printf.sprintf "\t%s" (f entry)
+            in
+            PP.print_lvl (lvl + 2) "%s\t%s%s\n" (MemOffset.to_string off) (MemRange.to_string r) entry_str
         ) off_list
     ) mem
+
+  let pp_mem_type (lvl: int) (mem: t) = pp_mem_type_generic lvl mem (Some Entry.to_string)
 
   let pp_ocaml_mem_type (lvl: int) (buf: Buffer.t) (mem: t) =
     PP.bprint_lvl lvl buf "[\n";
