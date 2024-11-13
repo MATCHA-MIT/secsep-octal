@@ -530,7 +530,8 @@ module MemType (Entry: EntryType) = struct
       (ptr: IsaBasic.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
     if ptr = IsaBasic.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
-      match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (SingleVar ptr, SingleVar ptr) CmpLeGe with
+      let local_stack_start: SingleExp.t = SingleBExp (SingleSub, SingleVar ptr, SingleConst 8L) in
+      match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (local_stack_start, local_stack_start) CmpLeGe with
       | Le -> false
       | Ge -> true
       | _ -> 
