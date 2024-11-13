@@ -239,7 +239,6 @@ module Transform = struct
       (init_mem_unity: mem_unity_t)
       : func_state =
     let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
-      Printf.printf "bb name: %s" bb.label;
       if (List.length bb.mnemonics) != (List.length bb.insts) ||
          (List.length bb.orig_asm) != (List.length bb.insts)  then
         transform_error (Printf.sprintf "Mismatch between mnemonics/orig_asm and instructions %d %d %d" (List.length bb.mnemonics) (List.length bb.orig_asm) (List.length bb.insts));
@@ -353,6 +352,7 @@ module Transform = struct
         let inst' = Isa.UInst (uop, o1', o2') in
         (inst', [], [], true), css'
       end
+    | TInst _ -> transform_error "not implemented yet" (* TODO *)
     | Xchg (o1, o2, o3, o4) -> begin
         let o1' = helper_prepare_memop o1 in
         let o2' = helper_prepare_memop o2 in
@@ -423,8 +423,11 @@ module Transform = struct
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> (orig, [], [], true), css (* handled in another pass *)
-    | RepStosq -> transform_error "RepStosq unimplemented"
-    | RepMovsq -> transform_error "RepStosq unimplemented"
+    | RepMovs _ -> transform_error "RepMovs unimplemented"
+    | RepLods _ -> transform_error "RepLods unimplemented"
+    | RepStos _ -> transform_error "RepStos unimplemented"
+    (* | RepStosq -> transform_error "RepStosq unimplemented"
+    | RepMovsq -> transform_error "RepStosq unimplemented" *)
     in
     (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css
 

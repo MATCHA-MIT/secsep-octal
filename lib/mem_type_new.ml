@@ -5,7 +5,7 @@ open Single_exp
 open Entry_type
 open Mem_offset_new
 open Full_mem_anno
-open Cond_type_new
+open Single_context
 open Constraint
 (* open Arch_type *)
 open Sexplib.Std
@@ -293,6 +293,26 @@ module MemType (Entry: EntryType) = struct
     fold_left_map helper start_var mem_layout
     (* let _ = mem_layout in start_var, [] *)
 
+  let add_dummy_stack_slot
+      (mem: t) : t =
+    (* let found, mem =
+      List.fold_left_map (
+        fun (acc: bool) (ptr, part_mem) ->
+          if acc then acc, (ptr, part_mem)
+          else if ptr = IsaBasic.rsp_idx then
+            true, (ptr, ((SingleExp.SingleConst 0L, SingleExp.SingleConst 0L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) :: part_mem)
+          else
+            acc, (ptr, part_mem)
+      ) false mem
+    in *)
+    let found =
+      List.find_opt (
+        fun (ptr, _) -> ptr = IsaBasic.rsp_idx
+      ) mem <> None
+    in
+    if found then mem
+    else (IsaBasic.rsp_idx, [ ((SingleExp.SingleConst 0L, SingleExp.SingleConst 0L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) ]) :: mem
+
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)
       (mem: (MemOffset.t * MemRange.t * 'a) list)
@@ -420,10 +440,12 @@ module MemType (Entry: EntryType) = struct
       (mem: t)
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t) :
-      MemOffset.t * MemRange.t * entry_t =
+      (MemOffset.t * MemRange.t * entry_t) * bool =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s"
-        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
+      ((SingleExp.SingleTop, SingleExp.SingleTop), RangeConst [], Entry.get_top_untaint_type ()),
+      false
+      (* mem_type_error (Printf.sprintf "get_slot_mem_type: Annotation %s does not match memory slot %s"
+        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off)) *)
     else
       let s_ptr, s_off, is_full = slot_info in
       match List.find_opt (fun (ptr, _) -> ptr = s_ptr) mem with
@@ -439,10 +461,69 @@ module MemType (Entry: EntryType) = struct
           ) part_mem
         in
         begin match lookup with
-        | Some result -> result
+        | Some result -> result, true
         | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
         end
 
+  let get_heuristic_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (mem: t)
+      (addr_off: MemOffset.t) :
+      (MemOffset.t, SingleContext.t list) Either.t =
+    (* Note: this function might add additional constraints to smt_ctx, please do push/pop outside! *)
+    let check_or_assert_helper
+        (lookup_offset: MemOffset.t) (target_offset: MemOffset.t) :
+        (MemOffset.t, SingleContext.t list) Either.t =
+      let l, r = lookup_offset in
+      let off_l, off_r = target_offset in
+      let cond_list: SingleContext.t list = [
+        Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
+        (* TODO: Think about whether this should be Lt or Le!!! *)
+        Cond (Lt, SingleExp.eval (SingleBExp (SingleSub, l, r)), SingleConst 0L);
+        Cond (Le, SingleExp.eval (SingleBExp (SingleSub, r, off_r)), SingleConst 0L);
+      ] in
+      (* TODO: Check, sat or add, one by one *)
+      begin match SingleContext.check_or_assert smt_ctx cond_list with
+      | None -> Left addr_off (* addr_off does not belongs to this entry *)
+      | Some cond_list -> Right cond_list
+      end
+    in
+    let ptr_set = get_ptr_set mem in
+    let l, r = addr_off in
+    match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    | Some b_l, Some b_r ->
+      if b_l <> b_r then Left addr_off
+      else
+        let part_mem = get_part_mem mem b_l in
+        begin match part_mem with
+        | [ target_offset, _, _ ] ->
+          check_or_assert_helper addr_off target_offset
+          (* let cond_list = [
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, off_l, l)), SingleExp.SingleConst 0L;
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, l, r)), SingleExp.SingleConst 0L;
+            SingleCondType.Le, SingleExp.eval (SingleExp.SingleBExp (SingleSub, r, off_r)), SingleExp.SingleConst 0L;
+          ] in
+          (* TODO: Check, sat or add, one by one *)
+          begin match SingleCondType.check_or_assert smt_ctx cond_list with
+          | None -> Left addr_off (* addr_off does not belongs to this entry *)
+          | Some cond_list -> Right cond_list
+          end *)
+          (* Left addr_off *)
+        | _ -> 
+          let other_var_set = SingleExp.SingleVarSet.remove b_l (MemOffset.get_vars addr_off) in
+          let other_var_to_zero_map = List.map (fun x -> (x, SingleExp.SingleConst 0L)) (SingleExp.SingleVarSet.to_list other_var_set) in
+          let other_zero_addr_off = MemOffset.repl_local_var other_var_to_zero_map addr_off in
+          Printf.printf "get_heuristic_mem_type orig off %s heuristic off %s\n" (MemOffset.to_string addr_off) (MemOffset.to_string other_zero_addr_off);
+          let lookup_part_mem = get_part_mem_type smt_ctx part_mem other_zero_addr_off other_zero_addr_off in
+          begin match lookup_part_mem with
+          | Some (_, (target_offset, _, _)) ->
+            check_or_assert_helper addr_off target_offset
+          | None -> Left addr_off
+          end
+          (* Left addr_off *)
+        end
+    | _ -> Left addr_off
+        
   let is_shared_mem_helper
       (is_quick: bool)
       (smt_ctx: SmtEmitter.t)
@@ -618,10 +699,11 @@ module MemType (Entry: EntryType) = struct
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_type: entry_t) :
-      t * (Constraint.t list) =
+      t * (Constraint.t list) * bool =
     if check_addr && (not (MemAnno.check_slot smt_ctx orig_addr_off slot_info)) then
-      mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s"
-        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off))
+      mem, [], false
+      (* mem_type_error (Printf.sprintf "set_slot_mem_type: Annotation %s does not match memory slot %s"
+        (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_off)) *)
     else
       let s_ptr, _, _ = slot_info in
       match List.find_opt (fun (ptr, _) -> ptr = s_ptr) mem with
@@ -629,7 +711,8 @@ module MemType (Entry: EntryType) = struct
       | Some (_, part_mem) ->
         let part_mem, constraints = set_slot_part_mem_type smt_ctx update_init_range part_mem orig_addr_off slot_info new_type in
         List.map (fun (ptr, p_mem) -> if ptr = s_ptr then (ptr, part_mem) else (ptr, p_mem)) mem,
-        constraints
+        constraints,
+        true
 
   let init_stack_update_list (mem: t) : (MemOffset.t * bool) list =
     let find_stack = 
@@ -704,8 +787,8 @@ module MemType (Entry: EntryType) = struct
         SingleExp.SingleVarSet.union acc (SingleExp.get_vars (Entry.get_single_exp entry))
     ) SingleExp.SingleVarSet.empty shared_mem *)
 
-  let gen_implicit_mem_constraints (smt_ctx: SmtEmitter.t) (mem_type: t) : unit =
-    let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
+  (* let gen_implicit_mem_constraints (smt_ctx: SmtEmitter.t) (mem_type: t) : unit =
+    (* let helper (offset_list: (MemOffset.t * 'a * 'b) list) : SmtEmitter.exp_t list =
       match offset_list with
       | [] -> []
       | ((l, r), _, _) :: [] ->
@@ -720,7 +803,68 @@ module MemType (Entry: EntryType) = struct
         fun (acc: SmtEmitter.exp_t list) (_, part_mem) ->
           (helper part_mem) @ acc
       ) [] mem_type
+    in *)
+    let helper (acc: SmtEmitter.exp_t list) (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) : SmtEmitter.exp_t list =
+      let _, offset_list = part_mem in
+      match offset_list with
+      | [] -> acc
+      | ((l, r), _, _) :: [] ->
+        if SingleExp.cmp l r = 0 then acc 
+        else (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
+      | ((l, _), _, _) :: tl ->
+        let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
     in
-    SmtEmitter.add_assertions smt_ctx exps
+    let exps = List.fold_left helper [] mem_type in
+    SmtEmitter.add_assertions smt_ctx exps *)
+
+  let get_mem_boundary_list (mem_type: t) : MemOffset.t list =
+    let helper 
+        (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) :
+        MemOffset.t option =
+      let _, offset_list = part_mem in
+      match offset_list with
+      | [] -> None
+      | ((l, r), _, _) :: [] ->
+        if SingleExp.cmp l r = 0 then None
+        else Some (l, r)
+      | ((l, _), _, _) :: tl ->
+        let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        Some (l, r)
+    in
+    List.filter_map helper mem_type
+
+  let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
+    List.map (
+        fun (l, r) -> 
+          SingleContext.Cond (Lt, l, r)
+      ) boundary_list
+
+  let rec get_mem_non_overlap_constraint_helper
+      (acc: SingleContext.t list)
+      (boundary_list: MemOffset.t list) :
+      SingleContext.t list =
+    match boundary_list with
+    | [] -> acc
+    | (hd_l, hd_r) :: tl ->
+      let acc = get_mem_non_overlap_constraint_helper acc tl in
+      List.fold_left (
+          fun (acc: SingleContext.t list) (l, r) ->
+            (SingleContext.Or [
+              Cond (Lt, hd_r, l);
+              Cond (Lt, r, hd_l);
+            ]) :: acc
+        ) acc tl
+
+  let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
+    get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type)
+
+  let get_mem_non_overlap_constraint (mem_type: t) : SingleContext.t list =
+    get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type)
+
+  let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
+    let boundary_list = get_mem_boundary_list mem_type in
+    let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
+    get_mem_non_overlap_constraint_helper boundary_constraint boundary_list
 
 end

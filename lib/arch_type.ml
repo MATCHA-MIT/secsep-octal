@@ -1,6 +1,7 @@
 open Pretty_print
 open Entry_type
 open Cond_type_new
+open Single_context
 open Reg_type_new
 open Mem_offset_new
 open Mem_type_new
@@ -221,204 +222,255 @@ module ArchType (Entry: EntryType) = struct
 
   let get_ld_op_type_no_slot
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64) :
+      (size: int64) : *)
+      (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     (* TODO: Add constriant: addr_type is untainted *)
     (* TODO: ld/st op taint is not handled!!! *)
-    let addr_type = get_mem_op_type curr_type disp base index scale in
+    (* let addr_type = get_mem_op_type curr_type disp base index scale in *)
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
+    let size_type = Entry.repl_local_var curr_type.local_var_map size_type in
+    let addr_untaint_cons = (Entry.get_untaint_constraint addr_type) @ (Entry.get_untaint_constraint size_type) in
     let addr_exp = Entry.get_single_exp addr_type in
-    let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-    if addr_exp = SingleTop then begin
-      Printf.printf "addr_exp = SingleTop\n";
+    let size_exp = Entry.get_single_exp size_type in
+    if addr_exp = SingleTop || size_exp = SingleTop then begin
+      Printf.printf "ld addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp);
       Entry.get_top_type (), 
       Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
       SingleExp.SingleVarSet.empty,
       None
     end else
-      let useful_vars = SingleExp.get_vars addr_exp in
-      match sub_sol_func (addr_exp, curr_type.pc) with
-      | Some opt_exp ->
-        let opt_offset = RangeExp.to_mem_offset opt_exp size in
-        (* let opt_offset = None in let _ = sub_sol_func in *)
-        let orig_addr_offset = 
-            (addr_exp, 
-            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
-        in
-        let simp_addr_offset = (
-          match opt_offset with
-          | Some o -> o
-          | None -> orig_addr_offset
-        ) in
-        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
-        | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
-          e_t, 
-          Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
-          useful_vars,
-          Some (ptr, off_w, is_full)
-        | None -> 
-          Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
-          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+      let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
+      let orig_addr_offset =
+        addr_exp, 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
+      in
+      let try_get_slot_type =
+        match anno_opt with
+        | None -> None
+        | Some slot_info -> Some (MemType.get_slot_mem_type smt_ctx true curr_type.mem_type orig_addr_offset slot_info)
+      in
+      match try_get_slot_type with
+      | Some ((off_w, off_r, e_t), true) ->
+        e_t, 
+        Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+        useful_vars,
+        anno_opt
+        (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
+        (* Some (ptr, off_w, is_full) *)
+      | _ -> (* Annotation not pass check or no annotation *)
+        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+        | Some (simp_l, simp_r), Some (_, simp_size) ->
+          let simp_addr_offset = 
+            simp_l,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+          in
+          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+          begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
+          | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
+            e_t, 
+            Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+            useful_vars,
+            Some (ptr, off_w, is_full)
+          | None -> 
+            Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
+            (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+            Entry.get_top_type (), 
+            Unknown simp_addr_offset :: addr_untaint_cons, 
+            useful_vars,
+            None
+          end
+        | _ -> 
+          Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
           Entry.get_top_type (), 
-          Unknown simp_addr_offset :: addr_untaint_cons, 
+          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
           useful_vars,
           None
         end
-      | _ -> 
-        Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
-        Entry.get_top_type (), 
-        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-        useful_vars,
-        None
 
   let get_ld_op_type_slot
       (smt_ctx: SmtEmitter.t)
       (check_addr: bool)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64)
+      (size: int64) *)
       (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     match anno_opt with
     | None -> arch_type_error "get_ld_op_type_slot slot annotation is None"
     | Some slot_info ->
-      let addr_type = get_mem_op_type curr_type disp base index scale in
+      (* let addr_type = get_mem_op_type curr_type disp base index scale in *)
       let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
+      let size_type = Entry.repl_local_var curr_type.local_var_map size_type in
+      let addr_untaint_cons = (Entry.get_untaint_constraint addr_type) @ (Entry.get_untaint_constraint size_type) in
       let addr_exp = Entry.get_single_exp addr_type in
-      let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-      let useful_vars = SingleExp.get_vars addr_exp in
+      let size_exp = Entry.get_single_exp size_type in
+      let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
       let orig_addr_offset = 
         (addr_exp, 
-        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))) 
       in
-      let off, range, entry = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
-      entry, Subset (orig_addr_offset, range, off) :: addr_untaint_cons, useful_vars
+      let (off, range, entry), pass_check = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
+      if pass_check then
+        entry, Subset (orig_addr_offset, range, off) :: addr_untaint_cons, useful_vars
+      else
+        arch_type_error (Printf.sprintf "get_ld_op_type_slot: Annotation %s does not match memory slot %s"
+          (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))
 
   let get_ld_op_type
       (smt_ctx: SmtEmitter.t)
       (prop_mode: prop_mode_t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64)
+      (size: int64) *)
       (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     match prop_mode with
-    | TypeInferDep -> get_ld_op_type_no_slot smt_ctx sub_sol_func curr_type disp base index scale size
+    | TypeInferDep -> get_ld_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type anno_opt
     | TypeInferTaint | TypeInferInit -> 
-      let e, cons, useful_var = get_ld_op_type_slot smt_ctx false curr_type disp base index scale size anno_opt in
+      let e, cons, useful_var = get_ld_op_type_slot smt_ctx false curr_type addr_type size_type anno_opt in
       e, cons, useful_var, anno_opt
     | TypeCheck -> arch_type_error "get_ld_op_type TypeCheck not implemented"
 
   let set_st_op_type_no_slot
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64) (new_type: entry_t) :
+      (size: int64)  *)
+      (anno_opt: MemAnno.slot_t option)
+      (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     (* TODO: Add constriant: addr_type is untainted *)
     (* TODO: ld/st op taint is not handled!!! *)
-    let addr_type = get_mem_op_type curr_type disp base index scale in
+    (* let addr_type = get_mem_op_type curr_type disp base index scale in *)
     let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
+    let size_type = Entry.repl_local_var curr_type.local_var_map size_type in
+    let addr_untaint_cons = (Entry.get_untaint_constraint addr_type) @ (Entry.get_untaint_constraint size_type) in
     let addr_exp = Entry.get_single_exp addr_type in
-    let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-    if addr_exp = SingleTop then
+    let size_exp = Entry.get_single_exp size_type in
+    if addr_exp = SingleTop || size_exp = SingleTop then begin
+      (* Printf.printf "St op %s\n" (Isa.string_of_operand (StOp (disp, base, index, scale, size, (None, None))));
+      RegType.pp_reg_type 0 curr_type.reg_type;
+      Printf.printf "Top addr_exp for orign addr_type %s pc %d\n" (Entry.to_string addr_type) curr_type.pc; *)
+      Printf.printf "st addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp);
       curr_type, 
       Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
       SingleExp.SingleVarSet.empty,
       None
-    else
-      let useful_vars = SingleExp.get_vars addr_exp in
-      match sub_sol_func (addr_exp, curr_type.pc) with
-      | Some opt_exp ->
-        let opt_offset = RangeExp.to_mem_offset opt_exp size in
-        (* let opt_offset = None in let _ = sub_sol_func in *)
-        let orig_addr_offset = 
-            (addr_exp, 
-            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
-        in
-        let simp_addr_offset = (
-          match opt_offset with
-          | Some o -> o
-          | None -> orig_addr_offset
-        ) in
-        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-        begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
-        | Some (new_mem, write_constraints, slot_anno) -> 
-          { curr_type with mem_type = new_mem }, 
-          write_constraints @ addr_untaint_cons, 
-          useful_vars,
-          Some slot_anno
-        | None -> 
-          (* Printf.printf "set_st_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset); *)
-          (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+    end else
+      let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
+      let orig_addr_offset =
+        addr_exp, 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
+      in
+      let try_set_slot_type =
+        match anno_opt with
+        | None -> None
+        | Some slot_info -> Some (MemType.set_slot_mem_type smt_ctx true false curr_type.mem_type orig_addr_offset slot_info new_type)
+      in
+      match try_set_slot_type with
+      | Some (new_mem, write_constraints, true) ->
+        { curr_type with mem_type = new_mem }, 
+        write_constraints @ addr_untaint_cons, 
+        useful_vars,
+        anno_opt
+      | _ -> (* Annotation not pass check or no annotation *)
+        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+        | Some (simp_l, simp_r), Some (_, simp_size) ->
+          let simp_addr_offset = 
+            simp_l,
+            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+          in
+          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+          begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
+          | Some (new_mem, write_constraints, slot_anno) -> 
+            { curr_type with mem_type = new_mem }, 
+            write_constraints @ addr_untaint_cons, 
+            useful_vars,
+            Some slot_anno
+          | None -> 
+            (* Printf.printf "set_st_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset); *)
+            (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+            curr_type, 
+            Unknown simp_addr_offset :: addr_untaint_cons, 
+            useful_vars,
+            None
+          end
+        | _ -> 
+          (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
           curr_type, 
-          Unknown simp_addr_offset :: addr_untaint_cons, 
+          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
           useful_vars,
           None
         end
-      | None -> 
-        (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
-        curr_type, 
-        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-        useful_vars,
-        None
     
   let set_st_op_type_slot
       (smt_ctx: SmtEmitter.t)
       (check_addr: bool)
       (update_init_range: bool)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64) 
+      (size: int64)  *)
       (anno_opt: MemAnno.slot_t option)
       (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     match anno_opt with
     | None -> arch_type_error "set_st_op_type_slot slot annotation is None"
     | Some slot_info ->
-      let addr_type = get_mem_op_type curr_type disp base index scale in
+      (* let addr_type = get_mem_op_type curr_type disp base index scale in *)
       let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in
+      let size_type = Entry.repl_local_var curr_type.local_var_map size_type in
+      let addr_untaint_cons = (Entry.get_untaint_constraint addr_type) @ (Entry.get_untaint_constraint size_type) in
       let addr_exp = Entry.get_single_exp addr_type in
-      let addr_untaint_cons = Entry.get_untaint_constraint addr_type in
-      let useful_vars = SingleExp.get_vars addr_exp in
+      let size_exp = Entry.get_single_exp size_type in
+      let useful_vars = MemOffset.get_vars (addr_exp, size_exp) in
       let orig_addr_offset = 
         (addr_exp, 
-        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, SingleExp.SingleConst size))) 
+        SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))) 
       in
-      let new_mem, write_constraints = 
+      let new_mem, write_constraints, pass_check = 
         MemType.set_slot_mem_type smt_ctx check_addr update_init_range curr_type.mem_type orig_addr_offset slot_info new_type
       in
-      { curr_type with mem_type = new_mem }, 
-      write_constraints @ addr_untaint_cons, 
-      useful_vars
+      if pass_check then
+        { curr_type with mem_type = new_mem }, 
+        write_constraints @ addr_untaint_cons, 
+        useful_vars
+      else
+        arch_type_error (Printf.sprintf "set_st_op_type_slot: Annotation %s does not match memory slot %s"
+          (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
       (prop_mode: prop_mode_t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
-      (disp: Isa.immediate option) (base: Isa.register option)
+      (addr_type: entry_t) (size_type: entry_t)
+      (* (disp: Isa.immediate option) (base: Isa.register option)
       (index: Isa.register option) (scale: Isa.scale option)
-      (size: int64)
+      (size: int64) *)
       (anno_opt: MemAnno.slot_t option)
       (new_type: entry_t) :
       t * (Constraint.t list) * SingleExp.SingleVarSet.t * (MemAnno.slot_t option) =
     match prop_mode with
-    | TypeInferDep -> set_st_op_type_no_slot smt_ctx sub_sol_func curr_type disp base index scale size new_type
+    | TypeInferDep -> set_st_op_type_no_slot smt_ctx sub_sol_func curr_type addr_type size_type anno_opt new_type
     | TypeInferTaint | TypeInferInit ->
       let new_mem, cons, useful_var = 
-        set_st_op_type_slot smt_ctx false (prop_mode = TypeInferInit) curr_type disp base index scale size anno_opt new_type
+        set_st_op_type_slot smt_ctx false (prop_mode = TypeInferInit) curr_type addr_type size_type anno_opt new_type
       in
       new_mem, cons, useful_var, anno_opt
     | TypeCheck -> arch_type_error "set_st_op_type TypeCheck not implemented"
@@ -426,7 +478,7 @@ module ArchType (Entry: EntryType) = struct
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
       (prop_mode: prop_mode_t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
       (src: Isa.operand) :
       entry_t * t * (Constraint.t list) * Isa.operand =
@@ -436,8 +488,10 @@ module ArchType (Entry: EntryType) = struct
     | MemOp (disp, base, index, scale) ->
       get_mem_op_type curr_type disp base index scale, curr_type, [], src
     | LdOp (disp, base, index, scale, size, (slot_anno, taint_anno) (* TODO: check offset and generate constraints *)) ->
+      let addr_type = get_mem_op_type curr_type  disp base index scale in
+      let size_type = Entry.get_const_type (ImmNum size) in
       let src_type, src_constraint, src_useful, slot_anno =
-        get_ld_op_type smt_ctx prop_mode sub_sol_func curr_type disp base index scale size slot_anno
+        get_ld_op_type smt_ctx prop_mode sub_sol_func curr_type addr_type size_type slot_anno
       in
       let ld_op_constraint = Entry.update_ld_taint_constraint src_type taint_anno in
       (
@@ -452,7 +506,7 @@ module ArchType (Entry: EntryType) = struct
   let set_dest_op_type
       (smt_ctx: SmtEmitter.t)
       (prop_mode: prop_mode_t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
       (dest: Isa.operand)
       (new_type: entry_t) :
@@ -460,19 +514,40 @@ module ArchType (Entry: EntryType) = struct
     match dest with
     | RegOp r -> set_reg_type curr_type r new_type, [], dest
     | StOp (disp, base, index, scale, size, (slot_anno, taint_anno)) ->
+      let addr_type = get_mem_op_type curr_type  disp base index scale in
+      let size_type = Entry.get_const_type (ImmNum size) in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint new_type taint_anno in
       let next_type, dest_constraint, dest_useful, slot_anno =
-        set_st_op_type smt_ctx prop_mode sub_sol_func curr_type disp base index scale size slot_anno new_type
+        set_st_op_type smt_ctx prop_mode sub_sol_func curr_type addr_type size_type slot_anno new_type
       in
       { next_type with useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful }, 
       st_op_constraint @ dest_constraint,
       StOp (disp, base, index, scale, size, (slot_anno, taint_anno))
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
 
-  let constriant_list_add_pc
-      (constraint_list: Constraint.t list) (pc: int) :
-      (Constraint.t * int) list =
-    List.map (fun x -> x, pc) constraint_list
+  let get_orig_simp_off
+      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option) (pc: int)
+      (left_type: entry_t) (right_type: entry_t) : 
+      MemOffset.t * (MemOffset.t option) * SingleExp.SingleVarSet.t =
+    let sub_helper (e: SingleExp.t) : MemOffset.t option =
+      match sub_sol_func (e, pc) with
+        | Some r -> (* RangeExp.to_mem_offset2 r *)
+          begin match RangeExp.to_mem_offset2 r with
+          | Some off -> Some off
+          | None -> Some (e, e)
+          end
+        | None -> None
+    in
+    let orig_l = Entry.get_single_exp left_type in
+    let orig_r = Entry.get_single_exp right_type in
+    if orig_l = SingleTop || orig_r = SingleTop then
+      (orig_l, orig_r), None, SingleExp.SingleVarSet.empty
+    else
+      (orig_l, orig_r),
+      (match sub_helper orig_l, sub_helper orig_r with
+      | Some (simp_l, _), Some (_, simp_r) -> Some (simp_l, simp_r)
+      | _ -> None),
+      MemOffset.get_vars (orig_l, orig_r)
 
   let add_constraints
       (curr_type: t) (new_constraints: Constraint.t list) : t =
@@ -482,7 +557,7 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (curr_type: t)
       (inst: Isa.instruction) :
       t * Isa.instruction =
@@ -493,58 +568,100 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
-      let dest_type = Entry.exe_bop_inst bop src0_type src1_type in
+      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
-      let ldst_bind_constraint = begin
-        if Isa.is_ld_st_related src0 dest then begin
-          Entry.handle_mem_rw src0_type dest_type
-        end else if Isa.is_ld_st_related src1 dest then begin
-          Entry.handle_mem_rw src1_type dest_type
-        end else
-          []
-      end in
+      let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
       let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
       { next_type with local_var_map = new_local_var },
       BInst (bop, dest, src0, src1)
-    (* | UInst (Mov, dest, src)
-    | UInst (Lea, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map src_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
-    | UInst (MovS, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let dest_type = Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint
-    | UInst (MovZ, dest, src) ->
-      let src_type, curr_type, src_constraint = get_src_op_type smt_ctx curr_type src in
-      let dest_type = Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type in
-      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
-      let next_type, dest_constraint = set_dest_op_type smt_ctx curr_type dest dest_type in
-      { next_type with local_var_map = new_local_var }, src_constraint @ dest_constraint *)
     | UInst (uop, dest, src) ->
       let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
       let dest_type = 
         begin match uop with
-        | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type
+        (* | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type *)
+        | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type
         | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type
         | _ -> Entry.exe_uop_inst uop src_type
         end 
       in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
-      let next_type = add_constraints next_type (src_constraint @ dest_constraint) in
+      let ldst_bind_constraint = Isa.get_ld_st_related_taint_constraint dest src in
+      let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
+    | TInst (top, dest, src_list) ->
+      let curr_type, src_op_type_list =
+        List.fold_left_map (
+          fun (curr_type: t) (src: Isa.operand) ->
+            let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
+            add_constraints curr_type src_constraint,
+            (src_type, src)
+        ) curr_type src_list
+      in
+      let src_type_list, src_list = List.split src_op_type_list in
+      let dest_type = Entry.exe_top_inst top src_type_list in
+      let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
+      let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest dest_type in
+      let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) src_list in
+      let next_type = add_constraints next_type (dest_constraint @ ldst_bind_constraint) in
+      { next_type with local_var_map = new_local_var },
+      TInst (top, dest, src_list)
+    | RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno)) ->
+      let rcx_type = get_reg_type curr_type RCX in
+      let src_addr_type = get_reg_type curr_type RSI in
+      let dest_addr_type = get_reg_type curr_type RDI in
+      let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
+      let src_type, src_constraint, src_useful, src_slot_anno = 
+        get_ld_op_type smt_ctx prop_mode sub_sol_func curr_type src_addr_type size_type src_slot_anno 
+      in
+      let ld_op_constraint = Entry.update_ld_taint_constraint src_type src_taint_anno in
+      let new_type, st_op_constraint = Entry.update_st_taint_constraint src_type dest_taint_anno in
+      let next_type, dest_constraint, dest_useful, dest_slot_anno =
+        set_st_op_type smt_ctx prop_mode sub_sol_func curr_type dest_addr_type size_type dest_slot_anno new_type
+      in
+      let next_type = add_constraints next_type (src_constraint @ ld_op_constraint @ dest_constraint @ st_op_constraint) in
+      { next_type with
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful |> SingleExp.SingleVarSet.union dest_useful },
+      RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno))
+    | RepLods (size, (src_slot_anno, src_taint_anno)) ->
+      let rcx_type = get_reg_type curr_type RCX in
+      let src_addr_type = get_reg_type curr_type RSI in
+      let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
+      let src_type, src_constraint, src_useful, src_slot_anno = 
+        get_ld_op_type smt_ctx prop_mode sub_sol_func curr_type src_addr_type size_type src_slot_anno 
+      in
+      let ld_op_constraint = Entry.update_ld_taint_constraint src_type src_taint_anno in
+      let new_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) src_type in
+      let next_type = set_reg_type curr_type RAX new_type in
+      let next_type = add_constraints next_type (src_constraint @ ld_op_constraint) in
+      { next_type with
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful },
+      RepLods (size, (src_slot_anno, src_taint_anno))
+    | RepStos (size, (dest_slot_anno, dest_taint_anno)) ->
+      let rcx_type = get_reg_type curr_type RCX in
+      let dest_addr_type = get_reg_type curr_type RDI in
+      let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
+      Printf.printf "RepStos rcx %s rdi %s size %s\n" (Entry.to_string rcx_type) (Entry.to_string dest_addr_type) (Entry.to_string size_type);
+      let src_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) (get_reg_type curr_type RAX) in
+      let new_type, st_op_constraint = Entry.update_st_taint_constraint src_type dest_taint_anno in
+      let next_type, dest_constraint, dest_useful, dest_slot_anno =
+        set_st_op_type smt_ctx prop_mode sub_sol_func curr_type dest_addr_type size_type dest_slot_anno new_type
+      in
+      let next_type = add_constraints next_type (dest_constraint @ st_op_constraint) in
+      { next_type with
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union dest_useful },
+      RepStos (size, (dest_slot_anno, dest_taint_anno))
     | Xchg (dest0, dest1, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
       let next_type, dest0_constraint, dest0 = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dest0 src1_type in
       let next_type, dest1_constraint, dest1 = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type dest1 src0_type in
-      add_constraints next_type (src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint),
+      let ldst_bind_constraint =
+        (Isa.get_ld_st_related_taint_constraint dest0 src0) @ (Isa.get_ld_st_related_taint_constraint dest1 src1)
+      in
+      add_constraints next_type (src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint @ ldst_bind_constraint),
       Xchg (dest0, dest1, src0, src1)
       (* next_type, 
       src0_constraint @ src1_constraint @ dest0_constraint @ dest1_constraint *)
@@ -565,7 +682,7 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src1 in
-      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst Isa.And src0_type src1_type) in
+      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type) in
       let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
       { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
@@ -576,7 +693,7 @@ module ArchType (Entry: EntryType) = struct
       let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
-          (Entry.exe_bop_inst Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+          (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
       let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
       let src_type, curr_type, src_constraint, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
@@ -597,7 +714,7 @@ module ArchType (Entry: EntryType) = struct
       let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
-          (Entry.exe_bop_inst Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
+          (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
       let next_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type (Isa.RegOp Isa.RSP) new_rsp_type in
       begin match new_ld_op with
@@ -608,7 +725,7 @@ module ArchType (Entry: EntryType) = struct
       end
       (* next_type, src_constraint @ dest_constraint *)
     | Nop | Syscall | Hlt -> curr_type, inst
-    | _ -> arch_type_error "inst not implemented"
+    | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
 
   let add_block_subtype
       (label: Isa.label)
@@ -666,14 +783,16 @@ module ArchType (Entry: EntryType) = struct
       t * (block_subtype_t list) =
     let _ = smt_ctx in
     match inst with
-    | Jmp label ->
+    | Jmp (label, _) ->
       (* 1. Add curr_type to target block's subtype *)
       let block_subtype = (add_block_subtype label curr_type block_subtype) in
       (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)
       let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
       curr_type, block_subtype
-    | Jcond (cond, label) ->
-      (* TODO: Add constraint: branch cond is untainted!!! *)
+    | Jcond (cond, label, _) ->
+      (* Add constraint: branch cond is untainted!!! *)
+      let cond_l, cond_r = curr_type.flag in
+      let cond_untaint_constraint = (Entry.get_untaint_constraint cond_l) @ (Entry.get_untaint_constraint cond_r) in
       let taken_type, not_taken_type, not_taken_cond = 
         update_branch_hist_get_not_taken_cond smt_ctx cond curr_type 
       in
@@ -688,12 +807,13 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp l_flag))
           (SingleExp.get_vars (Entry.get_single_exp r_flag))
       in
+      let not_taken_type = add_constraints not_taken_type cond_untaint_constraint in
       {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var}, block_subtype
     | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
 
   let type_prop_call
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (target_func_name: Isa.label)
@@ -701,15 +821,16 @@ module ArchType (Entry: EntryType) = struct
     Printf.printf "type_prop_call %s\n" target_func_name;
     (* Entry.pp_local_var 0 curr_type.local_var_map;
     pp_arch_type 0 curr_type; *)
-    let sub_sol_func' (e: SingleExp.t) : MemOffset.t option =
-      match sub_sol_func (e, curr_type.pc) with
-      | Some r -> RangeExp.to_mem_offset2 r
-      | None -> None
-    in
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
-      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, taint_var_map =
-        FuncInterface.func_call smt_ctx sub_sol_func' func_interface
+      let check_callee_context =
+        begin match curr_type.prop_mode with
+        | TypeInferDep | TypeCheck -> true
+        | _ -> false
+        end
+      in
+      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, var_map =
+        FuncInterface.func_call smt_ctx check_callee_context sub_sol_func func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
       in
       let call_anno = (
@@ -718,9 +839,9 @@ module ArchType (Entry: EntryType) = struct
           CallAnno.get_call_anno 
             (List.map Entry.get_single_taint_exp curr_type.reg_type)
             call_slot_info
-            (Entry.get_single_local_var_map curr_type.local_var_map)
-            (fun (x: SingleExp.t) -> sub_sol_func (x, curr_type.pc))
-            taint_var_map
+            (Entry.get_single_var_map var_map)
+            (Entry.get_taint_var_map var_map)
+            sub_sol_func
             func_interface.base_info
         | _ -> orig_call_anno
       ) in
@@ -746,6 +867,16 @@ module ArchType (Entry: EntryType) = struct
     (* Update pc here!!! *)
     (* Printf.printf "Prop inst %d %s\n" curr_type.pc (Isa.string_of_instruction inst); *)
     (* let unknown_before = List.length (Constraint.get_unknown curr_type.constraint_list) in *)
+    let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
+      (* Only return None if no solution is found. If cannot convert to mem offset, use [e, e]. *)
+      match sub_sol_func (e, curr_type.pc) with
+      | Some r -> (* RangeExp.to_mem_offset2 r *)
+        begin match RangeExp.to_mem_offset2 r with
+        | Some off -> Some off
+        | None -> Some (e, e)
+        end
+      | None -> None
+    in
     let (next_type, block_subtype), inst = 
       match inst with
       | Jmp _ | Jcond _ ->
@@ -891,12 +1022,14 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (func_name: Isa.label)
       (func_type: t list)
+      (context: SingleContext.t list)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
 
-    Z3.Solver.push (snd smt_ctx);
-    MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type;
+    SmtEmitter.push smt_ctx;
+    (* MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type; *)
+    SingleContext.add_assertions smt_ctx context;
 
     (* let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
       let r = 
@@ -912,13 +1045,48 @@ module ArchType (Entry: EntryType) = struct
       func_name = func_name;
       in_reg = in_state.reg_type;
       in_mem = in_mem;
-      context = [];
+      context = context;
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
       out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type);
       base_info = find_all_base_info in_state.reg_type in_mem;
     }
     in
-    Z3.Solver.pop (snd smt_ctx) 1;
+    SmtEmitter.pop smt_ctx 1;
     res
+
+  let get_branch_target_type
+      (block_subtype_list: block_subtype_t list)
+      (branch_block_label: Isa.label)
+      (branch_block_idx: int)
+      (branch_target_label: Isa.label) :
+      t * t =
+    let find_result =
+      List.fold_left (
+        fun (acc: int option * block_subtype_t option) (entry: block_subtype_t) ->
+          let acc_pc, acc_block = acc in
+          let block, _ = entry in
+          (
+            match acc_pc with
+            | Some _ -> acc_pc
+            | None ->
+              if block.label = branch_block_label then Some (block.pc + branch_block_idx)
+              else acc_pc
+          ), (
+            match acc_block with
+            | Some _ -> acc_block
+            | None ->
+              if block.label = branch_target_label then Some entry
+              else acc_block
+          )
+      ) (None, None) block_subtype_list
+    in
+    match find_result with
+    | Some branch_pc, Some (target_block, target_sub_list) ->
+      List.find (fun (x: t) -> x.pc = branch_pc) target_sub_list, target_block
+    | _ -> 
+      arch_type_error (
+        Printf.sprintf "cannot find block for branch at block %s (idx: %d) to target block %s" 
+          branch_block_label branch_block_idx branch_target_label
+      )
 
 end

@@ -1,9 +1,8 @@
 open Isa_basic
 open Single_exp
-open Taint_exp
 open Entry_type
 open Mem_offset_new
-open Cond_type_new
+open Single_context
 open Constraint
 open Reg_type_new
 open Mem_type_new
@@ -21,13 +20,13 @@ module FuncInterface (Entry: EntryType) = struct
 
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
-  module CondType = CondType (Entry)
+  (* module CondType = CondType (Entry) *)
 
   type t = {
     func_name: IsaBasic.label;
     in_reg: RegType.t;
     in_mem: MemType.t;
-    context: CondType.t list;
+    context: SingleContext.t list;
     out_reg: RegType.t;
     out_mem: MemType.t;
     base_info: CallAnno.base_info MemType.mem_content;
@@ -39,6 +38,12 @@ module FuncInterface (Entry: EntryType) = struct
     let channel = open_out filename in
     Sexp.output_hum channel (sexp_of_list sexp_of_t interface_list)
 
+  let interface_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    let s_exp = Sexp.input_sexp channel in
+    list_of_sexp t_of_sexp s_exp
+
   let pp_func_interface (lvl: int) (interface: t) =
     Printf.printf "\n";
     PP.print_lvl lvl "Func interface of func %s\n" interface.func_name;
@@ -46,7 +51,8 @@ module FuncInterface (Entry: EntryType) = struct
     RegType.pp_reg_type 0 interface.in_reg;
     MemType.pp_mem_type 0 interface.in_mem;
     PP.print_lvl lvl "Context\n";
-    CondType.pp_cond_list 0 interface.context;
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    (* SingleContext.pp_cond_list 0 interface.context; *)
     PP.print_lvl lvl "Output\n";
     RegType.pp_reg_type 0 interface.out_reg;
     MemType.pp_mem_type 0 interface.out_mem;
@@ -60,7 +66,9 @@ module FuncInterface (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "in_mem =\n";
     MemType.pp_ocaml_mem_type (lvl + 2) buf interface.in_mem;
     PP.bprint_lvl (lvl + 1) buf "context =\n";
-    CondType.pp_ocaml_cond_list (lvl + 2) buf interface.context;
+    (* Note that this function is deprecated, so I didn't support print the correct context here. *)
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    (* SingleCondType.pp_ocaml_cond_list (lvl + 2) buf interface.context; *)
     PP.bprint_lvl (lvl + 1) buf "out_reg =\n";
     RegType.pp_ocaml_reg_type (lvl + 2) buf interface.out_reg;
     PP.bprint_lvl (lvl + 1) buf "out_mem =\n";
@@ -369,16 +377,18 @@ module FuncInterface (Entry: EntryType) = struct
 
   let func_call_helper
       (smt_ctx: SmtEmitter.t)
+      (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (child_mem: MemType.t)
+      (child_context: SingleContext.t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
       CallAnno.slot_info MemType.mem_content option *
-      TaintExp.local_var_map_t option =
+      Entry.local_var_map_t =
     let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -414,13 +424,48 @@ module FuncInterface (Entry: EntryType) = struct
       *)
 
     (* TODO: Check context!!! *)
+
+    let check_context_helper () : Constraint.t =
+      (* TODO: Fix this!!! *)
+      let p_context, unknown_context =
+        List.partition_map (
+          fun (x: SingleContext.t) ->
+            if SingleContext.is_val (SingleExp.is_val single_var_set) x then
+              let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map x)) x in
+              match SingleContext.try_sub_sol sub_sol_func orig_cond with
+              | Some simp_cond -> Left (orig_cond, simp_cond)
+              | None -> Right None (* Sol for single var in this cond is not resolved *)
+            else
+              (* Context map to parent var is not resolved *)
+              Right None
+        ) child_context
+      in
+      if List.is_empty unknown_context then begin
+        (* We do not do quick check to avoid missing overflow constraints, but this might be slow!!! *)
+        SmtEmitter.push smt_ctx;
+        let check_result = SingleContext.sub_check_or_filter false smt_ctx p_context in
+        SmtEmitter.pop smt_ctx 1;
+        match check_result with
+        (* Note simp_context is simplified with solution, 
+          but to be used for check_or_assert, we need to filter out cond that is_val. *)
+        | Left simp_context ->
+          (Constraint.CalleeContext simp_context)
+        | Right unsat_cond ->
+          func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (Sexplib.Sexp.to_string (SingleContext.sexp_of_t unsat_cond)))
+        end else
+        Constraint.CalleeUnknownContext
+    in
+
+    let constraint_list = if check_context then (check_context_helper ()) :: constraint_list else constraint_list in
+
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
     get_slot_map_info mem_read_hint child_mem,
-    Entry.get_taint_var_map var_map
+    var_map
 
   let func_call
       (smt_ctx: SmtEmitter.t)
+      (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (func_interface: t)
       (global_var_set: SingleExp.SingleVarSet.t)
@@ -429,13 +474,14 @@ module FuncInterface (Entry: EntryType) = struct
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t *
       CallAnno.slot_info MemType.mem_content option *
-      TaintExp.local_var_map_t option =
+      Entry.local_var_map_t =
     (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)
       (* TODO: Check context!!! *)
-    func_call_helper smt_ctx sub_sol_func global_var_set (Entry.get_single_local_var_map local_var_map) 
+    func_call_helper smt_ctx check_context sub_sol_func global_var_set (Entry.get_single_var_map local_var_map) 
       func_interface.in_reg func_interface.in_mem
+      func_interface.context
       func_interface.out_reg func_interface.out_mem
       reg_type mem_type
 

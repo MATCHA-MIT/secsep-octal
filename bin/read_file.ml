@@ -8,17 +8,5 @@ let read_file (filename: string) : string =
     close_in_noerr channel;
     raise e
 
-let get_single_infer_filename (s: string) : string =
-  Printf.sprintf "./out/%s.single_infer" s
-
-let get_range_infer_filename (s: string) : string =
-  Printf.sprintf "./out/%s.range_infer" s
-
-let get_taint_infer_filename (s: string) : string =
-  Printf.sprintf "./out/%s.taint_infer" s
-
-let get_interface_list_filename (s: string) : string =
-  Printf.sprintf "./out/%s.interface" s
-
-let get_parsed_program_filename (s: string) : string =
-  Printf.sprintf "./out/%s.prog" s
+let get_related_filename (prog_name: string) (out_dir: string) (suffix: string) : string =
+  Printf.sprintf "./%s/%s.%s" out_dir prog_name suffix

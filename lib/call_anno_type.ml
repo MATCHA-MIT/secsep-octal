@@ -1,7 +1,6 @@
 open Isa_basic
 open Reg_type_new
 open Single_exp
-open Range_exp
 open Taint_exp
 open Single_entry_type
 open Taint_entry_type
@@ -12,7 +11,7 @@ open Sexplib.Std
 module CallAnno = struct
 
   exception CallAnnoError of string
-  let transform_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
+  let call_anno_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
 
   module TaintEntryType = TaintEntryType(SingleEntryType)
   module TaintRegType = RegType(TaintEntryType)
@@ -35,6 +34,7 @@ module CallAnno = struct
   type t' = {
     pr_reg: TaintRegType.t;
     ch_mem: slot_t MemTypeBasic.mem_content;
+    single_var_map: SingleExp.local_var_map_t;
     taint_var_map: TaintExp.local_var_map_t;
   }
   [@@deriving sexp]
@@ -71,24 +71,27 @@ module CallAnno = struct
   let get_call_anno
       (pr_reg: TaintRegType.t) 
       (call_mem_read_hint_option: slot_info MemTypeBasic.mem_content option)
-      (single_local_map: SingleExp.local_var_map_t)
-      (sub_sol_func: SingleExp.t -> RangeExp.t option)
+      (single_map: SingleExp.local_var_map_t)
       (taint_map_option: TaintExp.local_var_map_t option)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (base_info: base_info MemTypeBasic.mem_content) : t =
     (* CallAnno is responsible for replacing local variables & applying solutions for SE in reg types *)
     let pr_reg = List.map (fun (se, te) ->
-      let se = SingleExp.repl_local_var single_local_map se in
+      let se = SingleExp.repl_local_var single_map se in
       match sub_sol_func se with
-      | Some (Single se') -> (se', te)
+      | Some (se_l, se_r) ->
+        if SingleExp.cmp se_l se_r = 0 then (se_l, te) (* expecting result of to_mem_offset2 to be Single e *)
+        else (se, te)
       | _ -> (se, te)
     ) pr_reg in
     match call_mem_read_hint_option, taint_map_option with
     | None, _ | _, None -> None
-    | Some call_mem_read_hint, Some taint_var_map ->
+    | Some call_mem_read_hint, Some taint_map ->
       Some {
         pr_reg = pr_reg;
         ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
-        taint_var_map = taint_var_map;
+        single_var_map = single_map;
+        taint_var_map = taint_map;
       }
 
   let update_taint (update_taint: TaintExp.t -> TaintExp.t) (anno: t) : t =
@@ -108,5 +111,7 @@ module CallAnno = struct
         pr_reg = List.map update_taint_entry anno'.pr_reg;
         taint_var_map = List.map update_taint_map anno'.taint_var_map;
       }
+
+  (* TODO: We also need to update single var map!!! *)
 
 end

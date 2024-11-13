@@ -2,7 +2,9 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
+open Branch_anno_type
 open Call_anno_type
+open Constraint
 open Sexplib.Std
 
 module Isa (MemAnno: MemAnnoType) = struct
@@ -92,6 +94,19 @@ module Isa (MemAnno: MemAnnoType) = struct
     | LabelOp l1, LabelOp l2 -> l1 = l2
     | _ -> false
 
+  let get_ld_st_related_taint_constraint
+      (op1: operand) (op2: operand) : Constraint.t list =
+    match op1, op2 with
+    | LdOp (d1, b1, i1, s1, size1, anno1), StOp (d2, b2, i2, s2, size2, anno2)
+    | StOp (d2, b2, i2, s2, size2, anno2), LdOp (d1, b1, i1, s1, size1, anno1) ->
+      if d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2 then
+        begin match MemAnno.get_taint anno1, MemAnno.get_taint anno2 with
+        | Some t1, Some t2 -> [ TaintSub (t1, t2); TaintSub (t2, t1) ]
+        | _ -> []
+        end
+      else []
+    | _ -> []
+
   let is_ld_st_related (ld_op: operand) (st_op: operand) : bool = (* true if both operand operates on the same address *)
     match ld_op, st_op with
     | LdOp (d1, b1, i1, s1, size1, _), StOp(d2, b2, i2, s2, size2, _) ->
@@ -101,7 +116,9 @@ module Isa (MemAnno: MemAnnoType) = struct
   let get_reg_op_size (op_list: operand list) : int64 option =
     let helper (acc: int64 option) (op: operand) : int64 option =
       match op, acc with
-      | RegOp _, Some size -> Some size (* Note: this result should not be used when operand size does not match!!! *)
+      | RegOp r, Some size ->
+        if is_xmm r then Some size else Some (get_reg_size r)
+        (* Note: the following note might be staled Note: this result should not be used when operand size does not match!!! *)
         (* if get_reg_size r = size then acc else isa_error "reg size does not match" *)
       | RegOp r, None -> Some (get_reg_size r)
       | _, _ -> acc
@@ -115,15 +132,17 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Lea of operand * operand *)
     | BInst of bop * operand * operand * operand
     | UInst of uop * operand * operand
+    | TInst of top * operand * (operand list)
     | Xchg of operand * operand * operand * operand
     | Cmp of operand * operand
     | Test of operand * operand
     | Push of operand * MemAnno.t
     | Pop of operand * MemAnno.t
-    | RepStosq
-    | RepMovsq
-    | Jmp of label
-    | Jcond of branch_cond * label
+    | RepMovs of (int64 * MemAnno.t * MemAnno.t)
+    | RepLods of (int64 * MemAnno.t)
+    | RepStos of (int64 * MemAnno.t)
+    | Jmp of label * BranchAnno.t
+    | Jcond of branch_cond * label * BranchAnno.t
     | Call of label * CallAnno.t
     | Nop
     | Syscall
@@ -157,6 +176,11 @@ module Isa (MemAnno: MemAnnoType) = struct
   }
   [@@deriving sexp]
 
+  let prog_to_file (filename: string) (p: prog) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_prog p)
+
   let get_func (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
 
@@ -181,15 +205,21 @@ module Isa (MemAnno: MemAnnoType) = struct
       | Some s -> s
       | None -> isa_error "cannot find opcode for a uop"
       end
+    | TInst (top, _, _) ->
+      begin match opcode_of_tinst top with
+      | Some s -> s
+      | None -> isa_error "cannot find opcode for a top"
+      end
     | Cmp _ -> "cmp"
     | Test _ -> "test"
     | Push _ -> "push"
     | Pop _ -> "pop"
     | Xchg _ -> "xchg"
-    | RepStosq -> "rep stosq"
-    | RepMovsq -> "rep movsq"
+    | RepMovs _ -> "rep movs"
+    | RepLods _ -> "rep lods"
+    | RepStos _ -> "rep stos"
     | Jmp _ -> "jmp"
-    | Jcond (cond, _) ->
+    | Jcond (cond, _, _) ->
       begin match opcode_of_cond_jump cond with
       | Some s -> s
       | None -> isa_error "cannot find opcode for a cond jump"
@@ -220,6 +250,14 @@ module Isa (MemAnno: MemAnnoType) = struct
             opcode (get_tab opcode) (string_of_operand dst) (string_of_operand src)
       | None -> isa_error "cannot find opcode for a uop"
       end
+    | TInst (top, dst, src_list) ->
+      begin match opcode_of_tinst top with
+      | Some opcode ->
+        Printf.sprintf 
+            "%s%s%s\t<-\t%s" 
+            opcode (get_tab opcode) (string_of_operand dst) (String.concat ",\t" (List.map string_of_operand src_list))
+      | None -> isa_error "cannot find opcode for a top"
+      end
     | Cmp (src2, src1) ->
       Printf.sprintf "cmp\t\t%s,\t%s" (string_of_operand src2) (string_of_operand src1)
     | Test (src2, src1) ->
@@ -228,10 +266,14 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Pop (src, mem_anno) -> Printf.sprintf "pop\t\t%s # %s" (string_of_operand src) (MemAnno.to_string mem_anno)
     | Xchg (dst2, dst1, _, _) -> 
       Printf.sprintf "xchg\t%s,\t%s" (string_of_operand dst2) (string_of_operand dst1)
-    | RepStosq -> "rep stosq"
-    | RepMovsq -> "rep movsq"
-    | Jmp label -> Printf.sprintf "jmp\t\t%s" label
-    | Jcond (cond, label) ->
+    | RepMovs (size, anno1, anno2) ->
+      Printf.sprintf "rep movs(%Ld)\t # %s # %s" size (MemAnno.to_string anno1) (MemAnno.to_string anno2)
+    | RepLods (size, anno) ->
+      Printf.sprintf "rep lods(%Ld)\t # %s" size (MemAnno.to_string anno)
+    | RepStos (size, anno) ->
+      Printf.sprintf "rep stos(%Ld)\t # %s" size (MemAnno.to_string anno)
+    | Jmp (label, _) -> Printf.sprintf "jmp\t\t%s" label
+    | Jcond (cond, label, _) ->
       begin match opcode_of_cond_jump cond with
       | Some opcode -> Printf.sprintf "%s\t\t%s" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"
@@ -262,6 +304,15 @@ module Isa (MemAnno: MemAnnoType) = struct
           (ocaml_string_of_operand src)
       | None -> isa_error "cannot find opcode for a uop"
       end
+    | TInst (top, dst, src_list) ->
+      begin match ocaml_opcode_of_tinst top with
+      | Some opcode ->
+        Printf.sprintf "UInst (%s, %s, [%s])"
+          opcode
+          (ocaml_string_of_operand dst)
+          (String.concat "; " (List.map ocaml_string_of_operand src_list))
+      | None -> isa_error "cannot find opcode for a uop"
+      end
     | Cmp (src2, src1) ->
       Printf.sprintf "Cmp (%s, %s)" (ocaml_string_of_operand src2) (ocaml_string_of_operand src1)
     | Test (src2, src1) ->
@@ -276,10 +327,14 @@ module Isa (MemAnno: MemAnnoType) = struct
         (ocaml_string_of_operand dst1)
         (ocaml_string_of_operand o3)
         (ocaml_string_of_operand o4)
-    | RepStosq -> "RepStosq"
-    | RepMovsq -> "RepMovsq"
-    | Jmp label -> Printf.sprintf "Jmp \"%s\"" label
-    | Jcond (cond, label) ->
+    | RepMovs (size, anno1, anno2) ->
+      Printf.sprintf "RepMovs (%Ld, %s, %s)" size (MemAnno.to_ocaml_string anno1) (MemAnno.to_ocaml_string anno2)
+    | RepLods (size, anno) ->
+      Printf.sprintf "RepLods (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
+    | RepStos (size, anno) ->
+      Printf.sprintf "RepStos (%Ld, %s)" size (MemAnno.to_ocaml_string anno)
+    | Jmp (label, _) -> Printf.sprintf "Jmp \"%s\"" label
+    | Jcond (cond, label, _) ->
       begin match ocaml_opcode_of_cond_jump cond with
       | Some opcode -> Printf.sprintf "Jcond (%s, \"%s\")" opcode label
       | None -> isa_error "cannot find opcode for a cond jump"

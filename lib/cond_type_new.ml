@@ -98,6 +98,12 @@ module CondType (Entry: EntryTypeBasic) = struct
     ) cond_list;
     PP.bprint_lvl lvl buf "]\n"
 
+  let is_val (is_val_func: entry_t -> bool) (o: t) : bool =
+    let _, l, r = o in is_val_func l && is_val_func r
+
+  let repl (repl_func: entry_t -> entry_t) (o: t) : t =
+    let cond, l, r = o in cond, repl_func l, repl_func r
+
 end
 
 module SingleCondType = struct
@@ -144,6 +150,9 @@ include (CondType (SingleExp))
     | Be -> Z3.BitVector.mk_ule z3_ctx l r
     | Bt -> Z3.BitVector.mk_ult z3_ctx l r
 
+  let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
+    SmtEmitter.add_assertions smt_ctx (List.map (get_z3_mk smt_ctx) cond_list)
+
   let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 
     (* choose from one of two versions below *)
@@ -182,11 +191,56 @@ include (CondType (SingleExp))
     Printf.printf "<<<\n"; *)
     res
 
-  let check_trivial (cond: t) : bool option =
-    (* Use quick check *)
-    match check true (SmtEmitter.init_smt_ctx ()) [cond] with
-    | SatYes -> Some true
-    | SatNo -> Some false
-    | _ -> None
+  let check_or_assert
+      (smt_ctx: SmtEmitter.t) (cond_list: t list) : (t list) option =
+    (* If some cond in cond_list is SatNo, return None
+      If all cond in cond_list is SatYes, return Some [], no constraint is added to smt_ctx 
+      If some cond in cond_list is Unknown, assert it to be true in smt_ctx, return Some list contain it;
+      We return the list of minimal extra assertions need to add to smt_ctx to make cond_list hold *)
+    let helper (acc: (t list) option) (cond: t) : (t list) option =
+      match acc with
+      | None -> None
+      | Some acc_cond_list ->
+        begin match check true smt_ctx [cond] with
+        | SatYes -> acc
+        | SatNo -> None
+        | _ -> 
+          SmtEmitter.add_assertions smt_ctx [get_z3_mk smt_ctx cond];
+          Some (cond :: acc_cond_list)
+        end
+    in
+    List.fold_left helper (Some []) cond_list
+
+  let try_sub_sol
+      (sub_sol_func: (SingleExp.t) -> (SingleExp.t * SingleExp.t) option)
+      (cond: t) : t option =
+    let cond, l, r = cond in 
+    match sub_sol_func l, sub_sol_func r with
+    | Some (l1, l2), Some (r1, r2) ->
+      begin match cond with
+      | Eq | Ne -> if SingleExp.cmp l1 l2 = 0 && SingleExp.cmp r1 r2 = 0 then Some (cond, l1, r1) else Some (cond, l, r)
+      | Le | Lt -> Some (cond, l2, r1)
+      | Be | Bt -> Some (cond, l1, r2)
+      end
+    | _ -> None (* If no solution, then we do not try to check *)
+
+  let sub_check_or_filter
+      (is_quick: bool)
+      (smt_ctx: SmtEmitter.t) 
+      (cond_list: (t * t) list) : (t list, t) Either.t =
+    (* If cond_list might be sat, return Left (list of unknown cond)
+      else, return Right (unsat cond)*)
+    let helper (acc: (t list, t) Either.t) (cond_pair: t * t) : (t list, t) Either.t =
+      let cond, simp_cond = cond_pair in
+      match acc with
+      | Left acc_cond_list ->
+        begin match check is_quick smt_ctx [cond] with
+        | SatYes -> acc
+        | SatNo -> Right cond
+        | _ -> Left (simp_cond :: acc_cond_list)
+        end
+      | Right _ -> acc
+    in
+    List.fold_left helper (Left []) cond_list
 
 end

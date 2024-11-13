@@ -356,7 +356,7 @@ include SingleExpBasic
           single_exp_error (Printf.sprintf "add_local var conflict on var %d exp %s and %s" v (to_string e) (to_string e2)) 
       | None -> (v, e2) :: map
       end
-    | SingleTop -> map (* It is OK to replace any type with Top!!! For taint, it is OK to replace any taint with Tainted!!! *)
+    | SingleTop -> map
     | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
 
   let add_local_global_var (map: local_var_map_t) (global_var: SingleVarSet.t) : local_var_map_t =
@@ -381,10 +381,13 @@ include SingleExpBasic
       match e with
       | SingleTop | SingleConst _ -> e
       | SingleVar v ->
-        if v > 0 then (* input/block var *)
+        (* if only_repl_local && v > 0 then (* input/block var *)
            e (* Here is dirty since it will also lookup global var *)
-        else begin 
+        else  *)
+        begin (* TODO: Double check this change!!! *)
           match find_local_var_map map v with
+          | Some (SingleVar v') -> (* Prevent infinite rec call *)
+            if v = v' then SingleVar v' else repl_helper (SingleVar v')
           | Some e -> repl_helper e
           | None -> e
         end

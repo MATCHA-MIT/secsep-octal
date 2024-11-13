@@ -1,0 +1,22 @@
+((salsa20
+  (() (true) (false) () () () (false) (false) () () () () () () () () () ()
+   () () () () () ())
+  ((4 ())
+   (7
+    ((((SingleConst 0) (SingleVar 6))
+      (RangeConst (((SingleConst 0) (SingleVar 6)))) (true))))
+   (2
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) (true))))))
+ (_start
+  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  ((-2
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) (true))))
+   (-3
+    ((((SingleConst 0) (SingleConst 8))
+      (RangeConst (((SingleConst 0) (SingleConst 8)))) (true))))
+   (-4
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) (true))))
+   (4 ()))))

@@ -2,17 +2,21 @@
  (public_names 
   type 
   gen_interface 
+  parse_prog
   infer_single
   infer_range
   infer_taint
+  instantiate_taint
   prog_transform
   )
  (names 
   main 
   gen_interface 
+  parse_prog
   infer_single
   infer_range
   infer_taint
+  instantiate_taint
   prog_transform
   )
  (libraries core type))

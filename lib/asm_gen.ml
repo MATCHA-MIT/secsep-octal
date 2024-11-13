@@ -49,6 +49,10 @@ module AsmGen = struct
     | LabelOp label -> label
     | MemOp _ -> asm_gen_error "str_of_operand: MemOp not implemented/expected"
 
+  let str_of_tinst_operands (ctx: context) (_: Isa.top) (dst: Isa.operand) (oprs: Isa.operand list) : string =
+    let _, _, _ = ctx, dst, oprs in
+    asm_gen_error "str_of_tinst_operands: not implemented"
+
   let str_of_binst_operands (ctx: context) (_: Isa.bop) (dst: Isa.operand) (src2: Isa.operand) (src1: Isa.operand) : string =
     let str_of_operand' = str_of_operand ctx in
     if is_src_same_as_dst dst src1 then
@@ -79,6 +83,7 @@ module AsmGen = struct
 
     let str_operands = match inst with
 
+    | TInst (top, dst, oprs) -> str_of_tinst_operands ctx top dst oprs
     | BInst (bop, dst, src2, src1) -> str_of_binst_operands ctx bop dst src2 src1
     | UInst (uop, dst, src) -> str_of_uinst_operands ctx uop dst src
 
@@ -90,15 +95,16 @@ module AsmGen = struct
     | Syscall
     | Hlt -> ""
 
-    | Jmp label
-    | Jcond (_, label)
+    | Jmp (label, _)
+    | Jcond (_, label, _)
     | Call (label, _) -> label
 
     | Push (src, _)
     | Pop (src, _) -> str_of_operand ctx src
 
-    | RepStosq
-    | RepMovsq -> asm_gen_error "not implemented"
+    | RepMovs _
+    | RepLods _
+    | RepStos _ -> asm_gen_error "not implemented"
 
     in
 
@@ -146,8 +152,8 @@ module AsmGen = struct
     let ctx = { global_var_map = get_rev_imm_var_map prog.imm_var_map } in
 
     prog.orig_lines
-    |> Parser.preprocess_lines (Parser.line_processor true false) (* format preserved, a line must be trimmed before use *)
-    |> Parser.spliter_helper Parser.is_func_label [] []
+    |> List.concat_map (fun line -> Parser.line_processor true false line) (* format preserved, a line must be trimmed before use *)
+    |> Parser.spliter_helper (fun line -> Parser.is_func_label (String.trim line)) [] []
     |> List.map (fun (func_lines: string list) : string list ->
       Printf.printf "processing lines: %s\n" (String.concat "\n" func_lines);
       let first_line = List.hd func_lines |> String.trim in
