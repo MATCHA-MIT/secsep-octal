@@ -143,7 +143,7 @@ module Transform = struct
     List.exists is_bb_transformed func_state.bbs
 
   let get_rsp_var_from_reg_type (reg_type: RegType.t) : Isa.imm_var_id =
-    let rsp_var_id = match TaintSubtype.TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP) with
+    let rsp_var_id = match TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP) with
     | SingleVar var_id -> var_id
     | _ -> transform_error "Unexpected single expression for RSP"
     in
