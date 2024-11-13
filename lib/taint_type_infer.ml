@@ -78,6 +78,7 @@ module TaintTypeInfer = struct
         pc = block_single_type.pc;
         reg_type = new_reg_type;
         mem_type = new_mem_type;
+        context = block_single_type.context;
         flag = (TaintEntryType.get_top_untaint_type (), TaintEntryType.get_top_untaint_type ());
         branch_hist = [];
         full_not_taken_hist = [];

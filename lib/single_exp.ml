@@ -27,6 +27,7 @@ include SingleExpBasic
       | SingleXor -> "Xor"
       | SingleAnd -> "And"
       | SingleOr -> "Or"
+      | SingleMod -> "Mod"
       in
       "S-BinaryExp (" ^ op_str ^ ", " ^ (to_string l) ^ ", " ^ (to_string r) ^ ")"
     | SingleUExp (op, e) ->
@@ -50,6 +51,7 @@ include SingleExpBasic
       | SingleXor -> "SingleXor"
       | SingleAnd -> "SingleAnd"
       | SingleOr -> "SingleOr"
+      | SingleMod -> "SingleMod"
       in
       Printf.sprintf "SingleBExp (%s, %s, %s)" op_str (to_ocaml_string l) (to_ocaml_string r)
     | SingleUExp (op, e) ->
@@ -93,20 +95,26 @@ include SingleExpBasic
     | SingleSal, SingleMul -> 1
     | SingleSal, SingleSal -> 0
     | SingleSal, _ -> -1
+    | SingleSar, SingleMod
     | SingleSar, SingleOr
     | SingleSar, SingleAnd
     | SingleSar, SingleXor -> -1
     | SingleSar, SingleSar -> 0
     | SingleSar, _ -> 1
+    | SingleXor, SingleMod
     | SingleXor, SingleOr
     | SingleXor, SingleAnd -> -1
     | SingleXor, SingleXor -> 0
     | SingleXor, _ -> 1
+    | SingleAnd, SingleMod
     | SingleAnd, SingleOr -> -1
     | SingleAnd, SingleAnd -> 0
     | SingleAnd, _ -> 1
+    | SingleOr, SingleMod -> -1
     | SingleOr, SingleOr -> 0
     | SingleOr, _ -> 1
+    | SingleMod, SingleMod -> 0
+    | SingleMod, _ -> 1
 
   let cmp_single_uop (op1: single_uop) (op2: single_uop) : int =
     match op1, op2 with
@@ -324,6 +332,7 @@ include SingleExpBasic
           | SingleXor -> SingleConst (Int64.logxor v1 v2)
           | SingleAnd -> SingleConst (Int64.logand v1 v2)
           | SingleOr -> SingleConst (Int64.logor v1 v2)
+          | SingleMod -> SingleConst (Int64.rem v1 v2)
           end
         in [ [x] ]
       | _ -> [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]

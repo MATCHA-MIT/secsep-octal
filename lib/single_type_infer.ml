@@ -299,7 +299,12 @@ module SingleTypeInfer = struct
       if iter_left = 0 then
         (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
         (* NOTE: Since we do not have block subtype here, we cannot update branch anno here. We update when iter_left = 1 (see below) *)
-        { state with context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
+        { state with 
+          func_type = List.map (
+              fun (x: SingleSubtype.ArchType.t) ->
+                { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
+            ) state.func_type;
+          context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
@@ -356,6 +361,10 @@ module SingleTypeInfer = struct
           (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
           { state with 
             func = update_branch_anno block_subtype state.func;
+            func_type = List.map (
+              fun (x: SingleSubtype.ArchType.t) ->
+                { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
+            ) state.func_type;
             context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
         end else begin
           let state = if iter_left = 1 then { state with func = update_branch_anno block_subtype state.func } else state in

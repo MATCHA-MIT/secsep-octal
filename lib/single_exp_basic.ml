@@ -17,6 +17,7 @@ module SingleExpBasic = struct
     | SingleXor
     | SingleAnd
     | SingleOr
+    | SingleMod
   [@@deriving sexp]
 
   type single_uop =

@@ -2,6 +2,7 @@ open Isa_basic
 open Single_exp
 open Single_entry_type
 open Range_exp
+open Single_context
 open Arch_type
 open Smt_emitter
 open Pretty_print
@@ -38,6 +39,12 @@ module SingleSol = struct
     | SolNone -> RangeExp.to_smt_expr smt_ctx v_idx RangeExp.Top
     | SolSimple e
     | SolCond (_, e, _, _) -> RangeExp.to_smt_expr smt_ctx v_idx e
+
+  let to_context (v_idx: int) (s: t) : SingleContext.t option =
+    match s with
+    | SolNone -> None
+    | SolSimple e
+    | SolCond (_, e, _, _) -> RangeExp.to_context v_idx e
 
 end
 
@@ -377,6 +384,20 @@ module SingleSubtype = struct
         if SingleExp.SingleVarSet.mem var_idx useful_single_var then
           SmtEmitter.add_assertions smt_ctx [ to_smt_expr smt_ctx x ]
         else ()
+    ) sol
+
+  let to_context (sol: type_rel) : SingleContext.t option =
+    let var_idx, _ = sol.var_idx in
+    SingleSol.to_context var_idx sol.sol
+
+  let get_block_context
+      (sol: t) (useful_single_var: SingleExp.SingleVarSet.t) : SingleContext.t list =
+    List.filter_map (
+      fun (x: type_rel) ->
+        let var_idx, _ = x.var_idx in
+        if SingleExp.SingleVarSet.mem var_idx useful_single_var then
+          to_context x
+        else None
     ) sol
 
   let find_var_sol (tv_rel_list: t) (v: IsaBasic.imm_var_id) (v_pc: int) : RangeExp.t =

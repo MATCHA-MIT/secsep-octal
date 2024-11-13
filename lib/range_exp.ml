@@ -1,5 +1,6 @@
 open Isa_basic
 open Single_exp
+open Single_context
 open Smt_emitter
 open Sexplib.Std
 
@@ -58,6 +59,26 @@ module RangeExp = struct
       in
       Z3.Boolean.mk_or ctx eq_exp_list
     | Top -> Z3.Boolean.mk_true ctx
+
+  let to_context (v_idx: int) (r: t) : SingleContext.t option =
+    let v_exp = SingleExp.SingleVar v_idx in
+    match r with
+    | Single e -> Some (Cond (Eq, v_exp, e))
+    | Range (a, b, step) ->
+      let step = SingleExp.SingleConst step in
+      Some (And [
+        Cond (Le, a, v_exp);
+        Cond (Le, v_exp, b);
+        Cond (Eq, SingleBExp (SingleMod, SingleBExp (SingleSub, v_exp, a), step), SingleConst 0L);
+      ])
+    | SingleSet e_list ->
+      let eq_exp_list =
+        List.map (
+          fun x -> SingleContext.Cond (Eq, v_exp, x)
+        ) e_list
+      in
+      Some (Or eq_exp_list)
+    | Top -> None
 
   let find_var_sol (sol: (IsaBasic.imm_var_id * t) list) (v_idx: IsaBasic.imm_var_id) : t =
     match List.find_opt (fun (v, _) -> v = v_idx) sol with

@@ -145,6 +145,7 @@ module SmtEmitter = struct
         | SingleXor -> BitVector.mk_xor z3_ctx e1 e2
         | SingleAnd -> BitVector.mk_and z3_ctx e1 e2
         | SingleOr -> BitVector.mk_or z3_ctx e1 e2
+        | SingleMod ->BitVector.mk_smod z3_ctx e1 e2
       end
     | SingleUExp (op, se) ->
       let e = expr_of_single_exp smt_ctx se add_constr in

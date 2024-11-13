@@ -43,6 +43,7 @@ module ArchType (Entry: EntryType) = struct
     pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
+    context: SingleContext.t list;
     flag: entry_t * entry_t;
     branch_hist: (CondType.t * int) list;
     full_not_taken_hist: (CondType.t * int) list;
@@ -121,6 +122,7 @@ module ArchType (Entry: EntryType) = struct
       pc = start_pc;
       reg_type = reg_type;
       mem_type = mem_type;
+      context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
@@ -146,6 +148,7 @@ module ArchType (Entry: EntryType) = struct
       pc = start_pc;
       reg_type = reg_type;
       mem_type = mem_type;
+      context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
