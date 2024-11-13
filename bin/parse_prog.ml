@@ -13,5 +13,5 @@ let speclist = [
 let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
   let p = Parser.Parser.parse_program (read_file !input_asm_file) in
-  Parser.Parser.Isa.prog_to_file (get_output_filename !program_name "out" "s") p
+  Parser.Parser.Isa.prog_to_file (get_related_filename !program_name "out" "s") p
 

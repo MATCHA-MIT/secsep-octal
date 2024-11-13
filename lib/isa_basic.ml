@@ -29,7 +29,9 @@ module IsaBasic = struct
   [@@deriving sexp]
 
   module StrM = Map.Make(String)
+  module IntM = Map.Make(Int)
   type imm_var_map = imm_var_id StrM.t
+  type imm_var_rev_map = string IntM.t
   (* TODO: Fix this dirty implementation later!!! *)
   type list_t = (string * imm_var_id) list
   [@@deriving sexp]

@@ -860,6 +860,7 @@ module ArchType (Entry: EntryType) = struct
             call_slot_info
             (Entry.get_single_var_map var_map)
             (Entry.get_taint_var_map var_map)
+            sub_sol_func
             func_interface.base_info
         | _ -> orig_call_anno
       ) in

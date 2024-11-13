@@ -31,7 +31,7 @@ module SingleTypeInfer = struct
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
-    smt_ctx: SmtEmitter.t
+    smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
 

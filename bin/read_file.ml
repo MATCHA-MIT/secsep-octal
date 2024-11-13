@@ -8,5 +8,5 @@ let read_file (filename: string) : string =
     close_in_noerr channel;
     raise e
 
-let get_output_filename (prog_name: string) (out_dir: string) (suffix: string) : string =
+let get_related_filename (prog_name: string) (out_dir: string) (suffix: string) : string =
   Printf.sprintf "./%s/%s.%s" out_dir prog_name suffix

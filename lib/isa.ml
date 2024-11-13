@@ -28,6 +28,12 @@ module Isa (MemAnno: MemAnnoType) = struct
     let (disp, base, index, scale) = op in
     MemOp (disp, base, index, scale)
 
+  let extract_memop_of_ldst (op: operand) =
+    match op with
+    | LdOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
+    | StOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
+    | _ -> op
+
   let rec string_of_operand (op: operand): string =
     match op with
     | ImmOp imm -> string_of_immediate imm
@@ -146,6 +152,8 @@ module Isa (MemAnno: MemAnnoType) = struct
   type basic_block = {
     label: label;
     insts: instruction list;
+    mnemonics: string list; (* same length as insts *)
+    orig_asm: string option list; (* same length as insts, None if the instruction is added for auxilary purpose, like jmp at the end of BB *)
   }
   [@@deriving sexp]
 
@@ -158,6 +166,7 @@ module Isa (MemAnno: MemAnnoType) = struct
   type prog = {
     funcs: func list;
     imm_var_map: imm_var_map;
+    orig_lines: string list;
   }
   [@@deriving sexp]
 
@@ -433,7 +442,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm))
 
   let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg != (0L, 8L) then
+    if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
     let d, b, i, s = mem_op in
@@ -441,7 +450,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
 
   let make_inst_ld_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg != (0L, 8L) then
+    if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
     let d, b, i, s = mem_op in

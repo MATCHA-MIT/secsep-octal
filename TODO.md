@@ -25,3 +25,10 @@ rorq	$14, %rcx
 rolq	$23, %rax
 ```
 
+# Transformation Taint Var Instantiation
+
+Where is taint expression used?
+
+* In memory operands and push/pop -> program
+* Inspecting child's `in_mem` in its interface -> child's FI
+* Caller's `rsp` upon call -> `CallAnno/pr_reg`

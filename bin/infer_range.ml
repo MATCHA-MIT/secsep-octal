@@ -11,7 +11,7 @@ let speclist = [
 let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
   let single_infer_result = 
-    Single_type_infer.SingleTypeInfer.state_list_from_file (get_output_filename !program_name "out" "single_infer") 
+    Single_type_infer.SingleTypeInfer.state_list_from_file (get_related_filename !program_name "out" "single_infer") 
   in
   let general_interface_list = 
     Func_interface.FuncInterfaceConverter.TaintFuncInterface.interface_list_from_file "./interface/general_func_interface.func_interface" 
@@ -19,4 +19,4 @@ let () =
   let range_infer_result =
     Range_type_infer.RangeTypeInfer.infer single_infer_result general_interface_list
   in
-  Range_type_infer.RangeTypeInfer.state_list_to_file (get_output_filename !program_name "out" "range_infer") range_infer_result
+  Range_type_infer.RangeTypeInfer.state_list_to_file (get_related_filename !program_name "out" "range_infer") range_infer_result
