@@ -104,9 +104,10 @@ include SingleExp
 
   let add_context_map
       (is_mem: bool)
+      (simp_func: SingleExp.t -> SingleExp.t)
       (m: local_var_map_t) (e1: t) (e2: t) :
       local_var_map_t =
     let _ = is_mem in
-    add_local_var m e1 e2
+    add_local_var_simp simp_func m e1 e2
 
 end

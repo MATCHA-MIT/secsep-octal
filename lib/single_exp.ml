@@ -368,6 +368,20 @@ include SingleExpBasic
     | SingleTop -> map
     | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
 
+  let add_local_var_simp (simp_func: t -> t) (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
+    match e1 with
+    | SingleVar v -> 
+      let e2 = simp_func e2 in
+      begin match List.find_opt (fun (idx, _) -> idx = v) map with
+      | Some (_, e) -> 
+        if cmp e e2 = 0 then map 
+        else 
+          single_exp_error (Printf.sprintf "add_context_map conflict on var %d exp %s and %s" v (to_string e) (to_string e2)) 
+      | None -> (v, e2) :: map
+      end
+    | SingleTop -> map
+    | _ -> single_exp_error (Printf.sprintf "add_context_map cannot add %s->%s" (to_string e1) (to_string e2))
+
   let add_local_global_var (map: local_var_map_t) (global_var: SingleVarSet.t) : local_var_map_t =
     List.fold_left (
       fun acc var -> 

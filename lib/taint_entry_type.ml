@@ -193,13 +193,15 @@ module TaintBaseEntryType (Entry: EntryType) = struct
 
   let add_context_map
       (is_mem: bool)
+      (simp_func: SingleExp.t -> SingleExp.t)
       (map: local_var_map_t) (e1: t) (e2: t) :
       local_var_map_t =
     let single_map, taint_map = map in
     let s1, t1 = e1 in
     let s2, t2 = e2 in
-    Entry.add_context_map is_mem single_map s1 s2,
+    Entry.add_context_map is_mem simp_func single_map s1 s2,
     TaintExp.add_context_map is_mem taint_map t1 t2
+  
   let repl_local_var (map: local_var_map_t) (e: t) : t =
     let single_map, taint_map = map in
     let single, taint = e in

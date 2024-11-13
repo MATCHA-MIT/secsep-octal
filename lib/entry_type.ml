@@ -62,7 +62,7 @@ module type EntryType = sig
   val pp_local_var: int -> local_var_map_t -> unit
 
   (* This is used to build var map and var constraints when connecting two context *)
-  val add_context_map: bool (* is_mem *) -> local_var_map_t -> t -> t -> local_var_map_t
+  val add_context_map: bool (* is_mem *) -> (SingleExp.t -> SingleExp.t) (* simpl func*) -> local_var_map_t -> t -> t -> local_var_map_t
 
   (* eliminate all local variables*)
   val repl_local_var: local_var_map_t -> t -> t

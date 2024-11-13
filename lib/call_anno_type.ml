@@ -75,7 +75,7 @@ module CallAnno = struct
       (base_info: base_info MemTypeBasic.mem_content) : t =
     (* CallAnno is responsible for replacing local variables & applying solutions for SE in reg types *)
     let pr_reg = List.map (fun (se, te) ->
-      let se = SingleExp.repl_local_var single_map se in
+      (* let se = SingleExp.repl_local_var single_map se in *)
       match sub_sol_func se with
       | Some (se_l, se_r) ->
         if SingleExp.cmp se_l se_r = 0 then (se_l, te) (* expecting result of to_mem_offset2 to be Single e *)

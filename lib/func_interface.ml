@@ -76,13 +76,14 @@ module FuncInterface (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "out_mem =\n";
     MemType.pp_ocaml_mem_type (lvl + 2) buf interface.out_mem
 
-  let add_reg_var_map 
+  let add_reg_var_map
+      (simp_local_var: SingleExp.t -> SingleExp.t)
       (child_reg: RegType.t) (parent_reg: RegType.t) : 
       SingleExp.local_var_map_t * Entry.local_var_map_t =
     let child_single_reg = List.map Entry.get_single_exp child_reg in
     let parent_single_reg = List.map Entry.get_single_exp parent_reg in
-    List.fold_left2 SingleExp.add_local_var [] child_single_reg parent_single_reg,
-    List.fold_left2 (Entry.add_context_map false) Entry.get_empty_var_map child_reg parent_reg
+    List.fold_left2 (SingleExp.add_local_var_simp simp_local_var) [] child_single_reg parent_single_reg,
+    List.fold_left2 (Entry.add_context_map false simp_local_var) Entry.get_empty_var_map child_reg parent_reg
 
   type var_map_set_t = SingleExp.local_var_map_t * SingleExp.SingleVarSet.t * Entry.local_var_map_t
   [@@deriving sexp]
@@ -96,7 +97,9 @@ module FuncInterface (Entry: EntryType) = struct
   let add_mem_var_map
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
-      (local_var_map: SingleExp.local_var_map_t) 
+      (simp_local_var: SingleExp.t -> SingleExp.t)
+      (* Simp local var of the parent context, not changed, so keep it as a separate parameter *)
+      (* (local_var_map: SingleExp.local_var_map_t)  *)
       (* local var map of the parent context, not changed, so keep it as a separate parameter *)
       (var_map_set: var_map_set_t)
       (* single_var_map * single_var_set * var_map : 
@@ -113,8 +116,8 @@ module FuncInterface (Entry: EntryType) = struct
       match entry with
       | Untrans (c_off, c_range, c_entry) ->
         if MemOffset.is_val single_var_set c_off && MemRange.is_val single_var_set c_range then
-          let orig_m_off = MemOffset.repl_local_var local_var_map (MemOffset.repl_context_var single_var_map c_off) in
-          let m_range = MemRange.repl_local_var local_var_map (MemRange.repl_context_var single_var_map c_range) in
+          let orig_m_off = MemOffset.repl_context_var single_var_map c_off in
+          let m_range = MemRange.repl_context_var single_var_map c_range in
           (* Update useful vars as long as addr can be represented by parent vars *)
           let useful_vars = SingleExp.SingleVarSet.union (MemOffset.get_vars orig_m_off) (MemRange.get_vars m_range) in
           let acc_useful = SingleExp.SingleVarSet.union acc_useful useful_vars in
@@ -127,9 +130,9 @@ module FuncInterface (Entry: EntryType) = struct
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
               ( (* acc *)
-                (SingleExp.add_local_var single_var_map c_exp p_exp,
+                (SingleExp.add_local_var_simp simp_local_var single_var_map c_exp p_exp,
                 SingleExp.SingleVarSet.union single_var_set (SingleExp.get_vars c_exp),
-                (Entry.add_context_map true) var_map c_entry p_entry),
+                (Entry.add_context_map true simp_local_var) var_map c_entry p_entry),
                 acc_useful
               ),
               Mapped (p_ptr, p_off, is_full, m_range, c_entry)
@@ -200,7 +203,7 @@ module FuncInterface (Entry: EntryType) = struct
 
   let set_one_entry
       (smt_ctx: SmtEmitter.t)
-      (local_var_map: SingleExp.local_var_map_t)
+      (* (local_var_map: SingleExp.local_var_map_t) *)
       (var_map_set: var_map_set_t)
       (parent_entry: MemOffset.t * MemRange.t * entry_t)
       (read_hint: bool * MemRange.t * entry_t)
@@ -213,7 +216,7 @@ module FuncInterface (Entry: EntryType) = struct
     let read_range_constraint = Constraint.gen_range_subset m_in_range p_range p_off in
     let p_range, out_range_constraint, out_range_useful_var =
       if MemRange.is_val single_var_set c_out_range then
-        let m_out_range = MemRange.repl_local_var local_var_map (MemRange.repl_context_var single_var_map c_out_range) in
+        let m_out_range = MemRange.repl_context_var single_var_map c_out_range in
         MemRange.merge smt_ctx p_range m_out_range, [], MemRange.get_vars m_out_range
       else p_range, [ Constraint.Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
     in
@@ -241,7 +244,7 @@ module FuncInterface (Entry: EntryType) = struct
 
   let set_part_mem
       (smt_ctx: SmtEmitter.t)
-      (local_var_map: SingleExp.local_var_map_t)
+      (* (local_var_map: SingleExp.local_var_map_t) *)
       (var_map_set: var_map_set_t)
       (parent_entry: (MemOffset.t * MemRange.t * entry_t) list)
       (read_hint: read_hint_t list)
@@ -266,7 +269,7 @@ module FuncInterface (Entry: EntryType) = struct
         write_entry :: write_mem_tl ->
         if MemOffset.cmp p_off mp_off = 0 then
           let new_entry, new_constraints, new_useful_vars = 
-            set_one_entry smt_ctx local_var_map var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_entry 
+            set_one_entry smt_ctx var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_entry 
           in
           helper (new_entry :: finished_parent_entry) (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) parent_entry_tl read_hint_tl write_mem_tl
         else
@@ -279,7 +282,7 @@ module FuncInterface (Entry: EntryType) = struct
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
-      (local_var_map: SingleExp.local_var_map_t)
+      (* (local_var_map: SingleExp.local_var_map_t) *)
       (var_map_set: var_map_set_t)
       (parent_mem: MemType.t)
       (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
@@ -296,7 +299,7 @@ module FuncInterface (Entry: EntryType) = struct
       let ptr2, write_mem = write_mem_entry in
       if ptr = ptr2 then
         if SingleExp.SingleVarSet.mem ptr single_var_set then
-          let p_base = SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map (SingleVar ptr)) in
+          let p_base = SingleExp.repl_context_var single_var_map (SingleVar ptr) in
           match sub_sol_func p_base with
           | Some (p_base, _) -> 
             begin match SingleExp.find_base p_base (MemType.get_ptr_set parent_mem) with
@@ -304,7 +307,7 @@ module FuncInterface (Entry: EntryType) = struct
               let find_result =
                 List.find_map (
                   fun (x, part_mem) ->
-                    if x = p_ptr then Some (set_part_mem smt_ctx local_var_map var_map_set part_mem read_hint write_mem)
+                    if x = p_ptr then Some (set_part_mem smt_ctx var_map_set part_mem read_hint write_mem)
                     else None
                 ) p_mem
               in
@@ -382,7 +385,8 @@ module FuncInterface (Entry: EntryType) = struct
       (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (global_var_set: SingleExp.SingleVarSet.t)
-      (local_var_map: SingleExp.local_var_map_t)
+      (simp_local_var: SingleExp.t -> SingleExp.t)
+      (* (local_var_map: SingleExp.local_var_map_t) *)
       (child_reg: RegType.t) (child_mem: MemType.t)
       (child_context: SingleContext.t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
@@ -391,7 +395,7 @@ module FuncInterface (Entry: EntryType) = struct
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
       CallAnno.slot_info MemType.mem_content option *
       Entry.local_var_map_t =
-    let single_var_map, var_map = add_reg_var_map child_reg parent_reg in
+    let single_var_map, var_map = add_reg_var_map simp_local_var child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
         global_var_set
@@ -400,7 +404,7 @@ module FuncInterface (Entry: EntryType) = struct
     let single_var_map = SingleExp.add_local_global_var single_var_map global_var_set in
     let var_map = Entry.add_local_global_var var_map global_var_set in
     let ((single_var_map, single_var_set, var_map), read_useful_vars), mem_read_hint =
-      add_mem_var_map smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) child_mem parent_mem
+      add_mem_var_map smt_ctx sub_sol_func simp_local_var (single_var_map, single_var_set, var_map) child_mem parent_mem
     in
     (* Printf.printf "!!! set_reg_type\n"; *)
     RegType.pp_reg_type 0 child_out_reg;
@@ -408,7 +412,7 @@ module FuncInterface (Entry: EntryType) = struct
     let reg_type = set_reg_type var_map child_out_reg in
     (* Printf.printf "!!! set_mem_type\n"; *)
     let mem_type, constraint_list, write_useful_vars = 
-      set_mem_type smt_ctx sub_sol_func local_var_map (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
+      set_mem_type smt_ctx sub_sol_func (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
 
     let constraint_list = 
       get_reg_taint_constraint var_map parent_reg child_reg @
@@ -433,7 +437,7 @@ module FuncInterface (Entry: EntryType) = struct
         List.partition_map (
           fun (x: SingleContext.t) ->
             if SingleContext.is_val (SingleExp.is_val single_var_set) x then
-              let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_local_var local_var_map (SingleExp.repl_context_var single_var_map x)) x in
+              let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_context_var single_var_map x) x in
               match SingleContext.try_sub_sol sub_sol_func orig_cond with
               | Some simp_cond -> Left (orig_cond, simp_cond)
               | None -> Right None (* Sol for single var in this cond is not resolved *)
@@ -481,7 +485,7 @@ module FuncInterface (Entry: EntryType) = struct
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)
       (* TODO: Check context!!! *)
-    func_call_helper smt_ctx check_context sub_sol_func global_var_set (Entry.get_single_var_map local_var_map) 
+    func_call_helper smt_ctx check_context sub_sol_func global_var_set (SingleExp.repl_local_var (Entry.get_single_var_map local_var_map)) 
       func_interface.in_reg func_interface.in_mem
       func_interface.context
       func_interface.out_reg func_interface.out_mem

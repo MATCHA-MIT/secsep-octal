@@ -21,7 +21,7 @@ module BranchAnno = struct
       (branch_type: SingleExp.t) (target_type: SingleExp.t) :
       SingleExp.local_var_map_t =
     if SingleExp.is_val target_useful_var target_type then
-      SingleExp.add_local_var context_var_map target_type (SingleExp.repl_local_var branch_local_var_map branch_type)
+      SingleExp.add_local_var_simp (SingleExp.repl_local_var branch_local_var_map) context_var_map target_type branch_type
     else
       SingleExp.add_local_var context_var_map target_type SingleTop
 
