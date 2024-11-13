@@ -247,6 +247,63 @@ let bench_ed25519_plain : Base_func_interface.t = [
   ]
 ]
 
+let update_reg_taint 
+    (reg_type: Taint_type_infer.TaintTypeInfer.ArchType.RegType.t) 
+    (reg_taint: (bool option) list) :
+    Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+  List.map2 (
+    fun (single, taint) (taint_opt: bool option) ->
+      match taint_opt with
+      | Some b -> single, Taint_exp.TaintExp.TaintConst b
+      | None -> single, taint
+  ) reg_type reg_taint
+
+let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t = 
+  let start_var: Taint_type_infer.TaintTypeInfer.TaintEntryType.t = (SingleVar 0, TaintVar 0) in
+  let _, default_reg_type = Taint_type_infer.TaintTypeInfer.ArchType.RegType.init_reg_type start_var in
+  let in_reg : Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+    update_reg_taint default_reg_type
+      (get_reg_taint [
+        RDI, false;
+        RSI, false;
+        RDX, false;
+        RCX, true;
+      ])
+  in
+  let out_reg = List.mapi (
+    fun (i: int) entry ->
+      if Isa_basic.IsaBasic.is_reg_idx_callee_saved i then entry
+      else Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintConst true 
+  ) in_reg
+  in
+  {
+    func_name = "memset";
+    in_reg = in_reg;
+    in_mem = [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [], 
+        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+    ];
+    context = []; (* TODO: Add mem implicit constraints here, boundary + non-overlap *)
+    out_reg = out_reg;
+    out_mem = [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+    ];
+    base_info = [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [], 
+        BaseAsReg RDI
+      ];
+    ];
+  }
+
 
 let () = 
   let open Sexplib in

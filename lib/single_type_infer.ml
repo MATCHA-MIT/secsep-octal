@@ -323,7 +323,7 @@ module SingleTypeInfer = struct
             0 state.func_type = 0
         in
 
-        let num_unknown, label_unknown_list = 
+        let num_unknown, _ (* label_unknown_list *) = 
           List.fold_left_map (
             fun (acc: int) (x: ArchType.t) -> 
               let unknown_list = Constraint.get_unknown x.constraint_list in
@@ -332,16 +332,16 @@ module SingleTypeInfer = struct
           ) 0 state.func_type 
         in
         Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
-        List.iter (
+        (* List.iter (
           fun (label, unknown_list) -> 
             Printf.printf "%s\n" label;
             MemOffset.pp_unknown_list 0 unknown_list
-        ) label_unknown_list;
+        ) label_unknown_list; *)
         
         Printf.printf "\n\n%s: Infer iter %d update_mem%!\n\n" func_name curr_iter;
         let state = update_mem state in
         Printf.printf "\n\nInfer iter %d after update_mem%!\n\n" curr_iter;
-        pp_func_type 0 state;
+        (* pp_func_type 0 state; *)
 
         (* 2.5. Check or assert func call context *)
         let callee_context_resolved, state = check_or_assert_callee_context state in
@@ -354,7 +354,7 @@ module SingleTypeInfer = struct
         SmtEmitter.pop state.smt_ctx 1;
 
         Printf.printf "After infer, single subtype%!\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        (* SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
