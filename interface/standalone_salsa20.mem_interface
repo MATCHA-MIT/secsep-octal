@@ -24,5 +24,4 @@
       (RangeConst (((SingleConst 0) (SingleConst 8)))) SingleTop)))
    (-4
     ((((SingleConst 0) (SingleConst 64))
-      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
-   (4 ((((SingleConst 0) (SingleConst 0)) (RangeConst ()) SingleTop))))))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))))

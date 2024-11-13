@@ -13,23 +13,18 @@ let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
 let standalone_salsa20 : Base_func_interface.t = [
   "salsa20_words", [
-    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
   "salsa20_block", [
-    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
   "salsa20", [
-    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
     r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
     r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
-  "_start", salsa20_global @ [
-    r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]
-  ];
+  "_start", salsa20_global;
 ]
 
 let get_reg_taint (reg_taint: (Isa_basic.IsaBasic.register * bool) list) : (bool option) list =
@@ -65,7 +60,6 @@ let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
 let demo : Base_func_interface.t = [
   "table_select", [
     -2, [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], SingleTop) ];
-    (* r RSP, [ ((SingleConst 0L, SingleConst 0L), RangeConst [], SingleTop) ]; *)
   ];
 ]
 

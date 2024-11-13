@@ -536,11 +536,12 @@ module MemType (Entry: EntryType) = struct
       (ptr: IsaBasic.imm_var_id)
       (addr_offset: MemOffset.t) : bool =
     if ptr = IsaBasic.rsp_idx then (* NOTE: this requires on function input, rsp holds ImmVar rsp_idx*)
-      let local_stack_start: SingleExp.t = SingleBExp (SingleSub, SingleVar ptr, SingleConst 8L) in
+      let local_stack_start: SingleExp.t = SingleBExp (SingleAdd, SingleVar ptr, SingleConst 8L) in
       match MemOffset.offset_cmp_helper is_quick smt_ctx addr_offset (local_stack_start, local_stack_start) CmpLeGe with
       | Le -> false
       | Ge -> true
       | _ -> 
+        SmtEmitter.pp_smt_ctx 0 smt_ctx;
         mem_type_error 
         (Printf.sprintf "is_shared_mem cannot tell whether ptr %d and mem slot %s is shared or not" 
           ptr (MemOffset.to_string addr_offset))
@@ -571,7 +572,7 @@ module MemType (Entry: EntryType) = struct
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> 
             let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
-            if is_shared_mem_full_cmp smt_ctx ptr orig_addr_off then
+            if is_shared_mem_full_cmp smt_ctx ptr off then
               (Some (ptr, off, true), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
             else
               (Some (ptr, off, true), cons), (off, range, new_val)
