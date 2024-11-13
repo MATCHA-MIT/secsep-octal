@@ -8,4 +8,4 @@ let _ =
     List.nth standalone_salsa20_single_infer_state 0;
     List.nth standalone_salsa20_single_infer_state 1;
     List.nth standalone_salsa20_single_infer_state 2;
-  ]
+  ] []

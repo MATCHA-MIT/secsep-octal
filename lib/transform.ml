@@ -1,7 +1,7 @@
 open Isa
 open Parser
 open Taint_exp
-open Taint_subtype
+open Taint_entry_type
 open Taint_type_infer
 open Mem_type_new
 open Mem_offset_new
@@ -172,7 +172,7 @@ module Transform = struct
     let first_bb_state = List.hd ti_state.func_type in
     if not (Isa.is_label_function_entry first_bb_state.label) then
       transform_error "First basic block is not function entry";
-    let rsp_var_id = match TaintSubtype.TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type first_bb_state.reg_type Isa.RSP) with
+    let rsp_var_id = match TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type first_bb_state.reg_type Isa.RSP) with
     | SingleVar var_id -> var_id
     | _ -> transform_error "Unexpected single expression for RSP"
     in

@@ -1,4 +1,3 @@
-open Single_entry_type
 open Taint_exp
 open Taint_entry_type
 open Constraint
@@ -22,7 +21,6 @@ module TaintSubtype = struct
   type t = type_rel list
   [@@deriving sexp]
 
-  module TaintEntryType = TaintEntryType (SingleEntryType)
   module ArchType = ArchType (TaintEntryType)
 
   type sub_t = TaintExp.t * TaintExp.t

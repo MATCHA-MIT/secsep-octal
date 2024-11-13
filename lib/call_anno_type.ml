@@ -2,7 +2,6 @@ open Isa_basic
 open Reg_type_new
 open Single_exp
 open Taint_exp
-open Single_entry_type
 open Taint_entry_type
 open Mem_type_new
 open Mem_offset_new
@@ -13,8 +12,7 @@ module CallAnno = struct
   exception CallAnnoError of string
   let call_anno_error msg = raise (CallAnnoError ("[Call Annotation Error] " ^ msg))
 
-  module TaintEntryType = TaintEntryType(SingleEntryType)
-  module TaintRegType = RegType(TaintEntryType)
+  module TaintRegType = RegType (TaintEntryType)
 
   (* which slot in parent's memory is this slot mapped to *)
   (* base pointer, slot's offset to base pointer, accessing full slot or not *)

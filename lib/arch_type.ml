@@ -552,6 +552,19 @@ module ArchType (Entry: EntryType) = struct
       | _ -> None),
       MemOffset.get_vars (orig_l, orig_r)
 
+  let add_offset_rsp 
+      (smt_ctx: SmtEmitter.t)
+      (sub_sol_func: SingleExp.t -> MemOffset.t option)
+      (curr_type: t) (offset: int64) : t =
+    let prop_mode = curr_type.prop_mode in
+    let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
+    let new_rsp_type = 
+      Entry.repl_local_var curr_type.local_var_map 
+        (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset))) 
+    in
+    let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
+    curr_type
+
   let add_constraints
       (curr_type: t) (new_constraints: Constraint.t list) : t =
     {
@@ -693,12 +706,13 @@ module ArchType (Entry: EntryType) = struct
       Test (src0, src1)
     | Push (src, mem_anno) ->
       let size = Isa.get_op_size src in
-      let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
+      let curr_type = add_offset_rsp smt_ctx sub_sol_func curr_type (Int64.neg size) in
+      (* let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
           (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Sub rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
-      let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
+      let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in *)
       let src_type, curr_type, src_constraint, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type src in
       let next_type, dest_constraint, new_st_op = 
         set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.StOp (None, Some Isa.RSP, None, None, size, mem_anno)) src_type 
@@ -714,12 +728,13 @@ module ArchType (Entry: EntryType) = struct
       let size = Isa.get_op_size dst in
       let src_type, curr_type, src_constraint, new_ld_op = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.LdOp (None, Some Isa.RSP, None, None, size, mem_anno)) in
       let next_type, dest_constraint, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func curr_type dst src_type in
-      let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
+      let next_type = add_offset_rsp smt_ctx sub_sol_func next_type size in
+      (* let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func curr_type (Isa.RegOp Isa.RSP) in
       let new_rsp_type = 
         Entry.repl_local_var curr_type.local_var_map 
           (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum size))) 
       in
-      let next_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type (Isa.RegOp Isa.RSP) new_rsp_type in
+      let next_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func next_type (Isa.RegOp Isa.RSP) new_rsp_type in *)
       begin match new_ld_op with
       | LdOp (_, _, _, _, _, mem_anno) ->
         add_constraints next_type (src_constraint @ dest_constraint),
@@ -832,6 +847,7 @@ module ArchType (Entry: EntryType) = struct
         | _ -> false
         end
       in
+      let curr_type = add_offset_rsp smt_ctx sub_sol_func curr_type (-8L) in
       let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, var_map =
         FuncInterface.func_call smt_ctx check_callee_context sub_sol_func func_interface
           curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
@@ -848,13 +864,17 @@ module ArchType (Entry: EntryType) = struct
         | _ -> orig_call_anno
       ) in
       let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
-      { curr_type with
-        reg_type = new_reg;
-        mem_type = new_mem;
-        flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
-        constraint_list = new_constraints @ curr_type.constraint_list;
-        useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
-      },
+      let curr_type =
+        { curr_type with
+          reg_type = new_reg;
+          mem_type = new_mem;
+          flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+          constraint_list = new_constraints @ curr_type.constraint_list;
+          useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
+        }
+      in
+      let curr_type = add_offset_rsp smt_ctx sub_sol_func curr_type 8L in
+      curr_type,
       call_anno
     | _ -> arch_type_error (Printf.sprintf "[type_prop_call] Func %s interface not resolved yet" target_func_name)
 

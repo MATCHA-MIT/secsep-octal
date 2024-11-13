@@ -1,4 +1,5 @@
 open Taint_exp
+open Taint_entry_type
 open Taint_api
 open Taint_type_infer
 open Sexplib.Std
@@ -24,7 +25,7 @@ module TaintInstantiate = struct
       TaintExp.TaintVarSet.t =
     let var_set, _ =
       List.fold_left (
-        fun (acc: TaintExp.TaintVarSet.t * int) (entry: TaintTypeInfer.TaintEntryType.t) ->
+        fun (acc: TaintExp.TaintVarSet.t * int) (entry: TaintEntryType.t) ->
           let acc_set, acc_idx = acc in
           let _, taint = entry in
           if Isa.is_reg_idx_callee_saved acc_idx then
@@ -34,7 +35,7 @@ module TaintInstantiate = struct
       ) (TaintExp.TaintVarSet.empty, 0) func_interface.in_reg
     in
     TaintTypeInfer.ArchType.MemType.fold_left (
-      fun (acc: TaintExp.TaintVarSet.t) (entry: TaintTypeInfer.TaintEntryType.t) ->
+      fun (acc: TaintExp.TaintVarSet.t) (entry: TaintEntryType.t) ->
         let _, taint = entry in
         TaintExp.TaintVarSet.union (TaintExp.get_var_set taint) acc
     ) var_set func_interface.in_mem
@@ -116,7 +117,7 @@ module TaintInstantiate = struct
       (taint_api: TaintApi.t) : call_site_map_t =
     let helper 
         (acc: TaintExp.local_var_map_t) 
-        (entry: TaintTypeInfer.TaintEntryType.t) 
+        (entry: TaintEntryType.t) 
         (instance: bool option) : TaintExp.local_var_map_t =
       let _, taint = entry in
       match taint, instance with

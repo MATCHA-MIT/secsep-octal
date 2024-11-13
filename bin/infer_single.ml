@@ -15,6 +15,10 @@ let speclist = [
 let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
   let p = Parser.Parser.parse_program (read_file !input_asm_file) in
   let interface_list = Base_func_interface.parse (read_file !input_interface_file) in
-  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p interface_list 5 10 in
+  let general_interface_list = 
+    Func_interface.FuncInterfaceConverter.TaintFuncInterface.interface_list_from_file 
+      "./interface/general_func_interface.func_interface" 
+  in
+  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p interface_list general_interface_list 5 10 in
   Single_type_infer.SingleTypeInfer.state_list_to_file (get_output_filename !program_name "out" "single_infer") single_infer_result
   (* Main functionality here *)

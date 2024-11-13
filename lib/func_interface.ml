@@ -4,6 +4,8 @@ open Entry_type
 open Mem_offset_new
 open Single_context
 open Constraint
+open Single_entry_type
+open Taint_entry_type
 open Reg_type_new
 open Mem_type_new
 open Call_anno_type
@@ -498,5 +500,28 @@ module FuncInterface (Entry: EntryType) = struct
 
   let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
     List.find_opt (fun fi -> fi.func_name = l) fi_list
+
+end
+
+module FuncInterfaceConverter = struct
+  module SingleFuncInterface = FuncInterface (SingleEntryType)
+  module TaintFuncInterface = FuncInterface (TaintEntryType)
+
+  let get_one_single_func_interface
+      (interface: TaintFuncInterface.t) : SingleFuncInterface.t =
+    let mem_map = TaintFuncInterface.MemType.map in
+    {
+      func_name = interface.func_name;
+      in_reg = List.map TaintEntryType.get_single_exp interface.in_reg;
+      in_mem = mem_map TaintEntryType.get_single_exp interface.in_mem;
+      context = interface.context;
+      out_reg = List.map TaintEntryType.get_single_exp interface.out_reg;
+      out_mem = mem_map TaintEntryType.get_single_exp interface.out_mem;
+      base_info = interface.base_info;
+    }
+
+  let get_single_func_interface
+      (interface_list: TaintFuncInterface.t list) : SingleFuncInterface.t list =
+    List.map get_one_single_func_interface interface_list
 
 end

@@ -1,9 +1,11 @@
 open Isa
 open Taint_exp
 open Single_entry_type
+open Taint_entry_type
 open Mem_offset_new
 open Single_context
 open Constraint
+open Func_interface
 open Single_subtype
 open Taint_subtype
 open Range_type_infer
@@ -20,7 +22,6 @@ module TaintTypeInfer = struct
 
   let taint_type_infer_error msg = raise (TaintTypeInferError ("[Taint Type Infer Error] " ^ msg))
 
-  module TaintEntryType = TaintSubtype.TaintEntryType
   module ArchType = TaintSubtype.ArchType
   module FuncInterface = ArchType.FuncInterface
 
@@ -227,7 +228,9 @@ module TaintTypeInfer = struct
       taint_sol = taint_sol } *)
 
   let infer 
-      (range_infer_state_list: RangeTypeInfer.t list) : (FuncInterface.t list) * (t list) =
+      (range_infer_state_list: RangeTypeInfer.t list)
+      (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list) : 
+      (FuncInterface.t list) * (t list) =
     let helper
         (acc: FuncInterface.t list) (entry: RangeTypeInfer.t) :
         (FuncInterface.t list) * t =
@@ -239,7 +242,7 @@ module TaintTypeInfer = struct
       func_interface :: acc, infer_state
     in
     (* List.fold_left_map helper [] range_infer_state_list *)
-    let func_interface_list, infer_result = List.fold_left_map helper [] range_infer_state_list in
+    let func_interface_list, infer_result = List.fold_left_map helper general_func_interface_list range_infer_state_list in
     (* Printf.printf "=========================\n";
     Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
     List.rev func_interface_list, infer_result

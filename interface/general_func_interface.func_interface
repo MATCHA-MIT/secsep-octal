@@ -1,0 +1,44 @@
+(((func_name memset)
+  (in_reg
+   (((SingleVar 0) (TaintVar 0)) ((SingleVar 1) (TaintConst true))
+    ((SingleVar 2) (TaintConst false)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    ((SingleVar 6) (TaintConst false)) ((SingleVar 7) (TaintConst false))
+    ((SingleVar 8) (TaintVar 8)) ((SingleVar 9) (TaintVar 9))
+    ((SingleVar 10) (TaintVar 10)) ((SingleVar 11) (TaintVar 11))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    ((SingleVar 16) (TaintVar 16)) ((SingleVar 17) (TaintVar 17))
+    ((SingleVar 18) (TaintVar 18)) ((SingleVar 19) (TaintVar 19))
+    ((SingleVar 20) (TaintVar 20)) ((SingleVar 21) (TaintVar 21))
+    ((SingleVar 22) (TaintVar 22)) ((SingleVar 23) (TaintVar 23))))
+  (in_mem
+   ((7
+     ((((SingleConst 0) (SingleVar 2)) (RangeConst ())
+       (SingleTop (TaintVar 24)))))))
+  (context
+   ((Or
+     ((Cond (Lt (SingleConst 8) (SingleConst 0)))
+      (Cond (Lt (SingleVar 2) (SingleConst 0)))))
+    (Cond (Lt (SingleConst 0) (SingleConst 8)))
+    (Cond (Lt (SingleConst 0) (SingleVar 2)))))
+  (out_reg
+   ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))))
+  (out_mem
+   ((7
+     ((((SingleConst 0) (SingleVar 2))
+       (RangeConst (((SingleConst 0) (SingleVar 2))))
+       (SingleTop (TaintVar 24)))))))
+  (base_info
+   ((7 ((((SingleConst 0) (SingleVar 2)) (RangeConst ()) (BaseAsReg RDI))))))))

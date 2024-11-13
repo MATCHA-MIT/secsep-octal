@@ -5,6 +5,7 @@ open Constraint
 open Single_context
 open Single_subtype
 open Range_subtype
+open Func_interface
 open Single_type_infer
 open Smt_emitter
 open Full_mem_anno
@@ -192,7 +193,8 @@ module RangeTypeInfer = struct
     { state with func_type = func_type }
     
   let infer 
-      (single_infer_state_list: SingleTypeInfer.t list) : t list =
+      (single_infer_state_list: SingleTypeInfer.t list)
+      (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list) : t list =
     let helper
         (acc: FuncInterface.t list) (entry: SingleTypeInfer.t) :
         (FuncInterface.t list) * t =
@@ -203,7 +205,8 @@ module RangeTypeInfer = struct
       (* FuncInterface.pp_func_interface 0 func_interface; *)
       func_interface :: acc, infer_state
     in
-    let _, infer_result = List.fold_left_map helper [] single_infer_state_list in
+    let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
+    let _, infer_result = List.fold_left_map helper general_func_interface_list single_infer_state_list in
     (* Printf.printf "=========================\n";
     Sexp.output_hum stdout (sexp_of_list sexp_of_t infer_result); *)
     infer_result

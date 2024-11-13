@@ -1,11 +1,12 @@
 open Isa_basic
 open Single_exp
 open Entry_type
+open Single_entry_type
 open Taint_exp
 open Constraint
 open Smt_emitter
 
-module TaintEntryType (Entry: EntryType) = struct
+module TaintBaseEntryType (Entry: EntryType) = struct
   exception TaintEntryTypeError of string
 
   let taint_entry_type_error msg = raise (TaintEntryTypeError ("[Taint Single Type Error] " ^ msg))
@@ -221,3 +222,5 @@ module TaintEntryType (Entry: EntryType) = struct
     Entry.to_smt_expr smg_ctx single
 
 end
+
+module TaintEntryType = TaintBaseEntryType (SingleEntryType)

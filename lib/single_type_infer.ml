@@ -5,6 +5,7 @@ open Mem_offset_new
 open Single_context
 open Constraint
 (* open Constraint *)
+open Func_interface
 open Single_subtype
 open Smt_emitter
 open Pretty_print
@@ -72,7 +73,7 @@ module SingleTypeInfer = struct
     in
     let start_pc = 1 - min_global_var in
     (* I am still not sure whether to use offset or ptr+offset in MemType, but just add base here :) *)
-    let func_mem_interface = ArchType.MemType.add_dummy_stack_slot func_mem_interface in
+    let func_mem_interface = ArchType.MemType.add_ret_addr_stack_slot func_mem_interface in
     let func_mem_interface = ArchType.MemType.add_base_to_offset func_mem_interface in
     let max_var =
       ArchType.MemType.fold_left (
@@ -399,10 +400,9 @@ module SingleTypeInfer = struct
   let infer
       (prog: Isa.prog)
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
+      (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
       (iter: int)
       (solver_iter: int) : t list =
-    (* TODO: The correct order is for each function, infer its single type, then taint type, then next function.
-      So this function should be moved to a upper-level model that infer all types. *)
     let helper 
         (acc: FuncInterface.t list) (entry: Isa.label * ArchType.MemType.t) :
         (FuncInterface.t list) * t =
@@ -417,9 +417,10 @@ module SingleTypeInfer = struct
       Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
+    let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i >= 2 && i <= 3) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    let _, infer_result = List.fold_left_map helper [] func_mem_interface_list in
+    let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;
     Printf.printf "let %s_single_infer_state : SingleTypeInfer.t list =\n" prog_name;

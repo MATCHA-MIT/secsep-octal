@@ -293,7 +293,7 @@ module MemType (Entry: EntryType) = struct
     fold_left_map helper start_var mem_layout
     (* let _ = mem_layout in start_var, [] *)
 
-  let add_dummy_stack_slot
+  let add_ret_addr_stack_slot
       (mem: t) : t =
     (* let found, mem =
       List.fold_left_map (
@@ -311,7 +311,7 @@ module MemType (Entry: EntryType) = struct
       ) mem <> None
     in
     if found then mem
-    else (IsaBasic.rsp_idx, [ ((SingleExp.SingleConst 0L, SingleExp.SingleConst 0L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) ]) :: mem
+    else (IsaBasic.rsp_idx, [ ((SingleExp.SingleConst 0L, SingleExp.SingleConst 8L), MemRange.RangeConst [], Entry.get_top_untaint_type ()) ]) :: mem
 
   (* let get_mem_entry_one_ptr_helper
       (smt_ctx: SmtEmitter.t)
