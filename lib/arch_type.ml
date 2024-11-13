@@ -253,27 +253,27 @@ module ArchType (Entry: EntryType) = struct
         addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
       in
-      let try_get_slot_type =
-        match anno_opt with
-        | None -> None
-        | Some slot_info -> Some (MemType.get_slot_mem_type smt_ctx true curr_type.mem_type orig_addr_offset slot_info)
-      in
-      match try_get_slot_type with
-      | Some ((off_w, off_r, e_t), true) ->
-        e_t, 
-        Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
-        useful_vars,
-        anno_opt
-        (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
-        (* Some (ptr, off_w, is_full) *)
-      | _ -> (* Annotation not pass check or no annotation *)
-        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
-        | Some (simp_l, simp_r), Some (_, simp_size) ->
-          let simp_addr_offset = 
-            simp_l,
-            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
-          in
-          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+      begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+      | Some (simp_l, simp_r), Some (_, simp_size) ->
+        let simp_addr_offset = 
+          simp_l,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+        in
+        let try_get_slot_type =
+          match anno_opt with
+          | None -> None
+          | Some slot_info -> Some (MemType.get_slot_mem_type smt_ctx true curr_type.mem_type simp_addr_offset slot_info)
+        in
+        begin match try_get_slot_type with
+        | Some ((off_w, off_r, e_t), true) ->
+          e_t, 
+          Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+          useful_vars,
+          anno_opt
+          (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
+          (* Some (ptr, off_w, is_full) *)
+        | _ -> (* Annotation not pass check or no annotation *)
+        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
           begin match MemType.get_mem_type smt_ctx curr_type.mem_type orig_addr_offset simp_addr_offset with
           | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
             e_t, 
@@ -288,13 +288,14 @@ module ArchType (Entry: EntryType) = struct
             useful_vars,
             None
           end
-        | _ -> 
-          Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
-          Entry.get_top_type (), 
-          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-          useful_vars,
-          None
         end
+      | _ -> 
+        Printf.printf "get_ld_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp);
+        Entry.get_top_type (), 
+        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
+        useful_vars,
+        None
+      end
 
   let get_ld_op_type_slot
       (smt_ctx: SmtEmitter.t)
@@ -379,25 +380,25 @@ module ArchType (Entry: EntryType) = struct
         addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))
       in
-      let try_set_slot_type =
-        match anno_opt with
-        | None -> None
-        | Some slot_info -> Some (MemType.set_slot_mem_type smt_ctx true false curr_type.mem_type orig_addr_offset slot_info new_type)
-      in
-      match try_set_slot_type with
-      | Some (new_mem, write_constraints, true) ->
-        { curr_type with mem_type = new_mem }, 
-        write_constraints @ addr_untaint_cons, 
-        useful_vars,
-        anno_opt
-      | _ -> (* Annotation not pass check or no annotation *)
-        begin match sub_sol_func addr_exp, sub_sol_func size_exp with
-        | Some (simp_l, simp_r), Some (_, simp_size) ->
-          let simp_addr_offset = 
-            simp_l,
-            SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
-          in
-          (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
+      begin match sub_sol_func addr_exp, sub_sol_func size_exp with
+      | Some (simp_l, simp_r), Some (_, simp_size) ->
+        let simp_addr_offset = 
+          simp_l,
+          SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, simp_r, simp_size))
+        in
+        let try_set_slot_type =
+          match anno_opt with
+          | None -> None
+          | Some slot_info -> Some (MemType.set_slot_mem_type smt_ctx true false curr_type.mem_type simp_addr_offset slot_info new_type)
+        in
+        begin match try_set_slot_type with
+        | Some (new_mem, write_constraints, true) ->
+          { curr_type with mem_type = new_mem }, 
+          write_constraints @ addr_untaint_cons, 
+          useful_vars,
+          anno_opt
+        | _ -> (* Annotation not pass check or no annotation *)
+        (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
           begin match MemType.set_mem_type smt_ctx true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
           | Some (new_mem, write_constraints, slot_anno) -> 
             { curr_type with mem_type = new_mem }, 
@@ -412,13 +413,14 @@ module ArchType (Entry: EntryType) = struct
             useful_vars,
             None
           end
-        | _ -> 
-          (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
-          curr_type, 
-          Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
-          useful_vars,
-          None
         end
+      | _ -> 
+        (* Printf.printf "set_st_op_type cannot simplify for addr_exp %s\n" (SingleExp.to_string addr_exp); *)
+        curr_type, 
+        Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
+        useful_vars,
+        None
+      end
     
   let set_st_op_type_slot
       (smt_ctx: SmtEmitter.t)
