@@ -52,6 +52,7 @@ module type EntryType = sig
   val get_const_type: IsaBasic.immediate -> t
   val get_top_type: unit -> t
   val get_top_untaint_type: unit -> t
+  val get_top_taint_type: unit -> t
   val get_mem_op_type: IsaBasic.immediate option -> t option -> t option -> int64 -> t
 
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)

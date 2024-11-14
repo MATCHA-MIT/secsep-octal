@@ -154,7 +154,9 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     Entry.get_const_type imm, TaintConst false
   
   let get_top_type () : t = taint_entry_type_error "Maybe we should not get_top_type for taint"
-  let get_top_untaint_type (): t = (Entry.get_top_untaint_type (), TaintConst false)
+  let get_top_untaint_type () : t = (Entry.get_top_untaint_type (), TaintConst false)
+
+  let get_top_taint_type () : t = (Entry.get_top_taint_type (), TaintConst true)
 
   let split_option (e: ('a * 'b) option) : ('a option) * ('b option) =
     match e with

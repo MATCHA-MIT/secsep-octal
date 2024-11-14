@@ -786,10 +786,10 @@ module MemType (Entry: EntryType) = struct
               pp_mem_type 0 mem;
               mem_type_error "Empty local mem"
             | ((l, r), _, _) :: [] ->
-              (l, r), MemRange.RangeConst [], Entry.get_top_untaint_type ()
+              (l, r), MemRange.RangeConst [], Entry.get_top_taint_type ()
             | ((l, _), _, _) :: tl ->
               let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
-              (l, r), MemRange.RangeConst [], Entry.get_top_untaint_type ()
+              (l, r), MemRange.RangeConst [], Entry.get_top_taint_type ()
           ) in
           ptr, (local_entry :: shared_part_mem)
         else ptr, part_mem

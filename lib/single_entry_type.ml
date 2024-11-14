@@ -102,6 +102,8 @@ include SingleExp
   let get_top_type () : t = SingleTop
   let get_top_untaint_type () : t = SingleTop
 
+  let get_top_taint_type () : t = SingleTop
+
   let add_context_map
       (is_mem: bool)
       (simp_func: SingleExp.t -> SingleExp.t)
