@@ -242,7 +242,7 @@ module ArchType (Entry: EntryType) = struct
     let addr_exp = Entry.get_single_exp addr_type in
     let size_exp = Entry.get_single_exp size_type in
     if addr_exp = SingleTop || size_exp = SingleTop then begin
-      Printf.printf "ld addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp);
+      (* Printf.printf "ld addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp); *)
       Entry.get_top_type (), 
       Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
       SingleExp.SingleVarSet.empty,
@@ -369,7 +369,7 @@ module ArchType (Entry: EntryType) = struct
       (* Printf.printf "St op %s\n" (Isa.string_of_operand (StOp (disp, base, index, scale, size, (None, None))));
       RegType.pp_reg_type 0 curr_type.reg_type;
       Printf.printf "Top addr_exp for orign addr_type %s pc %d\n" (Entry.to_string addr_type) curr_type.pc; *)
-      Printf.printf "st addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp);
+      (* Printf.printf "st addr or size is top where addr = %s and size = %s\n" (SingleExp.to_string addr_exp) (SingleExp.to_string size_exp); *)
       curr_type, 
       Unknown (SingleTop, SingleTop) :: addr_untaint_cons, 
       SingleExp.SingleVarSet.empty,
@@ -1065,14 +1065,14 @@ module ArchType (Entry: EntryType) = struct
       | Single exp -> exp
       | _ -> SingleTop
     in *)
-    let in_mem = MemType.remove_local_mem_quick_cmp smt_ctx in_state.mem_type in
+    let in_mem = MemType.merge_local_mem_quick_cmp smt_ctx in_state.mem_type in
     let res: FuncInterface.t = {
       func_name = func_name;
       in_reg = in_state.reg_type;
       in_mem = in_mem;
       context = context;
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
-      out_mem = MemType.map (sub_sol out_state.pc) (MemType.remove_local_mem_quick_cmp smt_ctx out_state.mem_type);
+      out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type);
       base_info = find_all_base_info in_state.reg_type in_mem;
     }
     in

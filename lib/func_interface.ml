@@ -457,7 +457,8 @@ module FuncInterface (Entry: EntryType) = struct
         | Left simp_context ->
           (Constraint.CalleeContext simp_context)
         | Right unsat_cond ->
-          func_interface_error (Printf.sprintf "func_call_helper: get unstat constraint %s" (Sexplib.Sexp.to_string (SingleContext.sexp_of_t unsat_cond)))
+          Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond));
+          func_interface_error "func_call_helper: get unstat constraint"
         end else
         Constraint.CalleeUnknownContext
     in

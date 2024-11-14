@@ -128,7 +128,7 @@ module SingleContext = struct
       match acc with
       | None -> None
       | Some acc_cond_list ->
-        begin match check true smt_ctx [cond] with
+        begin match check false smt_ctx [cond] with
         | SatYes -> acc
         | SatNo -> None
         | _ -> 
@@ -150,11 +150,11 @@ module SingleContext = struct
     | Or c_list ->
       let sub_c_list = List.filter_map (try_sub_sol sub_sol_func) c_list in
       if List.length sub_c_list < List.length c_list then None
-      else Some (Or c_list)
+      else Some (Or sub_c_list)
     | And c_list ->
       let sub_c_list = List.filter_map (try_sub_sol sub_sol_func) c_list in
       if List.length sub_c_list < List.length c_list then None
-      else Some (And c_list)
+      else Some (And sub_c_list)
 
   let sub_check_or_filter
       (is_quick: bool)

@@ -772,6 +772,29 @@ module MemType (Entry: EntryType) = struct
         ptr, List.filter (fun (off, _, _) -> is_shared_mem_quick_cmp smt_ctx ptr off) part_mem
     ) mem
 
+  let merge_local_mem_quick_cmp
+      (smt_ctx: SmtEmitter.t)
+      (mem: t) : t =
+    List.map (
+      fun (ptr, part_mem) ->
+        if ptr = IsaBasic.rsp_idx then
+          (* ptr, part_mem *)
+          let shared_part_mem, local_part_mem = List.partition (fun (off, _, _) -> is_shared_mem_full_cmp smt_ctx ptr off) part_mem in
+          let local_entry : MemOffset.t * MemRange.t * entry_t = (
+            match local_part_mem with
+            | [] -> 
+              pp_mem_type 0 mem;
+              mem_type_error "Empty local mem"
+            | ((l, r), _, _) :: [] ->
+              (l, r), MemRange.RangeConst [], Entry.get_top_untaint_type ()
+            | ((l, _), _, _) :: tl ->
+              let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
+              (l, r), MemRange.RangeConst [], Entry.get_top_untaint_type ()
+          ) in
+          ptr, (local_entry :: shared_part_mem)
+        else ptr, part_mem
+    ) mem
+
   let get_shared_useful_var_quick_cmp (smt_ctx: SmtEmitter.t) (mem_type: t) : SingleExp.SingleVarSet.t =
     (* An ugly version that avoids copying mem_type *)
     List.fold_left (
@@ -859,8 +882,8 @@ module MemType (Entry: EntryType) = struct
       List.fold_left (
           fun (acc: SingleContext.t list) (l, r) ->
             (SingleContext.Or [
-              Cond (Lt, hd_r, l);
-              Cond (Lt, r, hd_l);
+              Cond (Le, hd_r, l);
+              Cond (Le, r, hd_l);
             ]) :: acc
         ) acc tl
 
@@ -873,6 +896,8 @@ module MemType (Entry: EntryType) = struct
   let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
     let boundary_list = get_mem_boundary_list mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
-    get_mem_non_overlap_constraint_helper boundary_constraint boundary_list
+    let result = get_mem_non_overlap_constraint_helper boundary_constraint boundary_list in
+    Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result));
+    result
 
 end

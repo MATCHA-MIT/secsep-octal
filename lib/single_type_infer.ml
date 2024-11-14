@@ -232,17 +232,21 @@ module SingleTypeInfer = struct
 
   let check_or_assert_callee_context (infer_state: t) : bool * t =
     (* Return resolved, context list*)
-    let has_callee_unknwon_context =
+    let has_callee_unknown_context =
       List.find_opt (
         fun (x: ArchType.t) -> Constraint.has_callee_unknown_context x.constraint_list
       ) infer_state.func_type <> None
     in
-    if has_callee_unknwon_context then false, infer_state
-    else
+    if has_callee_unknown_context then begin
+      Printf.printf "has_callee_unknown_context\n";
+      false, infer_state
+    end else
       let context_list = List.concat_map (
         fun (x: ArchType.t) -> Constraint.get_callee_context x.constraint_list
       ) infer_state.func_type
       in
+      Printf.printf "Callee context list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t context_list));
+      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
       let val_context_list = List.filter (SingleContext.is_val (SingleExp.is_val infer_state.input_var_set)) context_list in
       SmtEmitter.push infer_state.smt_ctx;
       let assert_list = 
@@ -305,7 +309,7 @@ module SingleTypeInfer = struct
               fun (x: SingleSubtype.ArchType.t) ->
                 { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
             ) state.func_type;
-          context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
+          context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
@@ -345,7 +349,13 @@ module SingleTypeInfer = struct
         (* pp_func_type 0 state; *)
 
         (* 2.5. Check or assert func call context *)
-        let callee_context_resolved, state = check_or_assert_callee_context state in
+        let callee_context_resolved, state = 
+          if unknown_resolved then check_or_assert_callee_context state
+          else begin
+            Printf.printf "we do not check_or_assert_callee_context before all addr are resolved";
+            false, state
+          end
+        in
 
         (* 3. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
@@ -366,7 +376,7 @@ module SingleTypeInfer = struct
               fun (x: SingleSubtype.ArchType.t) ->
                 { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
             ) state.func_type;
-            context = state.context @ (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type) }
+            context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
         end else begin
           let state = if iter_left = 1 then { state with func = update_branch_anno block_subtype state.func } else state in
           helper (clean_up_func_type state) (iter_left - 1)
