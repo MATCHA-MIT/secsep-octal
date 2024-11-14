@@ -762,7 +762,7 @@ module MemType (Entry: EntryType) = struct
         else acc, (ptr, entry)
     ) start_var mem
 
-  let remove_local_mem_quick_cmp
+  (* let remove_local_mem_quick_cmp
       (smt_ctx: SmtEmitter.t)
       (mem: t) : t =
     (* pp_mem_type 0 mem; *)
@@ -770,7 +770,7 @@ module MemType (Entry: EntryType) = struct
     List.map (
       fun (ptr, part_mem) ->
         ptr, List.filter (fun (off, _, _) -> is_shared_mem_quick_cmp smt_ctx ptr off) part_mem
-    ) mem
+    ) mem *)
 
   let merge_local_mem_quick_cmp
       (smt_ctx: SmtEmitter.t)
