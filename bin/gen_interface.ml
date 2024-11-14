@@ -260,9 +260,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     update_reg_taint default_reg_type
       (get_reg_taint [
         RDI, false;
-        RSI, false;
         RDX, false;
-        RCX, true;
       ])
   in
   let out_reg = List.mapi (
@@ -304,6 +302,71 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     ];
   }
 
+let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t = 
+  let start_var: Taint_entry_type.TaintEntryType.t = (SingleVar 0, TaintVar 0) in
+  let _, default_reg_type = Taint_type_infer.TaintTypeInfer.ArchType.RegType.init_reg_type start_var in
+  let in_reg : Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+    update_reg_taint default_reg_type
+      (get_reg_taint [
+        RDI, false; (* dest ptr *)
+        RSI, false; (* src ptr *)
+        RDX, false;
+      ])
+  in
+  let out_reg = List.mapi (
+    fun (i: int) entry ->
+      if Isa_basic.IsaBasic.is_reg_idx_callee_saved i then entry
+      else Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintConst true 
+  ) in_reg
+  in
+  let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = [
+    r RDI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+    r RSI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+  ] in
+  let mem_context = 
+    Taint_type_infer.TaintTypeInfer.ArchType.MemType.get_all_mem_constraint
+      (Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_ret_addr_stack_slot in_mem)
+  in
+  {
+    func_name = "memcpy";
+    in_reg = in_reg;
+    in_mem = in_mem;
+    context = mem_context;
+    out_reg = out_reg;
+    out_mem = [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+      r RSI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+    ];
+    base_info = [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [], 
+        BaseAsReg RDI
+      ];
+      r RSI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        BaseAsReg RSI 
+      ];
+    ];
+  }
+
 
 let () = 
   let open Sexplib in
@@ -316,6 +379,6 @@ let () =
   let channel = open_out "./interface/bench_ed25519_plain.mem_interface" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t bench_ed25519_plain);
   let channel = open_out "./interface/general_func_interface.func_interface" in
-  Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t [memset_interface])
+  Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t [memset_interface; memcpy_interface])
 
 

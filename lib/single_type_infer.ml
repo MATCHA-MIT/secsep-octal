@@ -328,7 +328,7 @@ module SingleTypeInfer = struct
             0 state.func_type = 0
         in
 
-        let num_unknown, _ (* label_unknown_list *) = 
+        let num_unknown, label_unknown_list (* label_unknown_list *) = 
           List.fold_left_map (
             fun (acc: int) (x: ArchType.t) -> 
               let unknown_list = Constraint.get_unknown x.constraint_list in
@@ -352,7 +352,7 @@ module SingleTypeInfer = struct
         let callee_context_resolved, state = 
           if unknown_resolved then check_or_assert_callee_context state
           else begin
-            Printf.printf "we do not check_or_assert_callee_context before all addr are resolved";
+            Printf.printf "we do not check_or_assert_callee_context before all addr are resolved\n";
             false, state
           end
         in
@@ -378,7 +378,17 @@ module SingleTypeInfer = struct
             ) state.func_type;
             context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
         end else begin
-          let state = if iter_left = 1 then { state with func = update_branch_anno block_subtype state.func } else state in
+          let state = (
+            if iter_left = 1 then begin
+              Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
+              List.iter (
+                fun (label, unknown_list) -> 
+                  Printf.printf "%s\n" label;
+                  MemOffset.pp_unknown_list 0 unknown_list
+              ) label_unknown_list;
+              { state with func = update_branch_anno block_subtype state.func }
+            end else state
+          ) in
           helper (clean_up_func_type state) (iter_left - 1)
         end
       end
