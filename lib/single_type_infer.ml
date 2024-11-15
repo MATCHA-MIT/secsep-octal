@@ -337,16 +337,16 @@ module SingleTypeInfer = struct
           ) 0 state.func_type 
         in
         Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
-        (* List.iter (
+        List.iter (
           fun (label, unknown_list) -> 
             Printf.printf "%s\n" label;
             MemOffset.pp_unknown_list 0 unknown_list
-        ) label_unknown_list; *)
+        ) label_unknown_list;
         
         Printf.printf "\n\n%s: Infer iter %d update_mem%!\n\n" func_name curr_iter;
         let state = update_mem state in
         Printf.printf "\n\nInfer iter %d after update_mem%!\n\n" curr_iter;
-        (* pp_func_type 0 state; *)
+        pp_func_type 0 state;
 
         (* 2.5. Check or assert func call context *)
         let callee_context_resolved, state = 
@@ -365,7 +365,7 @@ module SingleTypeInfer = struct
         SmtEmitter.pop state.smt_ctx 1;
 
         Printf.printf "After infer, single subtype%!\n";
-        (* SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
@@ -438,7 +438,7 @@ module SingleTypeInfer = struct
       func_interface :: acc, infer_state
     in
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
-    (* let func_mem_interface_list = List.filteri (fun i _ -> i >= 2 && i <= 3) func_mem_interface_list in *)
+    let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
     (* let buf = Buffer.create 1000 in

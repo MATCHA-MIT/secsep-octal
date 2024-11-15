@@ -463,17 +463,17 @@ module SingleSubtype = struct
           (* TODO: Double check this!!! *)
           let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
           Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
-        | SingleAdd, Single e, SingleSet e_list
+        (* | SingleAdd, Single e, SingleSet e_list
         | SingleAdd, SingleSet e_list, Single e ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list)
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list) *)
         | SingleSub, Single e, Range (e1, e2, s) ->
           Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), s)
         | SingleSub, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), s)
-        | SingleSub, Single e, SingleSet e_list ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list)
+        (* | SingleSub, Single e, SingleSet e_list ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSub, e, x))) e_list)
         | SingleSub, SingleSet e_list, Single e ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, x, e))) e_list)
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSub, x, e))) e_list) *)
         | SingleMul, Single (SingleConst 0L), _
         | SingleMul, _, Single (SingleConst 0L) -> Single (SingleConst 0L)
         | SingleMul, Single (SingleConst c), Range (e1, e2, s)
@@ -487,9 +487,9 @@ module SingleSubtype = struct
             Range (SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
             SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e1)),
             Int64.neg (Int64.mul c s))
-        | SingleMul, Single e, SingleSet e_list
+        (* | SingleMul, Single e, SingleSet e_list
         | SingleMul, SingleSet e_list, Single e ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list)
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list) *)
         | SingleSar, Range (e1, e2, s), Single (SingleConst c) ->
           (* Printf.printf "Cal sar %s %s\n" (RangeExp.to_string (Range (e1, e2, s))) (RangeExp.to_string (Single (SingleConst c))); *)
           let s_sar = Int64.shift_right s (Int64.to_int c) in
@@ -501,8 +501,8 @@ module SingleSubtype = struct
             Range (SingleEntryType.eval (SingleBExp (SingleSar, e1, SingleConst c)),
               SingleEntryType.eval (SingleBExp (SingleSar, e2, SingleConst c)),
               1L)
-        | SingleSar, SingleSet e_list, Single (SingleConst c) ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSar, x, SingleConst c))) e_list)
+        (* | SingleSar, SingleSet e_list, Single (SingleConst c) ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSar, x, SingleConst c))) e_list) *)
         | SingleSal, Range (e1, e2, s), Single (SingleConst c) ->
           let s_sal = Int64.shift_left s (Int64.to_int c) in
           if Int64.shift_right s_sal (Int64.to_int c) = s then
@@ -510,8 +510,12 @@ module SingleSubtype = struct
               SingleEntryType.eval (SingleBExp (SingleSal, e2, SingleConst c)),
               Int64.shift_left s (Int64.to_int c))
           else Top
-        | SingleSal, SingleSet e_list, Single (SingleConst c) ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list)
+        (* | SingleSal, SingleSet e_list, Single (SingleConst c) ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list) *)
+        | _, Single e, SingleSet e_list ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, e, x))) e_list)
+        | _, SingleSet e_list, Single e ->
+          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, x, e))) e_list)
         | _, r1, r2 -> 
           Printf.printf "sub_sol_single_to_range: WARNING! %s not handled l %s r %s\n" 
             (SingleExp.to_string e) (RangeExp.to_string r1) (RangeExp.to_string r2); 
@@ -519,7 +523,34 @@ module SingleSubtype = struct
         end
       | SingleUExp _ -> Top
     in
-    helper e
+    let e_vars = SingleExp.get_vars e in
+    let helper_sub_list (acc: SingleEntryType.t list) (tv_rel: type_rel) : SingleEntryType.t list =
+      let v, _ = tv_rel.var_idx in
+      if SingleExp.SingleVarSet.mem v e_vars then
+        match tv_rel.sol with
+        | SolSimple (SingleSet v_sol_list) ->
+          List.concat_map (fun v_sol -> List.map (fun e -> SingleExp.repl_var_exp e (v, v_sol)) acc) v_sol_list
+        | _ -> acc
+      else acc
+    in
+    let e_list = List.fold_left helper_sub_list [e] tv_rel_list in
+    match e_list with
+    | [] -> single_subtype_error "get empty list"
+    | e :: [] -> helper e
+    | _ ->
+      let simp_e_list = List.map helper e_list in
+      let single_e_list = List.filter_map (
+        fun (x: RangeExp.t) ->
+          match x with
+          | Single e -> Some e
+          | _ -> None
+      ) simp_e_list
+      in
+      if List.length simp_e_list = List.length single_e_list then
+        SingleSet single_e_list
+      else
+        helper e
+    (* helper e *)
 
   let sub_sol_single_to_range_opt
       (tv_rel_list: t)
@@ -643,6 +674,11 @@ module SingleSubtype = struct
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
+        (
+          let var_idx, _ = tv_rel.var_idx in
+          if var_idx = 114 then
+            Printf.printf "sub_range_list: \n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list RangeExp.sexp_of_t sub_range_list));
+        );
         if List.length sub_range_opt_list <> List.length sub_range_list then tv_rel
         else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then { tv_rel with sol = SolSimple (Top) }
         else begin

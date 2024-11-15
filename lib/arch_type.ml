@@ -838,9 +838,9 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (target_func_name: Isa.label)
       (orig_call_anno: CallAnno.t) : t * CallAnno.t =
-    Printf.printf "type_prop_call %s\n" target_func_name;
-    (* Entry.pp_local_var 0 curr_type.local_var_map;
-    pp_arch_type 0 curr_type; *)
+    Printf.printf "type_prop_call %s pc %d\n" target_func_name curr_type.pc;
+    Entry.pp_local_var 0 curr_type.local_var_map;
+    pp_arch_type 0 curr_type;
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
       let check_callee_context =
