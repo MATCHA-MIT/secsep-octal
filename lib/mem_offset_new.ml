@@ -234,6 +234,9 @@ module MemOffset = struct
       (pc: int) (o: t) : t = 
     let l, r = o in repl_func (l, pc), repl_func (r, pc)
 
+  let repl_var_exp (e: t) (v_idx_exp: IsaBasic.imm_var_id * SingleExp.t) : t =
+    let l, r = e in SingleExp.repl_var_exp l v_idx_exp, SingleExp.repl_var_exp r v_idx_exp
+
   let add_base (base_ptr: SingleExp.t) (o: t) : t =
     let l, r = o in
     SingleExp.eval (SingleBExp (SingleAdd, base_ptr, l)), 
