@@ -160,6 +160,7 @@ let bench_ed25519_plain : Base_func_interface.t = [
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
+    -2 (* K512 *),  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
   ];
   "OPENSSL_cleanse", [
     r RDI, [

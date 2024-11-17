@@ -458,6 +458,7 @@ module FuncInterface (Entry: EntryType) = struct
           (Constraint.CalleeContext simp_context)
         | Right unsat_cond ->
           Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond));
+          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
           func_interface_error "func_call_helper: get unstat constraint"
         end else
         Constraint.CalleeUnknownContext
