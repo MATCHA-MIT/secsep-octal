@@ -28,7 +28,7 @@ module CondType (Entry: EntryTypeBasic) = struct
     | (Le, l, r) -> (Lt, r, l)
     | (Lt, l, r) -> (Le, r, l)
     | (Be, l, r) -> (Bt, r, l)
-    | (Bt, l, r) -> (Be, l, r)
+    | (Bt, l, r) -> (Be, r, l)
 
   let to_string (cond: t) =
     let c, l, r = cond in
