@@ -28,8 +28,10 @@
         (SingleVar 7)))))
     (Cond
      (Lt (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Lt (SingleConst 0) (SingleVar 2)))
     (Cond
-     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))))
+     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Lt (SingleConst 0) (SingleConst 8)))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
     (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))
@@ -105,10 +107,13 @@
         (SingleVar 6)))))
     (Cond
      (Lt (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Lt (SingleConst 0) (SingleVar 2)))
     (Cond
      (Lt (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
+    (Cond (Lt (SingleConst 0) (SingleVar 2)))
     (Cond
-     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))))
+     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Lt (SingleConst 0) (SingleConst 8)))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
     (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))

@@ -129,7 +129,10 @@
      (((SingleConst 208) (SingleConst 212))
       (RangeConst (((SingleConst 208) (SingleConst 212)))) (SingleVar 27))
      (((SingleConst 212) (SingleConst 216))
-      (RangeConst (((SingleConst 212) (SingleConst 216)))) (SingleVar 28))))))
+      (RangeConst (((SingleConst 212) (SingleConst 216)))) (SingleVar 28))))
+   (-2
+    ((((SingleConst 0) (SingleConst 640))
+      (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))))
  (OPENSSL_cleanse
   ((7 ((((SingleConst 0) (SingleVar 6)) (RangeConst ()) SingleTop)))))
  (x25519_ge_p1p1_to_p2
@@ -184,7 +187,10 @@
       (RangeConst (((SingleConst 212) (SingleConst 216)))) (SingleVar 28))))
    (6
     ((((SingleConst 0) (SingleVar 2))
-      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))))
+      (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))
+   (-2
+    ((((SingleConst 0) (SingleConst 640))
+      (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))))
  (SHA512
   ((7
     ((((SingleConst 0) (SingleVar 6))

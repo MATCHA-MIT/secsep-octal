@@ -208,6 +208,7 @@ let bench_ed25519_plain : Base_func_interface.t = [
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
     r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    -2 (* K512 *),  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
   ];
   "SHA512", [
     r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
