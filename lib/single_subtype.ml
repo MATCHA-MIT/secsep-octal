@@ -572,8 +572,8 @@ module SingleSubtype = struct
   let sub_sol_offset_to_offset_list
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
-      (off_pc: int)
-      (off: MemOffset.t) : (MemOffset.t list) option =
+      (off_and_pc: MemOffset.t * int) : (MemOffset.t list) option =
+    let off, off_pc = off_and_pc in
     let off_list = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp off in
     let simp_off_helper (off: MemOffset.t) : MemOffset.t option =
       let l, r = off in

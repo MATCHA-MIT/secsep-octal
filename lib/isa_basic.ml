@@ -23,6 +23,8 @@ module IsaBasic = struct
   type label = string
   [@@deriving sexp]
 
+  module StringSet = Set.Make(String)
+
   let ret_label = ".Ret"
 
   type imm_var_id = int

@@ -249,11 +249,11 @@ module MemOffset = struct
         PP.print_lvl (lvl + 1) "%s\n"(to_string off)
     ) off_list
 
-  let pp_unknown_list (lvl: int) (unknown_list: (t *  int) list) =
+  let pp_unknown_list (lvl: int) (unknown_list: (t * int) list) =
     PP.print_lvl lvl "Unknown list\n";
     List.iter (
       fun (off, pc) ->
-        PP.print_lvl (lvl + 1) "%d %s\n" pc (to_string off)
+        PP.print_lvl (lvl + 1) "%d,\n%s\n" pc (Sexplib.Sexp.to_string_hum (sexp_of_t off))
     ) unknown_list
 
   let is_8byte_slot (o: t) : bool =

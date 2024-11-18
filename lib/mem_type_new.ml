@@ -482,6 +482,20 @@ module MemType (Entry: EntryType) = struct
         (MemOffset.t, SingleContext.t list) Either.t =
       let l, r = lookup_offset in
       let off_l, off_r = target_offset in
+      (* let cond_list: SingleContext.t list = 
+        if SingleExp.cmp l r = 0 then
+          [
+            Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
+            Cond (Le, SingleExp.eval (SingleBExp (SingleSub, r, off_r)), SingleConst 0L);
+          ]
+        else  
+          [
+            Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
+            (* TODO: Think about whether this should be Lt or Le!!! *)
+            Cond (Lt, SingleExp.eval (SingleBExp (SingleSub, l, r)), SingleConst 0L);
+            Cond (Le, SingleExp.eval (SingleBExp (SingleSub, r, off_r)), SingleConst 0L);
+          ] 
+      in *)
       let cond_list: SingleContext.t list = [
         Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
         (* TODO: Think about whether this should be Lt or Le!!! *)

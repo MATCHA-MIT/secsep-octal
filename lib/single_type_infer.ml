@@ -187,16 +187,28 @@ module SingleTypeInfer = struct
       let acc_update_list, acc_context = acc in
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
-      let unknown_range = 
+      (* let unknown_range = 
         List.map (
           fun ((l, r), pc) -> 
             SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (l, pc),
             SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (r, pc)
         ) unknown_list
       in
-      let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
+      let new_offset_list = List.filter_map MemOffset.from_range unknown_range in *)
+      let new_offset_list = 
+        List.concat (
+          List.filter_map (
+            SingleSubtype.sub_sol_offset_to_offset_list infer_state.single_subtype infer_state.input_var_set
+          ) unknown_list
+        ) 
+      in
+      (* Printf.printf "New off list\n";
+      MemOffset.pp_off_list 0 new_offset_list; *)
       (* Check whether the each offset belongs to some memory slot if add some contraints *)
       let is_val_offset_list, not_val_offset_list = List.partition (MemOffset.is_val infer_state.input_var_set) new_offset_list in
+      Printf.printf "%s new_off_list len %d is_val_offset_list len %d\n" a_type.label (List.length new_offset_list) (List.length is_val_offset_list);
+      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t is_val_offset_list));
+      (* MemOffset.pp_off_list 0 is_val_offset_list; *)
       let is_val_offset_list, new_context_list_list =
         List.partition_map (ArchType.MemType.get_heuristic_mem_type infer_state.smt_ctx mem_type) is_val_offset_list
       in
@@ -206,6 +218,7 @@ module SingleTypeInfer = struct
       MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
       List.flatten (acc_context :: new_context_list_list)
     in
+    (* Printf.printf "Update mem func type:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_t infer_state.func_type)); *)
     let update_list, new_context_list = List.fold_left helper (update_list, []) infer_state.func_type in
     let next_var, func_type =
       List.fold_left_map (
@@ -417,6 +430,14 @@ module SingleTypeInfer = struct
     ) func_type_list;
     PP.bprint_lvl lvl buf "]\n"
 
+  let filter_func_interface
+      (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
+      (func_name_list: Isa.label list) : (Isa.label * ArchType.MemType.t) list =
+    let func_name_set = Isa.StringSet.of_list func_name_list in
+    List.filter (
+      fun (x, _) -> Isa.StringSet.mem x func_name_set
+    ) func_mem_interface_list
+
   let infer
       (prog: Isa.prog)
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
@@ -438,8 +459,16 @@ module SingleTypeInfer = struct
       func_interface :: acc, infer_state
     in
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
-    let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in
+    (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
+    let func_mem_interface_list = 
+      filter_func_interface func_mem_interface_list [
+        "sha512_block_data_order";
+        "SHA512_Update";
+      ] 
+    in
+    Printf.printf "%d\n" (List.length func_mem_interface_list);
+    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map snd func_mem_interface_list)));
     let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;

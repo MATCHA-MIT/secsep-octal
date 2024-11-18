@@ -283,6 +283,8 @@ module ArchType (Entry: EntryType) = struct
           | None -> 
             Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
             (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
+            (* Printf.printf "Curr_type:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t curr_type));
+            SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
             Entry.get_top_type (), 
             Unknown simp_addr_offset :: addr_untaint_cons, 
             useful_vars,
@@ -804,6 +806,8 @@ module ArchType (Entry: EntryType) = struct
     let _ = smt_ctx in
     match inst with
     | Jmp (label, _) ->
+      (* 1. Update full_not_taken_hist *)
+      let curr_type = { curr_type with full_not_taken_hist = curr_type.branch_hist } in
       (* 1. Add curr_type to target block's subtype *)
       let block_subtype = (add_block_subtype label curr_type block_subtype) in
       (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)

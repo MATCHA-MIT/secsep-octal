@@ -457,8 +457,16 @@ module FuncInterface (Entry: EntryType) = struct
         | Left simp_context ->
           (Constraint.CalleeContext simp_context)
         | Right unsat_cond ->
-          Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond));
-          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
+          let unsat_cond_expr = SingleContext.to_smt_expr smt_ctx unsat_cond in
+          Printf.printf "p_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (List.map fst p_context)));
+          Printf.printf "%s\n%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond)) (Z3.Expr.to_string unsat_cond_expr);
+          (* (
+            match SmtEmitter.check_compliance smt_ctx [unsat_cond_expr] with
+            | SatYes -> Printf.printf "Should be sat\n"
+            | SatNo -> Printf.printf "Not sat\n"
+            | SatUnknown -> Printf.printf "Should be unknown\n"
+          ); *)
+          SmtEmitter.pp_smt_ctx 0 smt_ctx;
           func_interface_error "func_call_helper: get unstat constraint"
         end else
         Constraint.CalleeUnknownContext
