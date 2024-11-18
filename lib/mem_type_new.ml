@@ -866,9 +866,11 @@ module MemType (Entry: EntryType) = struct
     List.filter_map helper mem_type
 
   let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
-    List.map (
-        fun (l, r) -> 
-          SingleContext.Cond (Lt, l, r)
+    List.concat_map (
+        fun (l, r) -> [
+          SingleContext.Cond (Lt, l, r); 
+          SingleContext.Cond (Lt, SingleExp.SingleConst 0L, SingleExp.eval (SingleBExp (SingleSub, r, l)))
+        ]
       ) boundary_list
 
   let rec get_mem_non_overlap_constraint_helper
