@@ -305,6 +305,20 @@ module SingleTypeInfer = struct
         {x with insts = List.mapi (helper x.label) x.insts}
     ) func
 
+  let pp_graph
+      (block_subtype: ArchType.block_subtype_t list) : unit =
+    List.iter (
+      fun (entry: ArchType.block_subtype_t) ->
+        let target, br_list = entry in
+        List.iter (
+          fun (br: ArchType.t) ->
+            Printf.printf "%s %s\n" br.label target.label;
+            ()
+        ) br_list;
+        ()
+    ) block_subtype;
+    ()
+
   let infer_one_func
       (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
@@ -372,6 +386,8 @@ module SingleTypeInfer = struct
 
         (* 3. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
+        Printf.printf "Block_subtype\n";
+        pp_graph block_subtype;
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
         let state = { state with single_subtype = single_subtype } in
 
