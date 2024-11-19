@@ -7,6 +7,7 @@ open Constraint
 (* open Constraint *)
 open Func_interface
 open Single_subtype
+(* open Single_input_var_cond_subtype *)
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -375,7 +376,7 @@ module SingleTypeInfer = struct
         Printf.printf "\n\nInfer iter %d after update_mem%!\n\n" curr_iter;
         pp_func_type 0 state;
 
-        (* 2.5. Check or assert func call context *)
+        (* 3. Check or assert func call context *)
         let callee_context_resolved, state = 
           if unknown_resolved then check_or_assert_callee_context state
           else begin
@@ -384,12 +385,20 @@ module SingleTypeInfer = struct
           end
         in
 
-        (* 3. Single type infer *)
+        (* 4. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
         Printf.printf "Block_subtype\n";
         pp_graph block_subtype;
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
         let state = { state with single_subtype = single_subtype } in
+
+        (* 5. Input var block cond infer *)
+        (* let func_type = 
+          SingleInputVarCondSubtype.solve
+            (SingleSubtype.sub_sol_single_var single_subtype state.input_var_set)
+            block_subtype
+        in
+        let state = { state with func_type = func_type } in *)
 
         SmtEmitter.pop state.smt_ctx 1;
 
@@ -403,7 +412,7 @@ module SingleTypeInfer = struct
             func = update_branch_anno block_subtype state.func;
             func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
+                { x with context = x.context @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)}
             ) state.func_type;
             context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
         end else begin

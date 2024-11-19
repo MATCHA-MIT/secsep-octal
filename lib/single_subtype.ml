@@ -431,6 +431,25 @@ module SingleSubtype = struct
       end
     | None -> Top
 
+  let sub_sol_single_var
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (e: SingleExp.t) : SingleExp.t option =
+    if SingleExp.is_val input_var_set e then Some e
+    else
+      let e_vars = SingleExp.get_vars e in
+      let helper (acc: SingleExp.t) (tv_rel: type_rel) : SingleExp.t =
+        let v, _ = tv_rel.var_idx in
+        if SingleExp.SingleVarSet.mem v e_vars then
+          match tv_rel.sol with
+          | SolSimple (Single v_sol) ->
+            SingleExp.repl_var_exp e (v, v_sol)
+          | _ -> acc
+        else acc
+      in
+      let simp_e = List.fold_left helper e tv_rel_list in
+      if SingleExp.is_val input_var_set simp_e then Some simp_e else None
+
   let sub_sol_single_set_var
       (tv_rel_list: t)
       (get_vars: 'a -> SingleEntryType.SingleVarSet.t)
