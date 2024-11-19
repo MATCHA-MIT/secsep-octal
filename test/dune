@@ -12,9 +12,9 @@
  ; (libraries type)
  ; (modes byte)
 
- ; (name test_learn_z3)
- ; (libraries z3)
- ; (modes byte)
+ (name test_learn_z3)
+ (libraries z3)
+ (modes byte)
 
  ; (name test_single_type_infer)
  ; (libraries type)
@@ -24,9 +24,9 @@
  ; (libraries type)
  ; (modes byte)
 
- (name test_range_type_infer)
- (libraries type)
- (modes byte)
+ ; (name test_range_type_infer)
+ ; (libraries type)
+ ; (modes byte)
 
  ; (name test_transform)
  ; (libraries type)

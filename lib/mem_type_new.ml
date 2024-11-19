@@ -499,7 +499,7 @@ module MemType (Entry: EntryType) = struct
       let cond_list: SingleContext.t list = [
         Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, l)), SingleConst 0L);
         (* TODO: Think about whether this should be Lt or Le!!! *)
-        Cond (Lt, SingleExp.eval (SingleBExp (SingleSub, l, r)), SingleConst 0L);
+        Cond (Le, SingleExp.eval (SingleBExp (SingleSub, l, r)), SingleConst 0L);
         Cond (Le, SingleExp.eval (SingleBExp (SingleSub, r, off_r)), SingleConst 0L);
       ] in
       (* TODO: Check, sat or add, one by one *)
@@ -882,8 +882,8 @@ module MemType (Entry: EntryType) = struct
   let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
     List.concat_map (
         fun (l, r) -> [
-          SingleContext.Cond (Lt, l, r); 
-          SingleContext.Cond (Lt, SingleExp.SingleConst 0L, SingleExp.eval (SingleBExp (SingleSub, r, l)))
+          SingleContext.Cond (Le, l, r); 
+          SingleContext.Cond (Le, SingleExp.SingleConst 0L, SingleExp.eval (SingleBExp (SingleSub, r, l)))
         ]
       ) boundary_list
 

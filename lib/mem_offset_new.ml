@@ -14,6 +14,9 @@ module MemOffset = struct
   type t = SingleExp.t * SingleExp.t
   [@@deriving sexp]
 
+  type t_pc = t * int
+  [@@deriving sexp]
+
   type off_rel_t =
     | Eq 
     | Subset | Supset 
@@ -250,11 +253,12 @@ module MemOffset = struct
     ) off_list
 
   let pp_unknown_list (lvl: int) (unknown_list: (t * int) list) =
-    PP.print_lvl lvl "Unknown list\n";
-    List.iter (
+    PP.print_lvl lvl "Unknown list len %d\n" (List.length unknown_list);
+    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_t_pc unknown_list))
+    (* List.iter (
       fun (off, pc) ->
         PP.print_lvl (lvl + 1) "%d,\n%s\n" pc (Sexplib.Sexp.to_string_hum (sexp_of_t off))
-    ) unknown_list
+    ) unknown_list *)
 
   let is_8byte_slot (o: t) : bool =
     SingleExp.cmp (snd o) (SingleExp.SingleBExp (SingleAdd, (fst o), SingleConst (IsaBasic.get_gpr_full_size ()))) = 0

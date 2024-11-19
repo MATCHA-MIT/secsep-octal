@@ -136,9 +136,11 @@ module SingleTypeInfer = struct
         (ArchType.block_subtype_t list) * (Isa.instruction list list) =
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
+      if block_type.label = ".L196" then () else
       SingleContext.add_assertions infer_state.smt_ctx block_type.context;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
-      (* Printf.printf "type_prop_block %s\n" block.label; *)
+      Printf.printf "type_prop_block %s%!\n" block.label;
+      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
       let (_, block_subtype), block =
@@ -209,14 +211,15 @@ module SingleTypeInfer = struct
       (* Printf.printf "New off list\n";
       MemOffset.pp_off_list 0 new_offset_list; *)
       (* Check whether the each offset belongs to some memory slot if add some contraints *)
-      let is_val_offset_list, not_val_offset_list = List.partition (MemOffset.is_val infer_state.input_var_set) new_offset_list in
+      (* let is_val_offset_list, not_val_offset_list = List.partition (MemOffset.is_val infer_state.input_var_set) new_offset_list in
       Printf.printf "%s new_off_list len %d is_val_offset_list len %d\n" a_type.label (List.length new_offset_list) (List.length is_val_offset_list);
       Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t is_val_offset_list));
       (* MemOffset.pp_off_list 0 is_val_offset_list; *)
       let is_val_offset_list, new_context_list_list =
         List.partition_map (ArchType.MemType.get_heuristic_mem_type infer_state.smt_ctx mem_type) is_val_offset_list
       in
-      let new_offset_list = is_val_offset_list @ not_val_offset_list in
+      let new_offset_list = is_val_offset_list @ not_val_offset_list in *)
+      let new_context_list_list = [] in
       Printf.printf "update_mem\n";
       MemOffset.pp_off_list 0 new_offset_list; 
       MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
@@ -390,18 +393,19 @@ module SingleTypeInfer = struct
 
         (* 4. Single type infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
-        Printf.printf "Block_subtype\n";
-        pp_graph block_subtype;
+        (* Printf.printf "Block_subtype\n";
+        pp_graph block_subtype; *)
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
         let state = { state with single_subtype = single_subtype } in
 
         (* 5. Input var block cond infer *)
         let pc_cond_map =
           SingleInputVarCondSubtype.solve
+            state.smt_ctx
             (SingleSubtype.sub_sol_single_var single_subtype state.input_var_set)
             block_subtype
         in
-        Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleInputVarCondSubtype.sexp_of_pc_cond_t pc_cond_map));
+        (* Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleInputVarCondSubtype.sexp_of_pc_cond_t pc_cond_map)); *)
         let func_type =
           List.map2 (
             fun (x: ArchType.t) (pc_cond: SingleInputVarCondSubtype.pc_cond_t) ->

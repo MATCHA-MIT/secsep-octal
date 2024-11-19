@@ -5,6 +5,8 @@ open Arch_type
 open Set_sexp
 open Sexplib.Std
 open Sexplib
+open Single_context
+open Smt_emitter
 
 module SingleInputVarCondSubtype = struct
   exception SingleInputVarCondSubtypeError of string
@@ -168,7 +170,31 @@ module SingleInputVarCondSubtype = struct
           acc
     ) (IntSet.empty, var_sol_list) var_subtype_list
 
+  let check_cond_list
+      (smt_ctx: SmtEmitter.t)
+      (pc_cond_map: pc_cond_t list) : unit =
+    let helper (pc_cond: pc_cond_t) : unit =
+      SmtEmitter.push smt_ctx;
+      let ctx, solver = smt_ctx in
+      let cond_list = CondSet.to_list (snd pc_cond) in
+      List.iter (
+        fun (x: CondType.t) ->
+          SingleContext.add_assertions smt_ctx [ SingleContext.Cond (cond_map x) ];
+          let open Z3 in
+          match Z3.Solver.check solver [ Boolean.mk_true ctx ] with
+          | UNSATISFIABLE -> 
+            Printf.printf "pc_cond\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_pc_cond_t pc_cond));
+            Printf.printf "Unsat cond\n%s\n" (Sexplib.Sexp.to_string_hum (CondType.sexp_of_t x));
+            SmtEmitter.pp_smt_ctx 0 smt_ctx;
+            single_input_var_cond_subtype_error "cond UNSATISFIABLE"
+          | _ -> ()
+      ) cond_list;
+      SmtEmitter.pop smt_ctx 1
+    in
+    List.iter helper pc_cond_map
+
   let solve 
+      (smt_ctx: SmtEmitter.t)
       (sub_single_helper: SingleEntryType.t -> SingleEntryType.t option)
       (block_subtype_list: ArchType.block_subtype_t list) :
       pc_cond_t list =
@@ -191,6 +217,8 @@ module SingleInputVarCondSubtype = struct
     in
     let init_sol = List.map (fun (pc, _) -> pc, CondSet.empty) var_subtype_list in
     let _, pc_cond_map = helper true IntSet.empty init_sol 10 in
+    Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_pc_cond_t pc_cond_map));
+    check_cond_list smt_ctx pc_cond_map;
     pc_cond_map
     (* Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_pc_cond_t pc_cond_map));
     List.map2 (
