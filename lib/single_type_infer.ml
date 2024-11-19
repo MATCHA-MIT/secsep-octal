@@ -335,7 +335,7 @@ module SingleTypeInfer = struct
         { state with 
           func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = SingleSubtype.get_block_context state.single_subtype x.useful_var}
+                { x with context = x.context @ SingleSubtype.get_block_context state.single_subtype x.useful_var}
             ) state.func_type;
           context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
       else begin
