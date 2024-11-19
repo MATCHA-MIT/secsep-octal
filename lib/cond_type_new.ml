@@ -49,6 +49,11 @@ module CondType (Entry: EntryTypeBasic) = struct
     in
     Printf.sprintf "(%s, %s, %s)" s (Entry.to_ocaml_string l) (Entry.to_ocaml_string r)
 
+  let cmp (cond1: t) (cond2: t) : bool =
+    let c1, l1, r1 = cond1 in
+    let c2, l2, r2 = cond2 in
+    c1 = c2 && Entry.cmp l1 l2 = 0 && Entry.cmp r1 r2 = 0
+
   let get_taken_type (cond: IsaBasic.branch_cond) (flag: entry_t * entry_t) : t option =
     let l, r = flag in
     match cond with
