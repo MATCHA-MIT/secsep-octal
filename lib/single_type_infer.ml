@@ -7,7 +7,7 @@ open Constraint
 (* open Constraint *)
 open Func_interface
 open Single_subtype
-(* open Single_input_var_cond_subtype *)
+open Single_input_var_cond_subtype
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -136,6 +136,7 @@ module SingleTypeInfer = struct
         (ArchType.block_subtype_t list) * (Isa.instruction list list) =
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
+      SingleContext.add_assertions infer_state.smt_ctx block_type.context;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       (* Printf.printf "type_prop_block %s\n" block.label; *)
       let _ = iter_left in
@@ -179,6 +180,8 @@ module SingleTypeInfer = struct
       1. Check whether the offset belongs to some memory slot if adding some extra context (heuristic);
       2. Check whether the offset refers to a new local stack slot and update local stack if needed. *)
     SmtEmitter.push infer_state.smt_ctx;
+    Printf.printf "Update mem smt ctx\n";
+    SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
     let mem_type = (List.nth infer_state.func_type 0).mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
     let helper 
@@ -214,8 +217,8 @@ module SingleTypeInfer = struct
         List.partition_map (ArchType.MemType.get_heuristic_mem_type infer_state.smt_ctx mem_type) is_val_offset_list
       in
       let new_offset_list = is_val_offset_list @ not_val_offset_list in
-      (* Printf.printf "update_mem\n";
-      MemOffset.pp_off_list 0 new_offset_list;  *)
+      Printf.printf "update_mem\n";
+      MemOffset.pp_off_list 0 new_offset_list; 
       MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
       List.flatten (acc_context :: new_context_list_list)
     in
@@ -393,12 +396,28 @@ module SingleTypeInfer = struct
         let state = { state with single_subtype = single_subtype } in
 
         (* 5. Input var block cond infer *)
-        (* let func_type = 
+        let pc_cond_map =
           SingleInputVarCondSubtype.solve
             (SingleSubtype.sub_sol_single_var single_subtype state.input_var_set)
             block_subtype
         in
-        let state = { state with func_type = func_type } in *)
+        Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleInputVarCondSubtype.sexp_of_pc_cond_t pc_cond_map));
+        let func_type =
+          List.map2 (
+            fun (x: ArchType.t) (pc_cond: SingleInputVarCondSubtype.pc_cond_t) ->
+              let (label, _), cond_set = pc_cond in
+              if x.label = label then
+                { x with 
+                  context = List.map (
+                    fun (x: SingleInputVarCondSubtype.CondType.t) -> 
+                      SingleContext.Cond (SingleInputVarCondSubtype.cond_map x)
+                  ) (SingleInputVarCondSubtype.CondSet.to_list cond_set)
+                }
+              else
+                single_type_infer_error "label does not match"
+          ) state.func_type pc_cond_map
+        in
+        let state = { state with func_type = func_type } in
 
         SmtEmitter.pop state.smt_ctx 1;
 

@@ -335,7 +335,15 @@ include SingleExpBasic
           | SingleMod -> SingleConst (Int64.rem v1 v2)
           end
         in [ [x] ]
-      | _ -> [ [SingleBExp (bop, convert_t (eval_t l), convert_t (eval_t r))] ]
+      | _ -> 
+        if cmp eval_l eval_r = 0 then
+          begin match bop with
+          | SingleXor -> [ [SingleConst 0L] ]
+          | SingleAnd | SingleOr -> [ [eval_l] ]
+          | _ -> [ [SingleBExp (bop, eval_l, eval_r)] ]
+          end
+        else
+          [ [SingleBExp (bop, eval_l, eval_r)] ]
       end
     | SingleUExp (uop, l) ->
       [ [SingleUExp (uop, convert_t (eval_t l))] ]

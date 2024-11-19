@@ -1,7 +1,6 @@
 open Isa_basic
 open Single_entry_type
 open Cond_type_new
-open Single_context
 open Arch_type
 open Set_sexp
 open Sexplib.Std
@@ -29,6 +28,16 @@ module SingleInputVarCondSubtype = struct
       sexp_of_list CondType.sexp_of_t (elements s)
   end
 
+  let cond_map (c: CondType.t) : SingleCondType.t = (* Dirty fix on type *)
+    let cond, l, r = c in
+    let cond : SingleCondType.cond =
+      match cond with
+      | Eq -> Eq | Ne -> Ne
+      | Le -> Le | Lt -> Lt
+      | Be -> Be | Bt -> Bt
+    in
+    cond, l, r
+
   type pc_cond_t = (IsaBasic.label * int) * CondSet.t
   [@@deriving sexp]
 
@@ -48,10 +57,10 @@ module SingleInputVarCondSubtype = struct
       let cond, _ = cond_pc in
       let c, l, r = cond in
       match sub_single_helper l with
-      | None -> cond, None
+      | None | Some SingleTop -> cond, None
       | Some simp_l ->
         begin match sub_single_helper r with
-        | None -> cond, None
+        | None | Some SingleTop -> cond, None
         | Some simp_r -> cond, Some (c, simp_l, simp_r)
         end
     in
@@ -162,7 +171,7 @@ module SingleInputVarCondSubtype = struct
   let solve 
       (sub_single_helper: SingleEntryType.t -> SingleEntryType.t option)
       (block_subtype_list: ArchType.block_subtype_t list) :
-      ArchType.t list =
+      pc_cond_t list =
     let var_subtype_list = init_input_var_cond_subtype sub_single_helper block_subtype_list in
     let rec helper
         (always_solve: bool)
@@ -182,6 +191,8 @@ module SingleInputVarCondSubtype = struct
     in
     let init_sol = List.map (fun (pc, _) -> pc, CondSet.empty) var_subtype_list in
     let _, pc_cond_map = helper true IntSet.empty init_sol 10 in
+    pc_cond_map
+    (* Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_pc_cond_t pc_cond_map));
     List.map2 (
       fun (pc_cond: pc_cond_t) (block_subtype: ArchType.block_subtype_t) ->
         let (label, _), cond_set = pc_cond in
@@ -199,9 +210,13 @@ module SingleInputVarCondSubtype = struct
             in
             cond, l, r
           in
+          if List.length arch_type.context <> 0 then begin 
+            Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t arch_type.context));
+            single_input_var_cond_subtype_error "clear out arch_type context"
+          end else
           { arch_type with
             context = List.map (fun (x: CondType.t) -> SingleContext.Cond (map x)) (CondSet.to_list cond_set)  
           }
-    ) pc_cond_map block_subtype_list
+    ) pc_cond_map block_subtype_list *)
         
 end

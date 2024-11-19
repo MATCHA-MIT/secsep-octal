@@ -512,7 +512,7 @@ module MemType (Entry: EntryType) = struct
     let l, r = addr_off in
     match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l <> b_r then Left addr_off
+      if b_l <> b_r || b_l = IsaBasic.rsp_idx then Left addr_off
       else
         let part_mem = get_part_mem mem b_l in
         begin match part_mem with
