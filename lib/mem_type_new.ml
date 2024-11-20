@@ -863,6 +863,30 @@ module MemType (Entry: EntryType) = struct
     let exps = List.fold_left helper [] mem_type in
     SmtEmitter.add_assertions smt_ctx exps *)
 
+  let get_mem_align_constraint_helper (mem_type: t) : (int * int64) list =
+    let helper_inner (acc: int64) (entry: MemOffset.t * 'a * 'b) : int64 =
+      if acc = 16L then acc
+      else
+        let (l, r), _, _ = entry in
+        let len = SingleExp.eval (SingleBExp (SingleSub, r, l)) in
+        (* Printf.printf "len %s\n" (SingleExp.to_string len); *)
+        SingleExp.get_align [] len
+    in
+    let helper_outer (part_mem: int * ((MemOffset.t * 'a * 'b) list)) : (int * int64) option =
+      let ptr, entry_list = part_mem in
+      let align = List.fold_left helper_inner 1L entry_list in
+      (* Printf.printf "align %Ld\n" align; *)
+      if align > 1L then Some (ptr, align)
+      else None
+    in
+    List.filter_map helper_outer mem_type
+
+  let get_mem_align_constraint (mem_type: t) : SingleContext.t list =
+    List.map (
+      fun (ptr, align) -> 
+        SingleContext.Cond (Eq, SingleBExp (SingleAnd, SingleVar ptr, SingleConst (Int64.sub align 1L)), SingleConst 0L)
+    ) (get_mem_align_constraint_helper mem_type)
+
   let get_mem_boundary_list (mem_type: t) : MemOffset.t list =
     let helper 
         (part_mem: IsaBasic.imm_var_id * ((MemOffset.t * 'a * 'b) list)) :
@@ -904,15 +928,17 @@ module MemType (Entry: EntryType) = struct
         ) acc tl
 
   let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
-    get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type)
+    (get_mem_align_constraint mem_type) @
+    (get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type))
 
   let get_mem_non_overlap_constraint (mem_type: t) : SingleContext.t list =
     get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type)
 
   let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
     let boundary_list = get_mem_boundary_list mem_type in
+    let align_constraint = get_mem_align_constraint mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
-    let result = get_mem_non_overlap_constraint_helper boundary_constraint boundary_list in
+    let result = get_mem_non_overlap_constraint_helper (align_constraint @ boundary_constraint) boundary_list in
     Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result));
     result
 

@@ -2,6 +2,7 @@ open Isa
 open Single_exp
 open Single_entry_type
 open Mem_offset_new
+open Range_exp
 open Single_context
 open Constraint
 (* open Constraint *)
@@ -130,26 +131,37 @@ module SingleTypeInfer = struct
     (func_interface_list: FuncInterface.t list)
     (* (infer_state: t) : t * (ArchType.block_subtype_t list) = *)
     (infer_state: t) (iter_left: int) : t * (ArchType.block_subtype_t list) =
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper (List.hd infer_state.func_type).mem_type in
     let helper 
         (acc: (ArchType.block_subtype_t list) * (Isa.instruction list list)) 
         (block: Isa.basic_block) (block_type: ArchType.t) : 
         (ArchType.block_subtype_t list) * (Isa.instruction list list) =
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
-      if block_type.label = ".L196" then () else
+      (* if block_type.label = ".L196" then () else *)
       SingleContext.add_assertions infer_state.smt_ctx block_type.context;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       Printf.printf "type_prop_block %s%!\n" block.label;
       SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
+      let sub_sol_func (exp_pc: SingleExp.t * int) : RangeExp.t option =
+        let eval_align = SingleExp.eval_align ptr_align_list in
+        match SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set exp_pc with
+        | None -> None
+        | Some (Single e) -> Some (Single (eval_align e))
+        | Some (Range (l, r, step)) -> Some (Range (eval_align l, eval_align r, step))
+        | Some (SingleSet e_list) -> Some (SingleSet (List.map eval_align e_list))
+        | Some Top -> Some Top
+      in
       let (_, block_subtype), block =
         (* if iter_left = 1 && block.label = ".L2" then begin
           Printf.printf "skip prop %s\n" block.label;
           block_type, block_subtype
         end else *)
         ArchType.type_prop_block infer_state.smt_ctx 
-          (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set) 
+          sub_sol_func
+          (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set)  *)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)

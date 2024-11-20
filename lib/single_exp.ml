@@ -293,6 +293,16 @@ include SingleExpBasic
     | SingleBExp (_, SingleTop, _)
     | SingleBExp (_, _, SingleTop)
     | SingleUExp (_, SingleTop) -> [[ SingleTop ]]
+    | SingleBExp (SingleMul, SingleBExp (SingleSar, e0, SingleConst shift), SingleConst mul) ->
+      if shift >= 0L && shift < 64L && Int64.shift_left 1L (Int64.to_int shift) = mul then
+        eval_t (SingleBExp (SingleAnd, e0, SingleConst (Int64.neg mul)))
+      else
+        [[SingleBExp (SingleMul, SingleBExp (SingleSar, convert_t (eval_t e0), SingleConst shift), SingleConst mul)]]
+    | SingleBExp (SingleSal, SingleBExp (SingleSar, e0, SingleConst shift1), SingleConst shift2) ->
+      if shift1 >= 0L && shift1 < 64L && shift1 = shift2 then
+        eval_t (SingleBExp (SingleAnd, e0, SingleConst (Int64.neg (Int64.shift_left 1L (Int64.to_int shift1)))))
+      else
+        [[SingleBExp (SingleSal, SingleBExp (SingleSar, convert_t (eval_t e0), SingleConst shift1), SingleConst shift2)]]
     | SingleBExp (SingleAdd, l, r) ->
       add_t_list (eval_t l) (eval_t r)
     | SingleBExp (SingleSub, l, r) ->
@@ -358,6 +368,67 @@ include SingleExpBasic
     pp_single_exp 0 (convert_t (eval_t e));
     Printf.printf "\n====================\n"; *)
     convert_t (eval_t e)
+
+  let get_align (align_map: (int * int64) list) (e: t) : int64 = 
+    let rec helper (e: t) : int64 =
+      match e with
+      | SingleConst num ->
+        if Int64.rem num 16L = 0L then 16L
+        else if Int64.rem num 8L = 0L then 8L
+        else if Int64.rem num 4L = 0L then 4L
+        else if Int64.rem num 2L = 0L then 2L
+        else 1L
+      | SingleVar v ->
+        begin match List.find_map (fun (idx, idx_align) -> if idx = v then Some idx_align else None) align_map with
+        | Some v_align -> v_align
+        | None -> 1L
+        end
+      | SingleBExp (SingleAdd, e1, e2) | SingleBExp (SingleSub, e1, e2) ->
+        Int64.min (helper e1) (helper e2)
+      | SingleBExp (SingleMul, e1, e2) ->
+        Int64.mul (helper e1) (helper e2)
+      | SingleBExp (SingleAnd, _, SingleConst c) | SingleBExp (SingleAnd, SingleConst c, _) ->
+        helper (SingleConst (Int64.neg c))
+      | _ -> 1L
+    in
+    helper e  
+
+  let eval_align (align_map: (int * int64) list) (e: t) : t =
+    let is_and_num_align (c: int64) : bool =
+      c = -2L || c = -4L || c = -8L || c = -16L
+    in
+    let rec helper (e: t) : t =
+      match e with
+      | SingleBExp (SingleAnd, (SingleBExp (SingleAdd, e1, e2)), SingleConst c) 
+      | SingleBExp (SingleAnd, SingleConst c, (SingleBExp (SingleAdd, e1, e2))) ->
+        if is_and_num_align c then
+          let align = Int64.neg c in
+          let is_e1_aligned = Int64.rem (get_align align_map e1) align = 0L in
+          let is_e2_aligned = Int64.rem (get_align align_map e2) align = 0L in
+          if is_e1_aligned && is_e2_aligned then
+            SingleBExp (SingleAdd, helper e1, helper e2)
+          else if is_e1_aligned then
+            SingleBExp (SingleAdd, helper e1, helper (SingleBExp (SingleAnd, e2, SingleConst c)))
+          else if is_e2_aligned then
+            SingleBExp (SingleAdd, helper (SingleBExp (SingleAnd, e1, SingleConst c)), helper e2)
+          else
+            SingleBExp (SingleAnd, (SingleBExp (SingleAdd, helper e1, helper e2)), SingleConst c)
+        else SingleBExp (SingleAnd, (SingleBExp (SingleAdd, helper e1, helper e2)), SingleConst c)
+      | SingleBExp (SingleAnd, e, SingleConst c)
+      | SingleBExp (SingleAnd, SingleConst c, e) ->
+        if is_and_num_align c then
+          if Int64.rem (get_align align_map e) (Int64.neg c) = 0L then
+            helper e
+          else SingleBExp (SingleAnd, helper e, SingleConst c)
+        else SingleBExp (SingleAnd, helper e, SingleConst c)
+      | SingleBExp (bop, e1, e2) -> SingleBExp (bop, helper e1, helper e2)
+      | SingleUExp (uop, e1) -> SingleUExp (uop, helper e1)
+      | _ -> e
+    in
+    eval (helper e)
+
+
+
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     let new_idx = -pc in
