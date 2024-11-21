@@ -205,21 +205,21 @@ module SingleTypeInfer = struct
       let acc_update_list, acc_context = acc in
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
-      (* let unknown_range = 
+      let unknown_range = 
         List.map (
           fun ((l, r), pc) -> 
             SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (l, pc),
             SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (r, pc)
         ) unknown_list
       in
-      let new_offset_list = List.filter_map MemOffset.from_range unknown_range in *)
-      let new_offset_list = 
+      let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
+      (* let new_offset_list = 
         List.concat (
           List.filter_map (
             SingleSubtype.sub_sol_offset_to_offset_list infer_state.single_subtype infer_state.input_var_set
           ) unknown_list
         ) 
-      in
+      in *)
       (* Printf.printf "New off list\n";
       MemOffset.pp_off_list 0 new_offset_list; *)
       (* Check whether the each offset belongs to some memory slot if add some contraints *)
@@ -363,6 +363,8 @@ module SingleTypeInfer = struct
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
         SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type);
         SingleContext.add_assertions state.smt_ctx state.context;
+        (* if func_name = "SHA512_Update" then
+          SingleContext.add_assertions state.smt_ctx [ Cond (Le, SingleConst 0L, SingleVar 27) ]; *)
         (* gen_implicit_mem_constraints state; *)
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
