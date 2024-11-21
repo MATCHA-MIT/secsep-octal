@@ -97,6 +97,7 @@ module RangeTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (infer_state: t) : t * (ArchType.block_subtype_t list) =
     (* TODO: This is the same as the one in TaintTypeInfer. Consider to remove duplicate code. *)
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper (List.hd infer_state.func_type).mem_type in
     let helper 
         (block_subtype: ArchType.block_subtype_t list) 
         (block: Isa.basic_block) 
@@ -106,7 +107,10 @@ module RangeTypeInfer = struct
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
       let (_, block_subtype), _ =
         ArchType.type_prop_block infer_state.smt_ctx 
-          (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) 
+          (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set)  *)
+          (SingleSubtype.sub_sol_single_to_offset_opt 
+            (SingleEntryType.eval_align ptr_align_list)
+            infer_state.single_sol infer_state.input_single_var_set)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)

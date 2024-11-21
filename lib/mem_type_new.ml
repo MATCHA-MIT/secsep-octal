@@ -5,6 +5,7 @@ open Single_exp
 open Entry_type
 open Mem_offset_new
 open Full_mem_anno
+open Cond_type_new
 open Single_context
 open Constraint
 (* open Arch_type *)
@@ -403,6 +404,7 @@ module MemType (Entry: EntryType) = struct
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
     (* let stamp_beg = Unix.gettimeofday () in *)
+    (* Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off)); *)
     let ptr_set = get_ptr_set mem in
     let simp_l, simp_r = simp_addr_off in
     let result = match SingleExp.find_base simp_l ptr_set, SingleExp.find_base simp_r ptr_set with
@@ -471,7 +473,95 @@ module MemType (Entry: EntryType) = struct
         | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
         end
 
+  let get_heuristic_mem_slot_helper
+      (smt_ctx: SmtEmitter.t)
+      (mem: t)
+      (addr_off: MemOffset.t) :
+      MemOffset.t option =
+    let get_heuristic_part_mem_with_addr
+        (part_mem: (MemOffset.t * 'a * 'b) list) 
+        (addr: SingleExp.t) (is_addr_left: bool) : MemOffset.t option =
+      let cmp_op = if is_addr_left then SingleCondType.Lt else SingleCondType.Le in
+      List.find_map (
+        fun (entry: MemOffset.t * 'a * 'b) ->
+          let off, _, _ = entry in
+          let _, off_r = off in
+          if SingleCondType.check true smt_ctx [ cmp_op, addr, off_r ] = SatYes then
+            Some off
+          else None
+      ) part_mem
+    in
+    let choose_left_right (off: MemOffset.t) : SingleExp.t * bool * SingleExp.SingleVarSet.t =
+      let l, r = off in
+      let l_var_set = SingleExp.get_vars l in
+      let r_var_set = SingleExp.get_vars r in
+      if SingleExp.SingleVarSet.cardinal l_var_set < SingleExp.SingleVarSet.cardinal r_var_set then
+        l, true, l_var_set
+      else
+        r, false, r_var_set
+    in
+    let get_other_zero_addr 
+        (ptr: int) (addr: SingleExp.t) (addr_var_set: SingleExp.SingleVarSet.t) :
+        SingleExp.t =
+      let other_var_set = SingleExp.SingleVarSet.remove ptr addr_var_set in
+      let other_var_to_zero_map = List.map (fun x -> (x, SingleExp.SingleConst 0L)) (SingleExp.SingleVarSet.to_list other_var_set) in
+      SingleExp.repl_local_var other_var_to_zero_map addr
+    in
+    let ptr_set = get_ptr_set mem in
+    let l, r = addr_off in
+    match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
+    | Some b_l, Some b_r ->
+      if b_l <> b_r || b_l = IsaBasic.rsp_idx then None
+      else
+        let part_mem = get_part_mem mem b_l in
+        begin match part_mem with
+        | [ target_offset, _, _] -> Some target_offset
+        | _ -> 
+          let chosen_addr, is_left, chosen_addr_var_set = choose_left_right addr_off in
+          let other_zero_chosen_addr = get_other_zero_addr b_l chosen_addr chosen_addr_var_set in
+          get_heuristic_part_mem_with_addr part_mem other_zero_chosen_addr is_left
+        end
+    | _ -> None
+
   let get_heuristic_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (sub_sol_to_list_func: MemOffset.t * int -> (MemOffset.t list) option)
+      (input_var_set: SingleExp.SingleVarSet.t)
+      (mem: t)
+      (addr_off_pc: MemOffset.t * int) :
+      (MemOffset.t * int, (SingleContext.t list * bool)) Either.t =
+    let orig_off, _ = addr_off_pc in
+    let try_simp_off_opt =
+      if MemOffset.is_val input_var_set orig_off then Some (orig_off, orig_off)
+      else
+        match sub_sol_to_list_func addr_off_pc with
+        | Some [ simp_off ] -> Some (simp_off, simp_off)
+        | Some simp_off_list -> Some (List.hd simp_off_list, orig_off)
+        | None -> None
+    in
+    match try_simp_off_opt with
+    | None -> Left addr_off_pc
+    | Some (simp_off, (assert_l, assert_r)) ->
+      match get_heuristic_mem_slot_helper smt_ctx mem simp_off with
+      | Some (off_l, off_r) ->
+        let cmp_op: SingleCondType.cond = if SingleExp.cmp (fst orig_off) (snd orig_off) = 0 then Le else Lt in
+        let cond_list: SingleContext.t list = [
+          Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, assert_l)), SingleConst 0L);
+          (* TODO: Think about whether this should be Lt or Le!!! *)
+          Cond (cmp_op, assert_l, assert_r);
+          Cond (cmp_op, SingleExp.eval (SingleBExp (SingleSub, assert_l, assert_r)), SingleConst 0L);
+          Cond (Le, SingleExp.eval (SingleBExp (SingleSub, assert_r, off_r)), SingleConst 0L);
+        ] in
+        begin match SingleContext.check_or_assert smt_ctx cond_list with
+        | None -> Left addr_off_pc (* addr_off does not belongs to this entry *)
+        | Some cond_list -> 
+          Printf.printf "lookup %s\nslot %s" (MemOffset.to_string (assert_l, assert_r)) (MemOffset.to_string (off_l, off_r));
+          SmtEmitter.pp_smt_ctx 0 smt_ctx;
+          Right (cond_list, MemOffset.is_val input_var_set (assert_l, assert_r))
+        end
+      | None -> Left addr_off_pc
+
+  (* let get_heuristic_mem_type
       (smt_ctx: SmtEmitter.t)
       (mem: t)
       (addr_off: MemOffset.t) :
@@ -542,7 +632,7 @@ module MemType (Entry: EntryType) = struct
           end
           (* Left addr_off *)
         end
-    | _ -> Left addr_off
+    | _ -> Left addr_off *)
         
   let is_shared_mem_helper
       (is_quick: bool)

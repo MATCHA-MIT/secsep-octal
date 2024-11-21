@@ -44,6 +44,7 @@ module ArchType (Entry: EntryType) = struct
     reg_type: RegType.t;
     mem_type: MemType.t;
     context: SingleContext.t list;
+    tmp_context: SingleContext.t list;
     flag: entry_t * entry_t;
     branch_hist: (CondType.t * int) list;
     full_not_taken_hist: (CondType.t * int) list;
@@ -123,6 +124,7 @@ module ArchType (Entry: EntryType) = struct
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
+      tmp_context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
@@ -149,6 +151,7 @@ module ArchType (Entry: EntryType) = struct
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
+      tmp_context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
@@ -887,24 +890,25 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_inst
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: (SingleExp.t * int) -> MemOffset.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (inst: Isa.instruction)
       (block_subtype: block_subtype_t list) :
       (t * (block_subtype_t list)) * Isa.instruction =
     (* Update pc here!!! *)
-    (* Printf.printf "Prop inst %d %s\n" curr_type.pc (Isa.string_of_instruction inst); *)
+    (* Printf.printf "Prop inst %d %s%!\n" curr_type.pc (Isa.string_of_instruction inst); *)
     (* let unknown_before = List.length (Constraint.get_unknown curr_type.constraint_list) in *)
     let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
+      sub_sol_func (e, curr_type.pc)
       (* Only return None if no solution is found. If cannot convert to mem offset, use [e, e]. *)
-      match sub_sol_func (e, curr_type.pc) with
+      (* match sub_sol_func (e, curr_type.pc) with
       | Some r -> (* RangeExp.to_mem_offset2 r *)
         begin match RangeExp.to_mem_offset2 r with
         | Some off -> Some off
         | None -> Some (e, e)
         end
-      | None -> None
+      | None -> None *)
     in
     let (next_type, block_subtype), inst = 
       match inst with
@@ -937,7 +941,7 @@ module ArchType (Entry: EntryType) = struct
 
   let type_prop_block
       (smt_ctx: SmtEmitter.t)
-      (sub_sol_func: (SingleExp.t * int) -> RangeExp.t option)
+      (sub_sol_func: (SingleExp.t * int) -> MemOffset.t option)
       (func_interface_list: FuncInterface.t list)
       (curr_type: t)
       (block: Isa.instruction list)

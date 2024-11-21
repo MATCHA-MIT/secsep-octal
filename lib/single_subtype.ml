@@ -470,7 +470,8 @@ module SingleSubtype = struct
     in
     List.fold_left helper [e] tv_rel_list
 
-  let sub_sol_single_to_range_naive_set_repl
+  let sub_sol_single_to_range_naive_repl
+      (repl_set_sol: bool)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e_pc: int)
@@ -489,7 +490,9 @@ module SingleSubtype = struct
           else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step))))
         | SingleSet e_list ->
           if List.find_opt (fun x -> not (SingleExp.is_val input_var_set x)) e_list = None then
-            SingleSet e_list
+            if List.length e_list = 1 then Single (List.hd e_list)
+            else if repl_set_sol then SingleSet e_list
+            else Single (SingleVar v)
           else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (SingleSet e_list)))
         | Top -> Top
         end          
@@ -553,9 +556,19 @@ module SingleSubtype = struct
         (* | SingleSal, SingleSet e_list, Single (SingleConst c) ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSal, x, SingleConst c))) e_list) *)
         | _, Single e, SingleSet e_list ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, e, x))) e_list)
+          if repl_set_sol then
+            SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, e, x))) e_list)
+          else begin
+            Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (SingleEntryType.sexp_of_t e));
+            single_subtype_error "sub_sol_single_to_range_naive_repl: Do not expect get set operand"
+          end
         | _, SingleSet e_list, Single e ->
-          SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, x, e))) e_list)
+          if repl_set_sol then
+            SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (bop, x, e))) e_list)
+          else begin
+            Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (SingleEntryType.sexp_of_t e));
+            single_subtype_error "sub_sol_single_to_range_naive_repl: Do not expect get set operand"
+          end
         | _, r1, r2 -> 
           Printf.printf "sub_sol_single_to_range: WARNING! %s not handled l %s r %s\n" 
             (SingleExp.to_string e) (RangeExp.to_string r1) (RangeExp.to_string r2); 
@@ -565,6 +578,23 @@ module SingleSubtype = struct
     in
     helper e
 
+  let sub_sol_single_to_offset_opt
+      (eval_helper: SingleExp.t -> SingleExp.t)
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (e: type_pc_t) : MemOffset.t option =
+    let e, e_pc = e in
+    let resolved_vars = 
+      List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
+    in
+    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) e then
+      match sub_sol_single_to_range_naive_repl false tv_rel_list input_var_set e_pc e with
+      | Single e -> let e = eval_helper e in Some (e, e)
+      | Range (l, r, _) -> Some (eval_helper l, eval_helper r)
+      | _ -> let e = eval_helper e in Some (e, e)
+      (* Some (sub_sol_single_to_range tv_rel_list input_var_set e) *)
+    else None
+
   let sub_sol_single_to_range
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
@@ -573,9 +603,9 @@ module SingleSubtype = struct
     let e_list = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp e in
     match e_list with
     | [] -> single_subtype_error "sub_sol_single_to_range: get empty list"
-    | e :: [] -> sub_sol_single_to_range_naive_set_repl tv_rel_list input_var_set e_pc e
+    | e :: [] -> sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
     | _ ->
-      let simp_e_list = List.map (sub_sol_single_to_range_naive_set_repl tv_rel_list input_var_set e_pc) e_list in
+      let simp_e_list = List.map (sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc) e_list in
       let single_e_list = List.filter_map (
         fun (x: RangeExp.t) ->
           match x with
@@ -586,7 +616,7 @@ module SingleSubtype = struct
       if List.length simp_e_list = List.length single_e_list then
         SingleSet single_e_list
       else
-        sub_sol_single_to_range_naive_set_repl tv_rel_list input_var_set e_pc e
+        sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
 
   let sub_sol_offset_to_offset_list
       (tv_rel_list: t)
