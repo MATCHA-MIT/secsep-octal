@@ -32,5 +32,31 @@ module SingleExpBasic = struct
     | SingleUExp of single_uop * t
   [@@deriving sexp]
 
-  let hh (x: t) = sexp_of_t x 
+  type single_var_type_t =
+    | VarPtr
+    | VarLen
+    | VarOther
+  [@@deriving sexp]
+  
+  type var_type_map_t = (IsaBasic.imm_var_id * single_var_type_t) list
+  [@@deriving sexp]
+
+  let get_var_type
+      (var_type_map: var_type_map_t)
+      (var: IsaBasic.imm_var_id) : single_var_type_t =
+    match List.find_opt (fun (v, _) -> v = var) var_type_map with
+    | Some (_, t) -> t
+    | _ -> VarOther
+
+  let set_var_type 
+      (var_type_map: var_type_map_t)
+      (var: IsaBasic.imm_var_id)
+      (var_type: single_var_type_t) :
+      var_type_map_t =
+    match get_var_type var_type_map var, var_type with
+    | VarOther, _ -> (var, var_type) :: var_type_map
+    | VarPtr, VarLen
+    | VarLen, VarPtr -> single_exp_error "set_var_type conflict"
+    | _ -> var_type_map  
+
 end

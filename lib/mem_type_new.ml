@@ -245,6 +245,21 @@ module MemTypeBasic = struct
         )
     ) mem_layout
 
+  let get_var_type_map (mem_layout: 'a mem_content) : SingleExp.var_type_map_t =
+    List.fold_left (
+      fun (acc: SingleExp.var_type_map_t) (ptr, off_list) ->
+        let acc = SingleExp.set_var_type acc ptr SingleExp.VarPtr in
+        List.fold_left (
+          fun (acc: SingleExp.var_type_map_t) (entry: MemOffset.t * MemRange.t * 'a) ->
+            let (l, r), _, _ = entry in
+            let len_var_set = SingleExp.SingleVarSet.diff (SingleExp.get_vars r) (SingleExp.get_vars l) in
+            List.fold_left (
+              fun acc v -> 
+                SingleExp.set_var_type acc v SingleExp.VarLen
+            ) acc (SingleExp.SingleVarSet.to_list len_var_set)
+        ) acc off_list
+    ) [] mem_layout
+
 end
 
 module MemType (Entry: EntryType) = struct
@@ -475,6 +490,7 @@ module MemType (Entry: EntryType) = struct
 
   let get_heuristic_mem_slot_helper
       (smt_ctx: SmtEmitter.t)
+      (var_type_map: SingleExp.var_type_map_t)
       (mem: t)
       (addr_off: MemOffset.t) :
       MemOffset.t option =
@@ -491,21 +507,42 @@ module MemType (Entry: EntryType) = struct
           else None
       ) part_mem
     in
-    let choose_left_right (off: MemOffset.t) : SingleExp.t * bool * SingleExp.SingleVarSet.t =
+    let choose_left_right (off: MemOffset.t) : bool * SingleExp.SingleVarSet.t =
       let l, r = off in
       let l_var_set = SingleExp.get_vars l in
       let r_var_set = SingleExp.get_vars r in
-      if SingleExp.SingleVarSet.cardinal l_var_set < SingleExp.SingleVarSet.cardinal r_var_set then
-        l, true, l_var_set
+      if SingleExp.SingleVarSet.cardinal l_var_set <= SingleExp.SingleVarSet.cardinal r_var_set then
+        true, l_var_set
       else
-        r, false, r_var_set
+        false, r_var_set
     in
-    let get_other_zero_addr 
+    (* let get_other_zero_addr 
         (ptr: int) (addr: SingleExp.t) (addr_var_set: SingleExp.SingleVarSet.t) :
         SingleExp.t =
       let other_var_set = SingleExp.SingleVarSet.remove ptr addr_var_set in
       let other_var_to_zero_map = List.map (fun x -> (x, SingleExp.SingleConst 0L)) (SingleExp.SingleVarSet.to_list other_var_set) in
       SingleExp.repl_local_var other_var_to_zero_map addr
+    in *)
+    let get_heuristic_addr
+        (ptr: int) (off: MemOffset.t) (choose_left: bool) (addr_var_set: SingleExp.SingleVarSet.t) :
+        SingleExp.t =
+      let l, r = off in
+      let addr = if choose_left then l else r in
+      let len =
+        match SingleExp.eval (SingleBExp (SingleSub, r, l)) with
+        | SingleConst c -> c
+        | _ -> 0L
+      in
+      let other_var_set = SingleExp.SingleVarSet.remove ptr addr_var_set in
+      let other_var_repl_map =
+        List.map (
+          fun x ->
+            match SingleExp.get_var_type var_type_map x with
+            | VarLen -> (x, SingleExp.SingleConst len)
+            | _ -> (x, SingleExp.SingleConst 0L)
+        ) (SingleExp.SingleVarSet.to_list other_var_set)
+      in
+      SingleExp.repl_local_var other_var_repl_map addr
     in
     let ptr_set = get_ptr_set mem in
     let l, r = addr_off in
@@ -517,8 +554,8 @@ module MemType (Entry: EntryType) = struct
         begin match part_mem with
         | [ target_offset, _, _] -> Some target_offset
         | _ -> 
-          let chosen_addr, is_left, chosen_addr_var_set = choose_left_right addr_off in
-          let other_zero_chosen_addr = get_other_zero_addr b_l chosen_addr chosen_addr_var_set in
+          let is_left, chosen_addr_var_set = choose_left_right addr_off in
+          let other_zero_chosen_addr = get_heuristic_addr b_l addr_off is_left chosen_addr_var_set in
           get_heuristic_part_mem_with_addr part_mem other_zero_chosen_addr is_left
         end
     | _ -> None
@@ -527,6 +564,7 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (sub_sol_to_list_func: MemOffset.t * int -> (MemOffset.t list) option)
       (input_var_set: SingleExp.SingleVarSet.t)
+      (var_type_map: SingleExp.var_type_map_t)
       (mem: t)
       (addr_off_pc: MemOffset.t * int) :
       (MemOffset.t * int, (SingleContext.t list * bool)) Either.t =
@@ -542,15 +580,17 @@ module MemType (Entry: EntryType) = struct
     match try_simp_off_opt with
     | None -> Left addr_off_pc
     | Some (simp_off, (assert_l, assert_r)) ->
-      match get_heuristic_mem_slot_helper smt_ctx mem simp_off with
+      match get_heuristic_mem_slot_helper smt_ctx var_type_map mem simp_off with
       | Some (off_l, off_r) ->
         let cmp_op: SingleCondType.cond = if SingleExp.cmp (fst orig_off) (snd orig_off) = 0 then Le else Lt in
         let cond_list: SingleContext.t list = [
-          Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, assert_l)), SingleConst 0L);
+          (* Cond (Le, SingleExp.eval (SingleBExp (SingleSub, off_l, assert_l)), SingleConst 0L); *)
+          Cond (Le, off_l, assert_l);
           (* TODO: Think about whether this should be Lt or Le!!! *)
           Cond (cmp_op, assert_l, assert_r);
           Cond (cmp_op, SingleExp.eval (SingleBExp (SingleSub, assert_l, assert_r)), SingleConst 0L);
-          Cond (Le, SingleExp.eval (SingleBExp (SingleSub, assert_r, off_r)), SingleConst 0L);
+          (* Cond (Le, SingleExp.eval (SingleBExp (SingleSub, assert_r, off_r)), SingleConst 0L); *)
+          Cond (Le, assert_r, off_r);
         ] in
         begin match SingleContext.check_or_assert smt_ctx cond_list with
         | None -> Left addr_off_pc (* addr_off does not belongs to this entry *)

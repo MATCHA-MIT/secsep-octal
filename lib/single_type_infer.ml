@@ -32,6 +32,7 @@ module SingleTypeInfer = struct
     single_subtype: SingleSubtype.t;
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
+    var_type_map: SingleEntryType.var_type_map_t;
     context: SingleContext.t list;
     smt_ctx: SmtEmitter.t;
   }
@@ -115,6 +116,7 @@ module SingleTypeInfer = struct
           end
       ) (start_pc, start_var) func_body
     in
+    let var_type_map = ArchType.MemType.get_var_type_map func_mem_interface in
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
       func_name = func_name;
@@ -123,6 +125,7 @@ module SingleTypeInfer = struct
       single_subtype = [];
       next_var = next_var;
       input_var_set = input_var_set;
+      var_type_map = var_type_map;
       context = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
@@ -221,6 +224,7 @@ module SingleTypeInfer = struct
             infer_state.smt_ctx 
             (SingleSubtype.sub_sol_offset_to_offset_list infer_state.single_subtype infer_state.input_var_set)
             infer_state.input_var_set
+            infer_state.var_type_map
             mem_type
         ) unknown_list
       in
