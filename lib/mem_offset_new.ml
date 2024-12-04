@@ -161,6 +161,11 @@ module MemOffset = struct
       (* mem_offset_error 
         (Printf.sprintf "from_range cannot convert %s %s" (RangeExp.to_string l) (RangeExp.to_string r)) *)
 
+  let from_off_opt (off_opt_l_r: (t option) * (t option)) : t option =
+    match off_opt_l_r with
+    | Some (l, _), Some (_, r) -> Some (l, r)
+    | _ -> None
+
   (* This function should only be used when inserting new offset*)
   (* let assert_no_overflow
       (smt_ctx: SmtEmitter.t) (off: t) : unit =
@@ -239,6 +244,12 @@ module MemOffset = struct
 
   let repl_var_exp (e: t) (v_idx_exp: IsaBasic.imm_var_id * SingleExp.t) : t =
     let l, r = e in SingleExp.repl_var_exp l v_idx_exp, SingleExp.repl_var_exp r v_idx_exp
+
+  let eval_helper 
+      (single_eval_helper: SingleExp.t -> SingleExp.t)
+      (off: t) : t =
+    let l, r = off in
+    single_eval_helper l, single_eval_helper r
 
   let add_base (base_ptr: SingleExp.t) (o: t) : t =
     let l, r = o in

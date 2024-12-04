@@ -111,6 +111,9 @@ module RangeTypeInfer = struct
           (SingleSubtype.sub_sol_single_to_offset_opt 
             (SingleEntryType.eval_align ptr_align_list)
             infer_state.single_sol infer_state.input_single_var_set)
+          (SingleSubtype.sub_sol_single_to_offset_list
+            (SingleEntryType.eval_align ptr_align_list)
+            infer_state.single_sol infer_state.input_single_var_set)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
@@ -124,8 +127,10 @@ module RangeTypeInfer = struct
 
   let get_func_interface
       (infer_state: t) : FuncInterface.t =
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper (List.hd infer_state.func_type).mem_type in
     let sub_sol =
       SingleSubtype.sub_sol_single_to_single_func_interface
+        (SingleEntryType.eval_align ptr_align_list)
         infer_state.single_sol infer_state.input_single_var_set
     in
     ArchType.get_func_interface

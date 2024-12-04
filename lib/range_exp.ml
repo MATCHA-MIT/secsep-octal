@@ -97,6 +97,13 @@ module RangeExp = struct
     | Range (l, r, _) -> Some (l, r)
     | _ -> None
 
+  let eval_helper (single_eval_helper: SingleExp.t -> SingleExp.t) (r: t) : t =
+    match r with
+    | Single e -> Single (single_eval_helper e)
+    | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step)
+    | SingleSet e_list -> SingleSet (List.map single_eval_helper e_list)
+    | Top -> Top
+
   (* let single_exp_repl_sol (sol: (IsaBasic.imm_var_id * t) list) (e: SingleExp.t) : t =
     let rec helper (e: SingleExp.t) : t =
       match e with

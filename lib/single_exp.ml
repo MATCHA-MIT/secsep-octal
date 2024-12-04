@@ -612,6 +612,29 @@ include SingleExpBasic
     | hd :: [] -> Some hd
     | _ -> single_exp_error (Printf.sprintf "find_base find more than one base for %s" (to_string e))
 
+  let find_base_adv 
+      (sub_sol_to_list_func: t -> ((t * t) list) option)
+      (e: t) (ptr_set: SingleVarSet.t) : IsaBasic.imm_var_id option =
+    let base_opt = find_base e ptr_set in 
+    if base_opt <> None then
+      base_opt
+    else
+      match sub_sol_to_list_func e with
+      | Some e_list -> 
+        let p_set =
+          List.fold_left (
+            fun (acc: SingleVarSet.t) (e, _) ->
+              let p_set = filter_single_var e in
+              SingleVarSet.inter acc p_set
+          ) ptr_set e_list
+        in
+        begin match SingleVarSet.to_list p_set with
+        | [] -> None
+        | hd :: [] -> Some hd
+        | _ -> single_exp_error (Printf.sprintf "find_base find more than one base for %s" (to_string e))
+        end
+      | None -> None
+
   let get_single_exp (e: t) : t = e
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 

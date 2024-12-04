@@ -412,6 +412,7 @@ module MemType (Entry: EntryType) = struct
 
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
+      (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
       (mem: t)
       (orig_addr_off: MemOffset.t)
       (simp_addr_off: MemOffset.t) :
@@ -422,7 +423,8 @@ module MemType (Entry: EntryType) = struct
     (* Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off)); *)
     let ptr_set = get_ptr_set mem in
     let simp_l, simp_r = simp_addr_off in
-    let result = match SingleExp.find_base simp_l ptr_set, SingleExp.find_base simp_r ptr_set with
+    if SingleExp.cmp simp_l SingleTop = 0 || SingleExp.cmp simp_r SingleTop = 0 then None else
+    let result = match SingleExp.find_base_adv sub_sol_list_func simp_l ptr_set, SingleExp.find_base_adv sub_sol_list_func simp_r ptr_set with
     | Some b_l, Some b_r ->
       if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else 
@@ -546,6 +548,7 @@ module MemType (Entry: EntryType) = struct
     in
     let ptr_set = get_ptr_set mem in
     let l, r = addr_off in
+    if SingleExp.cmp l SingleTop = 0 || SingleExp.cmp r SingleTop = 0 then None else
     match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
       if b_l <> b_r || b_l = IsaBasic.rsp_idx then None
@@ -738,6 +741,7 @@ module MemType (Entry: EntryType) = struct
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
+      (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
       (update_init_range: bool)
       (mem: t)
       (orig_addr_off: MemOffset.t)
@@ -751,7 +755,7 @@ module MemType (Entry: EntryType) = struct
     let ptr_set = get_ptr_set mem in
     let simp_l, simp_r = simp_addr_off in
     let result: (t * (Constraint.t list) * FullMemAnno.slot_t) option = 
-      match SingleExp.find_base simp_l ptr_set, SingleExp.find_base simp_r ptr_set with
+      match SingleExp.find_base_adv sub_sol_list_func simp_l ptr_set, SingleExp.find_base_adv sub_sol_list_func simp_r ptr_set with
       | Some b_l, Some b_r ->
         if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
         else let part_mem = get_part_mem mem b_l in

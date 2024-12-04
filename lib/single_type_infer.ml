@@ -163,13 +163,18 @@ module SingleTypeInfer = struct
           (SingleExp.eval_align ptr_align_list)
           infer_state.single_subtype infer_state.input_var_set
       in
+      let sub_sol_list_func =
+        SingleSubtype.sub_sol_single_to_offset_list
+          (SingleExp.eval_align ptr_align_list)
+          infer_state.single_subtype infer_state.input_var_set
+      in
       let (_, block_subtype), block =
         (* if iter_left = 1 && block.label = ".L2" then begin
           Printf.printf "skip prop %s\n" block.label;
           block_type, block_subtype
         end else *)
         ArchType.type_prop_block infer_state.smt_ctx 
-          sub_sol_func
+          sub_sol_func sub_sol_list_func
           (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set)  *)
           func_interface_list block_type block.insts block_subtype
       in
@@ -204,7 +209,8 @@ module SingleTypeInfer = struct
       2. Check whether the offset refers to a new local stack slot and update local stack if needed. *)
     Printf.printf "Update mem smt ctx\n";
     SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
-    let mem_type = (List.nth infer_state.func_type 0).mem_type in
+    let mem_type = (List.hd infer_state.func_type).mem_type in
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
     let helper 
         (acc: ((MemOffset.t * bool) list) * (SingleContext.t list)) 
@@ -222,7 +228,9 @@ module SingleTypeInfer = struct
         List.partition_map (
           ArchType.MemType.get_heuristic_mem_type 
             infer_state.smt_ctx 
-            (SingleSubtype.sub_sol_offset_to_offset_list infer_state.single_subtype infer_state.input_var_set)
+            (SingleSubtype.sub_sol_offset_to_offset_list 
+            (SingleExp.eval_align ptr_align_list)
+              infer_state.single_subtype infer_state.input_var_set)
             infer_state.input_var_set
             infer_state.var_type_map
             mem_type
@@ -238,8 +246,12 @@ module SingleTypeInfer = struct
       let unknown_range = 
         List.map (
           fun ((l, r), pc) -> 
-            SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (l, pc),
-            SingleSubtype.sub_sol_single_to_range infer_state.single_subtype infer_state.input_var_set (r, pc)
+            SingleSubtype.sub_sol_single_to_range 
+              (SingleExp.eval_align ptr_align_list)
+              infer_state.single_subtype infer_state.input_var_set (l, pc),
+            SingleSubtype.sub_sol_single_to_range 
+              (SingleExp.eval_align ptr_align_list)
+              infer_state.single_subtype infer_state.input_var_set (r, pc)
         ) unknown_list
       in
       let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
@@ -381,6 +393,7 @@ module SingleTypeInfer = struct
       (iter: int)
       (solver_iter: int) : t =
     let init_infer_state = init prog func_name func_mem_interface in
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
         (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
@@ -451,7 +464,7 @@ module SingleTypeInfer = struct
         let pc_cond_map =
           SingleInputVarCondSubtype.solve
             state.smt_ctx
-            (SingleSubtype.sub_sol_single_var single_subtype state.input_var_set)
+            (SingleSubtype.sub_sol_single_var (SingleExp.eval_align ptr_align_list) single_subtype state.input_var_set)
             block_subtype
         in
         (* Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleInputVarCondSubtype.sexp_of_pc_cond_t pc_cond_map)); *)
@@ -507,8 +520,10 @@ module SingleTypeInfer = struct
 
   let get_func_interface
       (infer_state: t) : FuncInterface.t =
+    let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper (List.hd infer_state.func_type).mem_type in
     let sub_sol = 
       SingleSubtype.sub_sol_single_to_single_func_interface 
+        (SingleExp.eval_align ptr_align_list)
         infer_state.single_subtype infer_state.input_var_set 
     in
     ArchType.get_func_interface

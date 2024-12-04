@@ -431,10 +431,29 @@ module SingleSubtype = struct
       end
     | None -> Top
 
+  let is_sol_resolved
+      (is_val_helper: SingleExp.SingleVarSet.t -> 'a -> bool)
+      (tv_rel_list: t)
+      (input_var_set: SingleExp.SingleVarSet.t)
+      (e: 'a) : bool =
+    let resolved_vars = 
+      List.filter_map (
+        fun (x: type_rel) -> 
+          if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None
+      ) tv_rel_list
+    in
+    is_val_helper (
+      SingleExp.SingleVarSet.union 
+        (SingleExp.SingleVarSet.of_list resolved_vars) 
+        input_var_set
+    ) e
+
   let sub_sol_single_var
+      (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: SingleExp.t) : SingleExp.t option =
+    (* No need to use is_sol_resolved here since it already did that implicitly *)
     if SingleExp.is_val input_var_set e then Some e
     else
       let e_vars = SingleExp.get_vars e in
@@ -447,10 +466,12 @@ module SingleSubtype = struct
           | _ -> acc
         else acc
       in
-      let simp_e = List.fold_left helper e tv_rel_list in
+      let simp_e = eval_helper (List.fold_left helper e tv_rel_list) in
       if SingleExp.is_val input_var_set simp_e then Some simp_e else None
 
   let sub_sol_single_set_var
+      (* NOTE: this is a internal sub helper func, and eval_helper would be called by its caller,
+        so we do not have eval_helper for it *)
       (tv_rel_list: t)
       (get_vars: 'a -> SingleEntryType.SingleVarSet.t)
       (repl_var_exp: 'a -> IsaBasic.imm_var_id * SingleExp.t -> 'a)
@@ -471,6 +492,8 @@ module SingleSubtype = struct
     List.fold_left helper [e] tv_rel_list
 
   let sub_sol_single_to_range_naive_repl
+      (* NOTE: this is a internal sub helper func, and eval_helper would be called by its caller,
+        so we do not have eval_helper for it *)
       (repl_set_sol: bool)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
@@ -584,10 +607,11 @@ module SingleSubtype = struct
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : MemOffset.t option =
     let e, e_pc = e in
-    let resolved_vars = 
+    (* let resolved_vars = 
       List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
     in
-    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) e then
+    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) e then *)
+    if is_sol_resolved SingleExp.is_val tv_rel_list input_var_set e then
       match sub_sol_single_to_range_naive_repl false tv_rel_list input_var_set e_pc e with
       | Single e -> let e = eval_helper e in Some (e, e)
       | Range (l, r, _) -> Some (eval_helper l, eval_helper r)
@@ -595,7 +619,47 @@ module SingleSubtype = struct
       (* Some (sub_sol_single_to_range tv_rel_list input_var_set e) *)
     else None
 
+  let sub_sol_to_offset_list
+      (* NOTE: this is a wrapper func, and eval_helper would be called by its callee sub_to_off_opt_helper,
+        so we do not have eval_helper for it *)
+      (sub_to_list_helper: 'a -> 'a list)
+      (sub_to_off_opt_helper: 'a * int -> MemOffset.t option)
+      (e_and_pc: 'a * int) : (MemOffset.t list) option =
+    let e, e_pc = e_and_pc in
+    let e_list = sub_to_list_helper e in
+    let simp_helper (e: 'a) : MemOffset.t option =
+      sub_to_off_opt_helper (e, e_pc)
+    in
+    match e_list with
+    | [] -> single_subtype_error "sub_sol_to_offset_list: get empty list"
+    | e :: [] ->
+      let off_opt = simp_helper e in
+      begin match off_opt with
+      | Some out_off -> Some [out_off]
+      | None -> None
+      end
+    | _ -> 
+      let simp_off_list = List.filter_map simp_helper e_list in
+      if List.length simp_off_list = List.length e_list then
+        Some simp_off_list
+      else
+        let off_opt = simp_helper e in
+        begin match off_opt with
+        | Some out_off -> Some [out_off]
+        | None -> None
+        end
+
+  let sub_sol_single_to_offset_list
+      (eval_helper: SingleExp.t -> SingleExp.t)
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (e: type_pc_t) : (MemOffset.t list) option =
+    let sub_to_list_helper = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp in
+    let sub_to_off_opt_helper = sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set in
+    sub_sol_to_offset_list sub_to_list_helper sub_to_off_opt_helper e
+
   let sub_sol_single_to_range
+      (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t =
@@ -603,7 +667,9 @@ module SingleSubtype = struct
     let e_list = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp e in
     match e_list with
     | [] -> single_subtype_error "sub_sol_single_to_range: get empty list"
-    | e :: [] -> sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
+    | e :: [] -> 
+      sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
+      |> (RangeExp.eval_helper eval_helper)
     | _ ->
       let simp_e_list = List.map (sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc) e_list in
       let single_e_list = List.filter_map (
@@ -615,20 +681,34 @@ module SingleSubtype = struct
       in
       if List.length simp_e_list = List.length single_e_list then
         SingleSet single_e_list
+        |> (RangeExp.eval_helper eval_helper)
       else
         sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
+        |> (RangeExp.eval_helper eval_helper)
 
   let sub_sol_offset_to_offset_list
+      (* eval_helper and check sol resolved are all done by calling sub_sol_single_to_offset_opt *)
+      (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (off_and_pc: MemOffset.t * int) : (MemOffset.t list) option =
-    let off, off_pc = off_and_pc in
+    let sub_to_list_helper = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp in
+    let sub_to_off_opt_helper (off_and_pc: MemOffset.t * int) : MemOffset.t option =
+      let (l, r), off_pc = off_and_pc in
+      MemOffset.from_off_opt (
+        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (l, off_pc),
+        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (r, off_pc)
+      ) 
+    in
+    (* = sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set in *)
+    sub_sol_to_offset_list sub_to_list_helper sub_to_off_opt_helper off_and_pc
+    (* let off, off_pc = off_and_pc in
     let off_list = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp off in
     let simp_off_helper (off: MemOffset.t) : MemOffset.t option =
       let l, r = off in
-      MemOffset.from_range (
-        sub_sol_single_to_range tv_rel_list input_var_set (l, off_pc),
-        sub_sol_single_to_range tv_rel_list input_var_set (r, off_pc)
+      MemOffset.from_off_opt (
+        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (l, off_pc),
+        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (r, off_pc)
       ) 
     in
     match off_list with
@@ -648,26 +728,29 @@ module SingleSubtype = struct
         begin match off_opt with
         | Some out_off -> Some [out_off]
         | None -> None
-        end
+        end *)
 
   let sub_sol_single_to_range_opt
+      (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t option =
     let exp, _ = e in
-    let resolved_vars = 
+    (* let resolved_vars = 
       List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
     in
-    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then
-      Some (sub_sol_single_to_range tv_rel_list input_var_set e)
+    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then *)
+    if is_sol_resolved SingleExp.is_val tv_rel_list input_var_set exp then
+      Some (sub_sol_single_to_range eval_helper tv_rel_list input_var_set e)
     else None
 
   let sub_sol_single_to_single_func_interface
+      (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
     let r = 
-      sub_sol_single_to_range tv_rel_list input_var_set (e, pc) 
+      sub_sol_single_to_range eval_helper tv_rel_list input_var_set (e, pc) 
     in
     match r with
     | Single exp -> exp
@@ -770,7 +853,7 @@ module SingleSubtype = struct
           end
       else begin 
         (* To handle the case where exp contains resolved block vars *)
-        let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
+        let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt (fun x -> x) tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
         (
           let var_idx, _ = tv_rel.var_idx in
@@ -882,7 +965,7 @@ module SingleSubtype = struct
             (* TODO: Need to repl bound here!!! *)
             let bound = (
               (* Very imporant: here bound comes from the branch condition, which should be evaluated in the context of branch_pc - 1!!! *)
-              begin match sub_sol_single_to_range_opt tv_rel_list input_var_set (bound, (List.hd branch_pc) - 1) with
+              begin match sub_sol_single_to_range_opt (fun x -> x) tv_rel_list input_var_set (bound, (List.hd branch_pc) - 1) with
               | Some (Single e) -> e
               | Some _ -> bound
               | None -> SingleTop
