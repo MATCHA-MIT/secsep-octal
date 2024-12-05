@@ -18,6 +18,6 @@ let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
     Func_interface.FuncInterfaceConverter.TaintFuncInterface.interface_list_from_file
       "./interface/general_func_interface.func_interface"
   in
-  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p interface_list general_interface_list 5 10 in
+  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p interface_list general_interface_list 6 10 in
   Single_type_infer.SingleTypeInfer.state_list_to_file (get_related_filename !program_name "out" "single_infer") single_infer_result
   (* Main functionality here *)

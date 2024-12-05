@@ -110,6 +110,17 @@ module ArchType (Entry: EntryType) = struct
       fun (x, _) -> pp_arch_type_useful_var lvl x
     ) block_subtype_list
 
+  let get_arch_type (arch_type_list: t list) (label: Isa.label) : t =
+    match List.find_opt (fun (a: t) -> a.label = label) arch_type_list with
+    | Some a -> a
+    | None -> arch_type_error (Printf.sprintf "Cannot find label %s" label)
+
+  let set_arch_type (arch_type_list: t list) (new_type: t) : t list =
+    List.map (
+      fun (a: t) ->
+        if a.label = new_type.label then new_type else a
+    ) arch_type_list
+
   let init_func_input_from_layout
       (label: Isa.label) (start_var: entry_t) 
       (start_pc: int) (mem_type: MemType.t)

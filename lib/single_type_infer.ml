@@ -30,6 +30,7 @@ module SingleTypeInfer = struct
     func: Isa.basic_block list;
     func_type: ArchType.t list;
     single_subtype: SingleSubtype.t;
+    block_subtype: ArchType.block_subtype_t list; (* Tmp field: gen pipeline output for fast test. *)
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
     var_type_map: SingleEntryType.var_type_map_t;
@@ -123,6 +124,7 @@ module SingleTypeInfer = struct
       func = func_body;
       func_type = arch_type_list;
       single_subtype = [];
+      block_subtype = [];
       next_var = next_var;
       input_var_set = input_var_set;
       var_type_map = var_type_map;
@@ -417,6 +419,7 @@ module SingleTypeInfer = struct
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
+        let state = { state with block_subtype = block_subtype } in
         (* 2. Insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
           List.fold_left 
