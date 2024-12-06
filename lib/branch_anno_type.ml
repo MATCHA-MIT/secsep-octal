@@ -31,6 +31,7 @@ module BranchAnno = struct
       (target_reg_type: RegType.t) (target_mem_type: MemType.t)
       (target_useful_var: SingleExp.SingleVarSet.t) :
       SingleExp.local_var_map_t =
+    (* NOTE: We assume that target block only uses block local vars or SingleTop to represent their reg/mem slot type. *)
     let helper = add_var_map branch_local_var_map target_useful_var in
     let var_map = List.fold_left2 helper [] branch_reg_type target_reg_type in
     MemType.fold_left2 helper var_map branch_mem_type target_mem_type
