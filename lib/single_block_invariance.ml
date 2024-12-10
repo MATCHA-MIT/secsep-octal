@@ -81,7 +81,8 @@ module SingleBlockInvariance = struct
       match SingleContext.check_or_assert smt_ctx invariance_list with
       | None -> 
         SmtEmitter.pp_smt_ctx 0 smt_ctx;
-        Printf.printf "Unsat invariance\n%s\n" (Sexplib.Sexp.to_string (sexp_of_list SingleContext.sexp_of_t invariance_list));
+        Printf.printf "Jump from %s %d to %s %d\n" br_block_info.label br_block_info.pc target_block.label target_block.pc;
+        Printf.printf "Unsat invariance\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t invariance_list));
         single_block_invariance_error "Unsat invaraince"
       | Some cond_list -> cond_list
     in
@@ -106,12 +107,24 @@ module SingleBlockInvariance = struct
     if List.length target_block.tmp_context = 0 then begin
       Printf.printf "Block %s resolved, skip\n" target_label;
       func_type
+    end else if IsaBasic.is_label_function_entry target_block.label then begin
+      Printf.printf "Func entry %s, skip\n" target_label;
+      func_type
     end else begin
-      let func_type = List.fold_left (solve_one_pair smt_ctx target_block) func_type br_block_list in
-      Printf.printf "After resolve for block %s\n" target_label;
-      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_t func_type));
+      (if IsaBasic.is_label_function_entry target_block.label then begin
+        if List.length br_block_list > 0 then
+          single_block_invariance_error "Function input block has other input\n"
+        else
+          Printf.printf "Func entry %s, skip\n" target_label
+      end else begin
+        let func_type = List.fold_left (solve_one_pair smt_ctx target_block) func_type br_block_list in
+        Printf.printf "After resolve for block %s\n" target_label;
+        Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_t func_type))
+      end);
       ArchType.set_arch_type func_type
-        { target_block with tmp_context = [] }
+        { target_block with 
+          context = target_block.context @ target_block.tmp_context;
+          tmp_context = [] }
     end
 
   let is_tmp_resolved (func_type: ArchType.t list) : bool =

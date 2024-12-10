@@ -57,6 +57,13 @@ module SmtEmitter = struct
   | SatNo
   | SatUnknown
 
+  let check_context (smt_ctx: t) : sat_result_t =
+    let ctx, z3_solver = smt_ctx in
+    match Z3.Solver.check z3_solver [ Z3.Boolean.mk_true ctx ] with
+    | Z3.Solver.UNKNOWN -> SatUnknown
+    | Z3.Solver.SATISFIABLE -> SatYes
+    | Z3.Solver.UNSATISFIABLE -> SatNo
+
   let check_compliance (smt_ctx: t) (assertions: Expr.expr list) : sat_result_t =
     let ctx, z3_solver = smt_ctx in
     let assertions = 

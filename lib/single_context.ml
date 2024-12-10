@@ -23,6 +23,12 @@ module SingleContext = struct
     in
     helper cond *)
 
+  let ctx_or (l: t) (r: t) : t =
+    match l, r with
+    | Or or_list, other
+    | other, Or or_list -> Or (other :: or_list)
+    | _ -> Or [l; r]
+
   let rec is_val (is_val_func: SingleExp.t -> bool) (cond: t) : bool =
     match cond with
     | Cond c -> SingleCondType.is_val is_val_func c
@@ -130,7 +136,15 @@ module SingleContext = struct
       | Some acc_cond_list ->
         begin match check false smt_ctx [cond] with
         | SatYes -> acc
-        | SatNo -> None
+        | SatNo -> 
+          let check_ctx = SmtEmitter.check_context smt_ctx in
+          if check_ctx = SatYes then begin
+            Printf.printf "check_or_assert: unsat cond \n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t cond));
+            None
+          end else begin
+            SmtEmitter.pp_smt_ctx 0 smt_ctx;
+            single_context_error "check_or_assert: smt ctx not sat\n"
+          end
         | _ -> 
           SmtEmitter.add_assertions smt_ctx [to_smt_expr smt_ctx cond];
           Some (cond :: acc_cond_list)

@@ -846,6 +846,11 @@ module ArchType (Entry: EntryType) = struct
         update_branch_hist_get_not_taken_cond smt_ctx cond curr_type 
       in
       (* 1. Add curr_type + taken to target block's subtype *)
+      let taken_cond, _ = List.hd taken_type.branch_hist in
+      if (not (CondType.has_top taken_cond))
+        && SmtEmitter.check_compliance smt_ctx [ CondType.to_smt_expr smt_ctx taken_cond ] = SatNo then
+        Printf.printf "Warning: block %s pc %d cond branch %s cannot taken\n" 
+        curr_type.label curr_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst));
       let block_subtype = (add_block_subtype label taken_type block_subtype) in
       (* 2. Update ctx *)
       SmtEmitter.add_assertions smt_ctx not_taken_cond;

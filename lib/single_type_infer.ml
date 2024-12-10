@@ -3,14 +3,14 @@ open Single_exp
 open Single_entry_type
 open Mem_offset_new
 (* open Range_exp *)
-open! Cond_type_new
+open Cond_type_new
 open Single_context
 open Constraint
 (* open Constraint *)
 open Func_interface
 open Single_subtype
 open Single_input_var_cond_subtype
-(* open Single_block_invariance *)
+open Single_block_invariance
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -227,48 +227,22 @@ module SingleTypeInfer = struct
       ArchType.add_assertions infer_state.smt_ctx a_type;
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
 
-      (* 1. Get heuristic mem type *)
-      let rec add_branch_hist_helper
-          (not_taken_hist: (SingleCondType.t * int) list)
-          (off_pc: MemOffset.t * int) :
-          (SingleCondType.t * int) list =
-        match not_taken_hist with
-        | [] -> []
-        | (cond, cond_pc) :: tl ->
-          let _, pc = off_pc in
-          if pc > cond_pc then begin
-            if not (SingleCondType.has_top cond) then
-            SmtEmitter.add_assertions infer_state.smt_ctx [ SingleCondType.to_smt_expr infer_state.smt_ctx cond ];
-            (* Printf.printf "pc %d add cond_pc %d cond %s\n" pc cond_pc (SingleCondType.to_string cond); *)
-            add_branch_hist_helper tl off_pc
-          end else
-            not_taken_hist
+      (* 1. Get heuristic mem type
+            Very important: handle branch cond carefully, only add (taken1|taken2|...|assertion) to tmp_ctx
+            It does not matter too much about whether we add all ctx to z3. 
+            Missing ctx only cause assert more things that already true based on ctx.
+            But it is very important to not assert too strong conditions. *)
+      let full_taken_hist =
+        List.map (
+          fun (not_taken_cond, pc) -> 
+            SingleCondType.not_cond_type not_taken_cond, pc
+        ) a_type.full_not_taken_hist
       in
-      let _ = add_branch_hist_helper in
-      let _, unknown_or_new_ctx_list =
-        List.fold_left_map (
-          fun (not_taken_list: (SingleCondType.t * int) list)
-              (off_pc: MemOffset.t * int) ->
-            let not_taken_list = add_branch_hist_helper not_taken_list off_pc in
-            not_taken_list,
-            ArchType.MemType.get_heuristic_mem_type 
-              infer_state.smt_ctx 
-              (SingleSubtype.sub_sol_offset_to_offset_list 
-                (SingleExp.eval_align ptr_align_list)
-                infer_state.single_subtype infer_state.input_var_set)
-              infer_state.input_var_set
-              infer_state.var_type_map
-              a_type.mem_type
-              off_pc
-        ) (List.rev a_type.full_not_taken_hist) (List.rev unknown_list)
-      in
-      let unknown_list, local_new_context_list_list =
-        List.partition_map (fun x -> x) unknown_or_new_ctx_list
-      in
-      
-      (* TODO: Check why using the following code is much faster. *)
-      (* let unknown_list, local_new_context_list_list =
-        List.partition_map (
+      let get_tmp_ctx_helper
+          (off_pc: MemOffset.t * int) : 
+          (MemOffset.t * int, (SingleContext.t list)) Either.t =
+        let _, pc = off_pc in
+        let result =
           ArchType.MemType.get_heuristic_mem_type 
             infer_state.smt_ctx 
             (SingleSubtype.sub_sol_offset_to_offset_list 
@@ -277,8 +251,25 @@ module SingleTypeInfer = struct
             infer_state.input_var_set
             infer_state.var_type_map
             a_type.mem_type
-        ) unknown_list
-      in *)
+            off_pc
+        in
+        match result with
+        | Left _ -> result
+        | Right tmp_ctx ->
+          let taken_cond_list =
+            List.filter_map (
+              fun (taken_cond, cond_pc) ->
+                if pc > cond_pc then Some (SingleContext.Cond taken_cond)
+                else None
+            ) full_taken_hist
+          in
+          Right (List.map (
+            fun (x: SingleContext.t) -> SingleContext.ctx_or x (Or taken_cond_list)
+          ) tmp_ctx)
+      in
+      let unknown_list, local_new_context_list_list =
+        List.partition_map get_tmp_ctx_helper unknown_list
+      in
 
       (* 2. Insert new stack slots *)
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
@@ -413,14 +404,20 @@ module SingleTypeInfer = struct
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
-        (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
         (* NOTE: Since we do not have block subtype here, we cannot update branch anno here. We update when iter_left = 1 (see below) *)
         { state with 
           func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = x.context @ x.blk_br_context @ SingleSubtype.get_block_context state.single_subtype x.useful_var}
+                { x with 
+                  context = x.context 
+                    @ x.blk_br_context 
+                    @ SingleSubtype.get_block_context state.single_subtype x.useful_var
+                }
             ) state.func_type;
-          context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
+          context = state.context 
+            @ (List.hd state.func_type).context 
+            @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) 
+        }
       else begin
         let curr_iter = iter - iter_left + 1 in
         (* Prepare SMT context *)
@@ -503,12 +500,12 @@ module SingleTypeInfer = struct
         in
 
         (* 6. Extra block invariance infer (resolve tmp_context) *)
-        (* let func_type = 
+        let func_type = 
           if unknown_resolved then
             SingleBlockInvariance.solve state.smt_ctx state.input_var_set func_type block_subtype 5
           else
             func_type
-        in *)
+        in
 
         let state = { state with func_type = func_type } in
 
@@ -519,14 +516,20 @@ module SingleTypeInfer = struct
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
-          (* { state with context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) } *)
           { state with 
             func = update_branch_anno block_subtype state.func;
             func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = x.context @ x.blk_br_context @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)}
+                { x with 
+                  context = x.context 
+                    @ x.blk_br_context 
+                    @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)
+                }
             ) state.func_type;
-            context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
+            context = state.context 
+              @ (List.hd state.func_type).context 
+              @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) 
+          }
         end else begin
           let state = (
             if iter_left = 1 then begin
