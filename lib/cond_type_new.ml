@@ -1,21 +1,23 @@
 open Pretty_print
 open Entry_type_basic
 open Single_exp
-(* open Single_entry_type *)
 open Smt_emitter
 open Isa_basic
 
-module CondType (Entry: EntryTypeBasic) = struct
-  exception CondTypeError of string
-  let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
-
-  type entry_t = Entry.t
-  [@@deriving sexp]
-
+module CondTypeBase = struct
   type cond = 
     | Eq | Ne
     | Le | Lt (* Signed comparison *)
     | Be | Bt (* Unsigned comparison *)
+  [@@deriving sexp]
+end
+
+module CondType (Entry: EntryTypeBasic) = struct
+include CondTypeBase
+  exception CondTypeError of string
+  let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
+
+  type entry_t = Entry.t
   [@@deriving sexp]
 
   type t = cond * entry_t * entry_t
@@ -148,7 +150,7 @@ include (CondType (SingleExp))
       end
     | _ -> false
 
-  let get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+  (* let get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let z3_ctx, _ = smt_ctx in
     let cond, l, r = cond in
     let l = SingleExp.to_smt_expr smt_ctx l in
@@ -159,10 +161,10 @@ include (CondType (SingleExp))
     | Le -> Z3.BitVector.mk_sle z3_ctx l r
     | Lt -> Z3.BitVector.mk_slt z3_ctx l r
     | Be -> Z3.BitVector.mk_ule z3_ctx l r
-    | Bt -> Z3.BitVector.mk_ult z3_ctx l r
+    | Bt -> Z3.BitVector.mk_ult z3_ctx l r *)
 
   let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
-    SmtEmitter.add_assertions smt_ctx (List.map (get_z3_mk smt_ctx) cond_list)
+    SmtEmitter.add_assertions smt_ctx (List.map (to_smt_expr smt_ctx) cond_list)
 
   let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 
@@ -183,9 +185,9 @@ include (CondType (SingleExp))
       (* choose from one of two versions below *)
 
       (* is_quick = true -> accept quick check, but may ignore overflow/underflow *)
-      let exp_list = List.map (get_z3_mk smt_ctx) (if is_quick then unknown_list else cond_list) in
+      let exp_list = List.map (to_smt_expr smt_ctx) (if is_quick then unknown_list else cond_list) in
 
-      (* let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in *)
+      (* let exp_list = List.map (to_smt_expr smt_ctx) unknown_list in *)
 
       if List.length exp_list = 0 then
         SatYes
@@ -216,7 +218,7 @@ include (CondType (SingleExp))
         | SatYes -> acc
         | SatNo -> None
         | _ -> 
-          SmtEmitter.add_assertions smt_ctx [get_z3_mk smt_ctx cond];
+          SmtEmitter.add_assertions smt_ctx [to_smt_expr smt_ctx cond];
           Some (cond :: acc_cond_list)
         end
     in

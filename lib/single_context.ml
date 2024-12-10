@@ -13,7 +13,7 @@ module SingleContext = struct
     | And of t list
   [@@deriving sexp]
 
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+  (* let to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     let ctx, _ = smt_ctx in
     let rec helper (cond: t) : SmtEmitter.exp_t =
       match cond with
@@ -21,7 +21,7 @@ module SingleContext = struct
       | Or c_list -> Z3.Boolean.mk_or ctx (List.map helper c_list)
       | And c_list -> Z3.Boolean.mk_and ctx (List.map helper c_list)
     in
-    helper cond
+    helper cond *)
 
   let rec is_val (is_val_func: SingleExp.t -> bool) (cond: t) : bool =
     match cond with
@@ -67,18 +67,18 @@ module SingleContext = struct
             end
       ) (Left true) c_list
 
-  let rec get_z3_mk (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+  let rec to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     match cond with
-    | Cond c -> SingleCondType.get_z3_mk smt_ctx c
+    | Cond c -> SingleCondType.to_smt_expr smt_ctx c
     | Or c_list -> 
       let z3_ctx, _ = smt_ctx in
-      Z3.Boolean.mk_or z3_ctx (List.map (get_z3_mk smt_ctx) c_list)
+      Z3.Boolean.mk_or z3_ctx (List.map (to_smt_expr smt_ctx) c_list)
     | And c_list -> 
       let z3_ctx, _ = smt_ctx in
-      Z3.Boolean.mk_and z3_ctx (List.map (get_z3_mk smt_ctx) c_list)
+      Z3.Boolean.mk_and z3_ctx (List.map (to_smt_expr smt_ctx) c_list)
 
   let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
-    SmtEmitter.add_assertions smt_ctx (List.map (get_z3_mk smt_ctx) cond_list)
+    SmtEmitter.add_assertions smt_ctx (List.map (to_smt_expr smt_ctx) cond_list)
 
   let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 
@@ -99,9 +99,9 @@ module SingleContext = struct
       (* choose from one of two versions below *)
 
       (* is_quick = true -> accept quick check, but may ignore overflow/underflow *)
-      let exp_list = List.map (get_z3_mk smt_ctx) (if is_quick then unknown_list else cond_list) in
+      let exp_list = List.map (to_smt_expr smt_ctx) (if is_quick then unknown_list else cond_list) in
 
-      (* let exp_list = List.map (get_z3_mk smt_ctx) unknown_list in *)
+      (* let exp_list = List.map (to_smt_expr smt_ctx) unknown_list in *)
 
       if List.length exp_list = 0 then
         SatYes
@@ -132,7 +132,7 @@ module SingleContext = struct
         | SatYes -> acc
         | SatNo -> None
         | _ -> 
-          SmtEmitter.add_assertions smt_ctx [get_z3_mk smt_ctx cond];
+          SmtEmitter.add_assertions smt_ctx [to_smt_expr smt_ctx cond];
           Some (cond :: acc_cond_list)
         end
     in

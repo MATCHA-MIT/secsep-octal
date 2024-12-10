@@ -1,7 +1,6 @@
 open Isa_basic
 open Single_exp
 open Single_entry_type
-open Cond_type_new
 open Branch_anno_type
 open Single_context
 open Arch_type
@@ -32,17 +31,7 @@ module SingleBlockInvariance = struct
   let init 
       (input_var_set: SingleExp.SingleVarSet.t)
       (func_type: ArchType.t list) (* I add this so that I can use the most updated ArchType to update context *)
-      (block_subtype_list: ArchType.block_subtype_t list) : (ArchType.t list) * t =
-    let convert_helper (cond: ArchType.CondType.t) : SingleCondType.t =
-      let c, l, r = cond in
-      match c with
-      | Eq -> (Eq, l, r)
-      | Ne -> (Ne, l, r)
-      | Le -> (Le, l, r)
-      | Lt -> (Lt, l, r)
-      | Be -> (Be, l, r)
-      | Bt -> (Bt, l, r)
-    in
+      (block_subtype_list: ArchType.block_subtype_t list) : t =
     let helper_inner 
         (target_block: ArchType.t)
         (branch_block: ArchType.t) : br_block_t =
@@ -54,18 +43,18 @@ module SingleBlockInvariance = struct
       let br_var_map = SingleExp.add_local_global_var br_var_map input_var_set in
       { label = branch_block.label;
         pc = branch_block.pc;
-        br_context = List.map (fun (x, _) -> SingleContext.Cond (convert_helper x)) branch_block.branch_hist;
+        br_context = List.map (fun (x, _) -> SingleContext.Cond x) branch_block.branch_hist;
         br_var_map = br_var_map;
       }
     in
     let helper_outer
-        (block_subtype: ArchType.block_subtype_t) : ArchType.t * block_input_t =
-      let target_block, branch_block_list = block_subtype in
-      target_block,
-      (target_block.label,
-      List.map (helper_inner target_block) branch_block_list)
+        (target_block: ArchType.t)
+        (block_subtype: ArchType.block_subtype_t) : block_input_t =
+      let _, branch_block_list = block_subtype in
+      target_block.label,
+      List.map (helper_inner target_block) branch_block_list
     in
-    List.split (List.map helper_outer block_subtype_list)
+    List.map2 helper_outer func_type block_subtype_list
 
   let solve_one_pair
       (smt_ctx: SmtEmitter.t)
@@ -115,23 +104,42 @@ module SingleBlockInvariance = struct
       (block_input: block_input_t) : ArchType.t list =
     let target_label, br_block_list = block_input in
     let target_block = ArchType.get_arch_type func_type target_label in
-    if List.length target_block.tmp_context = 0 then func_type
-    else
+    if List.length target_block.tmp_context = 0 then begin
+      Printf.printf "Block %s resolved, skip\n" target_label;
+      func_type
+    end else begin
       let func_type = List.fold_left (solve_one_pair smt_ctx target_block) func_type br_block_list in
+      Printf.printf "After resolve for block %s\n" target_label;
+      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_t func_type));
       ArchType.set_arch_type func_type
         { target_block with tmp_context = [] }
+    end
+
+  let is_tmp_resolved (func_type: ArchType.t list) : bool =
+    List.fold_left (
+      fun (acc: bool) (arch_type: ArchType.t) ->
+        acc && (List.is_empty arch_type.tmp_context)
+    ) true func_type
 
   let rec solve_iter
       (smt_ctx: SmtEmitter.t)
       (func_type: ArchType.t list) (block_input_list: t)
       (iter: int) : ArchType.t list =
-    List.fold_left (solve_one_block smt_ctx) func_type block_input_list
+    Printf.printf "Single block invariance solve iter %d\n" iter;
+    if iter = 0 || is_tmp_resolved func_type then func_type
+    else
+    let func_type = List.fold_left (solve_one_block smt_ctx) func_type block_input_list in
+    solve_iter smt_ctx func_type block_input_list (iter - 1)
 
-  (* let solve
+  let solve
       (smt_ctx: SmtEmitter.t)
       (input_var_set: SingleExp.SingleVarSet.t)
+      (func_type: ArchType.t list)
       (block_subtype_list: ArchType.block_subtype_t list)
-      (iter: int) : ArchType.t list = *)
+      (iter: int) : ArchType.t list =
+    let block_input_list = init input_var_set func_type block_subtype_list in
+    Printf.printf "Br Context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t block_input_list));
+    solve_iter smt_ctx func_type block_input_list iter
 
   (* TODO: Reuse code from single_input_var_cond_subtype.ml *)
   (* We may only need to remove local vars, check whether the cond hist contains local var or not. 

@@ -3,12 +3,14 @@ open Single_exp
 open Single_entry_type
 open Mem_offset_new
 (* open Range_exp *)
+open! Cond_type_new
 open Single_context
 open Constraint
 (* open Constraint *)
 open Func_interface
 open Single_subtype
 open Single_input_var_cond_subtype
+(* open Single_block_invariance *)
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -215,18 +217,59 @@ module SingleTypeInfer = struct
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
     let helper 
-        (acc: ((MemOffset.t * bool) list) * (SingleContext.t list)) 
-        (* (acc_update_list: ((MemOffset.t * bool) list)) *)
+        (acc_update_list: ((MemOffset.t * bool) list))
         (a_type: ArchType.t) : 
-        (* ((MemOffset.t * bool) list) * (SingleContext.t list) = *)
-        (((MemOffset.t * bool) list) * (SingleContext.t list)) * ArchType.t =
-      let acc_update_list, acc_context = acc in
+        ((MemOffset.t * bool) list) * ArchType.t =
       SmtEmitter.push infer_state.smt_ctx;
-      SingleContext.add_assertions infer_state.smt_ctx acc_context;
+      (* NOTE: I don't know why, remove adding single_subtype sol make infer faster,
+          while add context and tmp_context make infer faster.
+          Keep all of them for now. *)
+      (* SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype a_type.useful_var; *)
+      SingleContext.add_assertions infer_state.smt_ctx a_type.context;
+      SingleContext.add_assertions infer_state.smt_ctx a_type.tmp_context;
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
 
-      (* Get heuristic mem type *)
-      let unknown_list, new_context_list_list =
+      (* 1. Get heuristic mem type *)
+      let rec add_branch_hist_helper
+          (not_taken_hist: (SingleCondType.t * int) list)
+          (off_pc: MemOffset.t * int) :
+          (SingleCondType.t * int) list =
+        match not_taken_hist with
+        | [] -> []
+        | (cond, cond_pc) :: tl ->
+          let _, pc = off_pc in
+          if pc > cond_pc then begin
+            if not (SingleCondType.has_top cond) then
+            SmtEmitter.add_assertions infer_state.smt_ctx [ SingleCondType.to_smt_expr infer_state.smt_ctx cond ];
+            (* Printf.printf "pc %d add cond_pc %d cond %s\n" pc cond_pc (SingleCondType.to_string cond); *)
+            add_branch_hist_helper tl off_pc
+          end else
+            not_taken_hist
+      in
+      let _ = add_branch_hist_helper in
+      let _, unknown_or_new_ctx_list =
+        List.fold_left_map (
+          fun (not_taken_list: (SingleCondType.t * int) list)
+              (off_pc: MemOffset.t * int) ->
+            let not_taken_list = add_branch_hist_helper not_taken_list off_pc in
+            not_taken_list,
+            ArchType.MemType.get_heuristic_mem_type 
+              infer_state.smt_ctx 
+              (SingleSubtype.sub_sol_offset_to_offset_list 
+                (SingleExp.eval_align ptr_align_list)
+                infer_state.single_subtype infer_state.input_var_set)
+              infer_state.input_var_set
+              infer_state.var_type_map
+              a_type.mem_type
+              off_pc
+        ) (List.rev a_type.full_not_taken_hist) (List.rev unknown_list)
+      in
+      let unknown_list, local_new_context_list_list =
+        List.partition_map (fun x -> x) unknown_or_new_ctx_list
+      in
+      
+      (* TODO: Check why using the following code is much faster. *)
+      (* let unknown_list, local_new_context_list_list =
         List.partition_map (
           ArchType.MemType.get_heuristic_mem_type 
             infer_state.smt_ctx 
@@ -235,15 +278,11 @@ module SingleTypeInfer = struct
               infer_state.single_subtype infer_state.input_var_set)
             infer_state.input_var_set
             infer_state.var_type_map
-            mem_type
+            a_type.mem_type
         ) unknown_list
-      in
-      let global_new_context_list_list, local_new_context_list_list =
-        (* List.partition_map (fun (x, b) -> if b then Left x else Right x) new_context_list_list *)
-        List.partition_map (fun (x, _) -> Right x) new_context_list_list
-      in
-      (* let global_new_context_list_list, local_new_context_list_list = [], [] in *)
+      in *)
 
+      (* 2. Insert new stack slots *)
       (* MemOffset.pp_unknown_list 0 unknown_list; *)
       let unknown_range = 
         List.map (
@@ -257,38 +296,17 @@ module SingleTypeInfer = struct
         ) unknown_list
       in
       let new_offset_list = List.filter_map MemOffset.from_range unknown_range in
-      (* let new_offset_list = 
-        List.concat (
-          List.filter_map (
-            SingleSubtype.sub_sol_offset_to_offset_list infer_state.single_subtype infer_state.input_var_set
-          ) unknown_list
-        ) 
-      in *)
-      (* Printf.printf "New off list\n";
-      MemOffset.pp_off_list 0 new_offset_list; *)
-      (* Check whether the each offset belongs to some memory slot if add some contraints *)
-      (* let is_val_offset_list, not_val_offset_list = List.partition (MemOffset.is_val infer_state.input_var_set) new_offset_list in
-      Printf.printf "%s new_off_list len %d is_val_offset_list len %d\n" a_type.label (List.length new_offset_list) (List.length is_val_offset_list);
-      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t is_val_offset_list));
-      (* MemOffset.pp_off_list 0 is_val_offset_list; *)
-      let is_val_offset_list, new_context_list_list =
-        List.partition_map (ArchType.MemType.get_heuristic_mem_type infer_state.smt_ctx mem_type) is_val_offset_list
-      in
-      let new_offset_list = is_val_offset_list @ not_val_offset_list in *)
-      (* let new_context_list_list = [] in *)
       Printf.printf "update_mem\n";
       MemOffset.pp_off_list 0 new_offset_list; 
       let result = 
-        (MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
-        List.flatten (acc_context :: global_new_context_list_list)),
+        MemOffset.insert_new_offset_list infer_state.smt_ctx acc_update_list new_offset_list,
         { a_type with tmp_context = List.flatten (a_type.tmp_context :: local_new_context_list_list) }
       in
       SmtEmitter.pop infer_state.smt_ctx 1;
       result
     in
     (* Printf.printf "Update mem func type:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_t infer_state.func_type)); *)
-    (* let update_list, new_context_list = List.fold_left helper (update_list, []) infer_state.func_type in *)
-    let (update_list, new_context_list), func_type = List.fold_left_map helper (update_list, []) infer_state.func_type in
+    let update_list, func_type = List.fold_left_map helper update_list infer_state.func_type in
     let next_var, func_type =
       List.fold_left_map (
         fun (acc: SingleEntryType.t) (a_type: ArchType.t) ->
@@ -307,7 +325,6 @@ module SingleTypeInfer = struct
       func_type = func_type;
       single_subtype = single_subtype;
       next_var = next_var;
-      context = new_context_list @ infer_state.context;
     }
     (* TODO: Also remove removed vars in single_subtype *)
 
@@ -420,7 +437,7 @@ module SingleTypeInfer = struct
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         let state = { state with block_subtype = block_subtype } in
-        (* 2. Insert stack addr in unknown list to mem type *)
+        (* 2. Get heuristic mem type or insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
           List.fold_left 
             (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 
@@ -479,13 +496,22 @@ module SingleTypeInfer = struct
                 { x with 
                   context = List.map (
                     fun (x: SingleInputVarCondSubtype.CondType.t) -> 
-                      SingleContext.Cond (SingleInputVarCondSubtype.cond_map x)
+                      SingleContext.Cond x
                   ) (SingleInputVarCondSubtype.CondSet.to_list cond_set)
                 }
               else
                 single_type_infer_error "label does not match"
           ) state.func_type pc_cond_map
         in
+
+        (* 6. Extra block invariance infer (resolve tmp_context) *)
+        (* let func_type = 
+          if unknown_resolved then
+            SingleBlockInvariance.solve state.smt_ctx state.input_var_set func_type block_subtype 5
+          else
+            func_type
+        in *)
+
         let state = { state with func_type = func_type } in
 
         SmtEmitter.pop state.smt_ctx 1;

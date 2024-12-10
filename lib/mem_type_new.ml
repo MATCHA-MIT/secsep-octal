@@ -570,7 +570,7 @@ module MemType (Entry: EntryType) = struct
       (var_type_map: SingleExp.var_type_map_t)
       (mem: t)
       (addr_off_pc: MemOffset.t * int) :
-      (MemOffset.t * int, (SingleContext.t list * bool)) Either.t =
+      (MemOffset.t * int, (SingleContext.t list)) Either.t =
     let orig_off, _ = addr_off_pc in
     let try_simp_off_opt =
       if MemOffset.is_val input_var_set orig_off then Some (orig_off, orig_off)
@@ -600,7 +600,7 @@ module MemType (Entry: EntryType) = struct
         | Some cond_list -> 
           Printf.printf "lookup %s\nslot %s" (MemOffset.to_string (assert_l, assert_r)) (MemOffset.to_string (off_l, off_r));
           SmtEmitter.pp_smt_ctx 0 smt_ctx;
-          Right (cond_list, MemOffset.is_val input_var_set (assert_l, assert_r))
+          Right cond_list
         end
       | None -> Left addr_off_pc
 
@@ -972,10 +972,10 @@ module MemType (Entry: EntryType) = struct
       | [] -> []
       | ((l, r), _, _) :: [] ->
         if SingleExp.cmp l r = 0 then [] 
-        else [ SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r) ]
+        else [ SingleCondType.to_smt_expr smt_ctx (SingleCondType.Lt, l, r) ]
       | ((l, _), _, _) :: tl ->
         let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
-        [ SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r) ]
+        [ SingleCondType.to_smt_expr smt_ctx (SingleCondType.Lt, l, r) ]
     in
     let exps =
       List.fold_left (
@@ -989,10 +989,10 @@ module MemType (Entry: EntryType) = struct
       | [] -> acc
       | ((l, r), _, _) :: [] ->
         if SingleExp.cmp l r = 0 then acc 
-        else (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
+        else (SingleCondType.to_smt_expr smt_ctx (SingleCondType.Lt, l, r)) :: acc
       | ((l, _), _, _) :: tl ->
         let( _, r), _, _ = List.nth tl ((List.length tl) - 1) in
-        (SingleCondType.get_z3_mk smt_ctx (SingleCondType.Lt, l, r)) :: acc
+        (SingleCondType.to_smt_expr smt_ctx (SingleCondType.Lt, l, r)) :: acc
     in
     let exps = List.fold_left helper [] mem_type in
     SmtEmitter.add_assertions smt_ctx exps *)

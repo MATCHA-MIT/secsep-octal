@@ -30,16 +30,6 @@ module SingleInputVarCondSubtype = struct
       sexp_of_list CondType.sexp_of_t (elements s)
   end
 
-  let cond_map (c: CondType.t) : SingleCondType.t = (* Dirty fix on type *)
-    let cond, l, r = c in
-    let cond : SingleCondType.cond =
-      match cond with
-      | Eq -> Eq | Ne -> Ne
-      | Le -> Le | Lt -> Lt
-      | Be -> Be | Bt -> Bt
-    in
-    cond, l, r
-
   type pc_cond_t = (IsaBasic.label * int) * CondSet.t
   [@@deriving sexp]
 
@@ -179,7 +169,7 @@ module SingleInputVarCondSubtype = struct
       let cond_list = CondSet.to_list (snd pc_cond) in
       List.iter (
         fun (x: CondType.t) ->
-          SingleContext.add_assertions smt_ctx [ SingleContext.Cond (cond_map x) ];
+          SingleContext.add_assertions smt_ctx [ SingleContext.Cond x ];
           let open Z3 in
           match Z3.Solver.check solver [ Boolean.mk_true ctx ] with
           | UNSATISFIABLE -> 
