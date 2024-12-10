@@ -146,8 +146,7 @@ module SingleTypeInfer = struct
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
       (* if block_type.label = ".L196" then () else *)
-      SingleContext.add_assertions infer_state.smt_ctx block_type.context;
-      SingleContext.add_assertions infer_state.smt_ctx block_type.tmp_context;
+      ArchType.add_assertions infer_state.smt_ctx block_type;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       Printf.printf "type_prop_block %s%!\n" block.label;
       SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
@@ -225,8 +224,7 @@ module SingleTypeInfer = struct
           while add context and tmp_context make infer faster.
           Keep all of them for now. *)
       (* SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype a_type.useful_var; *)
-      SingleContext.add_assertions infer_state.smt_ctx a_type.context;
-      SingleContext.add_assertions infer_state.smt_ctx a_type.tmp_context;
+      ArchType.add_assertions infer_state.smt_ctx a_type;
       let unknown_list = Constraint.get_unknown a_type.constraint_list in
 
       (* 1. Get heuristic mem type *)
@@ -420,7 +418,7 @@ module SingleTypeInfer = struct
         { state with 
           func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = x.context @ SingleSubtype.get_block_context state.single_subtype x.useful_var}
+                { x with context = x.context @ x.blk_br_context @ SingleSubtype.get_block_context state.single_subtype x.useful_var}
             ) state.func_type;
           context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
       else begin
@@ -494,7 +492,7 @@ module SingleTypeInfer = struct
               let (label, _), cond_set = pc_cond in
               if x.label = label then
                 { x with 
-                  context = List.map (
+                  blk_br_context = List.map (
                     fun (x: SingleInputVarCondSubtype.CondType.t) -> 
                       SingleContext.Cond x
                   ) (SingleInputVarCondSubtype.CondSet.to_list cond_set)
@@ -526,7 +524,7 @@ module SingleTypeInfer = struct
             func = update_branch_anno block_subtype state.func;
             func_type = List.map (
               fun (x: SingleSubtype.ArchType.t) ->
-                { x with context = x.context @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)}
+                { x with context = x.context @ x.blk_br_context @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)}
             ) state.func_type;
             context = state.context @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) }
         end else begin

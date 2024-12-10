@@ -80,6 +80,7 @@ module TaintTypeInfer = struct
         reg_type = new_reg_type;
         mem_type = new_mem_type;
         context = block_single_type.context;
+        blk_br_context = [];
         tmp_context = [];
         flag = (TaintEntryType.get_top_untaint_type (), TaintEntryType.get_top_untaint_type ());
         branch_hist = [];

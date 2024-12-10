@@ -70,8 +70,7 @@ module SingleBlockInvariance = struct
           We assume the function context is already initialized in smt_ctx.
     *)
     SmtEmitter.push smt_ctx;
-    SingleContext.add_assertions smt_ctx branch_block.context;
-    SingleContext.add_assertions smt_ctx branch_block.tmp_context;
+    ArchType.add_assertions smt_ctx branch_block;
     SingleContext.add_assertions smt_ctx br_block_info.br_context;
     
     (* 2. Get target_block's tmp cxt (invariance) that needs to be satisfied under branch_block's context *)

@@ -44,6 +44,7 @@ module ArchType (Entry: EntryType) = struct
     reg_type: RegType.t;
     mem_type: MemType.t;
     context: SingleContext.t list;
+    blk_br_context: SingleContext.t list;
     tmp_context: SingleContext.t list;
     flag: entry_t * entry_t;
     branch_hist: (CondType.t * int) list;
@@ -135,6 +136,7 @@ module ArchType (Entry: EntryType) = struct
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
+      blk_br_context = [];
       tmp_context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
@@ -162,6 +164,7 @@ module ArchType (Entry: EntryType) = struct
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
+      blk_br_context = [];
       tmp_context = [];
       flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
       branch_hist = [];
@@ -1146,5 +1149,10 @@ module ArchType (Entry: EntryType) = struct
         Printf.sprintf "cannot find block for branch at block %s (idx: %d) to target block %s" 
           branch_block_label branch_block_idx branch_target_label
       )
+
+  let add_assertions (smt_ctx: SmtEmitter.t) (a_type: t) : unit =
+    SingleContext.add_assertions smt_ctx a_type.context;
+    SingleContext.add_assertions smt_ctx a_type.blk_br_context;
+    SingleContext.add_assertions smt_ctx a_type.tmp_context
 
 end
