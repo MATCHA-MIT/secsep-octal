@@ -328,7 +328,61 @@ module SingleTypeInfer = struct
       Printf.printf "has_callee_unknown_context\n";
       false, infer_state
     end else
-      let context_list = List.concat_map (
+      let helper (acc: bool) (a_type: ArchType.t) : bool * ArchType.t =
+        let context_pc_list = Constraint.get_callee_context a_type.constraint_list in
+        if List.is_empty context_pc_list then acc, a_type
+        else begin
+        SmtEmitter.push infer_state.smt_ctx;
+        (* It is optional to add solution to smt_ctx here *)
+        (* SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype a_type.useful_var; *)
+        ArchType.add_assertions infer_state.smt_ctx a_type;
+        (* Printf.printf "check_or_assert_callee_context block %s\n" a_type.label;
+        List.iter (
+          fun (ctx_pc: SingleContext.t list * int) ->
+            let ctx_list, pc = ctx_pc in
+            Printf.printf "pc%d\n%s\n" pc (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t ctx_list))
+        ) context_pc_list; *)
+        let full_taken_hist =
+          List.map (
+            fun (not_taken_cond, pc) -> 
+              SingleCondType.not_cond_type not_taken_cond, pc
+          ) a_type.full_not_taken_hist
+        in
+        let get_tmp_ctx_helper
+            (ctx_pc: (SingleContext.t list) * int) : SingleContext.t list =
+          let ctx, pc = ctx_pc in
+          let assert_list = 
+            match SingleContext.check_or_assert infer_state.smt_ctx ctx with
+            | Some assert_list -> assert_list
+            | None -> single_type_infer_error "check_or_assert_callee_context unsat context"
+          in
+          let taken_cond_list =
+            List.filter_map (
+              fun (taken_cond, cond_pc) ->
+                if pc > cond_pc then Some (SingleContext.Cond taken_cond)
+                else None
+            ) full_taken_hist
+          in
+          List.map (fun x -> SingleContext.ctx_or x (Or taken_cond_list)) assert_list
+        in
+        let local_new_context_list_list =
+          List.map get_tmp_ctx_helper context_pc_list
+        in
+        let result =
+          { a_type with
+            tmp_context = List.flatten (a_type.tmp_context :: local_new_context_list_list) }
+        in
+        SmtEmitter.pop infer_state.smt_ctx 1;
+        false,
+        result
+        end
+      in
+
+      let resolved, func_type = List.fold_left_map helper true infer_state.func_type in
+      resolved,
+      { infer_state with func_type = func_type }
+      
+      (* let context_list = List.concat_map (
         fun (x: ArchType.t) -> Constraint.get_callee_context x.constraint_list
       ) infer_state.func_type
       in
@@ -342,7 +396,7 @@ module SingleTypeInfer = struct
         | None -> single_type_infer_error "check_or_assert_callee_context unsat context"
       in
       SmtEmitter.pop infer_state.smt_ctx 1;
-      List.is_empty context_list, { infer_state with context = assert_list @ infer_state.context }
+      List.is_empty context_list, { infer_state with context = assert_list @ infer_state.context } *)
 
   let clean_up_func_type (infer_state: t) : t =
     { infer_state with
@@ -502,7 +556,7 @@ module SingleTypeInfer = struct
 
         (* 6. Extra block invariance infer (resolve tmp_context) *)
         let func_type = 
-          if unknown_resolved then
+          if unknown_resolved && callee_context_resolved then
             SingleBlockInvariance.solve state.smt_ctx state.input_var_set func_type block_subtype 5
           else
             func_type

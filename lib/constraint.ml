@@ -36,8 +36,14 @@ module Constraint = struct
     | RangeConst o -> List.map (fun x -> Subset (x, range, off)) o
     | _ -> constraint_error (Printf.sprintf "Cannot gen range constraint for %s" (MemRange.to_string sub_range))
 
-  let get_callee_context (constraint_list: (t * int) list) : SingleContext.t list =
-    List.concat (
+  let get_callee_context (constraint_list: (t * int) list) : ((SingleContext.t list) * int) list =
+    List.filter_map (
+      fun (x, pc) ->
+        match x with
+        | CalleeContext context -> Some (context, pc)
+        | _ -> None
+    ) constraint_list
+    (* List.concat (
       List.filter_map (
         fun (x, _) ->
           match x with
@@ -45,7 +51,7 @@ module Constraint = struct
             Some context
           | _ -> None
       ) constraint_list
-    )
+    ) *)
 
   let has_callee_unknown_context (constraint_list: (t * int) list) : bool =
     List.find_opt (

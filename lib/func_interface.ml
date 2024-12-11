@@ -442,7 +442,7 @@ module FuncInterface (Entry: EntryType) = struct
 
     (* TODO: Check context!!! *)
 
-    let check_context_helper () : Constraint.t =
+    let check_context_helper () : Constraint.t list =
       (* TODO: Fix this!!! *)
       let p_context, unknown_context =
         List.partition_map (
@@ -466,7 +466,8 @@ module FuncInterface (Entry: EntryType) = struct
         (* Note simp_context is simplified with solution, 
           but to be used for check_or_assert, we need to filter out cond that is_val. *)
         | Left simp_context ->
-          (Constraint.CalleeContext simp_context)
+          if List.is_empty simp_context then []
+          else [Constraint.CalleeContext simp_context]
         | Right unsat_cond ->
           let unsat_cond_expr = SingleContext.to_smt_expr smt_ctx unsat_cond in
           Printf.printf "p_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (List.map fst p_context)));
@@ -480,10 +481,10 @@ module FuncInterface (Entry: EntryType) = struct
           SmtEmitter.pp_smt_ctx 0 smt_ctx;
           func_interface_error "func_call_helper: get unstat constraint"
         end else
-        Constraint.CalleeUnknownContext
+        [Constraint.CalleeUnknownContext]
     in
 
-    let constraint_list = if check_context then (check_context_helper ()) :: constraint_list else constraint_list in
+    let constraint_list = if check_context then (check_context_helper ()) @ constraint_list else constraint_list in
 
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
