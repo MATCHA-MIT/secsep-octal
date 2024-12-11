@@ -420,7 +420,8 @@ module MemType (Entry: EntryType) = struct
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
     (* let stamp_beg = Unix.gettimeofday () in *)
-    (* Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off)); *)
+    Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
+    Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
     let ptr_set = get_ptr_set mem in
     let simp_l, simp_r = simp_addr_off in
     if SingleExp.cmp simp_l SingleTop = 0 || SingleExp.cmp simp_r SingleTop = 0 then None else
@@ -1008,7 +1009,12 @@ module MemType (Entry: EntryType) = struct
     in
     let helper_outer (part_mem: int * ((MemOffset.t * 'a * 'b) list)) : (int * int64) option =
       let ptr, entry_list = part_mem in
-      let align = List.fold_left helper_inner 1L entry_list in
+      (* let align = List.fold_left helper_inner 1L entry_list in *)
+      let align =
+        if ptr = IsaBasic.rsp_idx then 8L
+        else if List.length entry_list = 1 then 1L
+        else List.fold_left helper_inner 1L entry_list
+      in
       (* Printf.printf "align %Ld\n" align; *)
       if align > 1L then Some (ptr, align)
       else None
