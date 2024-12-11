@@ -153,8 +153,7 @@ module SingleBlockInvariance = struct
     Printf.printf "Br Context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t block_input_list));
     solve_iter smt_ctx func_type block_input_list iter
 
-  (* TODO: Reuse code from single_input_var_cond_subtype.ml *)
-  (* We may only need to remove local vars, check whether the cond hist contains local var or not. 
-    We can keep block var. This is different from single_input_var_cond_subtype. *)
+  (* TODO: We may need to use tighter/weaker invariance when adding tmp_context to context.
+          Currently I did not take branch history into consideration. *)
 
 end
