@@ -398,8 +398,8 @@ module MemType (Entry: EntryType) = struct
       (bool * (MemOffset.t * MemRange.t * entry_t)) option =
     List.find_map (
       fun (off, range, entry) ->
-        match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpEqSubset with
-        | Eq | Subset ->
+        match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpSubset with
+        | Subset ->
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> Some (true, (off, range, entry)) (* full read *)
           | Subset -> 
@@ -420,8 +420,8 @@ module MemType (Entry: EntryType) = struct
     (* let _ = smt_ctx, mem, addr_offset in
     None *)
     (* let stamp_beg = Unix.gettimeofday () in *)
-    Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
-    Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
+    (* Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
+    Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off)); *)
     let ptr_set = get_ptr_set mem in
     let simp_l, simp_r = simp_addr_off in
     if SingleExp.cmp simp_l SingleTop = 0 || SingleExp.cmp simp_r SingleTop = 0 then None else
@@ -715,8 +715,8 @@ module MemType (Entry: EntryType) = struct
       | Some _, _ -> acc, entry
       | None, cons ->
         let off, range, entry_val = entry in
-        begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpEqSubset with
-        | Eq | Subset ->
+        begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpSubset with
+        | Subset ->
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> 
             let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
