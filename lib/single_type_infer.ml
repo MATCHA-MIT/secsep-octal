@@ -423,7 +423,8 @@ module SingleTypeInfer = struct
         (* Prepare SMT context *)
         SmtEmitter.push state.smt_ctx;
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-        SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type);
+        (* SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type); *)
+        SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type);
         SingleContext.add_assertions state.smt_ctx state.context;
         (* if func_name = "SHA512_Update" then
           SingleContext.add_assertions state.smt_ctx [ Cond (Le, SingleConst 0L, SingleVar 27) ]; *)
