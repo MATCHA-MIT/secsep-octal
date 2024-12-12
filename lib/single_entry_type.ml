@@ -77,14 +77,17 @@ include SingleExp
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
     | Punpck 
     | Pxor | Pand | Por
-    | Psll | Psrl -> SingleTop
+    | Psll | Psrl
+    | Xorps -> SingleTop
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     match isa_uop with
     | Mov | MovZ | Lea -> e
     | Not -> eval (SingleUExp (SingleNot, e))
     | Bswap -> SingleTop
-    | Neg -> SingleTop
+    | Neg -> eval (SingleBExp (SingleMul, e, SingleConst (-1L)))
+    | Inc -> eval (SingleBExp (SingleAdd, e, SingleConst 1L))
+    | Dec -> eval (SingleBExp (SingleAdd, e, SingleConst (-1L)))
 
   let exe_top_inst (isa_top: IsaBasic.top) (_: t list) : t =
     match isa_top with

@@ -375,6 +375,12 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     ];
   }
 
+let add_general_func_suffix
+    (func_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t) :
+    Taint_type_infer.TaintTypeInfer.FuncInterface.t list =
+  [func_interface;
+  {func_interface with func_name = func_interface.func_name ^ "@PLT"}]
+
 
 let () = 
   let open Sexplib in
@@ -387,6 +393,7 @@ let () =
   let channel = open_out "./interface/bench_ed25519_plain.mem_interface" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t bench_ed25519_plain);
   let channel = open_out "./interface/general_func_interface.func_interface" in
-  Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t [memset_interface; memcpy_interface])
+  Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t 
+    (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface]))
 
 

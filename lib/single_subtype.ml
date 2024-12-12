@@ -37,7 +37,8 @@ module SingleSol = struct
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (v_idx: int) (s: t) : SmtEmitter.exp_t =
     match s with
-    | SolNone -> RangeExp.to_smt_expr smt_ctx v_idx RangeExp.Top
+    | SolNone | SolSimple Top | SolSimple (Single SingleTop) -> SmtEmitter.mk_true smt_ctx
+      (* RangeExp.to_smt_expr smt_ctx v_idx RangeExp.Top *)
     | SolSimple e
     | SolCond (_, e, _, _) -> RangeExp.to_smt_expr smt_ctx v_idx e
 
@@ -439,6 +440,9 @@ module SingleSubtype = struct
     let resolved_vars = 
       List.filter_map (
         fun (x: type_rel) -> 
+          (* match x.sol with
+          | SolNone | SolSimple Top -> None
+          | _ -> let idx, _ = x.var_idx in Some idx *)
           if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None
       ) tv_rel_list
     in
@@ -815,11 +819,11 @@ module SingleSubtype = struct
       (input_var_set: SingleEntryType.SingleVarSet.t) : 
       type_rel =
     (* let target_idx, target_pc = tv_rel.var_idx in *)
-    let try_solve_top (tv_rel: type_rel) : type_rel =
+    (* let try_solve_top (tv_rel: type_rel) : type_rel =
       match List.find_opt (fun (x, _) -> x = SingleEntryType.SingleTop) tv_rel.subtype_list with
       | Some _ -> { tv_rel with sol = SolSimple Top }
       | None -> tv_rel
-    in
+    in *)
     let try_solve_single_sub_val (tv_rel: type_rel) : type_rel =
       let subtype_list = (* remove non-input SingleVar *)
         List.filter (
@@ -829,7 +833,9 @@ module SingleSubtype = struct
             | _ -> true
         ) tv_rel.subtype_list
       in
-      if List.find_opt (fun (x, _) -> not (SingleEntryType.is_val input_var_set x)) subtype_list = None then
+      if List.find_opt (fun (x, _) -> x = SingleEntryType.SingleTop) subtype_list <> None then
+        tv_rel
+      else if List.find_opt (fun (x, _) -> not (SingleEntryType.is_val input_var_set x)) subtype_list = None then
         match List.map (fun (x, pc_list) -> x, List.rev pc_list) subtype_list with
         | [] -> tv_rel
         | (hd, _) :: [] -> { tv_rel with sol = SolSimple (Single hd) }
@@ -1045,7 +1051,7 @@ module SingleSubtype = struct
       | None -> tv_rel
     in
     let solve_rules = [
-      try_solve_top;
+      (* try_solve_top; *)
       try_solve_loop_cond;
       try_solve_single_sub_val;
     ] in

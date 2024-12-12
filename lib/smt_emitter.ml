@@ -38,6 +38,10 @@ module SmtEmitter = struct
     let z3_ctx, _ = smt_ctx in
     BitVector.mk_numeral z3_ctx (Int64.to_string value) bv_width
 
+  let mk_true (smt_ctx: t) : Expr.expr =
+    let ctx, _ = smt_ctx in
+    Z3.Boolean.mk_true ctx
+
   let push (smt_ctx: t) : unit =
     Z3.Solver.push (snd smt_ctx)
 

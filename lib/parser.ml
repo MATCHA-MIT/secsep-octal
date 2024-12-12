@@ -82,7 +82,7 @@ module Parser = struct
     Char.code c >= 48 && Char.code c <= 57 
     || Char.code c >= 65 && Char.code c <= 90
     || Char.code c >= 97 && Char.code c <= 122
-    || c = '_' || c = '.'
+    || c = '_' || c = '.' || c = '@'
 
   let consume_name (cs: char list) : string * char list =
     let rec go (cs: char list) (acc: char list) =
@@ -203,8 +203,10 @@ module Parser = struct
     match ts with
     | LParen :: RegTok base :: RParen :: ts -> (* (base) *)
       (MemOp (None, Some base, None, None), ts)
-    | LParen :: RegTok base :: Comma :: RegTok index :: RParen :: ts -> (* (base + index) *)
+    | LParen :: RegTok base :: Comma :: RegTok index :: RParen :: ts -> (* (base, index) *)
       (MemOp (None, Some base, Some index, None), ts)
+    | LParen :: Comma :: RegTok index :: Comma :: ImmTok (imm, _) :: RParen :: ts ->  (* (, index, scale) *)
+      (MemOp (None, None, Some index, Some (imm_to_scale imm)), ts)
     | ImmTok (disp, _) :: LParen :: RegTok base :: RParen :: ts -> (* disp(base) *)
       (MemOp (Some disp, Some base, None, None), ts)
     | LParen :: RegTok base :: Comma :: RegTok index :: Comma :: ImmTok (imm, _) :: RParen :: ts ->  (* (base, index, scale) *)
@@ -445,13 +447,17 @@ module Parser = struct
           parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
         end *)
       | ("jmp", [LabelOp lb]) -> Jmp (lb, None)
-      | ("call", [LabelOp lb]) -> Call (lb, None)
+      | ("call", [LabelOp lb])
+      | ("callq", [LabelOp lb])  -> Call (lb, None)
+      (* | ("callq", [x]) -> 
+        Printf.printf "Callq %s\n" (Isa.string_of_operand x);
+        parse_error "callq" *)
       | (_, [LabelOp lb]) ->
         begin match Isa.op_of_cond_jump mnemonic with
         | Some op -> Jcond (op, lb, None)
         | None -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
         end
-      | ("ret", []) -> Jmp (Isa.ret_label, None) 
+      | ("ret", []) | ("retq", []) -> Jmp (Isa.ret_label, None) 
       | ("syscall", []) -> Syscall
       | ("hlt", []) -> Hlt
       | _ -> let opcode, opread_size_list, op_size = get_operand_size mnemonic operands in

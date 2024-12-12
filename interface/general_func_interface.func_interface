@@ -27,11 +27,80 @@
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 7)))))
     (Cond
-     (Lt (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
-    (Cond (Lt (SingleConst 0) (SingleVar 2)))
+     (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
+      (SingleConst 0)))
     (Cond
-     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
-    (Cond (Lt (SingleConst 0) (SingleConst 8)))))
+     (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond
+     (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Le (SingleConst 0) (SingleConst 8)))))
+  (out_reg
+   ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))))
+  (out_mem
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst
+        (((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))))
+       (SingleTop (TaintVar 24)))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (SingleTop (TaintConst true)))))))
+  (base_info
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst ()) (BaseAsReg RDI))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (BaseAsReg RSP)))))))
+ ((func_name memset@PLT)
+  (in_reg
+   (((SingleVar 0) (TaintVar 0)) ((SingleVar 1) (TaintVar 1))
+    ((SingleVar 2) (TaintConst false)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    ((SingleVar 6) (TaintVar 6)) ((SingleVar 7) (TaintConst false))
+    ((SingleVar 8) (TaintVar 8)) ((SingleVar 9) (TaintVar 9))
+    ((SingleVar 10) (TaintVar 10)) ((SingleVar 11) (TaintVar 11))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    ((SingleVar 16) (TaintVar 16)) ((SingleVar 17) (TaintVar 17))
+    ((SingleVar 18) (TaintVar 18)) ((SingleVar 19) (TaintVar 19))
+    ((SingleVar 20) (TaintVar 20)) ((SingleVar 21) (TaintVar 21))
+    ((SingleVar 22) (TaintVar 22)) ((SingleVar 23) (TaintVar 23))))
+  (in_mem
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst ()) (SingleTop (TaintVar 24)))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (SingleTop (TaintConst true)))))))
+  (context
+   ((Or
+     ((Cond
+       (Le (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)) (SingleVar 4)))
+      (Cond
+       (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
+        (SingleVar 7)))))
+    (Cond
+     (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
+      (SingleConst 0)))
+    (Cond
+     (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond
+     (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Le (SingleConst 0) (SingleConst 8)))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
     (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))
@@ -106,14 +175,112 @@
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 6)))))
     (Cond
-     (Lt (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
-    (Cond (Lt (SingleConst 0) (SingleVar 2)))
+     (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
+      (SingleConst 0)))
     (Cond
-     (Lt (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
-    (Cond (Lt (SingleConst 0) (SingleVar 2)))
+     (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
     (Cond
-     (Lt (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
-    (Cond (Lt (SingleConst 0) (SingleConst 8)))))
+     (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond
+     (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Le (SingleConst 0) (SingleConst 8)))))
+  (out_reg
+   ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))
+    (SingleTop (TaintConst true)) (SingleTop (TaintConst true))))
+  (out_mem
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst
+        (((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))))
+       (SingleTop (TaintVar 24)))))
+    (6
+     ((((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))
+       (RangeConst
+        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))))
+       (SingleTop (TaintVar 24)))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (SingleTop (TaintConst true)))))))
+  (base_info
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst ()) (BaseAsReg RDI))))
+    (6
+     ((((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))
+       (RangeConst
+        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))))
+       (BaseAsReg RSI))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (BaseAsReg RSP)))))))
+ ((func_name memcpy@PLT)
+  (in_reg
+   (((SingleVar 0) (TaintVar 0)) ((SingleVar 1) (TaintVar 1))
+    ((SingleVar 2) (TaintConst false)) ((SingleVar 3) (TaintVar 3))
+    ((SingleVar 4) (TaintVar 4)) ((SingleVar 5) (TaintVar 5))
+    ((SingleVar 6) (TaintConst false)) ((SingleVar 7) (TaintConst false))
+    ((SingleVar 8) (TaintVar 8)) ((SingleVar 9) (TaintVar 9))
+    ((SingleVar 10) (TaintVar 10)) ((SingleVar 11) (TaintVar 11))
+    ((SingleVar 12) (TaintVar 12)) ((SingleVar 13) (TaintVar 13))
+    ((SingleVar 14) (TaintVar 14)) ((SingleVar 15) (TaintVar 15))
+    ((SingleVar 16) (TaintVar 16)) ((SingleVar 17) (TaintVar 17))
+    ((SingleVar 18) (TaintVar 18)) ((SingleVar 19) (TaintVar 19))
+    ((SingleVar 20) (TaintVar 20)) ((SingleVar 21) (TaintVar 21))
+    ((SingleVar 22) (TaintVar 22)) ((SingleVar 23) (TaintVar 23))))
+  (in_mem
+   ((7
+     ((((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)))
+       (RangeConst ()) (SingleTop (TaintVar 24)))))
+    (6
+     ((((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))
+       (RangeConst
+        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))))
+       (SingleTop (TaintVar 24)))))
+    (4
+     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
+       (RangeConst ()) (SingleTop (TaintConst true)))))))
+  (context
+   ((Or
+     ((Cond
+       (Le (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)) (SingleVar 4)))
+      (Cond
+       (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
+        (SingleVar 7)))))
+    (Or
+     ((Cond
+       (Le (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2)) (SingleVar 6)))
+      (Cond
+       (Le (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)) (SingleVar 7)))))
+    (Or
+     ((Cond
+       (Le (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)) (SingleVar 4)))
+      (Cond
+       (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
+        (SingleVar 6)))))
+    (Cond
+     (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
+      (SingleConst 0)))
+    (Cond
+     (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond
+     (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
+    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond
+     (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
+    (Cond (Le (SingleConst 0) (SingleConst 8)))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
     (SingleTop (TaintConst true)) ((SingleVar 3) (TaintVar 3))

@@ -149,7 +149,7 @@ module SingleTypeInfer = struct
       ArchType.add_assertions infer_state.smt_ctx block_type;
       (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       Printf.printf "type_prop_block %s%!\n" block.label;
-      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
+      (* SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx; *)
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
       (* let sub_sol_func (exp_pc: SingleExp.t * int) : RangeExp.t option =
@@ -211,7 +211,7 @@ module SingleTypeInfer = struct
       1. Check whether the offset belongs to some memory slot if adding some extra context (heuristic);
       2. Check whether the offset refers to a new local stack slot and update local stack if needed. *)
     Printf.printf "Update mem smt ctx\n";
-    SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
+    (* SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx; *)
     let mem_type = (List.hd infer_state.func_type).mem_type in
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper mem_type in
     let update_list = ArchType.MemType.init_stack_update_list mem_type in
@@ -658,12 +658,12 @@ module SingleTypeInfer = struct
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    let func_mem_interface_list = 
+    (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
         "sha512_block_data_order";
         "SHA512_Update";
       ] 
-    in
+    in *)
     Printf.printf "%d\n" (List.length func_mem_interface_list);
     Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map snd func_mem_interface_list)));
     let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in

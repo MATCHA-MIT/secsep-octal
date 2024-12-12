@@ -634,6 +634,15 @@ module ArchType (Entry: EntryType) = struct
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = Isa.get_ld_st_related_taint_constraint dest src in
       let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
+      let next_type =
+        if Isa.uop_set_flag uop then
+          let simp_cond_type = Entry.repl_local_var new_local_var dest_type in
+          Printf.printf "Inst %s simp_cond_type %s%!\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_instruction inst)) (Entry.to_string simp_cond_type);
+          { next_type with
+            useful_var = SingleExp.SingleVarSet.union next_type.useful_var (SingleExp.get_vars (Entry.get_single_exp simp_cond_type));
+            flag = (simp_cond_type, Entry.get_const_type (Isa.ImmNum 0L)) }
+        else next_type
+      in
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
     | TInst (top, dest, src_list) ->

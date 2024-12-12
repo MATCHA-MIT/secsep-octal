@@ -2,6 +2,7 @@
  (public_names 
   type 
   gen_interface 
+  gen_interface_new
   parse_prog
   infer_single
   infer_block_invariance
@@ -13,6 +14,7 @@
  (names 
   main 
   gen_interface 
+  gen_interface_new
   parse_prog
   infer_single
   infer_block_invariance

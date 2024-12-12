@@ -31,6 +31,7 @@ module MemOffset = struct
     | CmpLeGe
     | CmpAll (* cmp [a, b] [b, c] -> Le *)
     | CmpOverlap (* cmp [a, b] [b, c] -> LOverlap *)
+    | CmpLeSubsetLoverlap
   [@@deriving sexp]
 
   let off_rel_t_to_string (x: off_rel_t) : string =
@@ -141,6 +142,11 @@ module MemOffset = struct
           else if check ge_req = SatYes then Ge
           else Other
         end
+      | CmpLeSubsetLoverlap -> begin
+          if check le_req = SatYes then Le
+          else if check loverlap_req = SatYes then LOverlap
+          else Other
+        end
     end in
     (* Printf.printf "time elapsed (offset_cmp): %f\n\n" (Unix.gettimeofday () -. stamp_beg); *)
     (* Printf.printf "result: %s\n\n" (off_rel_t_to_string result); *)
@@ -226,7 +232,35 @@ module MemOffset = struct
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 
-  let insert_new_offset_list = insert_new_offset_list_helper false
+  let insert_new_offset_list (* = insert_new_offset_list_helper false *)
+      (smt_ctx: SmtEmitter.t)
+      (ob_list: (t * bool) list) (new_o_list: t list) : (t * bool) list =
+    (* We assume offset in offset_list is sorted from smaller to larger *)
+    (* We assume stack is initialized, so only compare with the smallest slot to update the resevered space for child func*)
+    let insert_one_offset (ob_list: (t * bool) list) (new_o: t) : (t * bool) list =
+      match ob_list with
+      | [] -> [ (new_o, true) ]
+      | (hd_o, hd_updated) :: tl ->
+        begin match offset_quick_cmp smt_ctx new_o hd_o CmpLeSubsetLoverlap with
+        | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
+        | Subset -> (hd_o, hd_updated) :: tl
+        | LOverlap -> 
+          let new_l, _ = new_o in
+          let _, hd_r = hd_o in
+          ((new_l, hd_r), true) :: tl
+        | _ -> ob_list
+          (* Printf.printf "Warning insert_one_offset fail compare new offset %s with known offset %s\n" 
+          (to_string new_o) (to_string hd_o);
+          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
+          (hd_o, hd_updated) :: tl *)
+        end
+    in
+    let result = List.fold_left insert_one_offset ob_list new_o_list in
+    (* Printf.printf "\nresult:\n";
+    List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result; *)
+    (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
+    result
+
   let insert_new_offset_list_merge = insert_new_offset_list_helper true
 
   let get_vars (o: t) : SingleExp.SingleVarSet.t =

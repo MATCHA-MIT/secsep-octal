@@ -366,17 +366,19 @@ module IsaBasic = struct
     | None -> "None"
 
   let common_opcode_list = [
+    "xorps"; (* For the parser to work, this has to appear before xor *)
     "movabs"; "mov"; "movz"; "lea";
     "xchg";
     "add"; "adc"; "sub"; "mul"; "imul";
     "shrd";
     "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
-    "xor"; "and"; "or"; "not"; "bswap"; "neg";
+    "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
     "cmp"; "test";
     "push"; "pop";
     "punpck"; 
     "pxor"; "pand"; "por";
     "psll"; "psrl";
+    "pshufd";
   ]
 
   let rep_opcode_list = [
@@ -392,6 +394,7 @@ module IsaBasic = struct
     | Punpck 
     | Pxor | Pand | Por
     | Psll | Psrl
+    | Xorps
   [@@deriving sexp]
 
   let bop_opcode_map = [
@@ -403,6 +406,7 @@ module IsaBasic = struct
     ("punpck", Punpck); 
     ("pxor", Pxor); ("pand", Pand); ("por", Por);
     ("psll", Psll); ("psrl", Psrl);
+    ("xorps", Xorps);
   ]
 
   let bop_opcode_ocaml_str_map = [
@@ -414,6 +418,7 @@ module IsaBasic = struct
     ("Punpck", Punpck); 
     ("Pxor", Pxor); ("Pand", Pand); ("Por", Por);
     ("Psll", Psll); ("Psrl", Psrl);
+    ("Xorps", Xorps);
   ]
   
   type uop =
@@ -424,7 +429,13 @@ module IsaBasic = struct
     | Lea
     | Not | Bswap
     | Neg
+    | Inc |Dec
   [@@deriving sexp]
+
+  let uop_set_flag (uop: uop) : bool =
+    match uop with
+    | Inc | Dec -> true
+    | _ -> false
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
@@ -433,6 +444,7 @@ module IsaBasic = struct
     ("lea", Lea);
     ("not", Not); ("bswap", Bswap);
     ("neg", Neg);
+    ("inc", Inc); ("dec", Dec);
   ]
 
   let uop_opcode_ocaml_str_map = [
@@ -442,18 +454,22 @@ module IsaBasic = struct
     ("Lea", Lea);
     ("Not", Not); ("Bswap", Bswap);
     ("Neg", Neg);
+    ("Inc", Inc); ("Dec", Dec);
   ]
 
   type top =
     | Shrd
+    | Pshufd
   [@@deriving sexp]
 
   let top_opcode_map = [
     ("shrd", Shrd);
+    ("pshufd", Pshufd);
   ]
 
   let top_opcode_ocaml_str_map = [
     ("Shrd", Shrd);
+    ("Pshufd", Pshufd);
   ]
 
   type branch_cond =
@@ -516,7 +532,7 @@ module IsaBasic = struct
 
   let inst_referring_label (m: string) : bool =
     match m with
-    | "call"
+    | "call" | "callq"
     | "jmp" -> true
     | "rep" -> true (* dirty impl *)
     | _ -> (* Check if conditional branch opcode*)

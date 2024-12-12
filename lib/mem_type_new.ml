@@ -405,7 +405,12 @@ module MemType (Entry: EntryType) = struct
           | Subset -> 
             (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
             Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
-          | _ -> None
+          | _ -> 
+            SmtEmitter.pp_smt_ctx 0 smt_ctx;
+            Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
+            Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
+            Printf.printf "quick cmp success while full cmp failed\n";
+            None
           end
         | _ -> None
     ) part_mem
@@ -435,6 +440,9 @@ module MemType (Entry: EntryType) = struct
         | None -> None
         end
     | _ ->
+      Printf.printf "Cannot find base\n";
+      Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
+      Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
       let related_vars = SingleExp.SingleVarSet.union (SingleExp.get_vars simp_l) (SingleExp.get_vars simp_r) in
       (* heuristic priority: related vars > others; within each group, the offset list sizes are ascending *)
       let reformed_mem = List.map (fun (x, x_mem) ->
