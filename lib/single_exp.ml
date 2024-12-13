@@ -610,7 +610,7 @@ include SingleExpBasic
     match SingleVarSet.to_list (SingleVarSet.inter ptr_set p_set) with
     | [] -> None
     | hd :: [] -> Some hd
-    | _ -> single_exp_error (Printf.sprintf "find_base find more than one base for %s" (to_string e))
+    | _ -> None
 
   let find_base_adv 
       (sub_sol_to_list_func: t -> ((t * t) list) option)

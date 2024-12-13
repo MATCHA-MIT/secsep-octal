@@ -35,13 +35,6 @@ include Set.Make(Int)
       let right_ptr = filter_single_var r in
       union left_ptr right_ptr
     | _ -> empty
-  
-  let find_base (e: SingleExp.t) (ptr_list: t) : IsaBasic.imm_var_id option =
-    let p_list = filter_single_var e in
-    match to_list (inter p_list ptr_list) with
-    | [] -> None
-    | hd :: [] -> Some hd
-    | _ -> mem_key_set_error "find_base find more than one base"
 
 end
 
@@ -560,7 +553,7 @@ module MemType (Entry: EntryType) = struct
     if SingleExp.cmp l SingleTop = 0 || SingleExp.cmp r SingleTop = 0 then None else
     match SingleExp.find_base l ptr_set, SingleExp.find_base r ptr_set with
     | Some b_l, Some b_r ->
-      if b_l <> b_r || b_l = IsaBasic.rsp_idx then None
+      if b_l <> b_r (* || b_l = IsaBasic.rsp_idx *) then None
       else
         let part_mem = get_part_mem mem b_l in
         begin match part_mem with
