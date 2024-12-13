@@ -33,6 +33,7 @@ let bench_sha512_plain : Base_func_interface.t =
       k512,  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
     ];
     "main", [
+      k512,  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
       message, [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], SingleTop ];
       key, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
     ]
