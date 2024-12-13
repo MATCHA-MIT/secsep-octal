@@ -30,6 +30,7 @@ let bench_sha512_plain : Base_func_interface.t =
     "SHA512", [
       r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
       r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+      k512,  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
     ];
     "main", [
       message, [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], SingleTop ];
