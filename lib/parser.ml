@@ -263,7 +263,8 @@ module Parser = struct
       | "ups" | "aps" | "dqu" | "dqa" | "dq" -> dirty_op_size
       | _ -> 
         begin match opcode with
-        | "punpck" -> dirty_op_size
+        | "punpck"
+        | "packus" -> dirty_op_size
         | _ -> parse_error (Printf.sprintf "split_opcode_size: invalid size %s mnemonic %s" s mnemonic)
         end
     in

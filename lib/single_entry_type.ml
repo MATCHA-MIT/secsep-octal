@@ -75,7 +75,7 @@ include SingleExp
     | Xor -> if cmp e1 e2 = 0 then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))
     | And -> eval (SingleBExp (SingleAnd, e1, e2))
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
-    | Punpck 
+    | Punpck | Packus
     | Pxor | Pand | Por
     | Psll | Psrl
     | Xorps -> SingleTop

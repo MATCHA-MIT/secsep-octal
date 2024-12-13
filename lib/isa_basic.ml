@@ -375,10 +375,10 @@ module IsaBasic = struct
     "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
     "cmp"; "test";
     "push"; "pop";
-    "punpck"; 
+    "punpck"; "packus";
     "pxor"; "pand"; "por";
     "psll"; "psrl";
-    "pshufd";
+    "pshufd"; "pshuflw"; "pshufhw";
   ]
 
   let rep_opcode_list = [
@@ -391,7 +391,7 @@ module IsaBasic = struct
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
-    | Punpck 
+    | Punpck | Packus
     | Pxor | Pand | Por
     | Psll | Psrl
     | Xorps
@@ -403,7 +403,7 @@ module IsaBasic = struct
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
-    ("punpck", Punpck); 
+    ("punpck", Punpck); ("packus", Packus);
     ("pxor", Pxor); ("pand", Pand); ("por", Por);
     ("psll", Psll); ("psrl", Psrl);
     ("xorps", Xorps);
@@ -415,7 +415,7 @@ module IsaBasic = struct
     ("Sal", Sal); ("Sar", Sar); ("Shl", Shl); ("Shr", Shr);
     ("Rol", Rol); ("Ror", Ror);
     ("Xor", Xor); ("And", And); ("Or", Or);
-    ("Punpck", Punpck); 
+    ("Punpck", Punpck); ("Packus", Packus);
     ("Pxor", Pxor); ("Pand", Pand); ("Por", Por);
     ("Psll", Psll); ("Psrl", Psrl);
     ("Xorps", Xorps);
@@ -459,17 +459,21 @@ module IsaBasic = struct
 
   type top =
     | Shrd
-    | Pshufd
+    | Pshufd | Pshuflw | Pshufhw
   [@@deriving sexp]
 
   let top_opcode_map = [
     ("shrd", Shrd);
     ("pshufd", Pshufd);
+    ("pshuflw", Pshuflw);
+    ("pshufhw", Pshufhw);
   ]
 
   let top_opcode_ocaml_str_map = [
     ("Shrd", Shrd);
     ("Pshufd", Pshufd);
+    ("Pshuflw", Pshuflw);
+    ("Pshufhw", Pshufhw);
   ]
 
   type branch_cond =
