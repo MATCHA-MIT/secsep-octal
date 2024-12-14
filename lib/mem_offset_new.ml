@@ -144,6 +144,7 @@ module MemOffset = struct
         end
       | CmpLeSubsetLoverlap -> begin
           if check le_req = SatYes then Le
+          else if check subset_req = SatYes then Subset
           else if check loverlap_req = SatYes then LOverlap
           else Other
         end
@@ -241,6 +242,7 @@ module MemOffset = struct
       match ob_list with
       | [] -> [ (new_o, true) ]
       | (hd_o, hd_updated) :: tl ->
+        Printf.printf "Cmp \n%s\nand\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t new_o)) (Sexplib.Sexp.to_string_hum (sexp_of_t hd_o));
         begin match offset_quick_cmp smt_ctx new_o hd_o CmpLeSubsetLoverlap with
         | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
         | Subset -> (hd_o, hd_updated) :: tl
