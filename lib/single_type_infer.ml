@@ -201,11 +201,9 @@ module SingleTypeInfer = struct
         (ArchType.block_subtype_t list) * (Isa.instruction list list) =
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
-      (* if block_type.label = ".L196" then () else *)
       ArchType.add_assertions infer_state.smt_ctx block_type;
-      (* Printf.printf "Block %s solver \n%s\n" block.label (Z3.Solver.to_string solver); *)
       Printf.printf "type_prop_block %s%!\n" block.label;
-      (* SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx; *)
+      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
       (* let sub_sol_func (exp_pc: SingleExp.t * int) : RangeExp.t option =
@@ -542,7 +540,8 @@ module SingleTypeInfer = struct
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
-        let state = { state with block_subtype = block_subtype } in
+        Printf.printf "Useful vars\n";
+        ArchType.pp_arch_type_useful_var_list 0 state.func_type;
         (* 2. Get heuristic mem type or insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
           List.fold_left 
@@ -584,7 +583,17 @@ module SingleTypeInfer = struct
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
-        let state = { state with single_subtype = single_subtype } in
+        let state = 
+          { state with 
+            func_type = 
+              ArchType.update_with_block_subtype_helper (
+                fun (x: ArchType.t) (y: ArchType.t) -> { x with useful_var = y.useful_var }
+              ) block_subtype state.func_type; 
+            (* We need to update useful var *)
+            single_subtype = single_subtype; 
+            block_subtype = block_subtype 
+          } 
+        in
 
         (* 5. Input var block cond infer *)
         let pc_cond_map =

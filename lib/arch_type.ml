@@ -106,6 +106,11 @@ module ArchType (Entry: EntryType) = struct
     let var_s = String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list curr_type.useful_var)) in
     PP.print_lvl lvl "%s\t%s\n" curr_type.label var_s
 
+  let pp_arch_type_useful_var_list (lvl: int) (arch_type_list: t list) =
+    List.iter (
+      fun x -> pp_arch_type_useful_var lvl x
+    ) arch_type_list
+
   let pp_block_subtype_useful_var_list (lvl: int) (block_subtype_list: block_subtype_t list) =
     List.iter (
       fun (x, _) -> pp_arch_type_useful_var lvl x
@@ -210,13 +215,14 @@ module ArchType (Entry: EntryType) = struct
       constraint_list = update.constraint_list
     }
 
-  let update_with_block_subtype
+  let update_with_block_subtype_helper
+      (update_helper: t -> t -> t)
       (block_subtype: block_subtype_t list) (func_type: t list) : t list =
     List.map2 (
       fun (x: block_subtype_t) (y: t) ->
         let x, _ = x in
         if x.label = y.label then 
-          update_one_with_another_helper y x
+          update_helper y x
           (* { y with 
             useful_var = x.useful_var;
             full_not_taken_hist = x.full_not_taken_hist;
@@ -224,6 +230,8 @@ module ArchType (Entry: EntryType) = struct
           } *)
         else arch_type_error "update_useful_var label does not match"
     ) block_subtype func_type
+
+  let update_with_block_subtype = update_with_block_subtype_helper update_one_with_another_helper
 
   let get_reg_type (curr_type: t) (r: Isa.register) : entry_t =
     RegType.get_reg_type curr_type.reg_type r
@@ -911,6 +919,7 @@ module ArchType (Entry: EntryType) = struct
         | _ -> orig_call_anno
       ) in
       let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
+      Printf.printf "new constraints\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list Constraint.sexp_of_t (List.map (fun (x, _) -> x) new_constraints)));
       let curr_type =
         { curr_type with
           reg_type = new_reg;

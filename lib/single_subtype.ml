@@ -354,8 +354,6 @@ module SingleSubtype = struct
       (func_name: string)
       (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
     let useful_var_list = init_useful_var_from_block_subtype block_subtype_list in
-    Printf.printf "after init useful var\n";
-    pp_useful_var_list 0 useful_var_list;
     let useful_var_map_list =
       List.concat_map (
         fun (block_subtype: ArchType.block_subtype_t) ->
@@ -1010,20 +1008,26 @@ module SingleSubtype = struct
                   else begin
                     match find_base_step tv.supertype_list tv.subtype_list v_idx with
                     | Some (_, _, 0L) -> None
-                    | Some (_, (other_step, _), _) ->
+                    | Some (_, (other_step, _), v_step_sign) ->
                       (* NOTE: Must ensure the other_var is indeed in the cond!!! *)
+                      (* IMPORTANT: We need to use v_step from find_base_step instead of the solution*)
                       if SingleEntryType.cmp l other_step = 0 || SingleEntryType.cmp r other_step = 0 then begin
                         match tv.sol with
-                        | SolCond (v_br_pc, Range (v_base, _, v_step), _, _) ->
+                        | SolCond (v_br_pc, Range (v_l, v_r, v_step_no_sign), _, _) ->
                           if v_br_pc = List.hd branch_pc then
-                            if Int64.rem step v_step = 0L then
+                            if Int64.rem step v_step_no_sign = 0L then
+                              let v_base = 
+                                if v_step_sign = v_step_no_sign then v_l
+                                else if v_step_sign = Int64.neg v_step_no_sign then v_r
+                                else single_subtype_error (Printf.sprintf "incorrect step for var %d %Ld %Ld" v_idx v_step_sign v_step_no_sign)
+                              in
                               Some (SingleEntryType.eval (
                                 SingleBExp (
                                   SingleAdd,
                                   SingleBExp (
                                     SingleMul, 
                                     SingleBExp (SingleSub, SingleVar v_idx, v_base),
-                                    SingleConst (Int64.div step v_step)
+                                    SingleConst (Int64.div step v_step_sign)
                                   ),
                                   base
                                 )
