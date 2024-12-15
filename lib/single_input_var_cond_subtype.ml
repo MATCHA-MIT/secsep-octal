@@ -100,6 +100,45 @@ module SingleInputVarCondSubtype = struct
         List.map (get_simp_branch_hist_from_full_not_taken_hist full_not_taken_branch_hist_list) sub_block_list
     ) block_subtype_list
 
+
+  module BlockPairSet = struct
+    include Set.Make (
+      struct
+        let compare = compare
+        type t = IsaBasic.label * IsaBasic.label
+      end
+    )
+  end
+
+  let remove_useless_subtype
+      (var_subtype_list: pc_cond_subtype_t list) : pc_cond_subtype_t list =
+    let get_parent_child (parent_child_set: BlockPairSet.t) (var_subtype_list: pc_cond_subtype_t list) : BlockPairSet.t =
+      List.fold_left (
+        fun (acc: BlockPairSet.t) (var_subtype: pc_cond_subtype_t) ->
+          let (target, _), sub_list = var_subtype in
+          match sub_list with
+          | ((br, _), _) :: [] -> BlockPairSet.add (br, target) acc
+          | _ -> acc
+      ) parent_child_set var_subtype_list
+    in
+    let remove_one_dep (parent_child_set: BlockPairSet.t) (var_subtype: pc_cond_subtype_t) : pc_cond_subtype_t =
+      let (target, target_pc), sub_list = var_subtype in
+      (target, target_pc),
+      List.filter (
+        fun ((br, _), _) ->
+          not (target == br || (BlockPairSet.mem (target, br) parent_child_set))
+      ) sub_list
+    in
+    let rec remove_dep (parent_child_set: BlockPairSet.t) (var_subtype_list: pc_cond_subtype_t list) : pc_cond_subtype_t list =
+      let var_subtype_list = List.map (remove_one_dep parent_child_set) var_subtype_list in
+      let new_parent_child_set = get_parent_child parent_child_set var_subtype_list in
+      if BlockPairSet.cardinal new_parent_child_set <= BlockPairSet.cardinal parent_child_set then
+        var_subtype_list
+      else
+        remove_dep new_parent_child_set var_subtype_list
+    in
+    remove_dep BlockPairSet.empty var_subtype_list
+
   let solve_one_var
       (var_sol_list: pc_cond_t list)
       (var_subtype: pc_cond_subtype_t) :
@@ -189,6 +228,9 @@ module SingleInputVarCondSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list) :
       pc_cond_t list =
     let var_subtype_list = init_input_var_cond_subtype sub_single_helper block_subtype_list in
+    Printf.printf "Before remove_useless_subtype\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_pc_cond_subtype_t var_subtype_list));
+    let var_subtype_list = remove_useless_subtype var_subtype_list in
+    Printf.printf "After remove_useless_subtype\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_pc_cond_subtype_t var_subtype_list));
     let rec helper
         (always_solve: bool)
         (update_list: IntSet.t)
