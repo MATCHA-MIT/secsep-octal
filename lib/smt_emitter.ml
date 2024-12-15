@@ -61,6 +61,10 @@ module SmtEmitter = struct
   | SatNo
   | SatUnknown
 
+  let get_model (smt_ctx: t) : Model.model option =
+    let _, z3_solver = smt_ctx in
+    Z3.Solver.get_model z3_solver
+
   let check_context (smt_ctx: t) : sat_result_t =
     let ctx, z3_solver = smt_ctx in
     match Z3.Solver.check z3_solver [ Z3.Boolean.mk_true ctx ] with
@@ -164,5 +168,52 @@ module SmtEmitter = struct
         match op with
         | SingleNot -> BitVector.mk_not z3_ctx e
       end
+
+  let get_exp_no_overflow_constraint (smt_ctx: t) (se: SingleExpBasic.t) : exp_t list =
+    let z3_ctx, _ = smt_ctx in
+    let rec helper (se: SingleExpBasic.t) (constraint_list: exp_t list) : exp_t * (exp_t list) =
+      match se with
+      | SingleTop -> smt_emitter_error "get_exp_no_overflow_constraint cannot convert SingleTop!!!"
+      | SingleConst c -> mk_numeral smt_ctx c, constraint_list
+      | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width, constraint_list
+      | SingleBExp (op, se1, se2) ->
+        let e1, constraint_list = helper se1 constraint_list in
+        let e2, constraint_list = helper se2 constraint_list in
+        begin
+          match op with
+          | SingleAdd ->  
+              BitVector.mk_add z3_ctx e1 e2,
+              [
+                BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
+                BitVector.mk_add_no_underflow z3_ctx e1 e2;
+              ] @ constraint_list
+          | SingleSub ->
+              BitVector.mk_sub z3_ctx e1 e2,
+              [
+                BitVector.mk_sub_no_overflow z3_ctx e1 e2;
+                BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
+              ] @ constraint_list
+          | SingleMul ->
+              BitVector.mk_mul z3_ctx e1 e2,
+              [
+                BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
+                BitVector.mk_mul_no_underflow z3_ctx e1 e2;
+              ] @ constraint_list
+          | SingleSal -> BitVector.mk_shl z3_ctx e1 e2, constraint_list
+          | SingleSar -> BitVector.mk_ashr z3_ctx e1 e2, constraint_list
+          | SingleXor -> BitVector.mk_xor z3_ctx e1 e2, constraint_list
+          | SingleAnd -> BitVector.mk_and z3_ctx e1 e2, constraint_list
+          | SingleOr -> BitVector.mk_or z3_ctx e1 e2, constraint_list
+          | SingleMod ->BitVector.mk_smod z3_ctx e1 e2, constraint_list
+        end
+      | SingleUExp (op, se) ->
+        let e, constraint_list = helper se constraint_list in
+        begin
+          match op with
+          | SingleNot -> BitVector.mk_not z3_ctx e, constraint_list
+        end
+    in
+    let _, result = helper se [] in
+    result
 
 end

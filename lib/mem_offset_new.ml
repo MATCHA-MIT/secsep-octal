@@ -62,11 +62,11 @@ module MemOffset = struct
       SingleExp.cmp r1 r2
     else cmp_l
 
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (o: t) : SmtEmitter.exp_t * SmtEmitter.exp_t =
+  (* let to_smt_expr (smt_ctx: SmtEmitter.t) (o: t) : SmtEmitter.exp_t * SmtEmitter.exp_t =
     let l, r = o in
     (* TODO: This use add_no_overflow everytime offset is used for comparison. Consider to change to false for optimization!!! *)
     SmtEmitter.expr_of_single_exp smt_ctx l true,
-    SmtEmitter.expr_of_single_exp smt_ctx r true
+    SmtEmitter.expr_of_single_exp smt_ctx r true *)
 
   (* Semantically cmp helper*)
   let offset_cmp_helper (is_quick: bool) (smt_ctx: SmtEmitter.t) (o1: t) (o2: t) (mode: off_cmp_mode) : off_rel_t =

@@ -9,6 +9,7 @@ module SingleContext = struct
 
   type t =
     | Cond of SingleCondType.t
+    | NoOverflow of SingleExp.t
     | Or of t list
     | And of t list
   [@@deriving sexp]
@@ -32,12 +33,14 @@ module SingleContext = struct
   let rec is_val (is_val_func: SingleExp.t -> bool) (cond: t) : bool =
     match cond with
     | Cond c -> SingleCondType.is_val is_val_func c
+    | NoOverflow e -> is_val_func e
     | Or c_list | And c_list ->
       List.fold_left (fun acc x -> acc && (is_val is_val_func x)) true c_list
 
   let rec repl (repl_func: SingleExp.t -> SingleExp.t) (cond: t) : t =
     match cond with
     | Cond c -> Cond (SingleCondType.repl repl_func c)
+    | NoOverflow e -> NoOverflow (repl_func e)
     | Or c_list -> Or (List.map (repl repl_func) c_list)
     | And c_list -> And (List.map (repl repl_func) c_list)
 
@@ -48,6 +51,7 @@ module SingleContext = struct
       | Left b -> Left b
       | Right r -> Right (Cond r)
       end
+    | NoOverflow _ -> Right cond
     | Or c_list ->
       List.fold_left (
         fun (acc: (bool, t) Either.t) (x: t) ->
@@ -76,6 +80,9 @@ module SingleContext = struct
   let rec to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     match cond with
     | Cond c -> SingleCondType.to_smt_expr smt_ctx c
+    | NoOverflow e -> 
+      let z3_ctx, _ = smt_ctx in
+      Z3.Boolean.mk_and z3_ctx (SmtEmitter.get_exp_no_overflow_constraint smt_ctx e)
     | Or c_list -> 
       let z3_ctx, _ = smt_ctx in
       Z3.Boolean.mk_or z3_ctx (List.map (to_smt_expr smt_ctx) c_list)
@@ -160,6 +167,11 @@ module SingleContext = struct
       begin match SingleCondType.try_sub_sol sub_sol_func c with
       | Some c_sub -> Some (Cond c_sub)
       | None -> None
+      end
+    | NoOverflow e ->
+      begin match sub_sol_func e with
+      | Some _ -> Some (NoOverflow e) (* We do not try sub sol for this *)
+      | None -> None (* Just use this to decide whether sol are resolved *)
       end
     | Or c_list ->
       let sub_c_list = List.filter_map (try_sub_sol sub_sol_func) c_list in

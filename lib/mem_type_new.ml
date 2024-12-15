@@ -403,6 +403,28 @@ module MemType (Entry: EntryType) = struct
             Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
             Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
             Printf.printf "quick cmp success while full cmp failed\n";
+            (* begin match SmtEmitter.check_context smt_ctx with
+            | SatYes -> Printf.printf "ctx success\n"
+            | _ -> Printf.printf "ctx fail\n"
+            end; *)
+            (* let l1, r1 = orig_addr_off in
+            let l2, r2 = off in
+            Printf.printf "No overflow %s\n" (Z3.Expr.to_string (SmtEmitter.expr_of_single_exp smt_ctx (SingleBExp (SingleMul, SingleVar 2, SingleConst 128L)) true));
+            SmtEmitter.pp_smt_ctx 0 smt_ctx;
+            begin match SingleCondType.check false smt_ctx [ SingleCondType.Le, l2, l1 ] with
+            | SatYes -> Printf.printf "l2<=l1 SatYes\n"
+            | SatNo -> Printf.printf "l2<=l1 SatNo\n"
+            | _ -> Printf.printf "l2<=l1 SatUnknown\n";
+              begin match SmtEmitter.get_model smt_ctx with
+              | Some exp -> Printf.printf "Get model %s\n" (Z3.Model.to_string exp)
+              | None -> Printf.printf "No model\n"
+              end
+            end;
+            begin match SingleCondType.check false smt_ctx [ SingleCondType.Le, r1, r2 ] with
+            | SatYes -> Printf.printf "r1<=r2 SatYes\n"
+            | SatNo -> Printf.printf "r1<=r2 SatNo\n"
+            | _ -> Printf.printf "r1<=r2\n SatUnknown\n"
+            end; *)
             None
           end
         | _ -> None
@@ -1046,10 +1068,17 @@ module MemType (Entry: EntryType) = struct
 
   let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
     List.concat_map (
-        fun (l, r) -> [
-          SingleContext.Cond (Le, l, r); 
-          SingleContext.Cond (Le, SingleExp.SingleConst 0L, SingleExp.eval (SingleBExp (SingleSub, r, l)))
-        ]
+        fun (l, r) -> 
+          (* get_num_entry_constraint (SingleExp.eval (SingleBExp (SingleSub, r, l))) @  *)
+          let len = SingleExp.eval (SingleBExp (SingleSub, r, l)) in
+          let len_no_overflow_constraint =
+            if SingleExp.is_val SingleExp.SingleVarSet.empty len then []
+            else [(SingleContext.NoOverflow len)]
+          in
+          len_no_overflow_constraint @ [
+            SingleContext.Cond (Le, l, r); 
+            SingleContext.Cond (Le, SingleExp.SingleConst 0L, len)
+          ]
       ) boundary_list
 
   let rec get_mem_non_overlap_constraint_helper
