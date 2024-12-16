@@ -47,7 +47,7 @@ module IsaBasic = struct
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9
     (* | R0 *)
   [@@deriving sexp]
 
@@ -69,7 +69,8 @@ module IsaBasic = struct
     ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
     ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
     ("xmm0", XMM0); ("xmm1", XMM1); ("xmm2", XMM2); ("xmm3", XMM3); 
-    ("xmm4", XMM4); ("xmm5", XMM5); ("xmm6", XMM6); ("xmm7", XMM7); 
+    ("xmm4", XMM4); ("xmm5", XMM5); ("xmm6", XMM6); ("xmm7", XMM7);
+    ("xmm8", XMM8); ("xmm9", XMM9);
   ]
 
   let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
@@ -112,6 +113,8 @@ module IsaBasic = struct
       | XMM5 -> XMM5
       | XMM6 -> XMM6
       | XMM7 -> XMM7
+      | XMM8 -> XMM8
+      | XMM9 -> XMM9
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 2L then
       match r with
@@ -139,6 +142,8 @@ module IsaBasic = struct
       | XMM5 -> XMM5
       | XMM6 -> XMM6
       | XMM7 -> XMM7
+      | XMM8 -> XMM8
+      | XMM9 -> XMM9
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 4L then
       match r with
@@ -166,6 +171,8 @@ module IsaBasic = struct
       | XMM5 -> XMM5
       | XMM6 -> XMM6
       | XMM7 -> XMM7
+      | XMM8 -> XMM8
+      | XMM9 -> XMM9
       | _ -> isa_error "should not use high 1-byte reg"
     else if s = 8L then
       match r with
@@ -193,6 +200,8 @@ module IsaBasic = struct
       | XMM5 -> XMM5
       | XMM6 -> XMM6
       | XMM7 -> XMM7
+      | XMM8 -> XMM8
+      | XMM9 -> XMM9
       | _ -> isa_error "should not use high 1-byte reg"
     else
       isa_error "invalid register size"
@@ -223,6 +232,8 @@ module IsaBasic = struct
     | XMM5 -> 21
     | XMM6 -> 22
     | XMM7 -> 23
+    | XMM8 -> 24
+    | XMM9 -> 25
     (* | R0 -> 16 *)
 
   let get_full_reg_by_idx (idx: int) : register =
@@ -251,6 +262,8 @@ module IsaBasic = struct
     | 21 -> XMM5
     | 22 -> XMM6
     | 23 -> XMM7
+    | 24 -> XMM8
+    | 25 -> XMM9
     | _ -> isa_error "get_full_reg_by_idx: invalid idx"
 
   let get_reg_offset_size (r: register) : int64 * int64 =
@@ -260,11 +273,11 @@ module IsaBasic = struct
     | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> (0L, 2L)
     | AH | CH | DH | BH -> (1L, 1L)
     | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> isa_error "should not get_reg_offset_size for xmm registers"
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> isa_error "should not get_reg_offset_size for xmm registers"
 
   let get_reg_full_size (r: register) : int64 =
     match r with
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> 16L
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> 16L
     | _ -> 8L (* Note: vector reg has different full sizes!!! *)
   
   let get_gpr_full_size () : int64 = get_reg_full_size RAX
@@ -291,7 +304,7 @@ module IsaBasic = struct
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4L
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> 16L
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> 16L
 
   let is_reg_idx_callee_saved (r_idx: int) : bool =
     List.mem r_idx [
@@ -306,7 +319,7 @@ module IsaBasic = struct
 
   let is_xmm (r: register) : bool =
     match r with
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 -> true
+    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> true
     | _ -> false
 
   type immediate =
@@ -376,7 +389,7 @@ module IsaBasic = struct
     "cmp"; "test";
     "push"; "pop";
     "punpck"; "packus";
-    "pxor"; "pand"; "por";
+    "psub"; "pxor"; "pandn"; "pand"; "por";
     "psll"; "psrl";
     "pshufd"; "pshuflw"; "pshufhw";
   ]
@@ -392,7 +405,7 @@ module IsaBasic = struct
     | Rol | Ror
     | Xor | And | Or
     | Punpck | Packus
-    | Pxor | Pand | Por
+    | Psub | Pxor | Pandn | Pand | Por
     | Psll | Psrl
     | Xorps
   [@@deriving sexp]
@@ -404,7 +417,7 @@ module IsaBasic = struct
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
     ("punpck", Punpck); ("packus", Packus);
-    ("pxor", Pxor); ("pand", Pand); ("por", Por);
+    ("psub", Psub); ("pxor", Pxor); ("pandn", Pandn); ("pand", Pand); ("por", Por);
     ("psll", Psll); ("psrl", Psrl);
     ("xorps", Xorps);
   ]
@@ -416,7 +429,7 @@ module IsaBasic = struct
     ("Rol", Rol); ("Ror", Ror);
     ("Xor", Xor); ("And", And); ("Or", Or);
     ("Punpck", Punpck); ("Packus", Packus);
-    ("Pxor", Pxor); ("Pand", Pand); ("Por", Por);
+    ("Psub", Psub); ("Pxor", Pxor); ("Pandn", Pandn); ("Pand", Pand); ("Por", Por);
     ("Psll", Psll); ("Psrl", Psrl);
     ("Xorps", Xorps);
   ]
@@ -429,7 +442,7 @@ module IsaBasic = struct
     | Lea
     | Not | Bswap
     | Neg
-    | Inc |Dec
+    | Inc | Dec
   [@@deriving sexp]
 
   let uop_set_flag (uop: uop) : bool =

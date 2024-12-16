@@ -76,7 +76,7 @@ include SingleExp
     | And -> eval (SingleBExp (SingleAnd, e1, e2))
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
     | Punpck | Packus
-    | Pxor | Pand | Por
+    | Psub | Pxor | Pand | Pandn | Por
     | Psll | Psrl
     | Xorps -> SingleTop
 

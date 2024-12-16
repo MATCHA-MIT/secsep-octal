@@ -297,7 +297,7 @@ module Parser = struct
     | "movzbl" -> "movz", (list_merge_helper operands [Some 1L; Some 4L]), None
     | "movzwl" -> "movz", (list_merge_helper operands [Some 2L; Some 4L]), None
     | "movzbw" -> "movz", (list_merge_helper operands [Some 1L; Some 2L]), None
-    | _ -> 
+    | _ ->
       let opcode, op_size = split_opcode_size Isa.common_opcode_list mnemonic dirty_op_size in
       opcode, (List.map (fun x -> (x, op_size)) operands), op_size
 
