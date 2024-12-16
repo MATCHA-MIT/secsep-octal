@@ -88,11 +88,14 @@ module SingleInputVarCondSubtype = struct
     (arch_type.label, arch_type.pc),
     CondSet.of_list (helper [] (List.rev (List.map fst arch_type.branch_hist)) (List.rev full_not_taken_hist))
 
+  type tmp_t = ((string * int) * (CondType.t * CondType.t option) list) list
+  [@@deriving sexp]
+
   let init_input_var_cond_subtype
       (sub_single_helper: SingleEntryType.t -> SingleEntryType.t option)
       (block_subtype_list: ArchType.block_subtype_t list) : pc_cond_subtype_t list =
     let full_not_taken_branch_hist_list = get_not_taken_branch_hist sub_single_helper block_subtype_list in
-    (* Printf.printf "full_not_taken_branch_hist_list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (List.map fst full_not_taken_branch_hist_list))); *)
+    Printf.printf "full_not_taken_branch_hist_list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_tmp_t full_not_taken_branch_hist_list));
     List.map (
       fun (entry: ArchType.block_subtype_t) ->
         let block, sub_block_list = entry in
