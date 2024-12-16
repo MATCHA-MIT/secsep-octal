@@ -15,6 +15,8 @@ module type EntryType = sig
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
 
+  type flag_t = t * t
+
   type local_var_map_t
   val local_var_map_t_of_sexp : Sexp.t -> local_var_map_t
   val sexp_of_local_var_map_t : local_var_map_t -> Sexp.t
@@ -41,9 +43,9 @@ module type EntryType = sig
   val update_ld_taint_constraint: t -> TaintExp.t option -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t option -> t * Constraint.t list
 
-  val exe_bop_inst: bool -> IsaBasic.bop -> t -> t -> t
-  val exe_uop_inst: IsaBasic.uop -> t -> t
-  val exe_top_inst: IsaBasic.top -> t list -> t
+  val exe_bop_inst: bool -> IsaBasic.bop -> t -> t -> flag_t -> t * flag_t
+  val exe_uop_inst: IsaBasic.uop -> t -> flag_t -> t * flag_t
+  val exe_top_inst: IsaBasic.top -> t list -> flag_t -> t * flag_t
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
   val get_single_taint_exp: t -> (SingleExp.t * TaintExp.t)

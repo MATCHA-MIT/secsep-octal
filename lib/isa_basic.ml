@@ -445,11 +445,6 @@ module IsaBasic = struct
     | Inc | Dec
   [@@deriving sexp]
 
-  let uop_set_flag (uop: uop) : bool =
-    match uop with
-    | Inc | Dec -> true
-    | _ -> false
-
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
     (* ("movs", MovS);  *)

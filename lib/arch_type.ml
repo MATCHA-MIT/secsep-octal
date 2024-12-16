@@ -586,12 +586,12 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t) (offset: int64) : t =
     let prop_mode = curr_type.prop_mode in
     let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type (Isa.RegOp Isa.RSP) in
-    let new_rsp_type = 
-      Entry.repl_local_var curr_type.local_var_map 
-        (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset))) 
-    in
+
+    let new_rsp_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset)) curr_type.flag in
+    let new_rsp_type = Entry.repl_local_var curr_type.local_var_map new_rsp_type in
+
     let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
-    curr_type
+    {curr_type with flag = new_flag}
 
   let add_constraints
       (curr_type: t) (new_constraints: Constraint.t list) : t =
@@ -613,36 +613,41 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type in
+      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type curr_type.flag in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
       let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
-      { next_type with local_var_map = new_local_var },
+      (* FIXME: check useful var generation? 12/15/2024 *)
+      { next_type with local_var_map = new_local_var; flag = new_flag },
       BInst (bop, dest, src0, src1)
     | UInst (uop, dest, src) ->
       let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src in
-      let dest_type = 
+      let dest_type, new_flag = 
         begin match uop with
         (* | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type *)
-        | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type
-        | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type
-        | _ -> Entry.exe_uop_inst uop src_type
+        | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
+        | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
+        | _ -> Entry.exe_uop_inst uop src_type curr_type.flag
         end 
       in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = Isa.get_ld_st_related_taint_constraint dest src in
       let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
-      let next_type =
-        if Isa.uop_set_flag uop then
-          let simp_cond_type = Entry.repl_local_var new_local_var dest_type in
-          Printf.printf "Inst %s simp_cond_type %s%!\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_instruction inst)) (Entry.to_string simp_cond_type);
-          { next_type with
-            useful_var = SingleExp.SingleVarSet.union next_type.useful_var (SingleExp.get_vars (Entry.get_single_exp simp_cond_type));
-            flag = (simp_cond_type, Entry.get_const_type (Isa.ImmNum 0L)) }
-        else next_type
+      let next_type = { next_type with flag = new_flag } in
+
+      (* FIXME: useful var obtain may be wrong? 12/15/2024 *)
+      let next_type = match uop with
+      | Neg | Inc | Dec ->
+        let simp_cond_type = Entry.repl_local_var new_local_var dest_type in
+        Printf.printf "Inst %s simp_cond_type %s%!\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_instruction inst)) (Entry.to_string simp_cond_type);
+        { next_type with
+          useful_var = SingleExp.SingleVarSet.union next_type.useful_var (SingleExp.get_vars (Entry.get_single_exp simp_cond_type));
+        }
+      | Mov | MovZ | Lea | Not | Bswap -> next_type
       in
+
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
     | TInst (top, dest, src_list) ->
@@ -655,12 +660,13 @@ module ArchType (Entry: EntryType) = struct
         ) curr_type src_list
       in
       let src_type_list, src_list = List.split src_op_type_list in
-      let dest_type = Entry.exe_top_inst top src_type_list in
+      let dest_type, new_flag = Entry.exe_top_inst top src_type_list curr_type.flag in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) src_list in
       let next_type = add_constraints next_type (dest_constraint @ ldst_bind_constraint) in
-      { next_type with local_var_map = new_local_var },
+      (* FIXME: check useful var generation? 12/15/2024 *)
+      { next_type with local_var_map = new_local_var; flag = new_flag },
       TInst (top, dest, src_list)
     | RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno)) ->
       let rcx_type = get_reg_type curr_type RCX in
@@ -736,10 +742,14 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type) in
+
+      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type curr_type.flag in
+      let dest_type = Entry.repl_local_var curr_type.local_var_map dest_type in
+
       let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
+      (* FIXME: check useful var generation? 12/15/2024 *)
+      { curr_type with flag = new_flag; 
         useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars },
       Test (src0, src1)
     | Push (src, mem_anno) ->
