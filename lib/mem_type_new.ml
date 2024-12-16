@@ -838,7 +838,6 @@ module MemType (Entry: EntryType) = struct
       List.fold_left_map helper ([], Some s_left) part_mem
     in
     let num_slot = List.length update_rev_off_list in
-    Printf.printf "set_mult_slot_part_mem_type_helper: set slots\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t update_rev_off_list));
     match left_opt with
     | Some _ -> None
     | None -> 
