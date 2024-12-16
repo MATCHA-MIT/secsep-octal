@@ -41,6 +41,7 @@ module ArchType (Entry: EntryType) = struct
   type t = {
     label: Isa.label;
     pc: int;
+    dead_pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
     context: SingleContext.t list;
@@ -138,6 +139,7 @@ module ArchType (Entry: EntryType) = struct
     {
       label = label;
       pc = start_pc;
+      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
@@ -166,6 +168,7 @@ module ArchType (Entry: EntryType) = struct
     idx1, {
       label = label;
       pc = start_pc;
+      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
@@ -876,7 +879,8 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (inst: Isa.instruction)
       (block_subtype: block_subtype_t list) :
-      t * (block_subtype_t list) =
+      t * bool * (block_subtype_t list) =
+      (* Type after branch, alive (continue prop in the block) or not, updated block subtype *)
     let _ = smt_ctx in
     match inst with
     | Jmp (label, _) ->
@@ -886,7 +890,7 @@ module ArchType (Entry: EntryType) = struct
       let block_subtype = (add_block_subtype label curr_type block_subtype) in
       (* 2. This is the end of the current block, so update useful vars of this block in block_subtype *)
       let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
-      curr_type, block_subtype
+      curr_type, false, block_subtype
     | Jcond (cond, label, _) ->
       (* Add constraint: branch cond is untainted!!! *)
       let cond_l, cond_r = curr_type.flag in
@@ -896,13 +900,19 @@ module ArchType (Entry: EntryType) = struct
       in
       (* 1. Add curr_type + taken to target block's subtype *)
       let taken_cond, _ = List.hd taken_type.branch_hist in
-      if (not (CondType.has_top taken_cond))
-        && SmtEmitter.check_compliance smt_ctx [ CondType.to_smt_expr smt_ctx taken_cond ] = SatNo then
-        Printf.printf "Warning: block %s pc %d cond branch %s cannot taken\n" 
-        curr_type.label curr_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst));
-      let block_subtype = (add_block_subtype label taken_type block_subtype) in
-      (* 2. Update ctx *)
+      let block_subtype =
+        (* Only add to block subtype if the taken cond is possible*)
+        if (not (CondType.has_top taken_cond))
+          && SmtEmitter.check_compliance smt_ctx [ CondType.to_smt_expr smt_ctx taken_cond ] = SatNo then begin
+          Printf.printf "Warning: block %s pc %d cond branch %s (%s) cannot taken\n" 
+          curr_type.label curr_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)) (CondType.to_string taken_cond);
+          block_subtype
+        end else
+          (add_block_subtype label taken_type block_subtype) 
+      in
+      (* 2. Update and check ctx *)
       SmtEmitter.add_assertions smt_ctx not_taken_cond;
+      let not_taken_possible = SmtEmitter.check_context smt_ctx <> SatNo in
       (* 3. Update useful var and return curr_type + not taken *)
       let l_flag, r_flag = not_taken_type.flag in
       let useful_var = 
@@ -911,7 +921,22 @@ module ArchType (Entry: EntryType) = struct
           (SingleExp.get_vars (Entry.get_single_exp r_flag))
       in
       let not_taken_type = add_constraints not_taken_type cond_untaint_constraint in
-      {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var}, block_subtype
+      let not_taken_type = {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var} in
+      let not_taken_type, block_subtype =
+        if not not_taken_possible then begin
+          (* This is the end of the current block, similar to uncond jmp,
+            (1) update not taken hist
+            (2) update useful vars of this block in block_subtype *)
+          Printf.printf "Warning: block %s pc %d cond branch %s (%s) always taken, stop prop\n"
+          not_taken_type.label not_taken_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)) (CondType.to_string taken_cond);
+          let not_taken_type = { not_taken_type with full_not_taken_hist = not_taken_type.branch_hist } in 
+          not_taken_type,
+          (update_with_end_type not_taken_type block_subtype)
+        end else not_taken_type, block_subtype
+      in
+      not_taken_type,
+      not_taken_possible, 
+      block_subtype
     | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
 
   let type_prop_call
@@ -974,7 +999,7 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (inst: Isa.instruction)
       (block_subtype: block_subtype_t list) :
-      (t * (block_subtype_t list)) * Isa.instruction =
+      (t * bool * (block_subtype_t list)) * Isa.instruction =
     (* Update pc here!!! *)
     (* Printf.printf "Prop inst %d %s%!\n" curr_type.pc (Isa.string_of_instruction inst); *)
     (* let unknown_before = List.length (Constraint.get_unknown curr_type.constraint_list) in *)
@@ -992,7 +1017,7 @@ module ArchType (Entry: EntryType) = struct
     let sub_sol_list_func (e: SingleExp.t) : (MemOffset.t list) option =
       sub_sol_list_func (e, curr_type.pc)
     in
-    let (next_type, block_subtype), inst = 
+    let (next_type, continue_prop, block_subtype), inst = 
       match inst with
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype, inst
@@ -1002,7 +1027,7 @@ module ArchType (Entry: EntryType) = struct
         in
         (* let open Sexplib in
         Sexp.output_hum stdout (CallAnno.sexp_of_t call_anno); *)
-        (next_type,
+        (next_type, true,
         (* let _ = func_interface_list in
         let _ = target_func_name in
         Printf.printf "Warning: haven't implemented so far!\n";
@@ -1011,7 +1036,7 @@ module ArchType (Entry: EntryType) = struct
         Call (target_func_name, call_anno)
       | _ ->
         let next_type, inst = type_prop_non_branch smt_ctx sub_sol_func sub_sol_list_func curr_type inst in
-        (next_type, block_subtype), inst
+        (next_type, true, block_subtype), inst
     in
     (* let unknown_after = List.length (Constraint.get_unknown next_type.constraint_list) in
     (
@@ -1019,7 +1044,7 @@ module ArchType (Entry: EntryType) = struct
       else Printf.printf "PC %d inst %s introduces unknown addr\n" curr_type.pc (Isa.string_of_instruction inst)
     ); *)
     (* Printf.printf "type_prop_inst %s useful_vars %s\n" (Isa.string_of_instruction inst) (String.concat "," (List.map string_of_int (SingleExp.SingleVarSet.to_list next_type.useful_var))); *)
-    ({next_type with pc = next_type.pc + 1}, block_subtype), inst
+    ({next_type with pc = next_type.pc + 1}, continue_prop, block_subtype), inst
 
   let type_prop_block
       (smt_ctx: SmtEmitter.t)
@@ -1030,11 +1055,13 @@ module ArchType (Entry: EntryType) = struct
       (block: Isa.instruction list)
       (block_subtype: block_subtype_t list) :
       (t * (block_subtype_t list)) * (Isa.instruction list) =
-    let (curr_type, block_subtype), block = 
+    let (curr_type, _, block_subtype), block = 
       List.fold_left_map (
-        fun (curr, b_sub) inst -> 
-          type_prop_inst smt_ctx sub_sol_func sub_sol_list_func func_interface_list curr inst b_sub
-      ) (curr_type, block_subtype) block
+        fun (curr, continue_prop, b_sub) inst -> 
+          if continue_prop then
+            type_prop_inst smt_ctx sub_sol_func sub_sol_list_func func_interface_list curr inst b_sub
+          else (curr, continue_prop, b_sub), inst
+      ) (curr_type, true, block_subtype) block
     in
     if curr_type.label = Isa.ret_label then
       let curr_type = 
@@ -1175,7 +1202,7 @@ module ArchType (Entry: EntryType) = struct
       (branch_block_label: Isa.label)
       (branch_block_idx: int)
       (branch_target_label: Isa.label) :
-      t * t =
+      (t * t) option =
     let find_result =
       List.fold_left (
         fun (acc: int option * block_subtype_t option) (entry: block_subtype_t) ->
@@ -1198,7 +1225,11 @@ module ArchType (Entry: EntryType) = struct
     in
     match find_result with
     | Some branch_pc, Some (target_block, target_sub_list) ->
-      List.find (fun (x: t) -> x.pc = branch_pc) target_sub_list, target_block
+      let branch_block_opt = List.find_opt (fun (x: t) -> x.pc = branch_pc) target_sub_list in
+      begin match branch_block_opt with
+      | Some branch_block -> Some (branch_block, target_block)
+      | None -> None
+      end
     | _ -> 
       arch_type_error (
         Printf.sprintf "cannot find block for branch at block %s (idx: %d) to target block %s" 

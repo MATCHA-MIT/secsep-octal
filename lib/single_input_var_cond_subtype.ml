@@ -83,7 +83,6 @@ module SingleInputVarCondSubtype = struct
         helper simp_hist tl not_taken_tl
       | _, [] -> single_input_var_cond_subtype_error "full_not_taken_hist is shorter than branch hist"
     in
-    (* Printf.printf "Arch pc %d%!\n" arch_type.pc; *)
     let full_not_taken_hist = find_label arch_type.label full_not_taken_hist_list in
     (arch_type.label, arch_type.pc),
     CondSet.of_list (helper [] (List.rev (List.map fst arch_type.branch_hist)) (List.rev full_not_taken_hist))

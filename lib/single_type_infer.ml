@@ -461,25 +461,27 @@ module SingleTypeInfer = struct
     let helper (block_label: Isa.label) (idx: int) (inst: Isa.instruction) : Isa.instruction =
       match inst with
       | Jcond (cond, target, _) ->
-        let branch_block_type, target_block_type = 
-          ArchType.get_branch_target_type block_subtype block_label idx target
-        in
-        let anno = 
-          BranchAnno.get_branch_anno 
-            branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
-            target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
-        in
-        Jcond (cond, target, Some anno)
+        begin match ArchType.get_branch_target_type block_subtype block_label idx target with
+        | Some (branch_block_type, target_block_type) ->
+          let anno = 
+            BranchAnno.get_branch_anno 
+              branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
+              target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
+          in
+          Jcond (cond, target, Some anno)
+        | None -> Jcond (cond, target, None)
+        end
       | Jmp (target, _) ->
-        let branch_block_type, target_block_type = 
-          ArchType.get_branch_target_type block_subtype block_label idx target
-        in
-        let anno = 
-          BranchAnno.get_branch_anno 
-            branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
-            target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
-        in
-        Jmp (target, Some anno)
+        begin match ArchType.get_branch_target_type block_subtype block_label idx target with
+        | Some (branch_block_type, target_block_type) ->
+          let anno = 
+            BranchAnno.get_branch_anno 
+              branch_block_type.reg_type branch_block_type.mem_type branch_block_type.local_var_map
+              target_block_type.reg_type target_block_type.mem_type target_block_type.useful_var
+          in
+          Jmp (target, Some anno)
+        | None -> Jmp (target, None)
+        end
       | _ -> inst
     in
     List.map (
@@ -579,7 +581,7 @@ module SingleTypeInfer = struct
         in
 
         (* 4. Single type infer *)
-        let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
+        (* let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
@@ -595,13 +597,13 @@ module SingleTypeInfer = struct
           } 
         in
         Printf.printf "After infer, single subtype%!\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
 
-        (* 5. Input var block cond infer *)
+        (* 4. Input var block cond infer *)
         let pc_cond_map =
           SingleInputVarCondSubtype.solve
             state.smt_ctx
-            (SingleSubtype.sub_sol_single_var (SingleExp.eval_align ptr_align_list) single_subtype state.input_var_set)
+            (SingleSubtype.sub_sol_single_var (SingleExp.eval_align ptr_align_list) state.single_subtype state.input_var_set)
             block_subtype
         in
         (* Printf.printf "pc_cond_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleInputVarCondSubtype.sexp_of_pc_cond_t pc_cond_map)); *)
@@ -621,7 +623,7 @@ module SingleTypeInfer = struct
           ) state.func_type pc_cond_map
         in
 
-        (* 6. Extra block invariance infer (resolve tmp_context) *)
+        (* 5. Extra block invariance infer (resolve tmp_context) *)
         let func_type = 
           if unknown_resolved && callee_context_resolved then
             SingleBlockInvariance.solve state.smt_ctx state.input_var_set func_type block_subtype 5
@@ -630,6 +632,27 @@ module SingleTypeInfer = struct
         in
 
         let state = { state with func_type = func_type } in
+
+        (* 6. Single type infer *)
+        (* Put this as the last step so that prop always use the latest solution than other steps,
+           This ensures prop rules out impossible branches before input var block cond infer *)
+        let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
+        (* Printf.printf "Block_subtype\n";
+        pp_graph block_subtype; *)
+        let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
+        let state = 
+          { state with 
+            func_type = 
+              ArchType.update_with_block_subtype_helper (
+                fun (x: ArchType.t) (y: ArchType.t) -> { x with useful_var = y.useful_var }
+              ) block_subtype state.func_type; 
+            (* We need to update useful var *)
+            single_subtype = single_subtype; 
+            block_subtype = block_subtype 
+          } 
+        in
+        Printf.printf "After infer, single subtype%!\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
 
         SmtEmitter.pop state.smt_ctx 1;
 
