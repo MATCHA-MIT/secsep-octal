@@ -60,7 +60,7 @@ include SingleExp
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
     let _ = st_taint in e, []
 
-  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) : t =
+  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (same_op: bool) : t =
     match isa_bop with
     | Add -> eval (SingleBExp (SingleAdd, e1, e2))
     | Adc -> SingleTop
@@ -72,13 +72,13 @@ include SingleExp
     | Shr -> (* Check has a dirty, possibly incorrect calculation *)
       if is_check then SingleTop else eval (SingleBExp (SingleSar, e1, e2))
     | Rol | Ror -> SingleTop
-    | Xor -> if cmp e1 e2 = 0 then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))
+    | Xor -> if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))
     | And -> eval (SingleBExp (SingleAnd, e1, e2))
     | Or -> eval (SingleBExp (SingleOr, e1, e2))
+    | Pxor | Xorps -> if same_op then SingleConst 0L else SingleTop
     | Punpck | Packus
-    | Pxor | Pand | Por
-    | Psll | Psrl
-    | Xorps -> SingleTop
+    | Pand | Por
+    | Psll | Psrl -> SingleTop
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
     match isa_uop with

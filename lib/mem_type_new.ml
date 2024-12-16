@@ -842,6 +842,9 @@ module MemType (Entry: EntryType) = struct
     | Some _ -> None
     | None -> 
       let split_val_list = Entry.split_val new_val (List.rev update_rev_off_list) in
+      (* Printf.printf "set_mult_slot_part_mem_type_helper: set slots\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t update_rev_off_list));
+      Printf.printf "orig val:\n%s\n" (Sexplib.Sexp.to_string_hum (Entry.sexp_of_t new_val));
+      Printf.printf "split val list:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list Entry.sexp_of_t split_val_list)); *)
       let update_helper
           (entry: entry_t mem_slot) (update_idx: int option) : 
           entry_t mem_slot * (Constraint.t list) =
@@ -908,6 +911,7 @@ module MemType (Entry: EntryType) = struct
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
+      (simp_entry_func: Entry.t -> Entry.t) (* Only used for set mult entries *)
       (try_mult_slot_lookup: bool)
       (update_init_range: bool)
       (mem: t)
@@ -934,7 +938,7 @@ module MemType (Entry: EntryType) = struct
           )
         | None ->
           if try_mult_slot_lookup && enable_mult_slot_lookup smt_ctx b_l orig_addr_off simp_addr_off then begin
-            match set_mult_slot_part_mem_type_helper smt_ctx update_init_range b_l part_mem simp_addr_off new_type with
+            match set_mult_slot_part_mem_type_helper smt_ctx update_init_range b_l part_mem simp_addr_off (simp_entry_func new_type) with
             | Some (new_part_mem, new_cons, slot_anno) ->
               Some (
                 List.map (fun (p, entry) -> if p = b_l then (p, new_part_mem) else (p, entry)) mem,
@@ -1047,6 +1051,7 @@ module MemType (Entry: EntryType) = struct
   
   let set_slot_mem_type
       (smt_ctx: SmtEmitter.t)
+      (simp_entry_func: Entry.t -> Entry.t) (* Only used for set mult entries *)
       (check_addr: bool)
       (update_init_range: bool)
       (mem: t)
@@ -1067,7 +1072,7 @@ module MemType (Entry: EntryType) = struct
           if num_slot = 1 then
             set_slot_part_mem_type smt_ctx update_init_range part_mem orig_addr_off slot_info new_type
           else
-            set_mult_slot_part_mem_type smt_ctx update_init_range part_mem slot_info new_type
+            set_mult_slot_part_mem_type smt_ctx update_init_range part_mem slot_info (simp_entry_func new_type)
         in
         List.map (fun (ptr, p_mem) -> if ptr = s_ptr then (ptr, part_mem) else (ptr, p_mem)) mem,
         constraints,

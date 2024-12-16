@@ -346,7 +346,7 @@ include SingleExpBasic
           end
         in [ [x] ]
       | _ -> 
-        if cmp eval_l eval_r = 0 then
+        if cmp eval_l eval_r = 0 && cmp eval_l SingleTop <> 0 then
           begin match bop with
           | SingleXor -> [ [SingleConst 0L] ]
           | SingleAnd | SingleOr -> [ [eval_l] ]
@@ -431,8 +431,11 @@ include SingleExpBasic
 
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
-    let new_idx = -pc in
-    (new_idx, e) :: map, SingleVar new_idx
+    match e with
+    | SingleBExp _ | SingleUExp _ ->
+      let new_idx = -pc in
+      (new_idx, e) :: map, SingleVar new_idx
+    | _ -> map, e
 
   let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
     match e1 with
@@ -677,7 +680,7 @@ include SingleExpBasic
       begin match List.fold_left_map get_len_helper (Some 0L) off_list with
       | None, _ -> get_default_list SingleTop
       | Some total_len, len_list ->
-        if total_len > 64L then
+        if total_len > 8L then (* total_len is in bytes *)
           if const_val = 0L then get_default_list (SingleConst 0L)
           else get_default_list SingleTop
         else
