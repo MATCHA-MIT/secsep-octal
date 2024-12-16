@@ -41,7 +41,6 @@ module ArchType (Entry: EntryType) = struct
   type t = {
     label: Isa.label;
     pc: int;
-    dead_pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
     context: SingleContext.t list;
@@ -139,7 +138,6 @@ module ArchType (Entry: EntryType) = struct
     {
       label = label;
       pc = start_pc;
-      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
@@ -168,7 +166,6 @@ module ArchType (Entry: EntryType) = struct
     idx1, {
       label = label;
       pc = start_pc;
-      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
