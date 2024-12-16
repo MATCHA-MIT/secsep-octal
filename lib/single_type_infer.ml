@@ -594,6 +594,8 @@ module SingleTypeInfer = struct
             block_subtype = block_subtype 
           } 
         in
+        Printf.printf "After infer, single subtype%!\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype;
 
         (* 5. Input var block cond infer *)
         let pc_cond_map =
@@ -631,8 +633,6 @@ module SingleTypeInfer = struct
 
         SmtEmitter.pop state.smt_ctx 1;
 
-        Printf.printf "After infer, single subtype%!\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
         if unknown_resolved && callee_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
