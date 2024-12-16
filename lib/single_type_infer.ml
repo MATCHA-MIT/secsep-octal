@@ -1,3 +1,4 @@
+open Set_sexp
 open Isa
 open Single_exp
 open Single_entry_type
@@ -15,6 +16,7 @@ open Smt_emitter
 open Pretty_print
 open Full_mem_anno
 open Branch_anno_type
+open Block_alive
 open Sexplib.Std
 
 module SingleTypeInfer = struct
@@ -26,11 +28,13 @@ module SingleTypeInfer = struct
 
   module ArchType = SingleSubtype.ArchType
   module FuncInterface = ArchType.FuncInterface
+  module BlockAlive = BlockAlive (SingleEntryType)
 
   type t = {
     func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
+    alive_blocks: StringSet.t;
     single_subtype: SingleSubtype.t;
     block_subtype: ArchType.block_subtype_t list; (* Tmp field: gen pipeline output for fast test. *)
     next_var: SingleEntryType.t;
@@ -181,6 +185,7 @@ module SingleTypeInfer = struct
       func_name = func_name;
       func = func_body;
       func_type = arch_type_list;
+      alive_blocks = StringSet.of_list (List.map (fun (x: ArchType.t) -> x.label) arch_type_list);
       single_subtype = [];
       block_subtype = [];
       next_var = next_var;
@@ -544,19 +549,28 @@ module SingleTypeInfer = struct
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
         Printf.printf "Useful vars\n";
         ArchType.pp_arch_type_useful_var_list 0 state.func_type;
+
+        (* Get alive blocks *)
+        let state = { state with alive_blocks = BlockAlive.solve state.func_name block_subtype } in
+
         (* 2. Get heuristic mem type or insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
-          List.fold_left 
-            (fun acc (x: ArchType.t) -> acc + List.length (Constraint.get_unknown x.constraint_list)) 
-            0 state.func_type = 0
+          List.fold_left (
+            fun acc (x: ArchType.t) ->
+              if StringSet.mem x.label state.alive_blocks then 
+                acc + List.length (Constraint.get_unknown x.constraint_list)
+              else acc
+          ) 0 state.func_type = 0
         in
 
         let num_unknown, label_unknown_list (* label_unknown_list *) = 
           List.fold_left_map (
             fun (acc: int) (x: ArchType.t) -> 
+              if StringSet.mem x.label state.alive_blocks then 
               let unknown_list = Constraint.get_unknown x.constraint_list in
               acc + List.length unknown_list,
               (x.label, unknown_list)
+              else acc, (x.label, [])
           ) 0 state.func_type 
         in
         Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
@@ -718,9 +732,9 @@ module SingleTypeInfer = struct
   let filter_func_interface
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
       (func_name_list: Isa.label list) : (Isa.label * ArchType.MemType.t) list =
-    let func_name_set = Isa.StringSet.of_list func_name_list in
+    let func_name_set = StringSet.of_list func_name_list in
     List.filter (
-      fun (x, _) -> Isa.StringSet.mem x func_name_set
+      fun (x, _) -> StringSet.mem x func_name_set
     ) func_mem_interface_list
 
   let infer
