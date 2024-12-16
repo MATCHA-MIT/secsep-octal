@@ -291,21 +291,21 @@ module ArchType (Entry: EntryType) = struct
           | Some slot_info -> Some (MemType.get_slot_mem_type smt_ctx true curr_type.mem_type simp_addr_offset slot_info)
         in
         begin match try_get_slot_type with
-        | Some ((off_w, off_r, e_t), true) ->
+        | Some ((off_w, off_r, e_t), mult_slot_cons, true) ->
           e_t, 
-          Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+          Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons, 
           useful_vars,
           anno_opt
           (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
           (* Some (ptr, off_w, is_full) *)
         | _ -> (* Annotation not pass check or no annotation *)
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-          begin match MemType.get_mem_type smt_ctx sub_sol_list_func curr_type.mem_type orig_addr_offset simp_addr_offset with
-          | Some (is_full, ptr, (off_w, off_r, e_t)) -> 
+          begin match MemType.get_mem_type smt_ctx sub_sol_list_func true curr_type.mem_type orig_addr_offset simp_addr_offset with
+          | Some (is_full, ptr, (off_w, off_r, e_t), num_slot, mult_slot_cons) -> 
             e_t, 
-            Subset (orig_addr_offset, off_r, off_w) :: addr_untaint_cons, 
+            Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons, 
             useful_vars,
-            Some (ptr, off_w, is_full)
+            Some (ptr, off_w, is_full, num_slot)
           | None -> 
             Printf.printf "get_ld_op_type unknown addr orig %s simp %s\n" (MemOffset.to_string orig_addr_offset) (MemOffset.to_string simp_addr_offset);
             (* Use simp_addr_offset since we do not need to distinguish between eq and subset for resolving unknown address *)
@@ -349,9 +349,9 @@ module ArchType (Entry: EntryType) = struct
         (addr_exp, 
         SingleExp.eval (SingleExp.SingleBExp (SingleExp.SingleAdd, addr_exp, size_exp))) 
       in
-      let (off, range, entry), pass_check = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
+      let (off, range, entry), mult_slot_cons, pass_check = MemType.get_slot_mem_type smt_ctx check_addr curr_type.mem_type orig_addr_offset slot_info in
       if pass_check then
-        entry, Subset (orig_addr_offset, range, off) :: addr_untaint_cons, useful_vars
+        entry, Constraint.Subset (orig_addr_offset, range, off) :: mult_slot_cons @ addr_untaint_cons, useful_vars
       else
         arch_type_error (Printf.sprintf "get_ld_op_type_slot: Annotation %s does not match memory slot %s"
           (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))
@@ -429,7 +429,7 @@ module ArchType (Entry: EntryType) = struct
           anno_opt
         | _ -> (* Annotation not pass check or no annotation *)
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-          begin match MemType.set_mem_type smt_ctx sub_sol_list_func true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
+          begin match MemType.set_mem_type smt_ctx sub_sol_list_func true true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
           | Some (new_mem, write_constraints, slot_anno) -> 
             { curr_type with mem_type = new_mem }, 
             write_constraints @ addr_untaint_cons, 

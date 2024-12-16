@@ -61,7 +61,7 @@ module SmtEmitter = struct
   | SatNo
   | SatUnknown
 
-  let get_model (smt_ctx: t) : Model.model option =
+          let get_model (smt_ctx: t) : Model.model option =
     let _, z3_solver = smt_ctx in
     Z3.Solver.get_model z3_solver
 

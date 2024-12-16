@@ -27,6 +27,7 @@ module MemOffset = struct
 
   type off_cmp_mode =
     | CmpEqSubset
+    | CmpEq
     | CmpSubset
     | CmpLeGe
     | CmpAll (* cmp [a, b] [b, c] -> Le *)
@@ -111,6 +112,10 @@ module MemOffset = struct
       | CmpEqSubset (*1*) -> begin
           if check eq_req = SatYes then Eq
           else if check subset_req = SatYes then Subset
+          else Other
+        end
+      | CmpEq -> begin
+          if check eq_req = SatYes then Eq
           else Other
         end
       | CmpSubset -> begin

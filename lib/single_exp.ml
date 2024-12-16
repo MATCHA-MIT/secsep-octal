@@ -647,4 +647,44 @@ include SingleExpBasic
     | SingleBExp (SingleAdd, SingleConst off, SingleVar var) when var = base_id -> Some off
     | _ -> None
 
+  let split_val (e: t) (off_list: (t * t) list) : t list =
+    (* We do not check the off list is continuous here since we checked before we call split_val *)
+    let get_len_helper (acc: int64 option) (off: t * t) : (int64 option) * int64 =
+      match acc with
+      | None -> None, 0L
+      | Some total_len ->
+        let l, r = off in
+        match eval (SingleBExp (SingleSub, r, l)) with
+        | SingleConst c -> Some (Int64.add c total_len), c
+        | _ -> None, 0L
+    in
+    let get_default_list (default: t) = List.init (List.length off_list) (fun _ -> default) in
+    let get_byte_helper (sign_extension: bool) (acc: int64) (size: int64) : int64 * t =
+      (* We assume size refers to byte and is smaller than 8 *)
+      let bits = (Int64.to_int size) * 8 in
+      if bits < 0 || bits >= 64 then single_exp_error (Printf.sprintf "split val got invalid size %Ld" size)
+      else
+      let left_bits = 64 - bits in
+      let part_val = 
+        if sign_extension then Int64.shift_right (Int64.shift_left acc left_bits) left_bits
+        else Int64.shift_right_logical (Int64.shift_left acc left_bits) left_bits
+      in
+      let remained_val = Int64.shift_right acc bits in
+      remained_val, SingleConst part_val
+    in
+    match e with
+    | SingleConst const_val ->
+      begin match List.fold_left_map get_len_helper (Some 0L) off_list with
+      | None, _ -> get_default_list SingleTop
+      | Some total_len, len_list ->
+        if total_len > 64L then
+          if const_val = 0L then get_default_list (SingleConst 0L)
+          else get_default_list SingleTop
+        else
+          (* TODO: Decide whether to use signed extension or not later!!! *)
+          let _, val_list = List.fold_left_map (get_byte_helper true) const_val len_list in
+          val_list
+      end
+    | _ -> get_default_list SingleTop
+
 end

@@ -134,8 +134,8 @@ module FuncInterface (Entry: EntryType) = struct
           begin match sub_sol_func m_off_l, sub_sol_func m_off_r with
           | Some (m_off_l, _), Some (_, m_off_r) ->
             let simp_m_off = m_off_l, m_off_r in
-            begin match MemType.get_mem_type smt_ctx sub_sol_list_func parent_mem orig_m_off simp_m_off with
-            | Some (is_full, p_ptr, (p_off, _, p_entry)) ->
+            begin match MemType.get_mem_type smt_ctx sub_sol_list_func false parent_mem orig_m_off simp_m_off with
+            | Some (is_full, p_ptr, (p_off, _, p_entry), _, _) ->
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
               ( (* acc *)

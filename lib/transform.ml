@@ -303,7 +303,7 @@ module Transform = struct
           let slot_anno, taint_anno = mem_anno in
           if slot_anno = None || taint_anno = None then
             transform_error "Memory annotation missing information";
-          let (slot_base, _, _) = Option.get slot_anno in
+          let (slot_base, _, _, _) = Option.get slot_anno in
           let taint_anno = Option.get taint_anno in
           let taint_anno = tv_ittt taint_anno in (* mocking *)
           match get_slot_unity func_state.init_mem_unity slot_base with
@@ -339,7 +339,8 @@ module Transform = struct
         let css' = match uop, o1, o2 with
         | Isa.Mov, Isa.StOp(_, _, _, _, _, (slot_info, taint_info)), Isa.RegOp reg when Isa.is_reg_callee_saved reg && (String.starts_with ~prefix:"push" tf.mnemonic) ->
           (* TODO: is this enough to cover all cases? *)
-          let (slot_base, slot_offset, slot_full), taint_info = Option.get slot_info, Option.get taint_info in
+          (* TODO: Can you also handle the case of accessing multiple slots here?*)
+          let (slot_base, slot_offset, slot_full, _), taint_info = Option.get slot_info, Option.get taint_info in
           let taint_info = tv_ittt taint_info in (* mocking *)
           if slot_base = func_state.init_rsp_var_id && slot_full && MemOffset.is_8byte_slot slot_offset && taint_info = TaintConst true then
             helper_add_callee_saving_slot css reg slot_offset
@@ -384,7 +385,8 @@ module Transform = struct
         if slot_anno = None || taint_anno = None then
           transform_error "Memory annotation missing information";
         (* sanity check on stack access *)
-        let (slot_base, slot_offset, slot_is_full) = Option.get slot_anno in
+        (* TODO: Can you also handle the case of accessing multiple slots here?*)
+        let (slot_base, slot_offset, slot_is_full, _) = Option.get slot_anno in
         if slot_base != func_state.init_rsp_var_id then
           transform_error "Push/Pop not accessing stack memory";
         if not slot_is_full then

@@ -11,7 +11,7 @@ module type MemAnnoType = sig
 
   val make_empty : unit -> t
   val update_taint : t -> TaintExp.t -> t
-  val get_slot : t -> (IsaBasic.imm_var_id * MemOffset.t * bool) option
+  val get_slot : t -> (IsaBasic.imm_var_id * MemOffset.t * bool * int) option
   val get_taint : t -> TaintExp.t option
   val to_string : t -> string
   val to_ocaml_string: t -> string

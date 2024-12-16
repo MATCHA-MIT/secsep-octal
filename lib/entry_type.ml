@@ -71,6 +71,8 @@ module type EntryType = sig
   val is_val2 : local_var_map_t -> t -> bool
 
   val to_smt_expr: SmtEmitter.t -> t -> SmtEmitter.exp_t
+
+  val split_val : t -> (SingleExp.t * SingleExp.t) list -> t list
 end
 
 

@@ -225,6 +225,13 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let single, _ = e in
     Entry.to_smt_expr smg_ctx single
 
+  let split_val (e: t) (off_list: (SingleExp.t * SingleExp.t) list) : t list =
+    let single, taint = e in
+    let single_list = Entry.split_val single off_list in
+    List.map (
+      fun x -> x, taint
+    ) single_list
+  
 end
 
 module TaintEntryType = TaintBaseEntryType (SingleEntryType)

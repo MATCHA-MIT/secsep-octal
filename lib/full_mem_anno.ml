@@ -6,8 +6,8 @@ open Sexplib.Std
 
 module FullMemAnno = struct
 
-  (* base pointer, slot's offset to base pointer, accessing full slot or not *)
-  type slot_t = IsaBasic.imm_var_id * MemOffset.t * bool
+  (* base pointer, slot's offset to base pointer, accessing full slot or not, num of slots being accessed *)
+  type slot_t = IsaBasic.imm_var_id * MemOffset.t * bool * int
   [@@deriving sexp]
 
   (* taint info of the slot *)
@@ -34,11 +34,12 @@ module FullMemAnno = struct
   let slot_to_string (slot_info: slot_t option) : string =
     match slot_info with
     | None -> "None"
-    | Some (base, offset, full) ->
-      Printf.sprintf "base ptr: %d, offset: %s, full: %b"
+    | Some (base, offset, full, num) ->
+      Printf.sprintf "base ptr: %d, offset: %s, full: %b, num: %d"
         base
         (MemOffset.to_string offset)
         full
+        num
   
   let taint_to_string (taint_info: taint_t option) : string =
     match taint_info with
@@ -55,11 +56,12 @@ module FullMemAnno = struct
     let slot_info, taint_info = anno in
     let slot_str = match slot_info with
     | None -> "None"
-    | Some (base, offset, full) ->
-      Printf.sprintf "Some (%d, %s, %b)"
+    | Some (base, offset, full, num) ->
+      Printf.sprintf "Some (%d, %s, %b, %d)"
         base
         (MemOffset.to_ocaml_string offset)
         full
+        num
     in
     let taint_str = match taint_info with
     | None -> "None"
@@ -71,7 +73,7 @@ module FullMemAnno = struct
       (smt_ctx: SmtEmitter.t)
       (addr_off: MemOffset.t)
       (slot_info: slot_t) : bool =
-    let _, s_off, is_full = slot_info in
+    let _, s_off, is_full, _ = slot_info in
     match MemOffset.offset_full_cmp smt_ctx addr_off s_off CmpEqSubset with
     | Eq -> true
     | Subset -> not is_full
