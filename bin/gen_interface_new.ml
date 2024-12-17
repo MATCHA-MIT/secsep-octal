@@ -19,7 +19,7 @@ let standalone_salsa20 : Base_func_interface.t = [
   "_start", [
     -2, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
     -3, [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
-    -4, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+    -4, [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], SingleTop) ];
   ]
 ]
 

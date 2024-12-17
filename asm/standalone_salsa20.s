@@ -342,21 +342,16 @@ salsa20:                                # @salsa20
 	.type	_start,@function
 _start:                                 # @_start
 # %bb.0:
-	pushq	%rbp
-	pushq	%r15
 	pushq	%r14
-	pushq	%r13
-	pushq	%r12
 	pushq	%rbx
-	subq	$232, %rsp
-	movq	$1296236545, (%rsp)             # imm = 0x4D430001
-	movq	$key, 8(%rsp)
-	movq	$32, 16(%rsp)
-	movq	$0, 24(%rsp)
-	movq	$0, 32(%rsp)
+	subq	$72, %rsp
+	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	movq	$key, 24(%rsp)
+	movq	$32, 32(%rsp)
 	movq	$0, 40(%rsp)
-	xorl	%r15d, %r15d
-	movq	%rsp, %rax
+	movq	$0, 48(%rsp)
+	movq	$0, 56(%rsp)
+	leaq	16(%rsp), %rax
 	xorl	%edx, %edx
 	#APP
 	rolq	$3, %rdi
@@ -365,15 +360,15 @@ _start:                                 # @_start
 	rolq	$51, %rdi
 	xchgq	%rbx, %rbx
 	#NO_APP
-	movq	%rdx, 96(%rsp)
-	movq	96(%rsp), %rax
-	movq	$1296236545, (%rsp)             # imm = 0x4D430001
-	movq	$nonce, 8(%rsp)
-	movq	$8, 16(%rsp)
-	movq	$0, 24(%rsp)
-	movq	$0, 32(%rsp)
+	movq	%rdx, 8(%rsp)
+	movq	8(%rsp), %rax
+	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	movq	$nonce, 24(%rsp)
+	movq	$8, 32(%rsp)
 	movq	$0, 40(%rsp)
-	movq	%rsp, %rax
+	movq	$0, 48(%rsp)
+	movq	$0, 56(%rsp)
+	leaq	16(%rsp), %rax
 	xorl	%edx, %edx
 	#APP
 	rolq	$3, %rdi
@@ -382,15 +377,15 @@ _start:                                 # @_start
 	rolq	$51, %rdi
 	xchgq	%rbx, %rbx
 	#NO_APP
-	movq	%rdx, 96(%rsp)
-	movq	96(%rsp), %rax
-	movq	$1296236545, (%rsp)             # imm = 0x4D430001
-	movq	$msg, 8(%rsp)
-	movq	$64, 16(%rsp)
-	movq	$0, 24(%rsp)
-	movq	$0, 32(%rsp)
+	movq	%rdx, 8(%rsp)
+	movq	8(%rsp), %rax
+	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	movq	$msg, 24(%rsp)
+	movq	$128, 32(%rsp)
 	movq	$0, 40(%rsp)
-	movq	%rsp, %rax
+	movq	$0, 48(%rsp)
+	movq	$0, 56(%rsp)
+	leaq	16(%rsp), %rax
 	xorl	%edx, %edx
 	#APP
 	rolq	$3, %rdi
@@ -399,82 +394,21 @@ _start:                                 # @_start
 	rolq	$51, %rdi
 	xchgq	%rbx, %rbx
 	#NO_APP
-	movq	%rdx, 96(%rsp)
-	movq	96(%rsp), %rax
-	movq	nonce(%rip), %r12
-	movq	%r12, %r13
-	shrq	$32, %r13
-	movaps	key(%rip), %xmm0
-	movaps	%xmm0, 80(%rsp)                 # 16-byte Spill
-	movaps	key+16(%rip), %xmm0
-	movaps	%xmm0, 64(%rsp)                 # 16-byte Spill
-	movabsq	$8746603119078539264, %rbp      # imm = 0x79622D3200000000
-	leaq	96(%rsp), %r14
-	jmp	.LBB3_1
+	movq	%rdx, 8(%rsp)
+	movq	8(%rsp), %rax
+	movl	$128, %ebx
+	movq	nonce(%rip), %r14
 	.p2align	4, 0x90
-.LBB3_6:                                #   in Loop: Header=BB3_1 Depth=1
-	incl	%r15d
-	cmpl	$50, %r15d
-	je	.LBB3_7
-.LBB3_1:                                # =>This Loop Header: Depth=1
-                                        #     Child Loop BB3_2 Depth 2
-                                        #       Child Loop BB3_4 Depth 3
-	xorl	%ebx, %ebx
-	jmp	.LBB3_2
-	.p2align	4, 0x90
-.LBB3_5:                                #   in Loop: Header=BB3_2 Depth=2
-	movzbl	160(%rsp,%rbx), %eax
-	xorb	%al, msg(%rbx)
-	incq	%rbx
-	cmpq	$64, %rbx
-	je	.LBB3_6
-.LBB3_2:                                #   Parent Loop BB3_1 Depth=1
-                                        # =>  This Loop Header: Depth=2
-                                        #       Child Loop BB3_4 Depth 3
-	testb	$63, %bl
-	jne	.LBB3_5
-# %bb.3:                                #   in Loop: Header=BB3_2 Depth=2
-	movl	%ebx, %eax
-	shrl	$6, %eax
-	movl	$1634760805, (%rsp)             # imm = 0x61707865
-	movaps	80(%rsp), %xmm0                 # 16-byte Reload
-	movups	%xmm0, 4(%rsp)
-	movl	$857760878, 20(%rsp)            # imm = 0x3320646E
-	movl	%r12d, 24(%rsp)
-	movl	%r13d, 28(%rsp)
-	movl	%eax, 32(%rsp)
-	movq	%rbp, 36(%rsp)
-	movaps	64(%rsp), %xmm0                 # 16-byte Reload
-	movups	%xmm0, 44(%rsp)
-	movl	$1797285236, 60(%rsp)           # imm = 0x6B206574
-	movq	%r14, %rdi
-	movq	%rsp, %rsi
-	callq	salsa20_words
-	movl	$8, %eax
-	xorl	%edx, %edx
-	.p2align	4, 0x90
-.LBB3_4:                                #   Parent Loop BB3_1 Depth=1
-                                        #     Parent Loop BB3_2 Depth=2
-                                        # =>    This Inner Loop Header: Depth=3
-	movl	%edx, %ecx
-	andl	$-4, %ecx
-	movl	96(%rsp,%rcx), %esi
-	leal	-8(%rax), %ecx
-	andb	$16, %cl
-	movl	%esi, %edi
-                                        # kill: def $cl killed $cl killed $ecx
-	shrl	%cl, %edi
-	movb	%dil, 160(%rsp,%rdx)
-	movl	%eax, %ecx
-	andb	$24, %cl
-	shrl	%cl, %esi
-	movb	%sil, 161(%rsp,%rdx)
-	addq	$2, %rdx
-	addl	$16, %eax
-	cmpq	$64, %rdx
-	jne	.LBB3_4
-	jmp	.LBB3_5
-.LBB3_7:
+.LBB3_1:                                # =>This Inner Loop Header: Depth=1
+	movl	$msg, %edi
+	movl	$key, %edx
+	movq	%rbx, %rsi
+	movq	%r14, %rcx
+	callq	salsa20
+	decq	%rbx
+	cmpq	$78, %rbx
+	jne	.LBB3_1
+# %bb.2:
 	#APP
 	movl	$60, %eax
 	xorl	%edi, %edi
@@ -482,13 +416,9 @@ _start:                                 # @_start
 	hlt
 
 	#NO_APP
-	addq	$232, %rsp
+	addq	$72, %rsp
 	popq	%rbx
-	popq	%r12
-	popq	%r13
 	popq	%r14
-	popq	%r15
-	popq	%rbp
 	retq
 .Lfunc_end3:
 	.size	_start, .Lfunc_end3-_start
@@ -514,10 +444,10 @@ nonce:
 	.globl	msg
 	.p2align	4, 0x0
 msg:
-	.ascii	"\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b"
-	.size	msg, 64
+	.ascii	"\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b\b\001\002\003\004\005\006\007\007\006\005\004\003\002\001\b"
+	.size	msg, 128
 
-	.ident	"Debian clang version 16.0.6 (++20231112084702+7cbf1a259152-1~exp1~20231112084757.16)"
+	.ident	"Debian clang version 16.0.6 (++20230610113325+7cbf1a259152-1~exp1~20230610233413.4)"
 	.section	".note.GNU-stack","",@progbits
 	.addrsig
 	.addrsig_sym key
