@@ -113,8 +113,9 @@ module TaintTypeInfer = struct
     let helper 
         (block_subtype: ArchType.block_subtype_t list)
         (block_block_type: Isa.basic_block * ArchType.t) : ArchType.block_subtype_t list * Isa.basic_block =
-      (* Prepare SMT context for the current block *)
       let block, block_type = block_block_type in
+      if block_type.pc >= block_type.dead_pc then block_subtype, block else begin
+      (* Prepare SMT context for the current block *)
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
       let (_, block_subtype), new_block =

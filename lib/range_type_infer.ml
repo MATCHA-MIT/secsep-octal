@@ -102,6 +102,7 @@ module RangeTypeInfer = struct
         (block_subtype: ArchType.block_subtype_t list) 
         (block: Isa.basic_block) 
         (block_type: ArchType.t) : ArchType.block_subtype_t list =
+      if block_type.pc >= block_type.dead_pc then block_subtype else begin
       (* Prepare SMT context for the current block *)
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
@@ -119,6 +120,7 @@ module RangeTypeInfer = struct
       (* Printf.printf "After prop block %s\n" block.label; *)
       SmtEmitter.pop infer_state.smt_ctx 1;
       block_subtype
+      end
     in
     let block_subtype = ArchType.init_block_subtype_list_from_block_type_list infer_state.func_type in
     let block_subtype = List.fold_left2 helper block_subtype infer_state.func infer_state.func_type in
