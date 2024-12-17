@@ -644,23 +644,29 @@ module Parser = struct
     in
     let rec symbol_propagate_helper (func_list: Isa.func list) : Isa.func list =
       let old_list = func_list in
-      let func_list = List.fold_left (fun func_list (func: Isa.func) ->
-        List.map (fun (target_func: Isa.func) ->
+
+      let func_list = List.map (fun (func: Isa.func) ->
+        let related_gsymbols = List.fold_left (fun acc (subfunc: Isa.label) ->
           let subfunc_match =
-            List.find_opt (fun (element: Isa.label) ->
-              String.equal element target_func.name
-            ) func.subfunctions
+            List.find_opt (fun (func: Isa.func) ->
+              func.name = subfunc
+            ) old_list
           in
           match subfunc_match with
-          | None -> target_func
-          | Some _ ->
+          | None ->
+            Printf.printf "warning: skipping %s in symbol propagation\n" subfunc;
+            acc
+          | Some subfunc ->
             let missing = List.filter (fun (symbol: Isa.label) ->
-              not (List.mem symbol target_func.related_gsymbols)
-            ) func.related_gsymbols
+              not (List.mem symbol acc)
+            ) subfunc.related_gsymbols
             in
-            {target_func with related_gsymbols = missing @ target_func.related_gsymbols}
-        ) func_list
-      ) func_list func_list in
+            List.iter (fun s -> Printf.printf "adding %s to %s (from %s)\n" s func.name subfunc.name) missing;
+            missing @ acc
+        ) func.related_gsymbols func.subfunctions in
+        {func with related_gsymbols = related_gsymbols }
+      ) func_list in
+
       if same_func_list old_list func_list then
         old_list
       else
