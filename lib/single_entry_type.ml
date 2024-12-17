@@ -73,6 +73,7 @@ include SingleExp
     | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
     | Adc -> SingleTop |> set_flag_helper
     | Sub -> eval (SingleBExp (SingleSub, e1, e2)) |> set_flag_helper
+    | Sbb -> SingleTop |> set_flag_helper
     | Mul -> SingleTop |> set_flag_helper
     | Imul -> eval (SingleBExp (SingleMul, e1, e2)) |> set_flag_helper
     | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2)) |> set_flag_helper
@@ -83,8 +84,12 @@ include SingleExp
     | Xor -> (if cmp e1 e2 = 0 then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
     | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
     | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
+    | CmovEq -> SingleTop |> set_flag_helper
+    | Bt -> (* bit test, set CF to the bit *)
+      let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
+      e1, (result, get_const_type (IsaBasic.ImmNum 0L))
     | Punpck | Packus
-    | Psub | Pxor | Pand | Pandn | Por
+    | Padd | Psub | Pxor | Pand | Pandn | Por
     | Psll | Psrl
     | Xorps -> SingleTop, flags
 

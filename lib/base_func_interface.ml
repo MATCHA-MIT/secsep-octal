@@ -1,5 +1,5 @@
 open Isa_basic
-open Stack_layout
+open External_layouts
 open Single_type_infer
 open Sexplib.Std
 
@@ -17,12 +17,33 @@ let parse (source: string) : t =
   t_of_sexp (Sexp.of_string source)
 
 let add_stack_layout (interface: t) (stack_layout: StackLayout.t) : t =
-  List.map2 (
-    fun (one_func: entry_t) (one_stack: StackLayout.entry_t) ->
+  List.map (
+    fun (one_func: entry_t) ->
       let label1, mem = one_func in
-      let label2, stack = one_stack in
-      if label1 = label2 then
-        label1, (IsaBasic.get_reg_idx IsaBasic.RSP, stack) :: mem
+      let one_stack = List.find (fun one_stack -> String.equal (fst one_stack) label1) stack_layout in
+      let _, stack = one_stack in
+      label1, (IsaBasic.get_reg_idx IsaBasic.RSP, stack) :: mem
+  ) interface
+
+let add_global_symbol_layout
+    (func_interface: entry_t)
+    (imm_var_map: SingleTypeInfer.Isa.imm_var_map)
+    (used_symbols: IsaBasic.label list)
+    (global_symbol_layout: GlobalSymbolLayout.t)
+    : entry_t =
+  let func_label, func_mem = func_interface in
+  let symbol_layouts = List.map (fun symbol ->
+    let var_id = IsaBasic.StrM.find symbol imm_var_map in
+    let layout = List.find_map (fun layout ->
+      let label = fst layout in
+      if String.equal label symbol then
+        Some (var_id, snd layout)
       else
-        base_func_interface_error (Printf.sprintf "Label %s and %s does not match" label1 label2)
-  ) interface stack_layout
+        None
+    ) global_symbol_layout in
+    if Option.is_none layout then
+      base_func_interface_error (Printf.sprintf "cannot find layout of global symbol %s for func %s\n" symbol func_label);
+    Printf.printf "adding global symbol %s to %s\n%!" symbol func_label;
+    Option.get layout
+  ) used_symbols in
+  func_label, (func_mem @ symbol_layouts)

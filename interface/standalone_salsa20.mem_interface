@@ -64,13 +64,4 @@
      (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
-     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (-2
-    ((((SingleConst 0) (SingleConst 32))
-      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
-   (-3
-    ((((SingleConst 0) (SingleConst 8))
-      (RangeConst (((SingleConst 0) (SingleConst 8)))) SingleTop)))
-   (-4
-    ((((SingleConst 0) (SingleConst 64))
-      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))))
+     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop))))))

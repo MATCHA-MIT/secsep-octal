@@ -1,0 +1,9 @@
+((K512
+  ((((SingleConst 0) (SingleConst 640))
+    (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))
+ (message
+  ((((SingleConst 0) (SingleConst 256))
+    (RangeConst (((SingleConst 0) (SingleConst 256)))) SingleTop)))
+ (out
+  ((((SingleConst 0) (SingleConst 64))
+    (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
