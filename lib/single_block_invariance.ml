@@ -62,6 +62,8 @@ module SingleBlockInvariance = struct
       (func_type: ArchType.t list)
       (br_block_info: br_block_t) : ArchType.t list =
     let branch_block = ArchType.get_arch_type func_type br_block_info.label in
+    Printf.printf "Branch block\n%s\n" (Sexplib.Sexp.to_string_hum (ArchType.sexp_of_t branch_block));
+    Printf.printf "Br block info\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_br_block_t br_block_info));
     
     (* 1. Setup context of executing the branch, which consists of
           (1) branch_block.context
@@ -104,12 +106,13 @@ module SingleBlockInvariance = struct
       (block_input: block_input_t) : ArchType.t list =
     let target_label, br_block_list = block_input in
     let target_block = ArchType.get_arch_type func_type target_label in
+    Printf.printf "Solve Block %s\n" target_label;
     if List.length target_block.tmp_context = 0 then begin
       Printf.printf "Block %s resolved, skip\n" target_label;
       func_type
-    end else if IsaBasic.is_label_function_entry target_block.label then begin
+    (* end else if IsaBasic.is_label_function_entry target_block.label then begin
       Printf.printf "Func entry %s, skip\n" target_label;
-      func_type
+      func_type *)
     end else begin
       (if IsaBasic.is_label_function_entry target_block.label then begin
         if List.length br_block_list > 0 then

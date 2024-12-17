@@ -676,11 +676,7 @@ module ArchType (Entry: EntryType) = struct
       let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
       let next_type =
         if Isa.uop_set_flag uop then
-          let simp_cond_type = Entry.repl_local_var new_local_var dest_type in
-          Printf.printf "Inst %s simp_cond_type %s%!\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_instruction inst)) (Entry.to_string simp_cond_type);
-          { next_type with
-            useful_var = SingleExp.SingleVarSet.union next_type.useful_var (SingleExp.get_vars (Entry.get_single_exp simp_cond_type));
-            flag = (simp_cond_type, Entry.get_const_type (Isa.ImmNum 0L)) }
+          { next_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)) }
         else next_type
       in
       { next_type with local_var_map = new_local_var },
@@ -762,25 +758,15 @@ module ArchType (Entry: EntryType) = struct
     | Cmp (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let src0_type = Entry.repl_local_var curr_type.local_var_map src0_type in
-      let src1_type = Entry.repl_local_var curr_type.local_var_map src1_type in
-      let useful_vars = 
-        SingleExp.SingleVarSet.union 
-          (SingleExp.get_vars (Entry.get_single_exp src0_type))
-          (SingleExp.get_vars (Entry.get_single_exp src1_type))
-      in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (src0_type, src1_type); 
-        useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars },
+      { curr_type with flag = (src0_type, src1_type); },
       Cmp (src0, src1)
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type = Entry.repl_local_var curr_type.local_var_map (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type false) in
-      let useful_vars = SingleExp.get_vars (Entry.get_single_exp dest_type) in
+      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type false in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); 
-        useful_var = SingleExp.SingleVarSet.union curr_type.useful_var useful_vars },
+      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); },
       Test (src0, src1)
     | Push (src, mem_anno) ->
       let size = Isa.get_op_size src in
@@ -889,6 +875,12 @@ module ArchType (Entry: EntryType) = struct
       let block_subtype = (update_with_end_type curr_type block_subtype) in (* Maybe need to update local var map too... *)
       curr_type, false, block_subtype
     | Jcond (cond, label, _) ->
+      (* Simplify flag *)
+      let simp_flag =
+        Entry.repl_local_var curr_type.local_var_map (fst curr_type.flag),
+        Entry.repl_local_var curr_type.local_var_map (snd curr_type.flag)
+      in
+      let curr_type = { curr_type with flag = simp_flag } in
       (* Add constraint: branch cond is untainted!!! *)
       let cond_l, cond_r = curr_type.flag in
       let cond_untaint_constraint = (Entry.get_untaint_constraint cond_l) @ (Entry.get_untaint_constraint cond_r) in
