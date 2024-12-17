@@ -14,6 +14,9 @@ include SingleExp
   | OldExt of t (* Used for memory slot partial update *)
   [@@deriving sexp]
 
+  type flag_t = t * t
+  [@@deriving sexp]
+
   let get_taint_var_map (_: local_var_map_t) : TaintExp.local_var_map_t option = None
 
   let partial_read_val (e: t) : t =
@@ -60,38 +63,47 @@ include SingleExp
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
     let _ = st_taint in e, []
 
-  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (same_op: bool) : t =
+  let get_const_type = get_imm_type
+
+  let set_flag_helper (dest_type: t) =
+    dest_type, (dest_type, get_const_type (IsaBasic.ImmNum 0L))
+
+  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     match isa_bop with
-    | Add -> eval (SingleBExp (SingleAdd, e1, e2))
-    | Adc -> SingleTop
-    | Sub -> eval (SingleBExp (SingleSub, e1, e2))
-    | Mul -> SingleTop
-    | Imul -> eval (SingleBExp (SingleMul, e1, e2))
-    | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2))
-    | Sar -> eval (SingleBExp (SingleSar, e1, e2))
+    | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
+    | Adc -> SingleTop |> set_flag_helper
+    | Sub -> eval (SingleBExp (SingleSub, e1, e2)) |> set_flag_helper
+    | Mul -> SingleTop |> set_flag_helper
+    | Imul -> eval (SingleBExp (SingleMul, e1, e2)) |> set_flag_helper
+    | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2)) |> set_flag_helper
+    | Sar -> eval (SingleBExp (SingleSar, e1, e2)) |> set_flag_helper
     | Shr -> (* Check has a dirty, possibly incorrect calculation *)
-      if is_check then SingleTop else eval (SingleBExp (SingleSar, e1, e2))
-    | Rol | Ror -> SingleTop
-    | Xor -> if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))
-    | And -> eval (SingleBExp (SingleAnd, e1, e2))
-    | Or -> eval (SingleBExp (SingleOr, e1, e2))
+      (if is_check then SingleTop else eval (SingleBExp (SingleSar, e1, e2))) |> set_flag_helper
+    | Rol | Ror -> SingleTop |> set_flag_helper
+    | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
+    | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
+    | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
     | Pxor | Xorps -> if same_op then SingleConst 0L else SingleTop
     | Punpck | Packus
-    | Pand | Por
-    | Psll | Psrl -> SingleTop
+    | Psub | Pand | Pandn | Por
+    | Psll | Psrl -> SingleTop, flags
 
-  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flags: flag_t) : t * flag_t =
     match isa_uop with
-    | Mov | MovZ | Lea -> e
-    | Not -> eval (SingleUExp (SingleNot, e))
-    | Bswap -> SingleTop
-    | Neg -> eval (SingleBExp (SingleMul, e, SingleConst (-1L)))
-    | Inc -> eval (SingleBExp (SingleAdd, e, SingleConst 1L))
-    | Dec -> eval (SingleBExp (SingleAdd, e, SingleConst (-1L)))
+    | Mov | MovZ | Lea -> e, flags
+    | Not -> eval (SingleUExp (SingleNot, e)), flags
+    | Bswap -> SingleTop, flags
+    | Neg ->
+      eval (SingleBExp (SingleMul, e, SingleConst (-1L))) |> set_flag_helper
+    | Inc ->
+      eval (SingleBExp (SingleAdd, e, SingleConst 1L)) |> set_flag_helper
+    | Dec ->
+      eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) |> set_flag_helper
 
-  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) : t =
+  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (flags: flag_t) : t * flag_t =
     match isa_top with
-    | _ -> SingleTop
+    | Shrd -> SingleTop |> set_flag_helper
+    | Pshufd | Pshuflw | Pshufhw -> SingleTop, flags
 
   let get_single_taint_exp (_: t) : t * TaintExp.t =
     single_exp_error "Cannot get single taint exp on a single entry type"
@@ -99,8 +111,6 @@ include SingleExp
   let set_taint_with_other (x: t) (_: t) : t = x
 
   let get_single_var_map (m: local_var_map_t) : SingleExp.local_var_map_t = m
-
-  let get_const_type = get_imm_type
 
   let get_top_type () : t = SingleTop
   let get_top_untaint_type () : t = SingleTop

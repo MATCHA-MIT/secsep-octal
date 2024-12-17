@@ -295,7 +295,7 @@ module ArchType (Entry: EntryType) = struct
         begin match try_get_slot_type with
         | Some ((off_w, off_r, e_t), mult_slot_cons, true) ->
           e_t, 
-          Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons, 
+          Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons,
           useful_vars,
           anno_opt
           (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
@@ -303,9 +303,9 @@ module ArchType (Entry: EntryType) = struct
         | _ -> (* Annotation not pass check or no annotation *)
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
           begin match MemType.get_mem_type smt_ctx sub_sol_list_func true curr_type.mem_type orig_addr_offset simp_addr_offset with
-          | Some (is_full, ptr, (off_w, off_r, e_t), num_slot, mult_slot_cons) -> 
+          | Some (is_full, ptr, (off_w, off_r, e_t), num_slot, mult_slot_cons) ->
             e_t, 
-            Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons, 
+            Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons,
             useful_vars,
             Some (ptr, off_w, is_full, num_slot)
           | None -> 
@@ -561,7 +561,7 @@ module ArchType (Entry: EntryType) = struct
       let next_type, dest_constraint, dest_useful, slot_anno =
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type addr_type size_type slot_anno new_type
       in
-      { next_type with useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful }, 
+      { next_type with useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful },
       st_op_constraint @ dest_constraint,
       StOp (disp, base, index, scale, size, (slot_anno, taint_anno))
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
@@ -620,10 +620,10 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t) (offset: int64) : t =
     let prop_mode = curr_type.prop_mode in
     let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type (Isa.RegOp Isa.RSP) in
-    let new_rsp_type = 
-      Entry.repl_local_var curr_type.local_var_map 
-        (Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset)) false) 
-    in
+
+    let new_rsp_type, _ = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset)) curr_type.flag false in
+    let new_rsp_type = Entry.repl_local_var curr_type.local_var_map new_rsp_type in
+
     let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
     curr_type
 
@@ -647,27 +647,28 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type (Isa.cmp_operand src0 src1) in
+      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type curr_type.flag (Isa.cmp_operand src0 src1) in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
-      let next_type, dest_constraint, dest = 
+      let next_type, dest_constraint, dest =
         (* Dirty fix to allow clean up xmm reg with xor *)
         if bop = Pxor || bop = Xorps then
-          set_dest_op_type_helper true  smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type 
+          set_dest_op_type_helper true  smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type
         else
-          set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type 
+          set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type
       in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
       let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
-      { next_type with local_var_map = new_local_var },
+      (* FIXME: check useful var generation? 12/15/2024 *)
+      { next_type with local_var_map = new_local_var; flag = new_flag },
       BInst (bop, dest, src0, src1)
     | UInst (uop, dest, src) ->
       let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src in
-      let dest_type = 
+      let dest_type, new_flag =
         begin match uop with
         (* | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type *)
-        | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type
-        | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type
-        | _ -> Entry.exe_uop_inst uop src_type
+        | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
+        | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
+        | _ -> Entry.exe_uop_inst uop src_type curr_type.flag
         end 
       in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
@@ -678,7 +679,7 @@ module ArchType (Entry: EntryType) = struct
         if Isa.uop_set_flag uop then
           { next_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)) }
         else next_type
-      in
+      let next_type = { next_type with flag = new_flag } in
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
     | TInst (top, dest, src_list) ->
@@ -691,12 +692,12 @@ module ArchType (Entry: EntryType) = struct
         ) curr_type src_list
       in
       let src_type_list, src_list = List.split src_op_type_list in
-      let dest_type = Entry.exe_top_inst top src_type_list in
+      let dest_type, new_flag = Entry.exe_top_inst top src_type_list curr_type.flag in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) src_list in
       let next_type = add_constraints next_type (dest_constraint @ ldst_bind_constraint) in
-      { next_type with local_var_map = new_local_var },
+      { next_type with local_var_map = new_local_var; flag = new_flag },
       TInst (top, dest, src_list)
     | RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno)) ->
       let rcx_type = get_reg_type curr_type RCX in
@@ -764,9 +765,9 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type false in
+      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type curr_type.flag false in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)); },
+      { curr_type with flag = new_flag;  },
       Test (src0, src1)
     | Push (src, mem_anno) ->
       let size = Isa.get_op_size src in
@@ -893,11 +894,11 @@ module ArchType (Entry: EntryType) = struct
         (* Only add to block subtype if the taken cond is possible*)
         if (not (CondType.has_top taken_cond))
           && SmtEmitter.check_compliance smt_ctx [ CondType.to_smt_expr smt_ctx taken_cond ] = SatNo then begin
-          Printf.printf "Warning: block %s pc %d cond branch %s (%s) cannot taken\n" 
+          Printf.printf "Warning: block %s pc %d cond branch %s (%s) cannot taken\n"
           curr_type.label curr_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)) (CondType.to_string taken_cond);
           block_subtype
         end else
-          (add_block_subtype label taken_type block_subtype) 
+          (add_block_subtype label taken_type block_subtype)
       in
       (* 2. Update and check ctx *)
       SmtEmitter.add_assertions smt_ctx not_taken_cond;
@@ -918,13 +919,13 @@ module ArchType (Entry: EntryType) = struct
             (2) update useful vars of this block in block_subtype *)
           Printf.printf "Warning: block %s pc %d cond branch %s (%s) always taken, stop prop\n"
           not_taken_type.label not_taken_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)) (CondType.to_string taken_cond);
-          let not_taken_type = { not_taken_type with full_not_taken_hist = not_taken_type.branch_hist } in 
+          let not_taken_type = { not_taken_type with full_not_taken_hist = not_taken_type.branch_hist } in
           not_taken_type,
           (update_with_end_type not_taken_type block_subtype)
         end else not_taken_type, block_subtype
       in
       not_taken_type,
-      not_taken_possible, 
+      not_taken_possible,
       block_subtype
     | _ -> arch_type_error (Printf.sprintf "type_prop_branch: %s not supported" (Isa.string_of_instruction inst))
 
@@ -1006,7 +1007,7 @@ module ArchType (Entry: EntryType) = struct
     let sub_sol_list_func (e: SingleExp.t) : (MemOffset.t list) option =
       sub_sol_list_func (e, curr_type.pc)
     in
-    let (next_type, continue_prop, block_subtype), inst = 
+    let (next_type, continue_prop, block_subtype), inst =
       match inst with
       | Jmp _ | Jcond _ ->
         type_prop_branch smt_ctx curr_type inst block_subtype, inst
@@ -1044,9 +1045,9 @@ module ArchType (Entry: EntryType) = struct
       (block: Isa.instruction list)
       (block_subtype: block_subtype_t list) :
       (t * (block_subtype_t list)) * (Isa.instruction list) =
-    let (curr_type, _, block_subtype), block = 
+    let (curr_type, _, block_subtype), block =
       List.fold_left_map (
-        fun (curr, continue_prop, b_sub) inst -> 
+        fun (curr, continue_prop, b_sub) inst ->
           if continue_prop then
             type_prop_inst smt_ctx sub_sol_func sub_sol_list_func func_interface_list curr inst b_sub
           else (curr, continue_prop, b_sub), inst

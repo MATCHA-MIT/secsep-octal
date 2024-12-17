@@ -14,7 +14,10 @@ module TaintBaseEntryType (Entry: EntryType) = struct
   type t = Entry.t * TaintExp.t
   [@@deriving sexp]
 
-  type ext_t = 
+  type flag_t = t * t
+  [@@deriving sexp]
+
+  type ext_t =
     | SignExt
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
@@ -119,24 +122,50 @@ module TaintBaseEntryType (Entry: EntryType) = struct
       let single, taint = e in
       (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
     | None -> e, []
-  
-  let exe_bop_inst (is_check: bool)  (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (same_op: bool) : t =
+
+  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     let s1, t1 = e1 in
     let s2, t2 = e2 in
-    Entry.exe_bop_inst is_check isa_bop s1 s2 same_op,
-    if isa_bop = Xor && Entry.cmp s1 s2 = 0 then
-      TaintConst false
-    else
-      TaintExp.merge t1 t2
+    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
+    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst is_check isa_bop s1 s2 (fl_entry, fr_entry) same_op in
+    let (dest_taint_type: TaintExp.t) =
+      if isa_bop = Xor && Entry.cmp s1 s2 = 0 then
+        TaintConst false
+      else
+        TaintExp.merge t1 t2
+    in
+    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_bop with
+    | Add | Adc | Sub | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or ->
+      dest_taint_type, TaintConst false
+    | Punpck | Packus
+    | Psub | Pxor | Pand | Pandn | Por
+    | Psll | Psrl
+    | Xorps -> fl_taint, fr_taint
+    in
+    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
-  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) : t =
+
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flags: flag_t) : t * flag_t =
     let single, taint = e in
-    Entry.exe_uop_inst isa_uop single, taint
+    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
+    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_uop_inst isa_uop single (fl_entry, fr_entry) in
+    let dest_taint_type = taint in
+    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_uop with
+    | Mov | MovZ | Lea | Not | Bswap -> fl_taint, fr_taint
+    | Neg | Inc | Dec -> dest_taint_type, TaintConst false
+    in
+    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
-  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) : t =
+  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flags: flag_t) : t * flag_t =
     let single_list, t_list = List.split e_list in
-    Entry.exe_top_inst isa_top single_list,
-    List.fold_left TaintExp.merge (TaintConst false) t_list
+    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
+    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_top_inst isa_top single_list (fl_entry, fr_entry) in
+    let dest_taint_type = List.fold_left TaintExp.merge (TaintConst false) t_list in
+    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_top with
+    | Shrd -> dest_taint_type, TaintConst false
+    | Pshufd | Pshuflw | Pshufhw -> fl_taint, fr_taint
+    in
+    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
   let get_single_exp (e: t) : SingleExp.t =
     let single, _ = e in Entry.get_single_exp single
@@ -152,7 +181,7 @@ module TaintBaseEntryType (Entry: EntryType) = struct
 
   let get_const_type (imm: IsaBasic.immediate) : t =
     Entry.get_const_type imm, TaintConst false
-  
+
   let get_top_type () : t = taint_entry_type_error "Maybe we should not get_top_type for taint"
   let get_top_untaint_type () : t = (Entry.get_top_untaint_type (), TaintConst false)
 
@@ -231,7 +260,7 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     List.map (
       fun x -> x, taint
     ) single_list
-  
+
 end
 
 module TaintEntryType = TaintBaseEntryType (SingleEntryType)
