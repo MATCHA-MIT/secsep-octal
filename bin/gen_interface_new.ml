@@ -6,7 +6,7 @@ let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 let standalone_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
   "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
-  "msg", [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+  "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], SingleTop) ];
 ]
 
 let standalone_salsa20 : Base_func_interface.t = [
