@@ -108,6 +108,47 @@ let bench_ed25519_plain : Base_func_interface.t = [
       (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop;
     ];
   ];
+  "fe_mul_impl", [
+    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
+  "ge_madd", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
+    ];
+    r RDX, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+    ];
+  ];
+  "ge_p2_dbl", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+    ];
+  ];
+  "fe_tobytes", [
+    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
   "x25519_ge_p1p1_to_p2", [
     r RDI, [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
@@ -173,53 +214,12 @@ let bench_ed25519_plain : Base_func_interface.t = [
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
     ];
   ];
-  "ge_madd", [
-    r RDI, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
-      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
-    ];
-    r RSI, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
-      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
-    ];
-    r RDX, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
-    ];
-  ];
-  "ge_p2_dbl", [
-    r RDI, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
-      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
-    ];
-    r RSI, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
-    ];
-  ];
   "ED25519_sign", [
     r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
     r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
     r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "main", [
-  ];
-  "fe_mul_impl", [
-    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-  ];
-  "fe_tobytes", [
-    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
 ]
 
