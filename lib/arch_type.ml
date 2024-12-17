@@ -41,6 +41,7 @@ module ArchType (Entry: EntryType) = struct
   type t = {
     label: Isa.label;
     pc: int;
+    dead_pc: int;
     reg_type: RegType.t;
     mem_type: MemType.t;
     context: SingleContext.t list;
@@ -138,6 +139,7 @@ module ArchType (Entry: EntryType) = struct
     {
       label = label;
       pc = start_pc;
+      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
@@ -166,6 +168,7 @@ module ArchType (Entry: EntryType) = struct
     idx1, {
       label = label;
       pc = start_pc;
+      dead_pc = Int.max_int;
       reg_type = reg_type;
       mem_type = mem_type;
       context = [];
@@ -209,6 +212,7 @@ module ArchType (Entry: EntryType) = struct
 
   let update_one_with_another_helper (orig: t) (update: t) : t =
     { orig with
+      dead_pc = update.dead_pc;
       local_var_map = update.local_var_map;
       useful_var = update.useful_var;
       full_not_taken_hist = update.full_not_taken_hist;
@@ -910,10 +914,15 @@ module ArchType (Entry: EntryType) = struct
         if not not_taken_possible then begin
           (* This is the end of the current block, similar to uncond jmp,
             (1) update not taken hist
-            (2) update useful vars of this block in block_subtype *)
+            (2) update useful vars of this block in block_subtype
+            (3) update dead_pc *)
           Printf.printf "Warning: block %s pc %d cond branch %s (%s) always taken, stop prop\n"
           not_taken_type.label not_taken_type.pc (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)) (CondType.to_string taken_cond);
-          let not_taken_type = { not_taken_type with full_not_taken_hist = not_taken_type.branch_hist } in
+          let not_taken_type = { 
+            not_taken_type with 
+            full_not_taken_hist = not_taken_type.branch_hist; 
+            dead_pc = not_taken_type.pc + 1;
+          } in
           not_taken_type,
           (update_with_end_type not_taken_type block_subtype)
         end else not_taken_type, block_subtype

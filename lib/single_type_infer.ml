@@ -645,6 +645,15 @@ module SingleTypeInfer = struct
             func_type
         in
 
+        (* 6. Update dead_pc of dead blocks (after infer finished) *)
+        let func_type =
+          List.map (
+            fun (a_type: ArchType.t) ->
+              if StringSet.mem a_type.label state.alive_blocks then a_type
+              else { a_type with dead_pc = a_type.dead_pc }
+          ) func_type
+        in
+
         let state = { state with func_type = func_type } in
 
         (* 6. Single type infer *)

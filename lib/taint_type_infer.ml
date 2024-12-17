@@ -77,6 +77,7 @@ module TaintTypeInfer = struct
       acc, {
         label = block_single_type.label;
         pc = block_single_type.pc;
+        dead_pc = Int.max_int;
         reg_type = new_reg_type;
         mem_type = new_mem_type;
         context = block_single_type.context;
