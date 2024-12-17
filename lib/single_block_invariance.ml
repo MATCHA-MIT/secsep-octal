@@ -95,7 +95,7 @@ module SingleBlockInvariance = struct
     if List.length new_br_context = 0 then func_type
     else
       if target_block.label = branch_block.label then
-      single_block_invariance_error (Printf.sprintf "Unsat invaraince when jump from %s %d to %s\n" branch_block.label branch_block.pc target_block.label)
+      single_block_invariance_error (Printf.sprintf "Unsat invariance when jump from %s %d to %s\n" branch_block.label branch_block.pc target_block.label)
       else
         ArchType.set_arch_type func_type
           { branch_block with tmp_context = new_br_context @ branch_block.tmp_context }
