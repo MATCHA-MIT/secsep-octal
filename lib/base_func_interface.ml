@@ -1,12 +1,12 @@
 open Isa_basic
 open External_layouts
-open Single_type_infer
+open Single_subtype
 open Sexplib.Std
 
 exception BaseFuncInterfaceError of string
 let base_func_interface_error msg = raise (BaseFuncInterfaceError ("[Base Func Interface Error] " ^ msg))
 
-type entry_t = IsaBasic.label * SingleTypeInfer.ArchType.MemType.t
+type entry_t = IsaBasic.label * SingleSubtype.ArchType.MemType.t
 [@@deriving sexp]
 
 type t = entry_t list
@@ -27,7 +27,7 @@ let add_stack_layout (interface: t) (stack_layout: StackLayout.t) : t =
 
 let add_global_symbol_layout
     (func_interface: entry_t)
-    (imm_var_map: SingleTypeInfer.Isa.imm_var_map)
+    (imm_var_map: IsaBasic.imm_var_map)
     (used_symbols: IsaBasic.label list)
     (global_symbol_layout: GlobalSymbolLayout.t)
     : entry_t =

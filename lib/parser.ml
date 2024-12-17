@@ -611,10 +611,67 @@ module Parser = struct
           name = Option.get func_name;
           body = bbs;
           related_gsymbols = symbols;
+          subfunctions = [];
         }
       in
       List.fold_left_map helper Isa.StrM.empty func_list
     in
+
+    (* subfunctions extraction *)
+    let func_list = List.map(fun (func: Isa.func) ->
+      let calls = List.fold_left (fun acc (bb: Isa.basic_block) ->
+        let calls = List.filter_map (fun (inst: Isa.instruction) ->
+          match inst with
+          | Call (subfunc, _) -> Some subfunc
+          | _ -> None
+        ) bb.insts
+        in
+        calls @ acc
+      ) [] func.body
+      in
+      let calls = List.sort_uniq (fun x y -> String.compare x y) calls in
+      List.iter (fun subfunc -> Printf.printf "%s calls to %s\n" func.name subfunc) calls;
+      {func with subfunctions = calls}
+    ) func_list in
+    (* related gsymbols propagation *)
+    let same_func_list (l1: Isa.func list) (l2: Isa.func list) =
+      List.fold_left2 (fun acc (f1: Isa.func) (f2: Isa.func) ->
+        if not (String.equal f1.name f2.name) then
+          parse_error "func list invalid";
+        let cmp = (0 = List.compare (fun a b -> String.compare a b) f1.related_gsymbols f2.related_gsymbols) in
+        if cmp = false then false else acc
+      ) true l1 l2
+    in
+    let rec symbol_propagate_helper (func_list: Isa.func list) : Isa.func list =
+      let old_list = func_list in
+      let func_list = List.fold_left (fun func_list (func: Isa.func) ->
+        List.map (fun (target_func: Isa.func) ->
+          let subfunc_match =
+            List.find_opt (fun (element: Isa.label) ->
+              String.equal element target_func.name
+            ) func.subfunctions
+          in
+          match subfunc_match with
+          | None -> target_func
+          | Some _ ->
+            let missing = List.filter (fun (symbol: Isa.label) ->
+              not (List.mem symbol target_func.related_gsymbols)
+            ) func.related_gsymbols
+            in
+            {target_func with related_gsymbols = missing @ target_func.related_gsymbols}
+        ) func_list
+      ) func_list func_list in
+      if same_func_list old_list func_list then
+        old_list
+      else
+        symbol_propagate_helper func_list
+    in
+    let func_list = symbol_propagate_helper func_list in
+    List.iter (fun (func: Isa.func) ->
+      Printf.printf "global symbol of %s:\n" func.name;
+      List.iter (fun symbol -> Printf.printf "\t%s\n" symbol) func.related_gsymbols;
+    ) func_list;
+
     (* let rec bb_spliter lines bb acc_bb =
       match lines with
       | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)

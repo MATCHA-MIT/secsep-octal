@@ -750,6 +750,7 @@ module SingleTypeInfer = struct
       (prog: Isa.prog)
       (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
       (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
+      (global_symbol_layout: External_layouts.GlobalSymbolLayout.t)
       (iter: int)
       (solver_iter: int) : t list =
     let helper 
@@ -775,8 +776,17 @@ module SingleTypeInfer = struct
         "SHA512_Update";
       ] 
     in *)
+
+    let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
+      let label, _ = interface in
+      let func = List.find (fun (f: Parser.Parser.Isa.func) -> String.equal f.name label) prog.funcs in
+      Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsymbols global_symbol_layout
+    ) func_mem_interface_list
+    in
+
     Printf.printf "%d\n" (List.length func_mem_interface_list);
     Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map snd func_mem_interface_list)));
+
     let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;
