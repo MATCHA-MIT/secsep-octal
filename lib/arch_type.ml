@@ -143,7 +143,7 @@ module ArchType (Entry: EntryType) = struct
       context = [];
       blk_br_context = [];
       tmp_context = [];
-      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -171,7 +171,7 @@ module ArchType (Entry: EntryType) = struct
       context = [];
       blk_br_context = [];
       tmp_context = [];
-      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -183,7 +183,7 @@ module ArchType (Entry: EntryType) = struct
 
   let clean_up (arch_type: t) : t =
     { arch_type with
-      flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -641,7 +641,6 @@ module ArchType (Entry: EntryType) = struct
       (inst: Isa.instruction) :
       t * Isa.instruction =
     (* We do not update pc in this function! Should update outside!!! *)
-    let curr_type = { curr_type with flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ()) } in
     let prop_mode = curr_type.prop_mode in
     match inst with
     | BInst (bop, dest, src0, src1) ->
@@ -658,7 +657,6 @@ module ArchType (Entry: EntryType) = struct
       in
       let ldst_bind_constraint = List.concat_map (Isa.get_ld_st_related_taint_constraint dest) [src0; src1] in
       let next_type = add_constraints next_type (src0_constraint @ src1_constraint @ dest_constraint @ ldst_bind_constraint) in
-      (* FIXME: check useful var generation? 12/15/2024 *)
       { next_type with local_var_map = new_local_var; flag = new_flag },
       BInst (bop, dest, src0, src1)
     | UInst (uop, dest, src) ->
@@ -675,10 +673,6 @@ module ArchType (Entry: EntryType) = struct
       let next_type, dest_constraint, dest = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type dest dest_type in
       let ldst_bind_constraint = Isa.get_ld_st_related_taint_constraint dest src in
       let next_type = add_constraints next_type (src_constraint @ dest_constraint @ ldst_bind_constraint) in
-      let next_type =
-        if Isa.uop_set_flag uop then
-          { next_type with flag = (dest_type, Entry.get_const_type (Isa.ImmNum 0L)) }
-        else next_type
       let next_type = { next_type with flag = new_flag } in
       { next_type with local_var_map = new_local_var },
       UInst (uop, dest, src)
@@ -734,7 +728,6 @@ module ArchType (Entry: EntryType) = struct
       let rcx_type = get_reg_type curr_type RCX in
       let dest_addr_type = get_reg_type curr_type RDI in
       let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
-      Printf.printf "RepStos rcx %s rdi %s size %s\n" (Entry.to_string rcx_type) (Entry.to_string dest_addr_type) (Entry.to_string size_type);
       let src_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) (get_reg_type curr_type RAX) in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint src_type dest_taint_anno in
       let next_type, dest_constraint, dest_useful, dest_slot_anno =
@@ -765,9 +758,9 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func curr_type src1 in
-      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type curr_type.flag false in
+      let _, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type curr_type.flag false in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = new_flag;  },
+      { curr_type with flag = new_flag; },
       Test (src0, src1)
     | Push (src, mem_anno) ->
       let size = Isa.get_op_size src in
@@ -807,7 +800,8 @@ module ArchType (Entry: EntryType) = struct
       | _ -> arch_type_error "Get different ldop after pop"
       end
       (* next_type, src_constraint @ dest_constraint *)
-    | Nop | Syscall | Hlt -> curr_type, inst
+    | Syscall -> { curr_type with flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ()) }, inst
+    | Nop | Hlt -> curr_type, inst
     | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
 
   let add_block_subtype
@@ -971,7 +965,7 @@ module ArchType (Entry: EntryType) = struct
         { curr_type with
           reg_type = new_reg;
           mem_type = new_mem;
-          flag = (Entry.get_top_untaint_type (), Entry.get_top_untaint_type ());
+          flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
           constraint_list = new_constraints @ curr_type.constraint_list;
           useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
         }

@@ -83,7 +83,7 @@ include SingleExp
     | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
     | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
     | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
-    | Pxor | Xorps -> if same_op then SingleConst 0L else SingleTop
+    | Pxor | Xorps -> if same_op then SingleConst 0L, flags else SingleTop, flags
     | Punpck | Packus
     | Psub | Pand | Pandn | Por
     | Psll | Psrl -> SingleTop, flags
