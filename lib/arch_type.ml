@@ -1084,7 +1084,18 @@ module ArchType (Entry: EntryType) = struct
 
   let get_pc_cond_from_branch_hist
       (branch_hist: (CondType.t * int) list) (pc: int) : CondType.t option =
-    List.find_map (fun (cond, cond_pc) -> if pc = cond_pc then Some cond else None) branch_hist
+    match List.find_map (fun (cond, cond_pc) -> if pc = cond_pc then Some cond else None) branch_hist with
+    | Some cond -> Some cond
+    | None ->
+      (* Handle the following case:
+         je loop_end
+         jmp loop_begin
+         The jmp should also be able to use the branch condition.
+      *)
+      begin match branch_hist with
+      | [] -> None
+      | (hd, _) :: _ -> Some hd
+      end
 
   let get_branch_cond
       (block_subtype_list: block_subtype_t list) 

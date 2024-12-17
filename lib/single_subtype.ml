@@ -956,6 +956,8 @@ module SingleSubtype = struct
       | Some (base, (var_step, branch_pc), step) ->
         begin match ArchType.get_branch_cond block_subtype (List.hd branch_pc) with
         | None -> 
+          (* Note uncond jump now can use the last not taken cond! *)
+          (* TODO: Maybe we should make loop inference use more conditions. *)
           Printf.printf "Warning: try_solve_loop_cond found a uncond jump\n";
           tv_rel
         | Some (cond, l, r) ->
