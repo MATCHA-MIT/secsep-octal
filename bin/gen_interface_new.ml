@@ -198,6 +198,13 @@ let bench_ed25519_plain : Base_func_interface.t = [
   "x25519_sc_reduce", [
     r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
+  "table_select", [
+    r RDI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+    ];
+  ];
   "x25519_ge_scalarmult_base", [
     r RDI, [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
@@ -206,13 +213,6 @@ let bench_ed25519_plain : Base_func_interface.t = [
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
     r RSI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
-  ];
-  "table_select", [
-    r RDI, [
-      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
-    ];
   ];
   "ED25519_sign", [
     r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];

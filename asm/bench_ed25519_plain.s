@@ -193,10 +193,11 @@ x25519_ge_p1p1_to_p2:                   # @x25519_ge_p1p1_to_p2
 	movq	%r14, %rdi
 	movq	%rbx, %rsi
 	movq	%r15, %rdx
+	callq	fe_mul_impl
 	popq	%rbx
 	popq	%r14
 	popq	%r15
-	jmp	fe_mul_impl                     # TAILCALL
+	retq
 .Lfunc_end3:
 	.size	x25519_ge_p1p1_to_p2, .Lfunc_end3-x25519_ge_p1p1_to_p2
                                         # -- End function
@@ -229,12 +230,13 @@ x25519_ge_p1p1_to_p3:                   # @x25519_ge_p1p1_to_p3
 	movq	%r14, %rdi
 	movq	%rbx, %rsi
 	movq	%r12, %rdx
+	callq	fe_mul_impl
 	popq	%rbx
 	popq	%r12
 	popq	%r13
 	popq	%r14
 	popq	%r15
-	jmp	fe_mul_impl                     # TAILCALL
+	retq
 .Lfunc_end4:
 	.size	x25519_ge_p1p1_to_p3, .Lfunc_end4-x25519_ge_p1p1_to_p3
                                         # -- End function
