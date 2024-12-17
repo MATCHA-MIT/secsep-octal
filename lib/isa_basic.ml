@@ -40,6 +40,15 @@ module IsaBasic = struct
   let sexp_of_imm_var_map (s: imm_var_map) : Sexp.t =
     sexp_of_list_t (StrM.to_list s)
 
+  let get_rev_imm_var_map (global_var_map: imm_var_map) : imm_var_rev_map =
+    let kv_list = StrM.to_list global_var_map in
+    let vk_map = List.fold_left (fun acc_map (k, v) ->
+      if IntM.mem v acc_map then
+        isa_error "Unexpected duplicated value in imm_var_map";
+      IntM.add v k acc_map
+    ) IntM.empty kv_list in
+    vk_map
+
   type register =
     |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
@@ -380,14 +389,16 @@ module IsaBasic = struct
     "xorps"; (* For the parser to work, this has to appear before xor *)
     "movabs"; "mov"; "movz"; "lea";
     "xchg";
-    "add"; "adc"; "sub"; "mul"; "imul";
+    "add"; "adc"; "sub"; "sbb"; "mul"; "imul";
     "shrd";
     "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
     "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
     "cmp"; "test";
     "push"; "pop";
+    "cmoveq"; (* TODO: add better support for parsing cmovxx *)
+    "bt";
     "punpck"; "packus";
-    "psub"; "pxor"; "pandn"; "pand"; "por";
+    "padd"; "psub"; "pxor"; "pandn"; "pand"; "por";
     "psll"; "psrl";
     "pshufd"; "pshuflw"; "pshufhw";
   ]
@@ -397,37 +408,43 @@ module IsaBasic = struct
   ]
 
   type bop =
-    | Add | Adc | Sub
+    | Add | Adc | Sub | Sbb
     | Mul (* unsigned multiply *) | Imul (* signed multiply *)
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
+    | CmovEq
+    | Bt
     | Punpck | Packus
-    | Psub | Pxor | Pandn | Pand | Por
+    | Padd | Psub | Pxor | Pandn | Pand | Por
     | Psll | Psrl
     | Xorps
   [@@deriving sexp]
 
   let bop_opcode_map = [
-    ("add", Add); ("adc", Adc); ("sub", Sub);
+    ("add", Add); ("adc", Adc); ("sub", Sub); ("sbb", Sbb);
     ("mul", Mul); ("imul", Imul);
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
+    ("cmoveq", CmovEq);
+    ("bt", Bt);
     ("punpck", Punpck); ("packus", Packus);
-    ("psub", Psub); ("pxor", Pxor); ("pandn", Pandn); ("pand", Pand); ("por", Por);
+    ("padd", Padd); ("psub", Psub); ("pxor", Pxor); ("pandn", Pandn); ("pand", Pand); ("por", Por);
     ("psll", Psll); ("psrl", Psrl);
     ("xorps", Xorps);
   ]
 
   let bop_opcode_ocaml_str_map = [
-    ("Add", Add); ("Adc", Adc); ("Sub", Sub);
+    ("Add", Add); ("Adc", Adc); ("Sub", Sub); ("Sbb", Sbb);
     ("Mul", Mul); ("Imul", Imul);
     ("Sal", Sal); ("Sar", Sar); ("Shl", Shl); ("Shr", Shr);
     ("Rol", Rol); ("Ror", Ror);
     ("Xor", Xor); ("And", And); ("Or", Or);
+    ("CmovEq", CmovEq);
+    ("Bt", Bt);
     ("Punpck", Punpck); ("Packus", Packus);
-    ("Psub", Psub); ("Pxor", Pxor); ("Pandn", Pandn); ("Pand", Pand); ("Por", Por);
+    ("Padd", Padd); ("Psub", Psub); ("Pxor", Pxor); ("Pandn", Pandn); ("Pand", Pand); ("Por", Por);
     ("Psll", Psll); ("Psrl", Psrl);
     ("Xorps", Xorps);
   ]

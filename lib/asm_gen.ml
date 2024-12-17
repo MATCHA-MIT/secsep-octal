@@ -139,17 +139,8 @@ module AsmGen = struct
     (* top list where lines are still reversed *)
     List.rev lines
 
-  let get_rev_imm_var_map (global_var_map: Isa.imm_var_map) : Isa.imm_var_rev_map =
-    let kv_list = Isa.StrM.to_list global_var_map in
-    let vk_map = List.fold_left (fun acc_map (k, v) ->
-      if Isa.IntM.mem v acc_map then
-        transform_error "Unexpected duplicated value in imm_var_map";
-      Isa.IntM.add v k acc_map
-    ) Isa.IntM.empty kv_list in
-    vk_map
-
   let gen_asm (prog: Isa.prog) (tf_func_states: Transform.func_state list) : string =
-    let ctx = { global_var_map = get_rev_imm_var_map prog.imm_var_map } in
+    let ctx = { global_var_map = Isa.get_rev_imm_var_map prog.imm_var_map } in
 
     prog.orig_lines
     |> List.concat_map (fun line -> Parser.line_processor true false line) (* format preserved, a line must be trimmed before use *)

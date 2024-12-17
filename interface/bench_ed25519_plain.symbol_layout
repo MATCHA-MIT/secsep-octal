@@ -1,0 +1,42 @@
+((K512
+  ((((SingleConst 0) (SingleConst 640))
+    (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))
+ (k25519Precomp
+  ((((SingleConst 0) (SingleConst 24576))
+    (RangeConst (((SingleConst 0) (SingleConst 24576)))) SingleTop)))
+ (public_key
+  ((((SingleConst 0) (SingleConst 32))
+    (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
+ (private_key
+  ((((SingleConst 0) (SingleConst 64))
+    (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
+ (message
+  ((((SingleConst 0) (SingleConst 256))
+    (RangeConst (((SingleConst 0) (SingleConst 256)))) SingleTop)))
+ (signature
+  ((((SingleConst 0) (SingleConst 64))
+    (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
+ (.LCPI10_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI10_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI12_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI12_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI13_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI13_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI14_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop)))
+ (.LCPI16_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16)))) SingleTop))))

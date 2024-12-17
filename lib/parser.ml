@@ -217,6 +217,8 @@ module Parser = struct
       (MemOp (Some disp, Some base, Some index, Some (imm_to_scale imm)), ts)
     | ImmTok (disp, _) :: LParen :: Comma :: RegTok index :: Comma :: ImmTok (imm, _) :: RParen :: ts ->  (* disp(, index, scale) *)
       (MemOp (Some disp, None, Some index, Some (imm_to_scale imm)), ts)
+    | ImmTok (disp, _) :: LParen :: Comma :: RegTok index :: RParen :: ts ->  (* disp(, index) *)
+      (MemOp (Some disp, None, Some index, Some Scale1), ts)
     | ImmTok (disp, _) :: LParen :: RipTok :: RParen :: ts -> (* disp(rip) *)
       (MemOp (Some disp, None, None, None), ts)
     | _ -> parse_error ("parse_memory_operand: " ^ (String.concat ", " (List.map string_of_token ts)))
@@ -374,43 +376,46 @@ module Parser = struct
     else
       parse_error ("get_tinst: invalid number of operands " ^ (string_of_int (List.length operands)))
 
-  let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : Isa.imm_var_map * (Isa.instruction * string (* mnemonic *))=
+  let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : (Isa.imm_var_map * (IsaBasic.imm_var_id list)) * (Isa.instruction * string (* mnemonic *)) =
     let (mnemonic, ts) = match ts with
     | MneTok mnemonic :: ts -> (mnemonic, ts)
     | _ -> parse_error ("parse_tokens: unexpected end of input: " ^ (String.concat ", " (List.map string_of_token ts)))
     in
-    let imm_var_map, operands = if Isa.inst_referring_label mnemonic
-      then imm_var_map, [convert_imm_to_label ts]
+    let imm_var_map, symbols, operands = if Isa.inst_referring_label mnemonic
+      then imm_var_map, [], [convert_imm_to_label ts]
       else begin 
         let rec fill_id_helper 
-            (imm_var_map: Isa.imm_var_map) (imm_name: IsaBasic.immediate * (string option) list) :
-            Isa.imm_var_map * IsaBasic.immediate =
+            (info: Isa.imm_var_map * (IsaBasic.imm_var_id list)) (imm_name: IsaBasic.immediate * (string option) list) :
+            (IsaBasic.imm_var_map * (IsaBasic.imm_var_id list)) * IsaBasic.immediate =
+          let imm_var_map, symbols = info in
           match imm_name with
-          | ImmNum n, None :: [] -> (imm_var_map, ImmNum n)
+          | ImmNum n, None :: [] -> ((imm_var_map, symbols), ImmNum n)
           | ImmLabel v, (Some name) :: [] ->
-            if v <> imm_var_unset then (imm_var_map, ImmLabel v)
+            if v <> imm_var_unset then ((imm_var_map, v :: symbols), ImmLabel v)
             else begin
               if Isa.StrM.mem name imm_var_map
-              then (imm_var_map, ImmLabel (Isa.StrM.find name imm_var_map))
-              else begin
+              then begin
+                let id = Isa.StrM.find name imm_var_map in
+                ((imm_var_map, id :: symbols), ImmLabel id)
+              end else begin
                 (* let id = CodeType.stack_base_id + 1 + (Isa.StrM.cardinal imm_var_map) in *)(* id starts from stack_base_id + 1 *)
                 let id = imm_var_unset - 1 - (Isa.StrM.cardinal imm_var_map) in (* id starts from imm_var_unset, going negative!!! *)
                 Printf.printf "new imm_var: %s %d\n" name id;
-                (Isa.StrM.add name id imm_var_map, ImmLabel id)
+                ((Isa.StrM.add name id imm_var_map, id :: symbols), ImmLabel id)
               end
             end
           | ImmBExp (i1, i2), hd :: tl ->
-            let imm_var_map1, new_i1 = fill_id_helper imm_var_map (i1, [ hd ]) in
-            let imm_var_map2, new_i2 = fill_id_helper imm_var_map1 (i2, tl) in
-            (imm_var_map2, Isa.ImmBExp (new_i1, new_i2))
+            let (imm_var_map1, symbols1), new_i1 = fill_id_helper (imm_var_map, symbols) (i1, [ hd ]) in
+            let (imm_var_map2, symbols2), new_i2 = fill_id_helper (imm_var_map1, symbols1) (i2, tl) in
+            ((imm_var_map2, symbols2), Isa.ImmBExp (new_i1, new_i2))
           | _ -> parse_error "parse_tokens fail to generate imm_var_id"
         in
-        let imm_var_map, ts = List.fold_left_map (fun imm_var_map token ->
+        let (imm_var_map, symbols), ts = List.fold_left_map (fun imm_var_map token ->
           match token with
           (* TODO!!! *)
           | ImmTok (imm, name_list) ->
-            let new_imm_var_map, new_imm = fill_id_helper imm_var_map (imm, name_list) in
-            (new_imm_var_map, ImmTok (new_imm, name_list))
+            let (new_imm_var_map, symbols), new_imm = fill_id_helper imm_var_map (imm, name_list) in
+            ((new_imm_var_map, symbols), ImmTok (new_imm, name_list))
           (* | ImmTok (ImmLabel v, Some name) ->
             if v <> imm_var_unset
             then (imm_var_map, token)
@@ -424,9 +429,9 @@ module Parser = struct
               end
             end *)
           | _ -> (imm_var_map, token)
-        ) imm_var_map ts
+        ) (imm_var_map, []) ts
         in
-        imm_var_map, parse_operands ts
+        imm_var_map, symbols, parse_operands ts
       end
     in
     let inst: Isa.instruction = 
@@ -493,24 +498,26 @@ module Parser = struct
           end
         end *)
     in
-    imm_var_map, (inst, mnemonic)
+    (imm_var_map, symbols), (inst, mnemonic)
 
-  let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : Isa.imm_var_map * (Isa.instruction * string) (* mnemonic *) =
+  let parse_instr (imm_var_map: Isa.imm_var_map) (line: string) : (Isa.imm_var_map * (IsaBasic.imm_var_id list)) * (Isa.instruction * string) (* mnemonic *) =
     (* print_endline ("Parsing " ^ line); *)
     let tokens = tokenize_line line in
     (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
     parse_tokens imm_var_map tokens
 
-  let parse_basic_block (info: (Isa.imm_var_map * (Isa.label option))) (lines: string list)
-  : (Isa.imm_var_map * (Isa.label option)) * Isa.basic_block =
-    let imm_var_map, func = info in
+  let parse_basic_block (info: (Isa.imm_var_map * (Isa.label option) * (IsaBasic.imm_var_id list))) (lines: string list)
+  : (Isa.imm_var_map * (Isa.label option) * (IsaBasic.imm_var_id list)) * Isa.basic_block =
+    let imm_var_map, func, symbols = info in
     let label = parse_label (List.hd lines) in
     let func = if Isa.is_label_function_entry label then Some label else func in
-    let imm_var_map, insts_with_mne = List.fold_left_map (
-      fun imm_var_map line -> parse_instr imm_var_map line
-    ) imm_var_map (List.tl lines) in
+    let (imm_var_map, new_symbols), insts_with_mne = List.fold_left_map (
+      fun (imm_var_map, symbols) line ->
+      let (imm_var_map, new_symbols), result = parse_instr imm_var_map line in
+      (imm_var_map, new_symbols @ symbols), result
+    ) (imm_var_map, []) (List.tl lines) in
     let insts, mnemonics = List.split insts_with_mne in
-    (imm_var_map, func), {
+    (imm_var_map, func, new_symbols @ symbols), {
       label = label; 
       insts = insts;
       mnemonics = mnemonics;
@@ -589,10 +596,22 @@ module Parser = struct
       let helper 
           (imm_var_map: Isa.imm_var_map) (bbs: string list list) :
           Isa.imm_var_map * Isa.func =
-        let (imm_var_map, func_name), bbs =
-          List.fold_left_map parse_basic_block (imm_var_map, None) bbs
+        let (imm_var_map, func_name, symbols), bbs =
+          List.fold_left_map parse_basic_block (imm_var_map, None, []) bbs
         in
-        imm_var_map, { name = Option.get func_name; body = bbs }
+        let rev_imm_var_map = Isa.get_rev_imm_var_map imm_var_map in
+        let symbols = symbols
+          |> List.sort_uniq (fun (x: IsaBasic.imm_var_id) (y: IsaBasic.imm_var_id) -> Int.compare x y)
+          |> List.map (fun var_id -> Isa.IntM.find var_id rev_imm_var_map)
+        in
+        Printf.printf "symbols in %s\n\t" (Option.get func_name);
+        List.iter (fun symbol -> Printf.printf "%s " symbol) symbols;
+        Printf.printf "\n%!";
+        imm_var_map, {
+          name = Option.get func_name;
+          body = bbs;
+          related_gsymbols = symbols;
+        }
       in
       List.fold_left_map helper Isa.StrM.empty func_list
     in

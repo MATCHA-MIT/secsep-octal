@@ -135,10 +135,11 @@ module TaintBaseEntryType (Entry: EntryType) = struct
         TaintExp.merge t1 t2
     in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_bop with
-    | Add | Adc | Sub | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or ->
+    | Add | Adc | Sub | Sbb | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or | Bt ->
       dest_taint_type, TaintConst false
+    | CmovEq
     | Punpck | Packus
-    | Psub | Pxor | Pand | Pandn | Por
+    | Padd | Psub | Pxor | Pand | Pandn | Por
     | Psll | Psrl
     | Xorps -> fl_taint, fr_taint
     in

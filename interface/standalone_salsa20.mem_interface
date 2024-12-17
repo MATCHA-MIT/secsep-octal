@@ -57,13 +57,4 @@
      (((SingleConst -72) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
-     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (-2
-    ((((SingleConst 0) (SingleConst 32))
-      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
-   (-3
-    ((((SingleConst 0) (SingleConst 8))
-      (RangeConst (((SingleConst 0) (SingleConst 8)))) SingleTop)))
-   (-4
-    ((((SingleConst 0) (SingleConst 128))
-      (RangeConst (((SingleConst 0) (SingleConst 128)))) SingleTop))))))
+     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop))))))

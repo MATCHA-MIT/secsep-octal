@@ -160,6 +160,7 @@ module Isa (MemAnno: MemAnnoType) = struct
   type func = {
     name: label;
     body: basic_block list;
+    related_gsymbols: label list;
   }
   [@@deriving sexp]
 
