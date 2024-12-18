@@ -451,10 +451,10 @@ module FuncInterface (Entry: EntryType) = struct
               let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_context_var single_var_map x) x in
               match SingleContext.try_sub_sol sub_sol_func orig_cond with
               | Some simp_cond -> Left (orig_cond, simp_cond)
-              | None -> Right None (* Sol for single var in this cond is not resolved *)
+              | None -> Right x (* Sol for single var in this cond is not resolved *)
             else
               (* Context map to parent var is not resolved *)
-              Right None
+              Right x
         ) child_context
       in
       if List.is_empty unknown_context then begin
@@ -480,8 +480,10 @@ module FuncInterface (Entry: EntryType) = struct
           ); *)
           SmtEmitter.pp_smt_ctx 0 smt_ctx;
           func_interface_error "func_call_helper: get unstat constraint"
-        end else
-        [Constraint.CalleeUnknownContext]
+        end else begin
+          Printf.printf "CalleeUnknownContext\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t unknown_context));
+          [Constraint.CalleeUnknownContext]
+        end
     in
 
     let constraint_list = if check_context then (check_context_helper ()) @ constraint_list else constraint_list in

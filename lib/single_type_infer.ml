@@ -772,8 +772,11 @@ module SingleTypeInfer = struct
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
-        "sha512_block_data_order";
-        "SHA512_Update";
+        "table_select";
+        "ge_madd";
+        "fe_mul_impl";
+        "ge_p2_dbl";
+        "x25519_ge_scalarmult_base";
       ] 
     in *)
 

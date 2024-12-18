@@ -1092,8 +1092,8 @@ module ArchType (Entry: EntryType) = struct
       end *)
 
   let get_pc_cond_from_branch_hist
-      (branch_hist: (CondType.t * int) list) (pc: int) : CondType.t option =
-    match List.find_map (fun (cond, cond_pc) -> if pc = cond_pc then Some cond else None) branch_hist with
+      (branch_hist: (CondType.t * int) list) (pc: int) : (CondType.t * int) option =
+    match List.find_opt (fun (_, cond_pc) -> pc = cond_pc) branch_hist with
     | Some cond -> Some cond
     | None ->
       (* Handle the following case:
@@ -1103,12 +1103,12 @@ module ArchType (Entry: EntryType) = struct
       *)
       begin match branch_hist with
       | [] -> None
-      | (hd, _) :: _ -> Some hd
+      | hd :: _ -> Some hd
       end
 
   let get_branch_cond
       (block_subtype_list: block_subtype_t list) 
-      (branch_pc: int) : CondType.t option =
+      (branch_pc: int) : (CondType.t * int) option =
     let branch_hist = get_branch_hist block_subtype_list branch_pc in
     get_pc_cond_from_branch_hist branch_hist branch_pc
 
