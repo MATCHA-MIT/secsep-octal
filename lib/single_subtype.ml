@@ -72,6 +72,7 @@ module SingleSubtype = struct
   type type_rel = {
     var_idx: var_pc_t;
     sol: SingleSol.t;
+    other_constraint: SingleContext.t list;
     subtype_list: type_pc_list_t list; (* subtype, pc of the branch that jumps to var_idx's block *)
     supertype_list: var_pc_list_t list; (* NOTE: I omit br hist here since I noticed that current implementation cannot use it anyway *)
     set_sol: type_pc_list_t list; (* Dirty trick to record information to resolve relation between vars whose solution is a set of values; is empty list if not used *)
@@ -116,7 +117,9 @@ module SingleSubtype = struct
     | None ->
       let entry = 
         { var_idx = List.find (fun (v_idx, _) -> v_idx = var_idx) var_pc_map; 
-        sol = SingleSol.SolNone; subtype_list = []; supertype_list = [];
+        sol = SingleSol.SolNone; 
+        other_constraint = [];
+        subtype_list = []; supertype_list = [];
         set_sol = [] } 
       in
       entry :: tv_rel, entry
@@ -381,9 +384,10 @@ module SingleSubtype = struct
     List.iter (
       fun (x: type_rel) ->
         let var_idx, _ = x.var_idx in
-        if SingleExp.SingleVarSet.mem var_idx useful_single_var then
-          SmtEmitter.add_assertions smt_ctx [ to_smt_expr smt_ctx x ]
-        else ()
+        if SingleExp.SingleVarSet.mem var_idx useful_single_var then begin
+          SmtEmitter.add_assertions smt_ctx [ to_smt_expr smt_ctx x ];
+          SingleContext.add_assertions smt_ctx x.other_constraint
+        end else ()
     ) sol
 
   let to_context (sol: type_rel) : SingleContext.t option =
@@ -392,12 +396,15 @@ module SingleSubtype = struct
 
   let get_block_context
       (sol: t) (useful_single_var: SingleExp.SingleVarSet.t) : SingleContext.t list =
-    List.filter_map (
+    List.concat_map (
       fun (x: type_rel) ->
         let var_idx, _ = x.var_idx in
         if SingleExp.SingleVarSet.mem var_idx useful_single_var then
-          to_context x
-        else None
+          (* to_context x *)
+          match to_context x with
+          | Some sol_context -> sol_context :: x.other_constraint
+          | None -> x.other_constraint
+        else []
     ) sol
 
   let find_var_sol (tv_rel_list: t) (v: IsaBasic.imm_var_id) (v_pc: int) : RangeExp.t =
@@ -554,7 +561,7 @@ module SingleSubtype = struct
           else
             Range (SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
             SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e1)),
-            Int64.neg (Int64.mul c s))
+            Int64.mul c s)
         (* | SingleMul, Single e, SingleSet e_list
         | SingleMul, SingleSet e_list, Single e ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list) *)
@@ -891,9 +898,9 @@ module SingleSubtype = struct
             | _ -> SolSimple (SingleSet single_list)
             end *)
           | s :: [], (l, r, step) :: [] ->
-            if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst step))) = 0 then
+            if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst (Int64.abs step)))) = 0 then
               { tv_rel with sol = SolSimple (Range (l, s, step)) }
-            else if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleSub, l, SingleConst step))) = 0 then
+            else if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleSub, l, SingleConst (Int64.abs step)))) = 0 then
               { tv_rel with sol = SolSimple (Range (s, r, step))}
             else tv_rel
           | _ -> tv_rel (* TODO: Maybe need to improve this!!! *)
@@ -931,27 +938,53 @@ module SingleSubtype = struct
         Some (base, (var_step, branch_pc), var_idx, step)
       | _ -> None
     in
-    let bound_match (on_left: bool) (inc: bool) (cond: ArchType.CondType.cond) : bool * bool =
-      (* match, if match include bound or not *)
-      match on_left, inc, cond with
-      (* x+step <> / < / <= bound *)
-      | true, true, Ne
-      | true, true, Lt | true, true, Bt -> true, false
-      | true, true, Le | true, true, Be -> true, true
-      (* bound <> / < / <= x-step *)
-      | false, false, Ne
-      | false, false, Lt | false, false, Bt -> true, false
-      | false, false, Le | false, false, Be -> true, true
-      (* x-step <> bound *)
-      | true, false, Ne -> true, false
-      (* bound <> x+step *)
-      | false, true, Ne -> true, false
-      (* does not match *)
-      | _ -> false, false
+    let get_range_helper (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t) (step: int64) : RangeExp.t =
+      if step > 0L then
+        Range (begin_val, end_val, step)
+      else if step < 0L then
+        Range (end_val, begin_val, step)
+      else
+        single_subtype_error "get_range_helper step = 0L"
+    in
+    let bound_match 
+        (on_left: bool) (cond: ArchType.CondType.cond)
+        (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t) (step: int64) : (RangeExp.t * RangeExp.t * RangeExp.t) option =
+      let inc = step > 0L in
+      let len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val, begin_val)) in
+      let len_div_step = SingleEntryType.is_div len_val step in
+      (* Check whether cmp opcode, operand, and step value are compatible *)
+      let match_success =
+        match on_left, inc, cond with
+        | _, _, Ne ->
+          if not len_div_step then Printf.printf "Warning: for jne, step %Ld does not div len %s\n" step (SingleEntryType.to_string len_val);
+          true
+        | _, _, Eq -> false
+        | _ -> on_left = inc
+      in
+      if not match_success then None else
+      let in_loop_bound_off, resume_loop_bound_off =
+        match cond with
+        | Ne -> 0L, Int64.neg step
+        | Lt | Bt ->
+          if len_div_step then 0L, Int64.neg step
+          else if inc then Int64.sub step 1L, -1L
+          else Int64.add step 1L, 1L
+        | Le | Be -> step, 0L
+        | Eq -> single_subtype_error "this should not be reachable"
+      in
+      let end_val_in = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst in_loop_bound_off)) in
+      let end_val_resume = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst resume_loop_bound_off)) in
+      let range_in = get_range_helper begin_val end_val_in step in
+      let range_resume = get_range_helper begin_val end_val_resume step in
+      let range_out : RangeExp.t = 
+        if len_div_step then Single end_val_in
+        else get_range_helper end_val_resume end_val_in (if step > 0L then 1L else -1L)
+      in
+      Some (range_in, range_resume, range_out)
     in
     let gen_self_loop_sol
         (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t)
-        (step: int64) (* which could be positive or negative *)
+        (step: int64) (* signed, which could be positive or negative *)
         (step_before_cmp: bool) 
         (cmp_pc: int) (* or cond_pc: note this may not be the branch pc*)
         (resume_on_taken: bool)
@@ -961,15 +994,22 @@ module SingleSubtype = struct
         if step_before_cmp then SingleEntryType.eval (SingleBExp (SingleSub, end_val, SingleConst step))
         else end_val
       in
-      let inc = step > 0L in
-      let match_cmp_op_step, include_bound = bound_match cmp_var_on_left inc cmp_operand in
+      match bound_match cmp_var_on_left cmp_operand begin_val end_val step with
+      | Some (range_in, range_resume, range_out) ->
+        if var_cmp_in_same_block then
+          if resume_on_taken then
+            SolCond (cmp_pc, range_in, range_resume, range_out)
+          else SolCond (cmp_pc, range_in, range_out, range_resume)
+        else SolSimple range_in
+      | None -> 
+        Printf.printf "Bound match cannot find sol begin %s end %s\n" (SingleEntryType.to_string begin_val) (SingleEntryType.to_string end_val);
+        SolNone
+      (* let match_cmp_op_step, (in_loop_bound_off, resume_loop_bound_off) = 
+        bound_match cmp_var_on_left inc cmp_operand begin_val end_val_var_cmp step
+      in
       if match_cmp_op_step then 
-        let end_val, end_val_resume =
-          if include_bound then 
-            SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst step)), end_val
-          else
-            end_val, SingleEntryType.eval (SingleBExp (SingleSub, end_val, SingleConst step))
-        in
+        let end_val = SingleEntryType.eval (SingleBExp (SingleAdd, end_val_var_cmp, SingleConst in_loop_bound_off)) in
+        let end_val_resume = SingleEntryType.eval (SingleBExp (SingleAdd, end_val_var_cmp, SingleConst resume_loop_bound_off)) in
         let range, range_resume =
           if inc then
             RangeExp.Range (begin_val, end_val, step), RangeExp.Range (begin_val, end_val_resume, step)
@@ -982,9 +1022,21 @@ module SingleSubtype = struct
           else SolCond (cmp_pc, range, Single end_val, range_resume)
         else SolSimple range
       else begin
-        Printf.printf "Bound match cannot find sol begin %s end %s\n" (SingleEntryType.to_string begin_val) (SingleEntryType.to_string end_val);
+        Printf.printf "Bound match cannot find sol begin %s end %s\n" (SingleEntryType.to_string begin_val) (SingleEntryType.to_string end_val_var_cmp);
         SolNone
-      end
+      end *)
+    in
+    let gen_other_loop_sol
+        (self_info: int * SingleExp.t * int64)
+        (other_info: int * SingleExp.t * int64) :
+        SingleContext.t =
+      let self_idx, self_base, self_sign_step = self_info in
+      let other_idx, other_base, other_sign_step = other_info in
+      Cond (
+        Eq,
+        SingleExp.eval (SingleBExp (SingleMul, (SingleBExp (SingleSub, SingleVar self_idx, self_base)), SingleConst other_sign_step)),
+        SingleExp.eval (SingleBExp (SingleMul, (SingleBExp (SingleSub, SingleVar other_idx, other_base)), SingleConst self_sign_step))
+      )
     in
     let try_solve_loop_cond (tv_rel: type_rel) : type_rel =
       let target_idx, target_pc = tv_rel.var_idx in
@@ -1055,38 +1107,36 @@ module SingleSubtype = struct
                   else begin
                     match find_base_step tv.supertype_list tv.subtype_list v_idx with
                     | Some (_, _, _, 0L) -> None
-                    | Some (_, (other_step, _), other_var_idx, v_step_sign) ->
+                    | Some (_, (other_step, other_branch_pc), other_cmp_var_idx, v_step) ->
                       (* NOTE: Must ensure the other_var is indeed in the cond!!! *)
                       (* IMPORTANT: We need to use v_step from find_base_step instead of the solution*)
                       if SingleEntryType.cmp l other_step = 0 || SingleEntryType.cmp r other_step = 0
-                        || SingleEntryType.cmp l (SingleVar other_var_idx) = 0
-                        || SingleEntryType.cmp r (SingleVar other_var_idx) = 0 then begin
+                        || SingleEntryType.cmp l (SingleVar other_cmp_var_idx) = 0
+                        || SingleEntryType.cmp r (SingleVar other_cmp_var_idx) = 0 then begin
                         match tv.sol with
-                        | SolCond (v_br_pc, Range (v_l, v_r, v_step_no_sign), _, _) ->
-                          if v_br_pc = List.hd branch_pc then
-                            if Int64.rem step v_step_no_sign = 0L then
-                              let v_base = 
-                                if v_step_sign = v_step_no_sign then v_l
-                                else if v_step_sign = Int64.neg v_step_no_sign then v_r
-                                else single_subtype_error (Printf.sprintf "incorrect step for var %d %Ld %Ld" v_idx v_step_sign v_step_no_sign)
-                              in
+                        | SolCond (_, Range (v_l, v_r, _), _, _) -> (* Only real counter that used in cmp can have this format of solution *)
+                          if List.hd other_branch_pc = List.hd branch_pc then (* We check branch pc, which might not be the pc of the cond branch that do the cmp *)
+                            let v_base = if v_step > 0L then v_l else v_r in
+                            if Int64.rem step v_step = 0L then
                               Some (SingleEntryType.eval (
                                 SingleBExp (
                                   SingleAdd,
                                   SingleBExp (
                                     SingleMul, 
                                     SingleBExp (SingleSub, SingleVar v_idx, v_base),
-                                    SingleConst (Int64.div step v_step_sign)
+                                    SingleConst (Int64.div step v_step)
                                   ),
                                   base
                                 )
-                                (* SingleBExp (
-                                  SingleMul,
-                                  SingleBExp (SingleAdd, SingleBExp (SingleSub, SingleVar v_idx, v_base), base),
-                                  SingleConst (Int64.div step v_step)
-                                ) *)
-                              ))
-                            else single_subtype_error (Printf.sprintf "cannot represent range of symimm %d with symimm %d" target_idx v_idx)
+                              ), [])
+                            else 
+                              let _ = 
+                                Some (
+                                SingleExp.SingleVar target_idx,
+                                [ gen_other_loop_sol (target_idx, base, step) (v_idx, v_base, v_step) ]
+                              )
+                              in None
+                              (* single_subtype_error (Printf.sprintf "cannot represent range of symimm %d with symimm %d" target_idx v_idx) *)
                           else None
                         | _ -> None
                       end else None
@@ -1095,7 +1145,7 @@ module SingleSubtype = struct
               ) tv_rel_list
             in
             begin match find_other with
-            | Some sol -> { tv_rel with sol = SolSimple (Single sol) }
+            | Some (sol, other_constraint) -> { tv_rel with sol = SolSimple (Single sol); other_constraint = other_constraint }
             | None -> 
               Printf.printf "Warning: cannot find sol for var %d with find loop cond\n" target_idx;
               tv_rel
