@@ -2,6 +2,7 @@ open Taint_exp
 open Taint_entry_type
 open Taint_api
 open Taint_type_infer
+open Mem_offset_new
 open Sexplib.Std
 
 
@@ -80,10 +81,11 @@ module TaintInstantiate = struct
       (func_interface_list: FuncInterface.t list)
       (infer_state_list: TaintTypeInfer.t list) : call_site_map_t =
     let map =
-      List.map2 (
-        fun (x: TaintTypeInfer.t) (interface: FuncInterface.t) ->
-        x.func_name, get_one_func_taint_instantiate_set interface, []
-      ) infer_state_list func_interface_list
+      List.map (
+        fun (x: TaintTypeInfer.t) ->
+          let fi = List.find (fun (fi: FuncInterface.t) -> fi.func_name = x.func_name) func_interface_list in
+          x.func_name, get_one_func_taint_instantiate_set fi, []
+      ) infer_state_list
     in
     let helper
         (caller_name: Isa.label)
@@ -133,8 +135,59 @@ module TaintInstantiate = struct
         let interface = 
           List.find (fun (x: FuncInterface.t) -> x.func_name = func_name) func_interface_list 
         in
+
         let map = List.fold_left2 helper [] interface.in_reg reg_api in
-        let map = TaintTypeInfer.ArchType.MemType.fold_left2 helper map interface.in_mem (TaintTypeInfer.ArchType.MemType.add_base_to_offset mem_api) in
+
+        let str_of_bool_opt (x: bool option) =
+          match x with
+          | None -> "None"
+          | Some b -> Printf.sprintf "Some %b" b
+        in
+        let abs_mem_api = TaintTypeInfer.ArchType.MemType.add_base_to_offset mem_api in
+        Printf.printf "\nfunc: %s\n" func_name;
+        Printf.printf "in_mem:\n";
+        Mem_type_new.MemTypeBasic.pp_mem_type_generic 1 interface.in_mem None;
+        (* Printf.printf "taint_api:\n";
+        Mem_type_new.MemTypeBasic.pp_mem_type_generic 1 abs_mem_api (Some str_of_bool_opt); *)
+
+        (* construct same layout using None as the placeholder *)
+        (* then according to the taint api, find the slot and change its value *)
+        let sorted_mem_api = List.map (fun in_mem_part ->
+          let base_id, in_mem_slots = in_mem_part in
+          let api_part = List.find (fun api ->
+            let api_base_id, _ = api in
+            base_id = api_base_id
+          ) abs_mem_api
+          in
+          let result = List.map (fun slot ->
+            let off, range, _ = slot in
+            (off, range, None)
+          ) in_mem_slots
+          in
+          let result = List.fold_left (fun acc api_slot ->
+            let api_off, _, api_value = api_slot in
+            let found, acc = List.fold_left_map (fun found slot ->
+              let off, range, _ = slot in
+              if MemOffset.cmp off api_off = 0 then
+                true, (off, range, api_value)
+              else
+                found, slot
+            ) false acc
+            in
+            if not found then
+              taint_instantiate_error (
+                Printf.sprintf "cannot find slot %s in %s's in_mem\n" (MemOffset.to_string api_off) func_name
+              )
+            else
+              acc
+          ) result (snd api_part) in
+          (base_id, result)
+        ) interface.in_mem in
+        Printf.printf "sorted taint_api:\n";
+        Mem_type_new.MemTypeBasic.pp_mem_type_generic 1 sorted_mem_api (Some str_of_bool_opt);
+        Printf.printf "%!";
+        let map = TaintTypeInfer.ArchType.MemType.fold_left2 helper map interface.in_mem sorted_mem_api in
+
         func_name, get_one_func_taint_instantiate_set interface, [ "", map ]
     ) taint_api
 
@@ -215,11 +268,29 @@ module TaintInstantiate = struct
     ) instance_map_list infer_state_list |> List.split
 
   let instantiate
+      (prog: Isa.prog)
       (taint_api: TaintApi.t)
       (func_interface_list: FuncInterface.t list)
-      (infer_state_list: TaintTypeInfer.t list) :
+      (infer_state_list: TaintTypeInfer.t list)
+      (global_symbol_layout: External_layouts.GlobalSymbolLayout.t) :
       (FuncInterface.t list) * (TaintTypeInfer.t list) =
     let open Sexplib in
+
+    (* add taint initialization of global symbols *)
+    let taint_api = List.map (fun (api: TaintApi.api_t) ->
+      let label, reg_api, mem_api = api in
+      let func = List.find (fun (f: Isa.func) -> String.equal f.name label) prog.funcs in
+      let mem_api = Base_func_interface.add_global_symbol_taint
+        func.name
+        mem_api
+        prog.imm_var_map
+        func.related_gsymbols
+        global_symbol_layout
+      in
+      (label, reg_api, mem_api)
+    ) taint_api
+    in
+
     let call_site_map_api = gen_call_site_map_from_taint_api func_interface_list taint_api in
     let call_site_map = gen_call_site_map func_interface_list infer_state_list in
     let call_site_map = merge_call_site_map call_site_map call_site_map_api in

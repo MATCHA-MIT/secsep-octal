@@ -3,7 +3,10 @@ open Mem_type_new
 open Sexplib.Std
 
 module TaintApi = struct
-  type api_t = IsaBasic.label * ((bool option) list) * ((bool option) MemTypeBasic.mem_content)
+  type mem_t = ((bool option) MemTypeBasic.mem_content)
+  [@@deriving sexp]
+
+  type api_t = IsaBasic.label * ((bool option) list) * mem_t
   [@@deriving sexp]
 
   type t = api_t list

@@ -1,4 +1,18 @@
-((salsa20
+((salsa20_words
+  (() () () () () () (false) (false) () () () () () () () () () () () () ()
+   () () ())
+  ((4 ()) (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) (true))))
+   (6
+    ((((SingleConst 0) (SingleConst 64))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) (true))))))
+ (salsa20_block
+  (() (true) (true) () () () (false) (false) () () () () () () () () () () ()
+   () () () () ())
+  ((4 ()) (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) (true))))
+   (6
+    ((((SingleConst 0) (SingleConst 32))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) (true))))))
+ (salsa20
   (() (true) (false) () () () (false) (false) () () () () () () () () () ()
    () () () () () ())
   ((4 ())
@@ -10,13 +24,4 @@
       (RangeConst (((SingleConst 0) (SingleConst 32)))) (true))))))
  (_start
   (() () () () () () () () () () () () () () () () () () () () () () () ())
-  ((-2
-    ((((SingleConst 0) (SingleConst 32))
-      (RangeConst (((SingleConst 0) (SingleConst 32)))) (true))))
-   (-3
-    ((((SingleConst 0) (SingleConst 8))
-      (RangeConst (((SingleConst 0) (SingleConst 8)))) (true))))
-   (-4
-    ((((SingleConst 0) (SingleConst 64))
-      (RangeConst (((SingleConst 0) (SingleConst 64)))) (true))))
-   (4 ()))))
+  ((4 ()))))

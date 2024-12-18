@@ -44,6 +44,43 @@ let add_global_symbol_layout
     if Option.is_none layout then
       base_func_interface_error (Printf.sprintf "cannot find layout of global symbol %s for func %s\n" symbol func_label);
     Printf.printf "adding global symbol %s to %s\n%!" symbol func_label;
-    Option.get layout
+    let var_id, slots = Option.get layout in
+    let slots = List.map (fun (slot: Taint_entry_type.TaintEntryType.t Mem_type_new.MemTypeBasic.mem_slot) ->
+      let off, range, (se, _) = slot in
+      (off, range, se)
+    ) slots in
+    var_id, slots
   ) used_symbols in
   func_label, (func_mem @ symbol_layouts)
+
+let add_global_symbol_taint
+    (func_label: IsaBasic.label)
+    (mem_api: Taint_api.TaintApi.mem_t)
+    (imm_var_map: IsaBasic.imm_var_map)
+    (used_symbols: IsaBasic.label list)
+    (global_symbol_layout: GlobalSymbolLayout.t)
+    : Taint_api.TaintApi.mem_t =
+  let symbol_layouts = List.map (fun symbol ->
+    let var_id = IsaBasic.StrM.find symbol imm_var_map in
+    let layout = List.find_map (fun layout ->
+      let label = fst layout in
+      if String.equal label symbol then
+        Some (var_id, snd layout)
+      else
+        None
+    ) global_symbol_layout in
+    if Option.is_none layout then
+      base_func_interface_error (Printf.sprintf "cannot find layout of global symbol %s for func %s\n" symbol func_label);
+    Printf.printf "adding global symbol %s's taint to %s\n%!" symbol func_label;
+    let var_id, slots = Option.get layout in
+    let slots = List.map (fun (slot: Taint_entry_type.TaintEntryType.t Mem_type_new.MemTypeBasic.mem_slot) ->
+      let off, range, (_, taint) = slot in
+      let bool_val = match taint with
+      | TaintConst b -> Some b
+      | _ -> base_func_interface_error "unexpected taint var"
+      in
+      (off, range, bool_val)
+    ) slots in
+    var_id, slots
+  ) used_symbols in
+  mem_api @ symbol_layouts

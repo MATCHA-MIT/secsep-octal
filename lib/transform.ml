@@ -320,7 +320,7 @@ module Transform = struct
                     | _ -> transform_error "Unexpected memory operand accessing ununified memory"
                 end
               | TaintConst false -> operand
-              | _ -> transform_error "Unexpected taint annotation for memory operand accessing ununified memory"
+              | _ -> transform_error (Printf.sprintf "Unexpected taint annotation for memory operand %s accessing ununified memory" (Isa.string_of_operand operand));
             end
         end
       | _ -> operand

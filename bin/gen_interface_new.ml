@@ -3,10 +3,19 @@ open Type
 let r = Isa_basic.IsaBasic.get_reg_idx
 let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 
+let get_reg_taint (reg_taint: (Isa_basic.IsaBasic.register * bool) list) : (bool option) list =
+  List.fold_left (
+    fun (acc: (bool option) list) (reg, taint) ->
+      List.mapi (
+        fun i x ->
+          if i = r reg then Some taint else x
+      ) acc
+  ) (List.init Isa_basic.IsaBasic.total_reg_num (fun _ -> None)) reg_taint
+
 let standalone_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
-  "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
-  "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], SingleTop) ];
-  "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], SingleTop) ];
+  "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], (SingleTop, TaintConst true)) ];
+  "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], (SingleTop, TaintConst true)) ];
+  "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], (SingleTop, TaintConst true)) ];
 ]
 
 let standalone_salsa20 : Base_func_interface.t = [
@@ -26,10 +35,55 @@ let standalone_salsa20 : Base_func_interface.t = [
   ]
 ]
 
+let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
+  "salsa20_words",
+  get_reg_taint [
+    RDI, false;
+    RSI, false;
+  ],
+  [
+    r RSP, [];
+    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], Some true) ];
+    r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], Some true) ];
+  ];
+
+  "salsa20_block",
+  get_reg_taint [
+    RDI, false;
+    RSI, false;
+    RDX, true;
+    RCX, true;
+  ],
+  [
+    r RSP, [];
+    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], Some true) ];
+    r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], Some true) ];
+  ];
+
+  "salsa20",
+  get_reg_taint [
+    RDI, false;
+    RSI, false;
+    RDX, false;
+    RCX, true;
+  ],
+  [
+    r RSP, [];
+    r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], Some true) ];
+    r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], Some true) ]
+  ];
+
+  "_start",
+  get_reg_taint [],
+  [
+    r RSP, [];
+  ];
+]
+
 let bench_sha512_plain_global : External_layouts.GlobalSymbolLayout.t = [
-  "K512",  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
-  "message", [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], SingleTop ];
-  "out", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+  "K512",  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], (SingleTop, TaintConst true) ];
+  "message", [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], (SingleTop, TaintConst true) ];
+  "out", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
 ]
 
 let bench_sha512_plain : Base_func_interface.t = [
@@ -59,20 +113,20 @@ let bench_sha512_plain : Base_func_interface.t = [
 ]
 
 let bench_ed25519_plain_global : External_layouts.GlobalSymbolLayout.t = [
-  "K512", [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], SingleTop ];
-  "k25519Precomp", [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], SingleTop) ];
-  "public_key", [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
-  "private_key", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-  "message", [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], SingleTop ];
-  "signature", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-  ".LCPI10_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI10_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI12_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI12_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI13_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI14_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
-  ".LCPI16_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], SingleTop ];
+  "K512", [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], (SingleTop, TaintConst true) ];
+  "k25519Precomp", [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], (SingleTop, TaintConst true)) ];
+  "public_key", [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], (SingleTop, TaintConst true) ];
+  "private_key", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
+  "message", [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], (SingleTop, TaintConst true) ];
+  "signature", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
+  ".LCPI10_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI10_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI12_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI12_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI13_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI14_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI16_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
 ]
 
 let bench_ed25519_plain : Base_func_interface.t = [
@@ -233,6 +287,9 @@ let () =
   let channel = open_out "./interface/standalone_salsa20.mem_interface" in
   let stack = External_layouts.StackLayout.from_file "./out/standalone_salsa20.stack_layout" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout standalone_salsa20 stack));
+
+  let channel = open_out "./interface/standalone_salsa20.taint_api" in
+  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
 
   let channel = open_out "./interface/bench_sha512_plain.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_sha512_plain_global);

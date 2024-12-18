@@ -1,9 +1,12 @@
 ((key
   ((((SingleConst 0) (SingleConst 32))
-    (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
+    (RangeConst (((SingleConst 0) (SingleConst 32))))
+    (SingleTop (TaintConst true)))))
  (nonce
   ((((SingleConst 0) (SingleConst 8))
-    (RangeConst (((SingleConst 0) (SingleConst 8)))) SingleTop)))
+    (RangeConst (((SingleConst 0) (SingleConst 8))))
+    (SingleTop (TaintConst true)))))
  (msg
   ((((SingleConst 0) (SingleConst 128))
-    (RangeConst (((SingleConst 0) (SingleConst 128)))) SingleTop))))
+    (RangeConst (((SingleConst 0) (SingleConst 128))))
+    (SingleTop (TaintConst true))))))

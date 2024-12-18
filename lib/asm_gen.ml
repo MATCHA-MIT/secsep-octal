@@ -37,6 +37,7 @@ module AsmGen = struct
     | None, Some base, Some index, Some scale -> Printf.sprintf "(%%%s, %%%s, %s)" (Isa.string_of_reg base) (Isa.string_of_reg index) (Isa.scale_to_string scale)
     | Some _, None, None, None -> Printf.sprintf "%s" (str_of_disp d)
     | Some _, None, Some index, Some scale -> Printf.sprintf "%s(, %%%s, %s)" (str_of_disp d) (Isa.string_of_reg index) (Isa.scale_to_string scale)
+    | Some _, Some base, Some index, None -> Printf.sprintf "%s(%%%s, %%%s, )" (str_of_disp d) (Isa.string_of_reg base) (Isa.string_of_reg index)
     (* TODO: support more cases *)
     | _ -> asm_gen_error "str_of_memop: not implemented"
 
@@ -45,7 +46,9 @@ module AsmGen = struct
     | ImmOp imm -> str_of_immediate ctx true imm
     | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
     | LdOp (d, b, i, s, _, _)
-    | StOp (d, b, i, s, _, _) -> str_of_memop ctx d b i s
+    | StOp (d, b, i, s, _, _) -> 
+      (* Printf.printf "operand = %s\n%!" (Isa.string_of_operand op); *)
+      str_of_memop ctx d b i s
     | LabelOp label -> label
     | MemOp _ -> asm_gen_error "str_of_operand: MemOp not implemented/expected"
 

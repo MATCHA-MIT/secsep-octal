@@ -1,9 +1,12 @@
 ((K512
   ((((SingleConst 0) (SingleConst 640))
-    (RangeConst (((SingleConst 0) (SingleConst 640)))) SingleTop)))
+    (RangeConst (((SingleConst 0) (SingleConst 640))))
+    (SingleTop (TaintConst true)))))
  (message
   ((((SingleConst 0) (SingleConst 256))
-    (RangeConst (((SingleConst 0) (SingleConst 256)))) SingleTop)))
+    (RangeConst (((SingleConst 0) (SingleConst 256))))
+    (SingleTop (TaintConst true)))))
  (out
   ((((SingleConst 0) (SingleConst 64))
-    (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
+    (RangeConst (((SingleConst 0) (SingleConst 64))))
+    (SingleTop (TaintConst true))))))

@@ -39,9 +39,10 @@ module GlobalSymbolLayout = struct
   exception StackLayoutError of string
   let global_symbol_layout_error msg = raise (StackLayoutError ("[Global Symbol Layout Error] " ^ msg))
 
-  module MemType = MemType (SingleEntryType)
+  (* contains layout information (offsets) and taint initialization (TaintExp.t in the value) *)
+  module MemType = MemType (Taint_entry_type.TaintEntryType)
 
-  type entry_t = IsaBasic.label * ((SingleEntryType.t MemTypeBasic.mem_slot) list)
+  type entry_t = IsaBasic.label * ((Taint_entry_type.TaintEntryType.t MemTypeBasic.mem_slot) list)
   [@@deriving sexp]
 
   type t = entry_t list
