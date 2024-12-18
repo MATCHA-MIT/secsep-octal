@@ -976,8 +976,10 @@ module SingleSubtype = struct
       let end_val_resume = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst resume_loop_bound_off)) in
       let range_in = get_range_helper begin_val end_val_in step in
       let range_resume = get_range_helper begin_val end_val_resume step in
+      let new_len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val_in, begin_val)) in
+      let new_len_div_step = SingleEntryType.is_div new_len_val step in
       let range_out : RangeExp.t = 
-        if len_div_step then Single end_val_in
+        if len_div_step || new_len_div_step then Single end_val_in
         else get_range_helper (SingleExp.eval (SingleBExp (SingleAdd, end_val_resume, SingleConst 1L))) end_val_in (if step > 0L then 1L else -1L)
       in
       Some (range_in, range_resume, range_out)
@@ -1040,7 +1042,7 @@ module SingleSubtype = struct
         | _ -> None
       in
       let get_sol_helper (sub_base: SingleExp.t) (mult_step: int64) (shift_right: int64) (add_base: SingleExp.t) (range: RangeExp.t) : RangeExp.t =
-        let helper (e: SingleExp.t) : SingleExp.t =
+        let boundary_converter (e: SingleExp.t) : SingleExp.t =
           SingleExp.eval (
             SingleBExp (
               SingleAdd, 
@@ -1049,15 +1051,30 @@ module SingleSubtype = struct
             )
           )
         in
+        let boundary_converter_with_fix (e: SingleExp.t) (boundary_adjust: int64) : SingleExp.t =
+          let e = SingleExp.SingleBExp (SingleSub, e, SingleConst boundary_adjust) in
+          let e = boundary_converter e in
+          SingleExp.eval (SingleBExp (SingleAdd, e, SingleConst boundary_adjust))
+        in
         match range with
-        | Single other_x -> Single (helper other_x)
+        | Single other_x -> Single (boundary_converter_with_fix other_x 0L)
         | Range (l, r, step) -> 
-          let new_l = helper l in
-          let new_r = helper r in
+          let new_l = boundary_converter_with_fix l (if step > 0L then 1L else 0L) in
+          let new_r = boundary_converter_with_fix r (if step < 0L then -1L else 0L) in
           if SingleExp.cmp new_l new_r = 0 then Single new_l
           else Range (new_l, new_r, Int64.shift_right (Int64.mul step mult_step) (Int64.to_int shift_right))
         | _ -> single_subtype_error (Printf.sprintf "Invalid loop sol %s" (SingleSol.to_string other_sol))
       in
+      (* Why get_sol_helper is sol complex: 
+        Other solution may have the following formula:
+        [0, 4a + 2], [0, 4a - 2], [(4a - 2) + 1, 4a + 2], step = 2
+        We use +1 in ((4a - 2) + 1) to make the bounary accurate (applied when not aligned)
+        To get a sol of a var with step = 1, it is expected to be 
+        [0, a], [0, a - 1], a, step = 1.
+        But if we directly divide ((4a - 2) + 1) by 4, it is a - 1.
+        We need to do calculate as follows:
+        (((4a-2)+1) - 1) / 4 + 1.
+      *)
       let shift_opt = get_shift other_sign_step in
       let mult_step = if other_sign_step > 0L then self_sign_step else Int64.neg self_sign_step in
       let sol : SingleSol.t =
