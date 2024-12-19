@@ -8,6 +8,7 @@ open Constraint
 open Func_interface
 open Single_subtype
 open Taint_subtype
+open Taint_unknown_infer
 open Range_type_infer
 open Smt_emitter
 open Full_mem_anno
@@ -77,7 +78,7 @@ module TaintTypeInfer = struct
       acc, {
         label = block_single_type.label;
         pc = block_single_type.pc;
-        dead_pc = Int.max_int;
+        dead_pc = block_single_type.pc;
         reg_type = new_reg_type;
         mem_type = new_mem_type;
         context = block_single_type.context;
@@ -180,12 +181,12 @@ module TaintTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (range_infer_state: RangeTypeInfer.t) : t =
     let state = init range_infer_state in
-    Printf.printf "Before infer, func\n";
+    (* Printf.printf "Before infer, func\n";
     let buf = Buffer.create 1000 in
     Isa.pp_ocaml_block_list 0 buf state.func;
     Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf));
     Printf.printf "Before infer, func_type\n";
-    ArchType.pp_arch_type_list 0 state.func_type;
+    ArchType.pp_arch_type_list 0 state.func_type; *)
   
     (* 1. Type prop *)
     (* Prepare SMT context *)
@@ -202,8 +203,14 @@ module TaintTypeInfer = struct
         MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
     ) state.func_type;
 
+    (* 2. Get unknown variable *)
+    let unknown_var_set = TaintUnknownInfer.get_unknown_var_set block_subtype in
+    let unkown_sol = List.map (fun (x: TaintExp.taint_var_id) -> x, TaintExp.TaintUnknown) (TaintExp.TaintVarSet.to_list unknown_var_set) in
+    Printf.printf "TaintUnknown list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (TaintExp.TaintVarSet.to_list unknown_var_set)));
+
     (* 2. Taint type infer *)
-    let subtype_list = TaintSubtype.get_taint_constraint block_subtype in
+    Printf.printf "!!!\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_block_subtype_t block_subtype));
+    let subtype_list = TaintSubtype.get_taint_constraint unknown_var_set block_subtype in
 
     (* Get input var *)
     let input_arch = List.hd state.func_type in
@@ -215,6 +222,7 @@ module TaintTypeInfer = struct
     Printf.printf "Input var: %s\n" (TaintExp.to_string (TaintExp.TaintExp input_var));
 
     let taint_sol = TaintSubtype.solve_subtype_list input_var subtype_list in
+    let taint_sol = taint_sol @ unkown_sol in
     update_with_taint_sol taint_sol { state with taint_sol = taint_sol }
     (* let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
@@ -251,8 +259,8 @@ module TaintTypeInfer = struct
       let infer_state = infer_one_func acc entry in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" infer_state.func_name;
-      pp_func_type 0 infer_state;
-      (* FuncInterface.pp_func_interface 0 func_interface; *)
+      (* pp_func_type 0 infer_state; *)
+      FuncInterface.pp_func_interface 0 func_interface;
       func_interface :: acc, infer_state
     in
     (* List.fold_left_map helper [] range_infer_state_list *)

@@ -11,6 +11,8 @@ module Constraint = struct
     | Unknown of MemOffset.t
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
+    | TaintOverwritten of TaintExp.t
+    | TaintMustKnown of TaintExp.t
     | CalleeContext of (SingleContext.t list)
     | CalleeUnknownContext
   [@@deriving sexp]
@@ -30,6 +32,26 @@ module Constraint = struct
         | TaintSub (l, r) -> Some (l, r)
         | _ -> None
     ) constraint_list
+
+  let get_taint_overwritten (constraint_list: (t * int) list) : TaintExp.TaintVarSet.t =
+    List.fold_left (
+      fun (acc: TaintExp.TaintVarSet.t) (x, _) ->
+        match x with
+        | TaintOverwritten (TaintVar v) -> TaintExp.TaintVarSet.add v acc
+        | _ -> acc
+    ) TaintExp.TaintVarSet.empty constraint_list
+  
+  let get_taint_must_known (constraint_list: (t * int) list) : TaintExp.TaintVarSet.t * (int list) =
+    List.fold_left (
+      fun (acc: TaintExp.TaintVarSet.t * (int list)) (x, pc) ->
+        let must_known_var_set, invalid_pc_list = acc in
+        match x with
+        | TaintMustKnown (TaintUnknown) -> must_known_var_set, pc :: invalid_pc_list
+        | TaintMustKnown x -> 
+          TaintExp.TaintVarSet.union must_known_var_set (TaintExp.get_var_set x), 
+          invalid_pc_list
+        | _ -> acc
+    ) (TaintExp.TaintVarSet.empty, []) constraint_list
 
   let gen_range_subset (sub_range: MemRange.t) (range: MemRange.t) (off: MemOffset.t) : t list =
     match sub_range with

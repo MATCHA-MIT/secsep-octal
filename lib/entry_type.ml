@@ -40,6 +40,8 @@ module type EntryType = sig
   val get_eq_taint_constraint: t -> t -> Constraint.t list
   val get_sub_taint_constraint: t -> t -> Constraint.t list
   val get_untaint_constraint: t -> Constraint.t list
+  val get_overwritten_taint_constraint: t -> Constraint.t list
+  val get_must_known_taint_constraint: t -> Constraint.t list
   val update_ld_taint_constraint: t -> TaintExp.t option -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t option -> t * Constraint.t list
 
@@ -55,6 +57,7 @@ module type EntryType = sig
   val get_top_type: unit -> t
   val get_top_untaint_type: unit -> t
   val get_top_taint_type: unit -> t
+  val get_unknown_taint_type: unit -> t
   val get_mem_op_type: IsaBasic.immediate option -> t option -> t option -> int64 -> t
  
   (* vmap->exp->pc->(new_vmap,new_exp) use local var if exp is a bexp or uexp, pc determines local var id*)

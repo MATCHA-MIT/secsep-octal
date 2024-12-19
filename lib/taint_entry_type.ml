@@ -106,13 +106,21 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let _, taint = e in
     [ Constraint.TaintSub (taint, TaintConst false)]
 
+  let get_overwritten_taint_constraint (e: t) : Constraint.t list =
+    let _, taint = e in
+    [ Constraint.TaintOverwritten taint ]
+
+  let get_must_known_taint_constraint (e: t) : Constraint.t list =
+    let _, taint = e in
+    [ Constraint.TaintMustKnown taint ]
+
   let update_ld_taint_constraint (e: t) (ld_taint: TaintExp.t option) : (Constraint.t list) =
     (* e represents the data loaded from memory *)
     match ld_taint with
     | Some ld_taint ->
       let _, taint = e in
       (* t_mem == t_ld *)
-      [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint) ]
+      [ TaintSub (taint, ld_taint); TaintSub (ld_taint, taint); TaintMustKnown taint ]
     | None -> []
 
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
@@ -187,6 +195,8 @@ module TaintBaseEntryType (Entry: EntryType) = struct
   let get_top_untaint_type () : t = (Entry.get_top_untaint_type (), TaintConst false)
 
   let get_top_taint_type () : t = (Entry.get_top_taint_type (), TaintConst true)
+
+  let get_unknown_taint_type () : t = (Entry.get_unknown_taint_type (), TaintUnknown)
 
   let split_option (e: ('a * 'b) option) : ('a option) * ('b option) =
     match e with

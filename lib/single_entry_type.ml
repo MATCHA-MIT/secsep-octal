@@ -58,6 +58,12 @@ include SingleExp
   let get_untaint_constraint (e: t) : Constraint.t list =
     let _ = e in []
 
+  let get_overwritten_taint_constraint (e: t) : Constraint.t list =
+    let _ = e in []
+
+  let get_must_known_taint_constraint (e: t) : Constraint.t list =
+    let _ = e in []
+
   let update_ld_taint_constraint (_: t) (_: TaintExp.t option) : Constraint.t list = []
 
   let update_st_taint_constraint (e: t) (st_taint: TaintExp.t option) : t * (Constraint.t list) =
@@ -121,6 +127,8 @@ include SingleExp
   let get_top_untaint_type () : t = SingleTop
 
   let get_top_taint_type () : t = SingleTop
+
+  let get_unknown_taint_type () : t = SingleTop
 
   let add_context_map
       (is_mem: bool)

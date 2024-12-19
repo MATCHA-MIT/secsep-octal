@@ -15,6 +15,7 @@ module TaintExp = struct
     | TaintConst of bool
     | TaintVar of taint_var_id
     | TaintExp of TaintVarSet.t
+    | TaintUnknown
   [@@deriving sexp]
 
   type local_var_map_t = (taint_var_id * t) list
@@ -29,8 +30,11 @@ module TaintExp = struct
     | TaintVar _, TaintConst _ -> 1
     | TaintVar v1, TaintVar v2 -> compare v1 v2
     | TaintVar _, _ -> -1
+    | TaintExp _, TaintUnknown -> -1
     | TaintExp s1, TaintExp s2 -> compare s1 s2
     | TaintExp _, _ -> 1
+    | TaintUnknown, TaintUnknown -> 0
+    | TaintUnknown, _ -> 1
 
   let eval (e: t) : t =
     match e with
@@ -55,6 +59,11 @@ module TaintExp = struct
     | TaintVar v, TaintExp s
     | TaintExp s, TaintVar v -> TaintExp (TaintVarSet.add v s)
     | TaintExp s1, TaintExp s2 -> TaintExp (TaintVarSet.union s1 s2)
+    | TaintUnknown, _ | _, TaintUnknown -> 
+      (* Note: Actually we can allow this calculation proceed with returning TaintUnknown.
+        But I want to use this as a sanity check to make sure no weird or implict on slots with unknown taint
+      *)
+      taint_exp_error "should not merge with unknown taint"
 
   let merge_opt (e1: t option) (e2: t option) : t =
     match e1, e2 with
@@ -75,6 +84,7 @@ module TaintExp = struct
       else
         let remove_s = TaintVarSet.remove sol_id s in
         eval (merge sol_v (TaintExp remove_s))
+    | TaintUnknown -> TaintUnknown
 
   let repl_untaint (untaint_var: TaintVarSet.t) (e: t) : t =
     match e with
@@ -111,6 +121,7 @@ module TaintExp = struct
     | TaintExp s ->
       let var_str_list = List.map string_of_int (TaintVarSet.elements s) in
       "TaintVarSet (" ^ (String.concat " " var_str_list) ^ ")"
+    | TaintUnknown -> "TaintUnknown"
 
   let to_ocaml_string (e: t) : string =
     match e with
@@ -120,6 +131,7 @@ module TaintExp = struct
     | TaintExp s -> 
       let var_str_list = List.map string_of_int (TaintVarSet.elements s) in
       Printf.sprintf "TaintExp (TaintVarSet.of_list [ %s ])" (String.concat "; " var_str_list)
+    | TaintUnknown -> "TaintUnknown"
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     let _ = pc in
@@ -193,6 +205,7 @@ module TaintExp = struct
           fun (acc: t) (entry: taint_var_id) ->
             merge acc (repl_helper (TaintVar entry))
         ) (TaintConst false) (TaintVarSet.to_list var_set)
+      | TaintUnknown -> TaintUnknown
     in
     repl_helper e
 
@@ -212,6 +225,7 @@ module TaintExp = struct
           fun (acc: t) (entry: taint_var_id) ->
             merge acc (repl_helper (TaintVar entry))
         ) (TaintConst false) (TaintVarSet.to_list var_set)
+      | TaintUnknown -> TaintUnknown
     in
     repl_helper e
 
@@ -231,6 +245,7 @@ module TaintExp = struct
           fun (acc: t) (entry: taint_var_id) ->
             merge acc (repl_helper (TaintVar entry))
         ) (TaintConst false) (TaintVarSet.to_list var_set)
+      | TaintUnknown -> TaintUnknown
     in
     repl_helper e
     
@@ -239,6 +254,7 @@ module TaintExp = struct
     | TaintConst _ -> true
     | TaintVar v -> TaintVarSet.mem v var_set
     | TaintExp s -> TaintVarSet.subset s var_set
+    | TaintUnknown -> true
   
   let is_val2 (map: local_var_map_t) (e: t) : bool =
     let var_set =
@@ -254,5 +270,6 @@ module TaintExp = struct
     | TaintConst _ -> TaintVarSet.empty
     | TaintVar v -> TaintVarSet.singleton v
     | TaintExp s -> s
+    | TaintUnknown -> TaintVarSet.empty
 
 end

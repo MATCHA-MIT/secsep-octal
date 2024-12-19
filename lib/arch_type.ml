@@ -342,7 +342,9 @@ module ArchType (Entry: EntryType) = struct
       (anno_opt: MemAnno.slot_t option) :
       entry_t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     match anno_opt with
-    | None -> arch_type_error "get_ld_op_type_slot slot annotation is None"
+    | None -> 
+      Printf.printf "Block %s pc %d\n" curr_type.label curr_type.pc;
+      arch_type_error "get_ld_op_type_slot slot annotation is None"
     | Some slot_info ->
       (* let addr_type = get_mem_op_type curr_type disp base index scale in *)
       let addr_type = Entry.repl_local_var curr_type.local_var_map addr_type in

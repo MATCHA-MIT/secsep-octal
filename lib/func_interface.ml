@@ -239,15 +239,15 @@ module FuncInterface (Entry: EntryType) = struct
         if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
         else Entry.get_top_type ()
       in
-      (* We don't need this here since it is ensured by taint type check/inference of the child function!!! *)
+      (* We don't need to compare with m_in_entry since it is ensured by taint type check/inference of the child function!!! *)
       let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
       if is_full then 
         (p_off, p_range, m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint,
+        read_range_constraint @ out_range_constraint @ write_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
         out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint,
+        read_range_constraint @ out_range_constraint @ write_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
         out_range_useful_var
     end
 

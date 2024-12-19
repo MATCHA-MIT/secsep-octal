@@ -48,6 +48,7 @@ module TaintSubtype = struct
     ) tv_rel_list
 
   let get_one_block_subtype
+      (unknown_var_set: TaintExp.TaintVarSet.t)
       (subtype_list: sub_t list)
       (block_subtype: ArchType.block_subtype_t) : sub_t list =
     let sup_block, sub_block_list = block_subtype in
@@ -70,7 +71,11 @@ module TaintSubtype = struct
         (sub_entry: TaintEntryType.t) (sup_entry: TaintEntryType.t) : sub_t list =
       let _, sub_taint = sub_entry in
       let _, sup_taint = sup_entry in
-      (sub_taint, sup_taint) :: (sup_taint, sub_taint) :: subtype_list
+      match sup_taint with
+      | TaintVar v ->
+        if TaintExp.TaintVarSet.mem v unknown_var_set then subtype_list
+        else (sub_taint, sup_taint) :: (sup_taint, sub_taint) :: subtype_list
+      | _ -> (sub_taint, sup_taint) :: (sup_taint, sub_taint) :: subtype_list
     in
     let helper
         (sup_block: ArchType.t)
@@ -83,9 +88,10 @@ module TaintSubtype = struct
 
 
   let get_taint_constraint 
+      (unknown_var_set: TaintExp.TaintVarSet.t)
       (block_subtype_list: ArchType.block_subtype_t list) : 
       sub_t list =
-    List.fold_left get_one_block_subtype [] block_subtype_list
+    List.fold_left (get_one_block_subtype unknown_var_set) [] block_subtype_list
 
   let add_untaint (* for sub -> false *)
       (untaint_var: TaintExp.TaintVarSet.t)
@@ -95,6 +101,7 @@ module TaintSubtype = struct
     | TaintConst true -> taint_subtype_error "add_untaint find unsat constraint true -> false"
     | TaintVar v -> TaintExp.TaintVarSet.add v untaint_var
     | TaintExp e -> TaintExp.TaintVarSet.union e untaint_var
+    | TaintUnknown -> taint_subtype_error "TaintUnknown occurs"
   
   let remove_untaint (* replace untaint var with false in sub of sub -> sup, if sub = false, return None *)
       (untaint_var: TaintExp.TaintVarSet.t)
@@ -132,6 +139,7 @@ module TaintSubtype = struct
     | TaintConst false -> taint_subtype_error "add_taint find unsat constraint true -> false"
     | TaintConst true -> taint_var, None
     | TaintVar v -> TaintExp.TaintVarSet.add v taint_var, None
+    | TaintUnknown -> taint_subtype_error "TaintUnknown occurs"
     | _ -> taint_var, Some (TaintConst true, sup)
   
   let filter_taint_helper
