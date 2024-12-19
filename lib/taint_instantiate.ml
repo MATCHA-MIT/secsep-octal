@@ -83,7 +83,7 @@ module TaintInstantiate = struct
     let map =
       List.map (
         fun (x: TaintTypeInfer.t) ->
-          let fi = List.find (fun (fi: FuncInterface.t) -> fi.func_name = x.func_name) func_interface_list in
+          let fi = FuncInterface.find_fi func_interface_list x.func_name |> Option.get in
           x.func_name, get_one_func_taint_instantiate_set fi, []
       ) infer_state_list
     in

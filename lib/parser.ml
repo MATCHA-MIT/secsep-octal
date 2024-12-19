@@ -47,6 +47,7 @@ module Parser = struct
     | Comma
     | LParen
     | RParen
+    | Raw of string
 
   let imm_var_unset : IsaBasic.imm_var_id = -1
 
@@ -72,6 +73,7 @@ module Parser = struct
     | Comma -> "Comma"
     | LParen -> "LParen"
     | RParen -> "RParen"
+    | Raw s -> "Raw " ^ s
   
   let is_char_of_name_start (c: char) : bool =
     Char.code c >= 65 && Char.code c <= 90
@@ -164,6 +166,9 @@ module Parser = struct
     match ts with
     | Comma :: ts -> ts
     | _ -> parse_error "consume_comma"
+
+  let is_mne_compiler_annotation (mne_str: string) =
+    String.sub mne_str 0 1 = "."
   
   let tokenize_line (line: string) : token list =
     let rec go (cs: char list) (acc: token list) =
@@ -188,8 +193,11 @@ module Parser = struct
       
     in
     let cs = line |> String.to_seq |> List.of_seq in
-    let (mne_str, cs) = consume_name cs in 
-    go cs [MneTok mne_str]
+    let (mne_str, cs) = consume_name cs in
+    if is_mne_compiler_annotation mne_str then
+      [Raw line]
+    else
+      go cs [MneTok mne_str]
 
   let imm_to_scale (imm: IsaBasic.immediate) : Isa.scale =
     match imm with
@@ -377,6 +385,16 @@ module Parser = struct
       parse_error ("get_tinst: invalid number of operands " ^ (string_of_int (List.length operands)))
 
   let parse_tokens (imm_var_map: Isa.imm_var_map) (ts: token list) : (Isa.imm_var_map * (IsaBasic.imm_var_id list)) * (Isa.instruction * string (* mnemonic *)) =
+    let anno_opt = match ts with
+    | Raw raw_line :: [] ->
+      Some (imm_var_map, (Isa.Annotation raw_line, raw_line)) (* mnemonic is the whole line *)
+    | _ -> None
+    in
+    if Option.is_some anno_opt then begin
+      let imm_var_map, (inst, mnemonic) = Option.get anno_opt in
+      (imm_var_map, []), (inst, mnemonic)
+    end else
+
     let (mnemonic, ts) = match ts with
     | MneTok mnemonic :: ts -> (mnemonic, ts)
     | _ -> parse_error ("parse_tokens: unexpected end of input: " ^ (String.concat ", " (List.map string_of_token ts)))
@@ -521,14 +539,8 @@ module Parser = struct
       label = label; 
       insts = insts;
       mnemonics = mnemonics;
-      orig_asm = List.map (fun x -> Some x) (List.tl lines)
+      orig_asm = List.map (fun x -> Some x) lines;
     }
-
-  let filter_compiler_annotation (source: string) : bool =
-    if String.length source < 2 then true
-    else
-      let s = String.sub source 0 2 in
-      s = "\t."
 
   let split_on_chars sep_list (s: string) : string list =
     let helper (s: string list) sep : string list =
@@ -536,68 +548,60 @@ module Parser = struct
     in
     List.fold_left helper [ s ] sep_list
 
-  (* Printf.printf "Remain len %d\n" (List.length lines);
-  List.iter (fun x -> Printf.printf "%s\n" x) lines; *)
-  let is_label (line: string) : bool =
-    not (String.exists (fun c -> c = ':' || c = ' ') (String.sub line 0 (String.length line - 1))) &&
-    line.[(String.length line) - 1] = ':'
+  let line_processor (trim: bool) (line: string) : string list =
+    List.filter_map (fun (line: string) ->
+      (* get rid of comments *)
+      let line = match String.index_opt line '#' with
+      | Some pos -> String.sub line 0 pos
+      | None -> line
+      in
+      let line = String.trim line in
+      if line = "" then None else
+      match trim, Isa.is_label line with
+      | true, _ -> Some line
+      | false, true -> Some line
+      | false, false -> Some ("\t" ^ line)
+    ) (String.split_on_char ';' line)
 
-  (* We assume function label does not start with "."! *)
-  let is_func_label (line: string) : bool =
-    (is_label line) && line.[0] <> '.'
-
-  let line_processor (annotation: bool) (trim: bool) (line: string) : string list =
-    if not annotation && filter_compiler_annotation line then []
-    else begin
-      List.filter_map (fun (line: string) ->
-        (* get rid of comments *)
-        let first_sharp = String.index_opt line '#' in
-        let line = if first_sharp <> None then
-          String.sub line 0 (Option.get first_sharp)
-        else
-          line
-        in
-        let line' = String.trim line in
-        if line' = "" then None
-        else Some(
-          if trim then
-            line'
-          else begin
-            if is_label line' then
-              line'
-            else
-              "\t" ^ line'
-          end
-        )
-      ) (String.split_on_char ';' line)
-    end
-
-  let rec spliter_helper is_start bb acc_bb lines =
+  let rec split_helper split_here bb acc_bb lines =
     match lines with
     | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
     | line :: lines ->
-        if is_start line then
-          spliter_helper is_start [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb) lines
-        else
-          spliter_helper is_start (line :: bb) acc_bb lines
+      if split_here line then
+        split_helper split_here [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb) lines
+      else
+        split_helper split_here (line :: bb) acc_bb lines
 
   let parse_program (source: string) : Isa.prog =
-    let orig_lines = source |> String.split_on_char '\n' in
-
-    let lines = orig_lines |> List.concat_map (fun line -> line_processor false true line) in
-    (* Split lines into basic blocks *)
-    let bb_spliter = spliter_helper is_label in
-    let func_spliter lines =
-      let func_str_list = spliter_helper is_func_label [] [] lines in
-      List.map (bb_spliter [] []) func_str_list
+    let lines = source
+      |> String.split_on_char '\n'
+      |> List.concat_map (fun line -> line_processor true line)
     in
-    let func_list = func_spliter lines in
+
+    (* split in function level *)
+    let lines_of_funcs = split_helper Isa.is_func_label [] [] lines in
+    (* there could be lines before the first func; merge them into the first func *)
+    let lines_of_funcs = match (Isa.is_func_label (List.hd lines)), lines_of_funcs with
+    | false, fake_func :: (first_func_first_line :: first_func_rest) :: rest_funcs ->
+      if Isa.is_label (List.hd fake_func) then
+        parse_error "first fake block should not have a label";
+      if not (Isa.is_func_label first_func_first_line) then
+        parse_error "expecting function label";
+      ((first_func_first_line :: fake_func) @ (Isa.fake_bb_sentry_label :: first_func_rest)) :: rest_funcs
+    | _, _ -> lines_of_funcs
+    in
+
+    (* in each function, split by labels to get BBs *)
+    let bbs_of_funcs = List.map (fun lines_of_func ->
+      split_helper Isa.is_label [] [] lines_of_func
+    ) lines_of_funcs in
+
     let imm_var_map, func_list =
       let helper 
-          (imm_var_map: Isa.imm_var_map) (bbs: string list list) :
-          Isa.imm_var_map * Isa.func =
+          (imm_var_map: Isa.imm_var_map) (lines_of_bbs: string list list)
+          : Isa.imm_var_map * Isa.func =
         let (imm_var_map, func_name, symbols), bbs =
-          List.fold_left_map parse_basic_block (imm_var_map, None, []) bbs
+          List.fold_left_map parse_basic_block (imm_var_map, None, []) lines_of_bbs
         in
         let rev_imm_var_map = Isa.get_rev_imm_var_map imm_var_map in
         let symbols = symbols
@@ -614,7 +618,7 @@ module Parser = struct
           subfunctions = [];
         }
       in
-      List.fold_left_map helper Isa.StrM.empty func_list
+      List.fold_left_map helper Isa.StrM.empty bbs_of_funcs
     in
 
     (* subfunctions extraction *)
@@ -697,7 +701,15 @@ module Parser = struct
       | [] -> List.rev acc
       | bb :: [] -> List.rev (bb :: acc)
       | bb1 :: bb2 :: bbs ->
-          let bb1 = if List.length bb1.insts > 0 && Isa.inst_is_uncond_jump (List.hd (List.rev bb1.insts))
+          (* now annotations can appear at the end of each BB; we need to find the real last instruction *)
+          let last_nonanno_inst = List.find_opt (fun (inst: Isa.instruction) ->
+            match inst with
+            | Annotation _ -> false
+            | _ -> true
+          ) (List.rev bb1.insts)
+          in
+
+          let bb1 = if List.length bb1.insts > 0 && Option.is_some last_nonanno_inst && Isa.inst_is_uncond_jump (Option.get last_nonanno_inst)
             then bb1
             else {bb1 with insts = bb1.insts @ [Jmp (bb2.label, None)]; mnemonics = bb1.mnemonics @ ["jmp"]; orig_asm = bb1.orig_asm @ [None] }
           in
@@ -709,13 +721,13 @@ module Parser = struct
     ) func_list in
     (* let bbs = add_jmp_for_adj_bb bbs [] in *)
     let get_ret_bb : Isa.basic_block =
-      { label = Isa.ret_label; insts = []; mnemonics = []; orig_asm = [] } in
+      { label = Isa.ret_label; insts = []; mnemonics = []; orig_asm = [None (* "line" of the label *)] } in
     let func_list = List.map (
       fun (func: Isa.func) ->
         { func with body = func.body @ [get_ret_bb] }
     ) func_list
     in
-    { funcs = func_list; imm_var_map = imm_var_map; orig_lines = orig_lines }
+    { funcs = func_list; imm_var_map = imm_var_map }
     (* {bbs = bbs @ [get_ret_bb]; imm_var_map = imm_var_map} *)
 
   let prog_to_file (filename: string) (prog: Isa.prog) =

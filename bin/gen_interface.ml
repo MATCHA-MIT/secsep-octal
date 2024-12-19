@@ -50,10 +50,10 @@ let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
   ];
   "_start",
   get_reg_taint [], [
+    r RSP, [];
     -2, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], Some true) ];
     -3, [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], Some true) ];
     -4, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], Some true) ];
-    r RSP, []
   ]
 ]
 

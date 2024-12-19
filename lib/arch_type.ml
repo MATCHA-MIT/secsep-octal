@@ -805,7 +805,7 @@ module ArchType (Entry: EntryType) = struct
       end
       (* next_type, src_constraint @ dest_constraint *)
     | Syscall -> { curr_type with flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ()) }, inst
-    | Nop | Hlt -> curr_type, inst
+    | Nop | Hlt | Annotation _ -> curr_type, inst
     | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
 
   let add_block_subtype

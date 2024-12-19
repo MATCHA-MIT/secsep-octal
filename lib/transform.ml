@@ -151,8 +151,10 @@ module Transform = struct
 
   let get_func_init_rsp_var (ti_state: TaintTypeInfer.t) : Isa.imm_var_id =
     let first_bb_state = List.hd ti_state.func_type in
+
     if not (Isa.is_label_function_entry first_bb_state.label) then
       transform_error "First basic block is not function entry";
+
     get_rsp_var_from_reg_type first_bb_state.reg_type
 
   let mem_part_taint_counter
@@ -197,17 +199,33 @@ module Transform = struct
 
   (* mock the real instantiate step *)
 
+  (*
   let get_taint_var_instantiate_map (func_name: string) : TaintExp.local_var_map_t =
     let helper (untaint_list: TaintExp.taint_var_id list) (taint_list: TaintExp.taint_var_id list) =
       List.map (fun x -> (x, TaintExp.TaintConst false)) untaint_list @
       List.map (fun x -> (x, TaintExp.TaintConst true)) taint_list
     in
     match func_name with
-    | "salsa20_words" -> helper [] [4; 6; 13; 14; 15; 16; 37]
-    | "salsa20_block" -> helper [] [2; 3; 4; 22]
-    | "salsa20" -> helper [2] [4; 6; 13; 14; 15; 16; 26]
-    | "_start" -> helper [] [4; 17; 18]
+    | "salsa20_words" -> helper [] [4; 6; 13; 14; 15; 16]
+    | "salsa20_block" -> helper [] [4]
+    | "salsa20" -> helper [] [4; 6; 13; 14; 15]
+    | "_start" -> helper [] [4; 6]
     | _ -> []
+  *)
+
+  let get_taint_var_instantiate_map (ti: TaintTypeInfer.t) : TaintExp.local_var_map_t =
+    let helper (untaint_list: TaintExp.taint_var_id list) (taint_list: TaintExp.taint_var_id list) =
+      List.map (fun x -> (x, TaintExp.TaintConst false)) untaint_list @
+      List.map (fun x -> (x, TaintExp.TaintConst true)) taint_list
+    in
+    let first_bb_type = List.hd ti.func_type in
+    let taint_tv_list = List.filter_map (fun idx ->
+      let reg_type = List.nth first_bb_type.reg_type idx in
+      match snd reg_type with
+      | TaintVar tv -> Some tv
+      | _ -> None
+    ) Isa.callee_saved_reg_idx in
+    helper [] taint_tv_list
 
   let taint_var_ittt (ittt_map: TaintExp.local_var_map_t) (taint_exp: TaintExp.t) : TaintExp.t =
     match taint_exp with
@@ -240,13 +258,13 @@ module Transform = struct
       : func_state =
     let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
       if (List.length bb.mnemonics) != (List.length bb.insts) ||
-         (List.length bb.orig_asm) != (List.length bb.insts)  then
+         (List.length bb.orig_asm) - 1 != (List.length bb.insts) then (* first orig_asm is a label *)
         transform_error (Printf.sprintf "Mismatch between mnemonics/orig_asm and instructions %d %d %d" (List.length bb.mnemonics) (List.length bb.orig_asm) (List.length bb.insts));
       {
         label = bb.label;
         insts = List.map2 (
           fun inst (mnemonic, orig_asm) -> InstTransform.init inst mnemonic orig_asm
-        ) bb.insts (List.combine bb.mnemonics bb.orig_asm);
+        ) bb.insts (List.combine bb.mnemonics (List.tl bb.orig_asm (* first orig_asm is a label *)));
       }
     ) ti_state.func in
     {
@@ -378,6 +396,7 @@ module Transform = struct
     | Jcond _
     | Nop
     | Syscall
+    | Annotation _
     | Hlt -> (orig, [], [], true), css
     | Push (o, mem_anno)
     | Pop (o, mem_anno) -> begin
@@ -537,6 +556,8 @@ module Transform = struct
     *)
     let offset1 = SingleExp.match_const_offset addr_beg rsp_var_id |> Option.get in
     let offset2 = SingleExp.match_const_offset curr_rsp rsp_var_id |> Option.get in
+    (* curr_rsp has already been subtracted by 8 to push to return address *)
+    let offset2 = Int64.add offset2 8L in
     Int64.sub offset1 offset2
 
   let transform_basic_block_calls
@@ -725,6 +746,56 @@ module Transform = struct
     let _, _ = ti_state, init_mem_unity in
     [] (* TODO *)
 
+  let simplify_bb_push_pops
+    (_: func_state)
+    (bb: basic_block)
+    : basic_block =
+    let extract_offset_helper (inst: Isa.instruction) =
+      match inst with
+      | BInst (Add, RegOp reg1, RegOp reg2, ImmOp (ImmNum imm)) when reg1 = reg2 ->
+        Some imm
+      | _ -> None
+    in
+    let helper (acc_insts: InstTransform.t list) (tf: InstTransform.t) : InstTransform.t list =
+      if acc_insts = [] then [tf] else
+      let x = List.hd acc_insts in
+      let x, tf = match x.orig, tf.orig with
+      | Push _, Push _ ->
+        if List.length x.inst_pre != 1 || List.length x.inst_post != 0 ||
+           List.length tf.inst_pre != 1 || List.length tf.inst_post != 0 then
+          transform_error "unexpected transformed push";
+        let acc_offset = extract_offset_helper (List.hd x.inst_pre) |> Option.get in
+        let new_offset = extract_offset_helper (List.hd tf.inst_pre) |> Option.get in
+
+        let x_inst = match x.inst with
+        | UInst(Mov, StOp(offset_as_disp, Some RSP, None, None, o_size, mem_anno), o') ->
+          let disp = match offset_as_disp with
+          | None -> acc_offset
+          | Some (ImmNum v) -> Int64.add v acc_offset
+          | _ -> transform_error "unexpected transformed disp"
+          in
+          Isa.UInst (Mov, StOp(Some (ImmNum disp), Some RSP, None, None, o_size, mem_anno), o')
+        | _ -> transform_error "unexpected transformed push";
+        in
+
+        let x = { x with
+          inst = x_inst;
+          inst_pre = [];
+        } in
+
+        let tf = { tf with
+          inst_pre = [Isa.make_inst_add_i_r (Int64.add acc_offset new_offset) Isa.RSP]
+        } in
+
+        (x, tf)
+      | Pop _, Pop _ -> (x, tf)
+      | _, _ -> (x, tf)
+      in
+      tf :: x :: (List.tl acc_insts)
+    in
+    let new_insts = List.fold_left helper [] bb.insts in
+    { bb with insts = List.rev new_insts }
+
   (* Step 5 *)
   let transform_one_function
       (fi_list: FuncInterface.t list)
@@ -734,7 +805,8 @@ module Transform = struct
     let func_state = init_func_state ti_state init_mem_unity in
 
     (* mocking tv ittt *)
-    let ittt_map = get_taint_var_instantiate_map func_state.func_name in
+    (* let ittt_map = get_taint_var_instantiate_map func_state.func_name in *)
+    let ittt_map = get_taint_var_instantiate_map ti_state in
     let tv_ittt = taint_var_ittt ittt_map in
 
     (* basic pass *)
@@ -760,6 +832,18 @@ module Transform = struct
       bbs = bbs;
     }
     in
+
+    (*
+    (* simplify push/pop sequence *)
+    let bbs = List.map (
+      fun bb -> simplify_bb_push_pops func_state bb
+    ) func_state.bbs in
+    let func_state = {
+      func_state with
+      bbs = bbs;
+    }
+    in
+    *)
 
     pp_func_state func_state;
     func_state

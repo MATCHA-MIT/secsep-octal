@@ -24,6 +24,7 @@ module IsaBasic = struct
   [@@deriving sexp]
 
   let ret_label = ".Ret"
+  let fake_bb_sentry_label = ".first_bb_sentry__:"
 
   type imm_var_id = int
   [@@deriving sexp]
@@ -313,13 +314,15 @@ module IsaBasic = struct
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
     | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> 16L
 
-  let is_reg_idx_callee_saved (r_idx: int) : bool =
-    List.mem r_idx [
+  let callee_saved_reg_idx = [
       3; (* RBX *)
       4; (* RSP *)
       5; (* RBP *)
       12; 13; 14; 15
     ]
+
+  let is_reg_idx_callee_saved (r_idx: int) : bool =
+    List.mem r_idx callee_saved_reg_idx
 
   let is_reg_callee_saved (r: register) : bool =
     is_reg_idx_callee_saved (get_reg_idx r)
@@ -556,6 +559,14 @@ module IsaBasic = struct
   let op_of_cond_jump = string_to_sth cond_jump_opcode_map
 
   let is_label_function_entry (l: label) = l.[0] <> '.'
+
+  let is_label (line: string) : bool =
+    not (String.exists (fun c -> c = ':' || c = ' ') (String.sub line 0 (String.length line - 1))) &&
+    line.[(String.length line) - 1] = ':'
+
+  (* We assume function label does not start with "."! *)
+  let is_func_label (line: string) : bool =
+    (is_label line) && line.[0] <> '.'
 
   let inst_referring_label (m: string) : bool =
     match m with

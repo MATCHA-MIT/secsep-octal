@@ -147,6 +147,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop
     | Syscall
     | Hlt
+    | Annotation of string
   [@@deriving sexp]
 
   type basic_block = {
@@ -168,7 +169,6 @@ module Isa (MemAnno: MemAnnoType) = struct
   type prog = {
     funcs: func list;
     imm_var_map: imm_var_map;
-    orig_lines: string list;
   }
   [@@deriving sexp]
 
@@ -230,6 +230,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
+    | Annotation anno -> anno
 
   let string_of_instruction (inst: instruction) : string =
     let get_tab (opcode: string): string =
@@ -284,6 +285,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
+    | Annotation anno -> anno
 
   let ocaml_string_of_instruction (inst: instruction) : string =
     match inst with
@@ -345,6 +347,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "Nop"
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
+    | Annotation anno-> Printf.sprintf "Annotation \"%s\"" anno
       
 
   (* let get_op_list (inst: instruction) : operand list =
