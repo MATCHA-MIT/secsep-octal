@@ -205,11 +205,13 @@ include SingleExpBasic
       | SingleConst c1 :: SingleConst c2 :: tl ->
         let c12 = Int64.mul c1 c2 in
         if c12 = 0L then []
-        else if c12 = 1L then tl
+        else if c12 = 1L then
+          if List.is_empty tl then [ SingleConst 1L ] else tl
         else SingleConst c12 :: tl
       | SingleConst c :: tl ->
         if c = 0L then []
-        else if c = 1L then tl
+        else if c = 1L then 
+          if List.is_empty tl then [ SingleConst 1L ] else tl
         else x
       | _ -> x
 

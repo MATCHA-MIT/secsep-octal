@@ -593,6 +593,7 @@ module SingleTypeInfer = struct
             false, state
           end
         in
+        Printf.printf "\n\n%s: Infer iter %d after check_or_assert_callee_context%!\n\n" func_name curr_iter;
 
         (* 4. Single type infer *)
         (* let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
@@ -636,6 +637,7 @@ module SingleTypeInfer = struct
                 single_type_infer_error "label does not match"
           ) state.func_type pc_cond_map
         in
+        Printf.printf "\n\n%s: Infer iter %d after SingleInputVarCondSubtype%!\n\n" func_name curr_iter;
 
         (* 5. Extra block invariance infer (resolve tmp_context) *)
         let func_type = 
@@ -644,6 +646,7 @@ module SingleTypeInfer = struct
           else
             func_type
         in
+        Printf.printf "\n\n%s: Infer iter %d after SingleBlockInvariance%!\n\n" func_name curr_iter;
 
         (* 6. Update dead_pc of dead blocks (after infer finished) *)
         let func_type =
@@ -653,6 +656,7 @@ module SingleTypeInfer = struct
               else { a_type with dead_pc = a_type.pc }
           ) func_type
         in
+        Printf.printf "\n\n%s: Infer iter %d after update dead_pc%!\n\n" func_name curr_iter;
 
         let state = { state with func_type = func_type } in
 
@@ -775,8 +779,12 @@ module SingleTypeInfer = struct
         "table_select";
         "ge_madd";
         "fe_mul_impl";
+        "fe_tobytes";
         "ge_p2_dbl";
+        "x25519_sc_reduce";
         "x25519_ge_scalarmult_base";
+        "sha512_block_data_order";
+        "ED25519_sign";
       ] 
     in
 

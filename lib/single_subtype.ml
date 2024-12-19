@@ -1035,6 +1035,7 @@ module SingleSubtype = struct
         SingleSol.t * SingleContext.t =
       let self_idx, self_base, self_sign_step = self_info in
       let other_idx, other_base, other_sign_step = other_info in
+      (* Printf.printf "%s %Ld %s %Ld\n" (SingleExp.to_string self_base) self_sign_step (SingleExp.to_string other_base) other_sign_step; *)
       let get_shift (step: int64) : int64 option =
         match Int64.abs step with
         | 1L -> Some 0L | 2L -> Some 1L | 4L -> Some 2L | 8L -> Some 3L | 16L -> Some 4L 
@@ -1095,6 +1096,10 @@ module SingleSubtype = struct
         SingleExp.eval (SingleBExp (SingleMul, (SingleBExp (SingleSub, SingleVar other_idx, other_base)), SingleConst self_sign_step))
       )
       in
+      (* Printf.printf "!!! extra_cond \n%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t extra_cond));
+      Printf.printf "%s\n" (SingleExp.to_string (SingleBExp (SingleSub, SingleVar other_idx, other_base)));
+      Printf.printf "%s\n" (SingleExp.to_string (SingleExp.eval (SingleBExp (SingleSub, SingleVar other_idx, other_base))));
+      Printf.printf "%s\n" (SingleExp.to_string (SingleBExp (SingleMul, (SingleBExp (SingleSub, SingleVar other_idx, other_base)), SingleConst self_sign_step))); *)
       sol, extra_cond
     in
     let try_solve_loop_cond (tv_rel: type_rel) : type_rel =
