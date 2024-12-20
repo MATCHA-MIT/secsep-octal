@@ -208,7 +208,7 @@ module SingleTypeInfer = struct
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
       ArchType.add_assertions infer_state.smt_ctx block_type;
       Printf.printf "type_prop_block %s%!\n" block.label;
-      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
+      (* SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx; *)
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
       (* let sub_sol_func (exp_pc: SingleExp.t * int) : RangeExp.t option =
@@ -664,6 +664,7 @@ module SingleTypeInfer = struct
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
+        Printf.printf "\n\n%s: Infer iter %d after init single_subtype%!\n\n" func_name curr_iter;
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in

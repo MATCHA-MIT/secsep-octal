@@ -316,6 +316,20 @@ module SingleSubtype = struct
     in
     List.fold_left insert ul1 ul2
 
+  let add_useful_var_block_subtype_one_iter
+      (var_pc_map: var_pc_t list)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (useful_var_list: useful_var_t list)
+      (tv_rel: t) : t * (ArchType.block_subtype_t list) * useful_var_t list =
+    List.fold_left (
+      fun (acc: t * (ArchType.block_subtype_t list) * useful_var_t list) (entry: useful_var_t) ->
+        let acc_tv_rel, acc_block_subtype_list, acc_new_useful_var_list = acc in
+        let acc_tv_rel, acc_block_subtype_list, new_useful_var_list =
+          add_one_useful_var_block_subtype var_pc_map acc_block_subtype_list entry acc_tv_rel
+        in
+        acc_tv_rel, acc_block_subtype_list, merge_useful_var acc_new_useful_var_list new_useful_var_list
+    ) (tv_rel, block_subtype_list, []) useful_var_list
+
   let rec add_all_useful_var_block_subtype
       (var_pc_map: var_pc_t list)
       (block_subtype_list: ArchType.block_subtype_t list)
@@ -324,21 +338,39 @@ module SingleSubtype = struct
       (tv_rel: t) (count: int) : t * (ArchType.block_subtype_t list) =
     (* Printf.printf "add_all_useful_var_block_subtype %d\n" count;
     Printf.printf "before\n";
-    pp_useful_var_list 0 useful_var_list; *)
+    pp_useful_var_list 0 useful_var_list;
+    Printf.printf "%!\n"; *)
+    match useful_var_list with
+    | [] -> tv_rel, block_subtype_list
+    | _ ->
+      let tv_rel, block_subtype_list, useful_var_list = 
+        add_useful_var_block_subtype_one_iter var_pc_map block_subtype_list useful_var_list tv_rel
+      in
+      add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
+
+  (* let rec add_all_useful_var_block_subtype
+      (var_pc_map: var_pc_t list)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (useful_var_list: useful_var_t list)
+      (* (tv_rel: t) : t * (ArchType.block_subtype_t list) = *)
+      (tv_rel: t) (count: int) : t * (ArchType.block_subtype_t list) =
+    Printf.printf "add_all_useful_var_block_subtype %d\n" count;
+    Printf.printf "before\n";
+    pp_useful_var_list 0 useful_var_list;
     match useful_var_list with
     | [] -> tv_rel, block_subtype_list
     | hd :: tl ->
       let tv_rel, block_subtype_list, new_useful_var_list =
         add_one_useful_var_block_subtype var_pc_map block_subtype_list hd tv_rel
       in
-      (* Printf.printf "after\n";
-      pp_useful_var_list 0 useful_var_list; *)
+      Printf.printf "new_useful_var_list\n";
+      pp_useful_var_list 0 new_useful_var_list;
       let useful_var_list = merge_useful_var tl new_useful_var_list in
       (* add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel *)
-      (* if count > 0 then *)
+      if count > 0 then
         add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
-      (* else if List.length useful_var_list > 0 then begin
-        Printf.printf "Warning: useful vars not handled due to limited layers of recursive calls";
+      else if List.length useful_var_list > 0 then begin
+        Printf.printf "Warning: useful vars not handled due to limited layers of recursive calls\n";
         pp_useful_var_list 0 useful_var_list;
         tv_rel, block_subtype_list
       end
@@ -371,7 +403,7 @@ module SingleSubtype = struct
           )
       ) block_subtype_list
     in
-    add_all_useful_var_block_subtype useful_var_map_list block_subtype_list useful_var_list [] 10
+    add_all_useful_var_block_subtype useful_var_map_list block_subtype_list useful_var_list [] 200
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in
