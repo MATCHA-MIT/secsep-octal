@@ -1,0 +1,56 @@
+((K512
+  ((((SingleConst 0) (SingleConst 640))
+    (RangeConst (((SingleConst 0) (SingleConst 640))))
+    (SingleTop (TaintConst true)))))
+ (k25519Precomp
+  ((((SingleConst 0) (SingleConst 24576))
+    (RangeConst (((SingleConst 0) (SingleConst 24576))))
+    (SingleTop (TaintConst true)))))
+ (public_key
+  ((((SingleConst 0) (SingleConst 32))
+    (RangeConst (((SingleConst 0) (SingleConst 32))))
+    (SingleTop (TaintConst true)))))
+ (private_key
+  ((((SingleConst 0) (SingleConst 64))
+    (RangeConst (((SingleConst 0) (SingleConst 64))))
+    (SingleTop (TaintConst true)))))
+ (message
+  ((((SingleConst 0) (SingleConst 256))
+    (RangeConst (((SingleConst 0) (SingleConst 256))))
+    (SingleTop (TaintConst true)))))
+ (signature
+  ((((SingleConst 0) (SingleConst 64))
+    (RangeConst (((SingleConst 0) (SingleConst 64))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI10_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI10_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI12_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI12_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI13_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI13_1
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI14_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true)))))
+ (.LCPI17_0
+  ((((SingleConst 0) (SingleConst 16))
+    (RangeConst (((SingleConst 0) (SingleConst 16))))
+    (SingleTop (TaintConst true))))))

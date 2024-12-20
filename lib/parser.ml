@@ -168,7 +168,7 @@ module Parser = struct
     | _ -> parse_error "consume_comma"
 
   let is_mne_compiler_annotation (mne_str: string) =
-    String.sub mne_str 0 1 = "."
+    String.sub mne_str 0 1 = "." && mne_str.[(String.length mne_str) - 1] != ':'
   
   let tokenize_line (line: string) : token list =
     let rec go (cs: char list) (acc: token list) =
@@ -549,6 +549,20 @@ module Parser = struct
     List.fold_left helper [ s ] sep_list
 
   let line_processor (trim: bool) (line: string) : string list =
+    (* ignore ';' and do not split lines if is annotation (dirty) *)
+    let trimmed = String.trim line in
+    if String.equal trimmed "" then [] else
+    let first_word = match String.index_opt trimmed ' ' with
+    | None -> trimmed
+    | Some idx -> String.sub trimmed 0 idx
+    in
+    let splitted =
+      if is_mne_compiler_annotation first_word then
+        [line]
+      else
+        (String.split_on_char ';' line)
+    in
+
     List.filter_map (fun (line: string) ->
       (* get rid of comments *)
       let line = match String.index_opt line '#' with
@@ -561,7 +575,7 @@ module Parser = struct
       | true, _ -> Some line
       | false, true -> Some line
       | false, false -> Some ("\t" ^ line)
-    ) (String.split_on_char ';' line)
+    ) splitted
 
   let rec split_helper split_here bb acc_bb lines =
     match lines with
