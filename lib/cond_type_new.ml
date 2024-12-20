@@ -256,4 +256,8 @@ include (CondType (SingleExp))
     in
     List.fold_left helper (Left []) cond_list
 
+  let get_vars (e: t) : SingleExp.SingleVarSet.t =
+    let _, l, r = e in
+    SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
+
 end

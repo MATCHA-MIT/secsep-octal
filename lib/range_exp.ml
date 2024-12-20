@@ -42,12 +42,16 @@ module RangeExp = struct
     | Range (a, b, step) ->
       let a_exp = SingleExp.to_smt_expr smt_ctx a in
       let b_exp = SingleExp.to_smt_expr smt_ctx b in
+      let diff_align =
+        if step > 0L then Z3.BitVector.mk_sub ctx v_exp a_exp
+        else Z3.BitVector.mk_sub ctx v_exp b_exp
+      in
       let step = SingleExp.to_smt_expr smt_ctx (SingleConst step) in
       let a_le_v = Z3.BitVector.mk_sle ctx a_exp v_exp in
       let v_le_b = Z3.BitVector.mk_sle ctx v_exp b_exp in
       let mod_step_eq_0 = 
         Z3.Boolean.mk_eq ctx 
-          (Z3.BitVector.mk_smod ctx (Z3.BitVector.mk_sub ctx v_exp a_exp) step) 
+          (Z3.BitVector.mk_smod ctx diff_align step) 
           (SingleExp.to_smt_expr smt_ctx (SingleConst 0L)) 
       in
       Z3.Boolean.mk_and ctx [a_le_v; v_le_b; mod_step_eq_0]
@@ -65,11 +69,15 @@ module RangeExp = struct
     match r with
     | Single e -> Some (Cond (Eq, v_exp, e))
     | Range (a, b, step) ->
+      let diff_align : SingleExp.t =
+        if step > 0L then SingleBExp (SingleSub, v_exp, a)
+        else SingleBExp (SingleSub, v_exp, b)
+      in
       let step = SingleExp.SingleConst step in
       Some (And [
         Cond (Le, a, v_exp);
         Cond (Le, v_exp, b);
-        Cond (Eq, SingleBExp (SingleMod, SingleBExp (SingleSub, v_exp, a), step), SingleConst 0L);
+        Cond (Eq, SingleBExp (SingleMod, diff_align, step), SingleConst 0L);
       ])
     | SingleSet e_list ->
       let eq_exp_list =

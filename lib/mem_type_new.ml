@@ -703,8 +703,8 @@ module MemType (Entry: EntryType) = struct
         begin match SingleContext.check_or_assert smt_ctx cond_list with
         | None -> Left addr_off_pc (* addr_off does not belongs to this entry *)
         | Some cond_list -> 
-          Printf.printf "lookup %s\nslot %s" (MemOffset.to_string (assert_l, assert_r)) (MemOffset.to_string (off_l, off_r));
-          SmtEmitter.pp_smt_ctx 0 smt_ctx;
+          (* Printf.printf "lookup %s\nslot %s" (MemOffset.to_string (assert_l, assert_r)) (MemOffset.to_string (off_l, off_r));
+          SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
           Right cond_list
         end
       | None -> Left addr_off_pc

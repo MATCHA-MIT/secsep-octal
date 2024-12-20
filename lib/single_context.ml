@@ -37,6 +37,13 @@ module SingleContext = struct
     | Or c_list | And c_list ->
       List.fold_left (fun acc x -> acc && (is_val is_val_func x)) true c_list
 
+  let rec get_vars (cond: t) : SingleExp.SingleVarSet.t =
+    match cond with
+    | Cond c -> SingleCondType.get_vars c
+    | NoOverflow e -> SingleExp.get_vars e
+    | Or c_list | And c_list ->
+      List.fold_left (fun acc x -> SingleExp.SingleVarSet.union acc (get_vars x)) SingleExp.SingleVarSet.empty c_list
+
   let rec repl (repl_func: SingleExp.t -> SingleExp.t) (cond: t) : t =
     match cond with
     | Cond c -> Cond (SingleCondType.repl repl_func c)

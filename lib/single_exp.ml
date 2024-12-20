@@ -205,11 +205,13 @@ include SingleExpBasic
       | SingleConst c1 :: SingleConst c2 :: tl ->
         let c12 = Int64.mul c1 c2 in
         if c12 = 0L then []
-        else if c12 = 1L then tl
+        else if c12 = 1L then
+          if List.is_empty tl then [ SingleConst 1L ] else tl
         else SingleConst c12 :: tl
       | SingleConst c :: tl ->
         if c = 0L then []
-        else if c = 1L then tl
+        else if c = 1L then 
+          if List.is_empty tl then [ SingleConst 1L ] else tl
         else x
       | _ -> x
 
@@ -427,8 +429,30 @@ include SingleExpBasic
     in
     eval (helper e)
 
+  let rec try_eval_div (e: t) (div: int64) : t option =
+    if div = 1L then Some e else
+    match e with
+    | SingleConst c -> 
+      if Int64.rem c div = 0L then 
+        Some (SingleConst (Int64.div c div))
+      else None
+    | SingleBExp (SingleMul, e', SingleConst c)
+    | SingleBExp (SingleMul, SingleConst c, e') ->
+      if Int64.rem c div = 0L then 
+        Some (SingleBExp (SingleMul, e', SingleConst (Int64.div c div)))
+      else None
+    | SingleBExp (bop, e1, e2) ->
+      if bop = SingleAdd || bop = SingleSub then begin
+        match try_eval_div e1 div, try_eval_div e2 div with
+        | Some e1', Some e2' -> Some (SingleBExp (bop, e1', e2'))
+        | _ -> None
+      end else None
+    | _ -> None
 
-
+  let is_div (e: t) (div: int64) : bool =
+    if div = 1L then true
+    else if Int64.rem (get_align [] e) div = 0L then true
+    else try_eval_div e div <> None
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     match e with

@@ -442,22 +442,31 @@ module FuncInterface (Entry: EntryType) = struct
 
     (* TODO: Check context!!! *)
 
-    let check_context_helper () : Constraint.t list =
+    let check_context_helper () : Constraint.t list * SingleExp.SingleVarSet.t =
       (* TODO: Fix this!!! *)
-      let p_context, unknown_context =
+      let p_orig_context, untrans_context =
         List.partition_map (
           fun (x: SingleContext.t) ->
             if SingleContext.is_val (SingleExp.is_val single_var_set) x then
-              let orig_cond = SingleContext.repl (fun x -> SingleExp.repl_context_var single_var_map x) x in
-              match SingleContext.try_sub_sol sub_sol_func orig_cond with
-              | Some simp_cond -> Left (orig_cond, simp_cond)
-              | None -> Right x (* Sol for single var in this cond is not resolved *)
-            else
-              (* Context map to parent var is not resolved *)
-              Right x
+              Left (SingleContext.repl (fun x -> SingleExp.repl_context_var single_var_map x) x)
+            else Right x
         ) child_context
       in
-      if List.is_empty unknown_context then begin
+      let context_useful_var =
+        List.fold_left (
+          fun (acc: SingleExp.SingleVarSet.t) (x: SingleContext.t) ->
+            SingleExp.SingleVarSet.union acc (SingleContext.get_vars x)
+        ) SingleExp.SingleVarSet.empty p_orig_context
+      in
+      let p_context, unknown_context =
+        List.partition_map (
+          fun (orig_cond: SingleContext.t) ->
+            match SingleContext.try_sub_sol sub_sol_func orig_cond with
+            | Some simp_cond -> Left (orig_cond, simp_cond)
+            | None -> Right orig_cond (* Sol for single var in this cond is not resolved *)
+        ) p_orig_context
+      in
+      if List.is_empty untrans_context && List.is_empty unknown_context then begin
         (* We do not do quick check to avoid missing overflow constraints, but this might be slow!!! *)
         SmtEmitter.push smt_ctx;
         let check_result = SingleContext.sub_check_or_filter false smt_ctx p_context in
@@ -466,8 +475,8 @@ module FuncInterface (Entry: EntryType) = struct
         (* Note simp_context is simplified with solution, 
           but to be used for check_or_assert, we need to filter out cond that is_val. *)
         | Left simp_context ->
-          if List.is_empty simp_context then []
-          else [Constraint.CalleeContext simp_context]
+          if List.is_empty simp_context then [], context_useful_var
+          else [Constraint.CalleeContext simp_context], context_useful_var
         | Right unsat_cond ->
           let unsat_cond_expr = SingleContext.to_smt_expr smt_ctx unsat_cond in
           Printf.printf "p_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (List.map fst p_context)));
@@ -481,15 +490,23 @@ module FuncInterface (Entry: EntryType) = struct
           SmtEmitter.pp_smt_ctx 0 smt_ctx;
           func_interface_error "func_call_helper: get unstat constraint"
         end else begin
+          Printf.printf "CalleeUntransContext\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t untrans_context));
           Printf.printf "CalleeUnknownContext\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t unknown_context));
-          [Constraint.CalleeUnknownContext]
+          [Constraint.CalleeUnknownContext], context_useful_var
         end
     in
 
-    let constraint_list = if check_context then (check_context_helper ()) @ constraint_list else constraint_list in
+    let constraint_list, context_useful_var = 
+      if check_context then
+        let new_constraint_list, context_useful_var = check_context_helper () in
+        new_constraint_list @ constraint_list, context_useful_var
+      else
+        constraint_list, SingleExp.SingleVarSet.empty
+    in
+      (* if check_context then (check_context_helper ()) @ constraint_list else constraint_list in *)
 
     reg_type, mem_type, 
-    constraint_list, SingleExp.SingleVarSet.union read_useful_vars write_useful_vars,
+    constraint_list, SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union read_useful_vars write_useful_vars) context_useful_var,
     get_slot_map_info mem_read_hint child_mem,
     var_map
 

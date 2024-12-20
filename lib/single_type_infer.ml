@@ -208,7 +208,7 @@ module SingleTypeInfer = struct
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_subtype block_type.useful_var;
       ArchType.add_assertions infer_state.smt_ctx block_type;
       Printf.printf "type_prop_block %s%!\n" block.label;
-      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
+      (* SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx; *)
       let _ = iter_left in
       let block_subtype, update_block_list = acc in
       (* let sub_sol_func (exp_pc: SingleExp.t * int) : RangeExp.t option =
@@ -593,6 +593,7 @@ module SingleTypeInfer = struct
             false, state
           end
         in
+        Printf.printf "\n\n%s: Infer iter %d after check_or_assert_callee_context%!\n\n" func_name curr_iter;
 
         (* 4. Single type infer *)
         (* let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
@@ -636,6 +637,7 @@ module SingleTypeInfer = struct
                 single_type_infer_error "label does not match"
           ) state.func_type pc_cond_map
         in
+        Printf.printf "\n\n%s: Infer iter %d after SingleInputVarCondSubtype%!\n\n" func_name curr_iter;
 
         (* 5. Extra block invariance infer (resolve tmp_context) *)
         let func_type = 
@@ -644,6 +646,7 @@ module SingleTypeInfer = struct
           else
             func_type
         in
+        Printf.printf "\n\n%s: Infer iter %d after SingleBlockInvariance%!\n\n" func_name curr_iter;
 
         (* 6. Update dead_pc of dead blocks (after infer finished) *)
         let func_type =
@@ -653,6 +656,7 @@ module SingleTypeInfer = struct
               else { a_type with dead_pc = a_type.pc }
           ) func_type
         in
+        Printf.printf "\n\n%s: Infer iter %d after update dead_pc%!\n\n" func_name curr_iter;
 
         let state = { state with func_type = func_type } in
 
@@ -660,6 +664,7 @@ module SingleTypeInfer = struct
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
+        Printf.printf "\n\n%s: Infer iter %d after init single_subtype%!\n\n" func_name curr_iter;
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
@@ -770,15 +775,19 @@ module SingleTypeInfer = struct
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    (* let func_mem_interface_list = 
+    let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
         "table_select";
         "ge_madd";
         "fe_mul_impl";
+        "fe_tobytes";
         "ge_p2_dbl";
+        "x25519_sc_reduce";
         "x25519_ge_scalarmult_base";
+        "sha512_block_data_order";
+        "ED25519_sign";
       ] 
-    in *)
+    in
 
     let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
       let label, _ = interface in
