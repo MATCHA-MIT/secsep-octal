@@ -290,8 +290,8 @@ let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t 
   ".LCPI12_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
   ".LCPI13_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
   ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI14_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI17_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI15_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI18_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
 ]
 
 let bench_ed25519_plain_noinline : Base_func_interface.t = [

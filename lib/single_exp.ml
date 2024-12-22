@@ -12,6 +12,8 @@ include SingleExpBasic
 
   let get_empty_var_map : local_var_map_t = []
 
+  let get_empty_var_map_from_init_single_var_map (map: local_var_map_t) : local_var_map_t = map
+
   let rec to_string (se: t) =
     match se with
     | SingleTop -> "Top"

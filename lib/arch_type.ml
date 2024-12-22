@@ -51,6 +51,9 @@ module ArchType (Entry: EntryType) = struct
     branch_hist: (CondType.t * int) list;
     full_not_taken_hist: (CondType.t * int) list;
     constraint_list: (Constraint.t * int) list;
+    extra_call_context_map_list: (int * SingleExp.local_var_map_t) list;
+    extra_call_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list;
+    extra_call_context_hist: ((SingleContext.t list) * int) list;
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
     useful_var: SingleExp.SingleVarSet.t;
@@ -149,6 +152,9 @@ module ArchType (Entry: EntryType) = struct
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
+      extra_call_context_map_list = [];
+      extra_call_subtype_list = [];
+      extra_call_context_hist = [];
       local_var_map = Entry.get_empty_var_map;
       useful_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
@@ -178,6 +184,9 @@ module ArchType (Entry: EntryType) = struct
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
+      extra_call_context_map_list = [];
+      extra_call_subtype_list = [];
+      extra_call_context_hist = [];
       local_var_map = Entry.get_empty_var_map;
       useful_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
@@ -216,7 +225,8 @@ module ArchType (Entry: EntryType) = struct
       local_var_map = update.local_var_map;
       useful_var = update.useful_var;
       full_not_taken_hist = update.full_not_taken_hist;
-      constraint_list = update.constraint_list
+      constraint_list = update.constraint_list;
+      extra_call_subtype_list = update.extra_call_subtype_list;
     }
 
   let update_with_block_subtype_helper
@@ -943,7 +953,7 @@ module ArchType (Entry: EntryType) = struct
       (target_func_name: Isa.label)
       (orig_call_anno: CallAnno.t) : t * CallAnno.t =
     Printf.printf "type_prop_call %s pc %d%!\n" target_func_name curr_type.pc;
-    Entry.pp_local_var 0 curr_type.local_var_map;
+    (* Entry.pp_local_var 0 curr_type.local_var_map; *)
     pp_arch_type 0 curr_type;
     match FuncInterface.find_fi func_interface_list target_func_name with
     | Some func_interface ->
@@ -954,9 +964,18 @@ module ArchType (Entry: EntryType) = struct
         end
       in
       let curr_type = add_offset_rsp smt_ctx sub_sol_func sub_sol_list_func curr_type (-8L) in
-      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, var_map =
-        FuncInterface.func_call smt_ctx check_callee_context sub_sol_func sub_sol_list_func func_interface
-          curr_type.global_var curr_type.local_var_map curr_type.reg_type curr_type.mem_type
+      let extra_context_map =
+        List.find_map (
+          fun (x, map) -> if x = curr_type.pc then Some map else None
+        ) curr_type.extra_call_context_map_list |> Option.get
+      in
+      let new_reg, new_mem, new_constraints, new_useful_vars, call_slot_info, var_map, extra_subtype_list, extra_context_list =
+        FuncInterface.func_call 
+          smt_ctx check_callee_context 
+          sub_sol_func sub_sol_list_func func_interface
+          curr_type.global_var curr_type.local_var_map
+          extra_context_map
+          curr_type.reg_type curr_type.mem_type
       in
       let call_anno = (
         match curr_type.prop_mode with
@@ -978,7 +997,9 @@ module ArchType (Entry: EntryType) = struct
           mem_type = new_mem;
           flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
           constraint_list = new_constraints @ curr_type.constraint_list;
-          useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var
+          useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var;
+          extra_call_subtype_list = extra_subtype_list @ curr_type.extra_call_subtype_list;
+          extra_call_context_hist = (extra_context_list, curr_type.pc) :: curr_type.extra_call_context_hist;
         }
       in
       let curr_type = add_offset_rsp smt_ctx sub_sol_func sub_sol_list_func curr_type 8L in
@@ -1172,6 +1193,7 @@ module ArchType (Entry: EntryType) = struct
       (func_name: Isa.label)
       (func_type: t list)
       (context: SingleContext.t list)
+      (out_single_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
@@ -1194,9 +1216,11 @@ module ArchType (Entry: EntryType) = struct
       func_name = func_name;
       in_reg = in_state.reg_type;
       in_mem = in_mem;
-      context = context;
+      in_context = context;
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
       out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type);
+      out_context = out_state.context;
+      out_single_subtype_list = out_single_subtype_list;
       base_info = find_all_base_info in_state.reg_type in_mem;
     }
     in

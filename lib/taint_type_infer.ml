@@ -34,6 +34,7 @@ module TaintTypeInfer = struct
     input_single_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
     taint_sol: TaintExp.local_var_map_t;
+    ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
@@ -88,6 +89,9 @@ module TaintTypeInfer = struct
         branch_hist = [];
         full_not_taken_hist = [];
         constraint_list = [];
+        extra_call_context_map_list = block_single_type.extra_call_context_map_list;
+        extra_call_subtype_list = block_single_type.extra_call_subtype_list;
+        extra_call_context_hist = block_single_type.extra_call_context_hist;
         local_var_map = TaintEntryType.get_empty_var_map;
         useful_var = block_single_type.useful_var;
         global_var = block_single_type.global_var;
@@ -104,6 +108,7 @@ module TaintTypeInfer = struct
       input_single_var_set = range_infer_state.input_single_var_set;
       context = range_infer_state.context;
       taint_sol = [];
+      ret_subtype_list = range_infer_state.ret_subtype_list;
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
@@ -159,6 +164,7 @@ module TaintTypeInfer = struct
       infer_state.func_name
       infer_state.func_type
       infer_state.context
+      infer_state.ret_subtype_list
       sub_sol_for_taint
 
   let update_with_taint_sol

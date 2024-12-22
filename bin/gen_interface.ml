@@ -287,7 +287,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     func_name = "memset";
     in_reg = in_reg;
     in_mem = in_mem;
-    context = mem_context;
+    in_context = mem_context;
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -297,6 +297,8 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       ];
       r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
+    out_context = [];
+    out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
@@ -345,7 +347,7 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     func_name = "memcpy";
     in_reg = in_reg;
     in_mem = in_mem;
-    context = mem_context;
+    in_context = mem_context;
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -360,6 +362,8 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       ];
       r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
+    out_context = [];
+    out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 

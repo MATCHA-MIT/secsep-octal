@@ -28,9 +28,11 @@ module FuncInterface (Entry: EntryType) = struct
     func_name: IsaBasic.label;
     in_reg: RegType.t;
     in_mem: MemType.t;
-    context: SingleContext.t list;
+    in_context: SingleContext.t list;
     out_reg: RegType.t;
     out_mem: MemType.t;
+    out_context: SingleContext.t list;
+    out_single_subtype_list: (IsaBasic.imm_var_id * (SingleExp.t list)) list; (* This is for the ease of single infer *)
     base_info: CallAnno.base_info MemType.mem_content;
   }
   [@@deriving sexp]
@@ -53,11 +55,12 @@ module FuncInterface (Entry: EntryType) = struct
     RegType.pp_reg_type 0 interface.in_reg;
     MemType.pp_mem_type 0 interface.in_mem;
     PP.print_lvl lvl "Context\n";
-    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.in_context);
     (* SingleContext.pp_cond_list 0 interface.context; *)
     PP.print_lvl lvl "Output\n";
     RegType.pp_reg_type 0 interface.out_reg;
     MemType.pp_mem_type 0 interface.out_mem;
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.out_context);
     Printf.printf "\n"
 
   let pp_ocaml_func_interface (lvl: int) (buf: Buffer.t) (interface: t) =
@@ -69,21 +72,29 @@ module FuncInterface (Entry: EntryType) = struct
     MemType.pp_ocaml_mem_type (lvl + 2) buf interface.in_mem;
     PP.bprint_lvl (lvl + 1) buf "context =\n";
     (* Note that this function is deprecated, so I didn't support print the correct context here. *)
-    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.context);
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.in_context);
     (* SingleCondType.pp_ocaml_cond_list (lvl + 2) buf interface.context; *)
     PP.bprint_lvl (lvl + 1) buf "out_reg =\n";
     RegType.pp_ocaml_reg_type (lvl + 2) buf interface.out_reg;
     PP.bprint_lvl (lvl + 1) buf "out_mem =\n";
-    MemType.pp_ocaml_mem_type (lvl + 2) buf interface.out_mem
+    MemType.pp_ocaml_mem_type (lvl + 2) buf interface.out_mem;
+    Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.out_context)
 
   let add_reg_var_map
       (simp_local_var: SingleExp.t -> SingleExp.t)
+      (extra_single_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (parent_reg: RegType.t) : 
       SingleExp.local_var_map_t * Entry.local_var_map_t =
     let child_single_reg = List.map Entry.get_single_exp child_reg in
     let parent_single_reg = List.map Entry.get_single_exp parent_reg in
-    List.fold_left2 (SingleExp.add_local_var_simp simp_local_var) [] child_single_reg parent_single_reg,
-    List.fold_left2 (Entry.add_context_map false simp_local_var) Entry.get_empty_var_map child_reg parent_reg
+    List.fold_left2 
+      (SingleExp.add_local_var_simp simp_local_var) 
+      extra_single_var_map 
+      child_single_reg parent_single_reg,
+    List.fold_left2 
+      (Entry.add_context_map false simp_local_var) 
+      (Entry.get_empty_var_map_from_init_single_var_map extra_single_var_map) 
+      child_reg parent_reg
 
   type var_map_set_t = SingleExp.local_var_map_t * SingleExp.SingleVarSet.t * Entry.local_var_map_t
   [@@deriving sexp]
@@ -398,15 +409,19 @@ module FuncInterface (Entry: EntryType) = struct
       (global_var_set: SingleExp.SingleVarSet.t)
       (simp_local_var: SingleExp.t -> SingleExp.t)
       (* (local_var_map: SingleExp.local_var_map_t) *)
+      (extra_single_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (child_mem: MemType.t)
       (child_context: SingleContext.t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
+      (child_out_context: SingleContext.t list) (child_out_single_subtype_list: (IsaBasic.imm_var_id * (SingleExp.t list)) list)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t * 
       CallAnno.slot_info MemType.mem_content option *
-      Entry.local_var_map_t =
-    let single_var_map, var_map = add_reg_var_map simp_local_var child_reg parent_reg in
+      Entry.local_var_map_t *
+      ((IsaBasic.imm_var_id * (SingleExp.t list)) list) *
+      (SingleContext.t list) =
+    let single_var_map, var_map = add_reg_var_map simp_local_var extra_single_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
         global_var_set
@@ -448,7 +463,7 @@ module FuncInterface (Entry: EntryType) = struct
         List.partition_map (
           fun (x: SingleContext.t) ->
             if SingleContext.is_val (SingleExp.is_val single_var_set) x then
-              Left (SingleContext.repl (fun x -> SingleExp.repl_context_var single_var_map x) x)
+              Left (SingleContext.repl (SingleExp.repl_context_var single_var_map) x)
             else Right x
         ) child_context
       in
@@ -505,10 +520,45 @@ module FuncInterface (Entry: EntryType) = struct
     in
       (* if check_context then (check_context_helper ()) @ constraint_list else constraint_list in *)
 
+    (* Get extra call subtype list *)
+    let extra_subtype_list = 
+      List.filter_map (
+        fun (entry: IsaBasic.imm_var_id * (SingleExp.t list)) ->
+          let c_idx, c_sub = entry in
+          let is_val =
+            List.fold_left (
+              fun (acc: bool) (sub: SingleExp.t) ->
+                acc && (SingleExp.is_val single_var_set sub)
+            ) (SingleExp.SingleVarSet.mem c_idx single_var_set) c_sub
+          in
+          if is_val then
+            match SingleExp.repl_context_var single_var_map (SingleVar c_idx) with
+            | SingleVar p_idx ->
+              Some (p_idx,
+              List.map (SingleExp.repl_context_var single_var_map) c_sub)
+            | e -> 
+              func_interface_error 
+                (Printf.sprintf "func_call_helper extra var %d is mapped to non-var exp %s\n" c_idx (SingleExp.to_string e))
+          else None
+      ) child_out_single_subtype_list 
+    in
+
+    (* Get extra call context list *)
+    let extra_context_list = 
+      List.filter_map (
+        fun (x: SingleContext.t) ->
+          if SingleContext.is_val (SingleExp.is_val single_var_set) x then
+            Some (SingleContext.repl (SingleExp.repl_context_var single_var_map) x)
+          else None
+      ) child_out_context 
+    in
+    SingleContext.add_assertions smt_ctx extra_context_list;
+
     reg_type, mem_type, 
     constraint_list, SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union read_useful_vars write_useful_vars) context_useful_var,
     get_slot_map_info mem_read_hint child_mem,
-    var_map
+    var_map,
+    extra_subtype_list, extra_context_list
 
   let func_call
       (smt_ctx: SmtEmitter.t)
@@ -518,19 +568,27 @@ module FuncInterface (Entry: EntryType) = struct
       (func_interface: t)
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: Entry.local_var_map_t)
+      (extra_single_var_map: SingleExp.local_var_map_t)
       (reg_type: RegType.t) (mem_type: MemType.t) :
       RegType.t * MemType.t * 
       (Constraint.t list) * SingleExp.SingleVarSet.t *
       CallAnno.slot_info MemType.mem_content option *
-      Entry.local_var_map_t =
+      Entry.local_var_map_t *
+      ((IsaBasic.imm_var_id * (SingleExp.t list)) list) *
+      (SingleContext.t list) =
     (* match List.find_opt (fun (x: t) -> x.func_name = func_name) func_inferface_list with
     | None -> func_interface_error (Printf.sprintf "Func %s interface not resolved yet" func_name)
     | Some func_interface -> *)
       (* TODO: Check context!!! *)
-    func_call_helper smt_ctx check_context sub_sol_func sub_sol_list_func global_var_set (SingleExp.repl_local_var (Entry.get_single_var_map local_var_map)) 
+    func_call_helper 
+      smt_ctx check_context 
+      sub_sol_func sub_sol_list_func 
+      global_var_set (SingleExp.repl_local_var (Entry.get_single_var_map local_var_map)) 
+      extra_single_var_map
       func_interface.in_reg func_interface.in_mem
-      func_interface.context
+      func_interface.in_context
       func_interface.out_reg func_interface.out_mem
+      func_interface.out_context func_interface.out_single_subtype_list
       reg_type mem_type
 
   let fi_list_to_file (filename: string) (fi_list: t list) =
@@ -560,9 +618,11 @@ module FuncInterfaceConverter = struct
       func_name = interface.func_name;
       in_reg = List.map TaintEntryType.get_single_exp interface.in_reg;
       in_mem = mem_map TaintEntryType.get_single_exp interface.in_mem;
-      context = interface.context;
+      in_context = interface.in_context;
       out_reg = List.map TaintEntryType.get_single_exp interface.out_reg;
       out_mem = mem_map TaintEntryType.get_single_exp interface.out_mem;
+      out_context = interface.out_context;
+      out_single_subtype_list = interface.out_single_subtype_list;
       base_info = interface.base_info;
     }
 

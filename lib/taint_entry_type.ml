@@ -28,6 +28,9 @@ module TaintBaseEntryType (Entry: EntryType) = struct
 
   let get_empty_var_map = Entry.get_empty_var_map, []
 
+  let get_empty_var_map_from_init_single_var_map (single_map: SingleExp.local_var_map_t) =
+    Entry.get_empty_var_map_from_init_single_var_map single_map, []
+
   let get_single_var_map (map: local_var_map_t) : SingleExp.local_var_map_t =
     let single_map, _ = map in Entry.get_single_var_map single_map
 

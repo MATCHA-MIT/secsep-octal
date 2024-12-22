@@ -12,6 +12,7 @@ open Func_interface
 open Single_subtype
 open Single_input_var_cond_subtype
 open Single_block_invariance
+open Single_ret_invariance
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -41,6 +42,7 @@ module SingleTypeInfer = struct
     input_var_set: SingleEntryType.SingleVarSet.t;
     var_type_map: SingleEntryType.var_type_map_t;
     context: SingleContext.t list;
+    ret_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list;
     smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
@@ -124,11 +126,62 @@ module SingleTypeInfer = struct
             ptr, fix_stack slots
           else ptr, slots
       ) func_mem_interface
+
+  let init_extra_call_var_map
+      (func_body: Isa.basic_block list)
+      (func_type: ArchType.t list)
+      (func_interface_list: FuncInterface.t list)
+      (next_var: SingleExp.t) : SingleExp.t * (ArchType.t list) =
+    let next_var_id =
+      match next_var with
+      | SingleVar v -> v
+      | _ -> single_type_infer_error "next_var is not a var"
+    in
+    let get_one_func_var_map
+        (next_var: int)
+        (call_info: int * Isa.label) : int * (int * SingleExp.local_var_map_t) =
+      let call_pc, callee_name = call_info in
+      let func_interface =
+        List.find (
+          fun (x: FuncInterface.t) -> x.func_name = callee_name
+        ) func_interface_list
+      in
+      let next_var, var_map =
+        List.fold_left_map (
+          fun (next_var: int) (child_var_id, _) ->
+            next_var + 1, (child_var_id, SingleExp.SingleVar next_var)
+        ) next_var func_interface.out_single_subtype_list
+      in
+      next_var, (call_pc, var_map)
+    in
+    let update_one_block_callee_var_map
+        (next_var: int)
+        (block_and_type: Isa.basic_block * ArchType.t) : int * ArchType.t =
+      let block, block_type = block_and_type in
+      let call_info_list =
+        List.mapi (
+          fun (idx: int) (inst: Isa.instruction) ->
+            match inst with
+            | Call (callee_label, _) ->
+              Some (block_type.pc + idx, callee_label)
+            | _ -> None
+        ) block.insts |> (List.filter_map (fun x -> x))
+      in
+      let next_var, var_map =
+        List.fold_left_map get_one_func_var_map next_var call_info_list
+      in
+      next_var, { block_type with extra_call_context_map_list = var_map }
+    in
+    let next_var_id, func_type =
+      List.fold_left_map update_one_block_callee_var_map next_var_id (List.combine func_body func_type)
+    in
+    SingleExp.SingleVar next_var_id, func_type
     
   let init
       (prog: Isa.prog)
       (func_name: string)
-      (func_mem_interface: ArchType.MemType.t) : t =
+      (func_mem_interface: ArchType.MemType.t)
+      (func_interface_list: FuncInterface.t list) : t =
     let func_body = (Isa.get_func prog func_name).body in
     let func_mem_interface = fix_func_mem_interface func_name func_body func_mem_interface in
     let global_var_list = List.map (fun (_, x) -> x) (Isa.StrM.to_list prog.imm_var_map) in
@@ -179,6 +232,7 @@ module SingleTypeInfer = struct
           end
       ) (start_pc, start_var) func_body
     in
+    let next_var, arch_type_list = init_extra_call_var_map func_body arch_type_list func_interface_list next_var in
     let var_type_map = ArchType.MemType.get_var_type_map func_mem_interface in
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
@@ -192,6 +246,7 @@ module SingleTypeInfer = struct
       input_var_set = input_var_set;
       var_type_map = var_type_map;
       context = [];
+      ret_subtype_list = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
@@ -515,7 +570,7 @@ module SingleTypeInfer = struct
       (func_mem_interface: ArchType.MemType.t)
       (iter: int)
       (solver_iter: int) : t =
-    let init_infer_state = init prog func_name func_mem_interface in
+    let init_infer_state = init prog func_name func_mem_interface func_interface_list in
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
@@ -593,7 +648,7 @@ module SingleTypeInfer = struct
             false, state
           end
         in
-        Printf.printf "\n\n%s: Infer iter %d after check_or_assert_callee_context%!\n\n" func_name curr_iter;
+        Printf.printf "\n\n%s: Infer iter %d after check_or_assert_callee_context resolved %b%!\n\n" func_name curr_iter callee_context_resolved;
 
         (* 4. Single type infer *)
         (* let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
@@ -640,13 +695,13 @@ module SingleTypeInfer = struct
         Printf.printf "\n\n%s: Infer iter %d after SingleInputVarCondSubtype%!\n\n" func_name curr_iter;
 
         (* 5. Extra block invariance infer (resolve tmp_context) *)
-        let func_type = 
+        let func_type, tmp_context_resolved = 
           if unknown_resolved && callee_context_resolved then
-            SingleBlockInvariance.solve state.smt_ctx state.input_var_set func_type block_subtype 5
+            SingleBlockInvariance.solve state.smt_ctx true state.input_var_set func_type block_subtype state.single_subtype 100
           else
-            func_type
+            func_type, false
         in
-        Printf.printf "\n\n%s: Infer iter %d after SingleBlockInvariance%!\n\n" func_name curr_iter;
+        Printf.printf "\n\n%s: Infer iter %d after SingleBlockInvariance resolved %b%!\n\n" func_name curr_iter tmp_context_resolved;
 
         (* 6. Update dead_pc of dead blocks (after infer finished) *)
         let func_type =
@@ -658,9 +713,24 @@ module SingleTypeInfer = struct
         in
         Printf.printf "\n\n%s: Infer iter %d after update dead_pc%!\n\n" func_name curr_iter;
 
-        let state = { state with func_type = func_type } in
+        (* 6. Add extra ret invariance (after resolve everything) *)
+        let func_type, ret_subtype_list =
+          let sub_range_func = 
+            SingleSubtype.sub_sol_single_to_range 
+            (SingleExp.eval_align ptr_align_list)
+            state.single_subtype state.input_var_set
+          in
+          if unknown_resolved && callee_context_resolved && tmp_context_resolved then
+            SingleRetInvariance.gen_ret_invariance 
+              state.smt_ctx sub_range_func state.input_var_set
+              func_type block_subtype state.single_subtype
+          else
+            func_type, []
+        in
 
-        (* 6. Single type infer *)
+        let state = { state with func_type = func_type; ret_subtype_list = ret_subtype_list } in
+
+        (* 7. Single type infer *)
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
@@ -684,7 +754,7 @@ module SingleTypeInfer = struct
 
         SmtEmitter.pop state.smt_ctx 1;
 
-        if unknown_resolved && callee_context_resolved then begin
+        if unknown_resolved && callee_context_resolved && tmp_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
           { state with 
@@ -732,6 +802,7 @@ module SingleTypeInfer = struct
       infer_state.func_name
       infer_state.func_type
       infer_state.context
+      infer_state.ret_subtype_list
       sub_sol
 
   let pp_ocaml_infer_result (lvl: int) (buf: Buffer.t) (func_type_list: t list) =
@@ -777,15 +848,11 @@ module SingleTypeInfer = struct
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
-        "table_select";
-        "ge_madd";
-        "fe_mul_impl";
-        "fe_tobytes";
-        "ge_p2_dbl";
-        "x25519_sc_reduce";
-        "x25519_ge_scalarmult_base";
         "sha512_block_data_order";
-        "ED25519_sign";
+        "SHA512_Init";
+        "SHA512_Final";
+        "SHA512_Update";
+        "SHA512"
       ] 
     in
 

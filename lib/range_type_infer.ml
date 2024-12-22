@@ -31,6 +31,7 @@ module RangeTypeInfer = struct
     input_single_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
     (* range_sol: MemRange.local_var_map_t; *)
+    ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
   }
   [@@deriving sexp]
@@ -90,6 +91,7 @@ module RangeTypeInfer = struct
       input_single_var_set = single_infer_state.input_var_set;
       context = single_infer_state.context;
       (* range_sol = []; *)
+      ret_subtype_list = single_infer_state.ret_subtype_list;
       smt_ctx = single_infer_state.smt_ctx;
     }
 
@@ -140,6 +142,7 @@ module RangeTypeInfer = struct
       infer_state.func_name
       infer_state.func_type
       infer_state.context
+      infer_state.ret_subtype_list
       sub_sol
 
   let infer_one_func

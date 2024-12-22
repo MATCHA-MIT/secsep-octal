@@ -22,6 +22,7 @@ module type EntryType = sig
   val sexp_of_local_var_map_t : local_var_map_t -> Sexp.t
 
   val get_empty_var_map: local_var_map_t
+  val get_empty_var_map_from_init_single_var_map: SingleExp.local_var_map_t -> local_var_map_t
   val get_taint_var_map: local_var_map_t -> TaintExp.local_var_map_t option
 
   (* TODO: Remove these two after finished updating memory type!!! *)

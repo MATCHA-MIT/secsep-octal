@@ -254,7 +254,23 @@ module SingleSubtype = struct
       in
       acc_tv_rel, (sub_block.label, SingleEntryType.SingleVarSet.union reg_useful_var mem_useful_var)
     in
-    List.fold_left_map helper tv_rel sub_block_list
+    let tv_rel, sub_useful_list = List.fold_left_map helper tv_rel sub_block_list in
+    let tv_rel, sup_useful =
+      List.fold_left (
+        fun (acc: t * SingleExp.SingleVarSet.t) (subtype_entry: IsaBasic.imm_var_id * (SingleExp.t list)) ->
+          let sup_idx, sub_list = subtype_entry in
+          List.fold_left (
+            fun (acc: t * SingleExp.SingleVarSet.t) (sub: SingleExp.t) ->
+              let acc_tv_rel, acc_useful = acc in
+              if SingleEntryType.SingleVarSet.mem sup_idx useful_var then
+                let sub = SingleEntryType.repl_local_var sup_block.local_var_map sub in
+                add_sub_sub_super_super var_pc_map acc_tv_rel (sub, []) sup_idx,
+                SingleEntryType.SingleVarSet.union acc_useful (SingleEntryType.get_vars sub)
+              else acc
+          ) acc sub_list
+      ) (tv_rel, SingleExp.SingleVarSet.empty) sup_block.extra_call_subtype_list
+    in
+    tv_rel, (sup_block.label, sup_useful) :: sub_useful_list
 
   let update_block_subtype_useful_var
       (block_subtype: ArchType.block_subtype_t list)

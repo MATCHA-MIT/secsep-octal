@@ -27,7 +27,9 @@ module SingleContext = struct
   let ctx_or (l: t) (r: t) : t =
     match l, r with
     | Or or_list, other
-    | other, Or or_list -> Or (other :: or_list)
+    | other, Or or_list -> 
+      if List.is_empty or_list then other
+      else Or (other :: or_list)
     | _ -> Or [l; r]
 
   let rec is_val (is_val_func: SingleExp.t -> bool) (cond: t) : bool =
