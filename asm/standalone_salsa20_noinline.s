@@ -1,5 +1,5 @@
 	.text
-	.file	"standalone_salsa20.c"
+	.file	"standalone_salsa20_noinline.c"
 	.globl	salsa20_words                   # -- Begin function salsa20_words
 	.p2align	4, 0x90
 	.type	salsa20_words,@function
@@ -259,74 +259,39 @@ salsa20:                                # @salsa20
 	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	subq	$200, %rsp
+	subq	$72, %rsp
 	testq	%rsi, %rsi
-	je	.LBB2_6
+	je	.LBB2_5
 # %bb.1:
-	movq	%rcx, %r13
+	movq	%rcx, %rbx
 	movq	%rdx, %r14
 	movq	%rsi, %r15
 	movq	%rdi, %r12
-	movq	%rcx, %rbx
-	shrq	$32, %rbx
 	xorl	%ebp, %ebp
+	movq	%rsp, %r13
 	jmp	.LBB2_2
 	.p2align	4, 0x90
-.LBB2_5:                                #   in Loop: Header=BB2_2 Depth=1
+.LBB2_4:                                #   in Loop: Header=BB2_2 Depth=1
 	movl	%ebp, %eax
 	andl	$63, %eax
-	movzbl	64(%rsp,%rax), %eax
+	movzbl	(%rsp,%rax), %eax
 	xorb	%al, (%r12,%rbp)
 	incq	%rbp
-	cmpq	%r15, %rbp
-	je	.LBB2_6
-.LBB2_2:                                # =>This Loop Header: Depth=1
-                                        #     Child Loop BB2_4 Depth 2
+	cmpq	%rbp, %r15
+	je	.LBB2_5
+.LBB2_2:                                # =>This Inner Loop Header: Depth=1
 	testb	$63, %bpl
-	jne	.LBB2_5
-# %bb.3:                                #   in Loop: Header=BB2_2 Depth=1
-	movl	%ebp, %eax
-	shrl	$6, %eax
-	movl	$1634760805, (%rsp)             # imm = 0x61707865
-	movups	(%r14), %xmm0
-	movups	%xmm0, 4(%rsp)
-	movl	$857760878, 20(%rsp)            # imm = 0x3320646E
-	movl	%r13d, 24(%rsp)
-	movl	%ebx, 28(%rsp)
-	movl	%eax, 32(%rsp)
-	movabsq	$8746603119078539264, %rax      # imm = 0x79622D3200000000
-	movq	%rax, 36(%rsp)
-	movups	16(%r14), %xmm0
-	movups	%xmm0, 44(%rsp)
-	movl	$1797285236, 60(%rsp)           # imm = 0x6B206574
-	leaq	128(%rsp), %rdi
-	movq	%rsp, %rsi
-	callq	salsa20_words
-	movl	$8, %eax
-	xorl	%edx, %edx
-	.p2align	4, 0x90
-.LBB2_4:                                #   Parent Loop BB2_2 Depth=1
-                                        # =>  This Inner Loop Header: Depth=2
-	movl	%edx, %ecx
-	andl	$-4, %ecx
-	movl	128(%rsp,%rcx), %esi
-	leal	-8(%rax), %ecx
-	andb	$16, %cl
-	movl	%esi, %edi
-                                        # kill: def $cl killed $cl killed $ecx
-	shrl	%cl, %edi
-	movb	%dil, 64(%rsp,%rdx)
-	movl	%eax, %ecx
-	andb	$24, %cl
-	shrl	%cl, %esi
-	movb	%sil, 65(%rsp,%rdx)
-	addq	$2, %rdx
-	addl	$16, %eax
-	cmpq	$64, %rdx
 	jne	.LBB2_4
-	jmp	.LBB2_5
-.LBB2_6:
-	addq	$200, %rsp
+# %bb.3:                                #   in Loop: Header=BB2_2 Depth=1
+	movl	%ebp, %ecx
+	shrl	$6, %ecx
+	movq	%r13, %rdi
+	movq	%r14, %rsi
+	movq	%rbx, %rdx
+	callq	salsa20_block
+	jmp	.LBB2_4
+.LBB2_5:
+	addq	$72, %rsp
 	popq	%rbx
 	popq	%r12
 	popq	%r13

@@ -22,8 +22,11 @@ let () =
   let prog = Parser.Parser.prog_from_file (get_related_filename !program_name "out" "prog") in
   let tf_func_states = List.filter_map (fun (ti: Taint_type_infer.TaintTypeInfer.t) ->
     (* if ti.func_name <> "salsa20_words" && ti.func_name <> "salsa20_block" then None else *)
-    let init_mem_unity = Transform.Transform.get_func_init_mem_unity ti in
-    Some (Transform.Transform.transform_one_function taint_infer_result_fi ti init_mem_unity)
+    if Option.get ti.alive then begin
+      let init_mem_unity = Transform.Transform.get_func_init_mem_unity ti in
+      Some (Transform.Transform.transform_one_function taint_infer_result_fi ti init_mem_unity)
+    end else
+      None
   ) taint_infer_result_states in
 
   (* print into output_name *)

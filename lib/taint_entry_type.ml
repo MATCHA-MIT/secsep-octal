@@ -137,7 +137,7 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst is_check isa_bop s1 s2 (fl_entry, fr_entry) same_op in
     let (dest_taint_type: TaintExp.t) =
-      if isa_bop = Xor && Entry.cmp s1 s2 = 0 then
+      if (isa_bop = Xor || isa_bop = Xorps) && Entry.cmp s1 s2 = 0 then
         TaintConst false
       else
         TaintExp.merge t1 t2

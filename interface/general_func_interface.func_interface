@@ -29,6 +29,7 @@
     (Cond
      (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
       (SingleConst 0)))
+    (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
@@ -95,6 +96,7 @@
     (Cond
      (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
       (SingleConst 0)))
+    (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
@@ -177,9 +179,10 @@
     (Cond
      (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
       (SingleConst 0)))
+    (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
-    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond (Le (SingleConst 0) (SingleVar 2))) (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
@@ -272,9 +275,10 @@
     (Cond
      (Eq (SingleBExp SingleAnd (SingleVar 4) (SingleConst 7))
       (SingleConst 0)))
+    (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
-    (Cond (Le (SingleConst 0) (SingleVar 2)))
+    (Cond (Le (SingleConst 0) (SingleVar 2))) (NoOverflow (SingleVar 2))
     (Cond
      (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
