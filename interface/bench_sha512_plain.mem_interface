@@ -106,4 +106,5 @@
      (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
+     (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop))))))

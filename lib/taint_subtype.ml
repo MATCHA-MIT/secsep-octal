@@ -341,6 +341,7 @@ module TaintSubtype = struct
     else if remain_subtype_len < orig_subtype_len then
       solve_subtype_list_helper input_var tv_rel_list subtype_list
     else begin
+      Printf.printf "\nsolve_subtype_list_helper not making progress, exiting...\n\n";
       pp_subtype 0 tv_rel_list;
       TaintExp.pp_local_var 0 sol_list;
       pp_sub_t_list 0 subtype_list;

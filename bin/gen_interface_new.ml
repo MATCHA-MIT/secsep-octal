@@ -469,6 +469,14 @@ let bench_ed25519_plain_noinline : Base_func_interface.t = [
   ];
 ]
 
+let bench_ed25519_plain_noinline_taint_api : Taint_api.TaintApi.t = [
+  "main",
+  get_reg_taint [],
+  [
+    r RSP, [];
+  ];
+]
+
 let update_reg_taint 
     (reg_type: Taint_type_infer.TaintTypeInfer.ArchType.RegType.t) 
     (reg_taint: (bool option) list) :
@@ -513,7 +521,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     func_name = "memset";
     in_reg = in_reg;
     in_mem = in_mem;
-    context = mem_context;
+    in_context = mem_context;
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -523,6 +531,8 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       ];
       r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
+    out_context = [];
+    out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
@@ -571,7 +581,7 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     func_name = "memcpy";
     in_reg = in_reg;
     in_mem = in_mem;
-    context = mem_context;
+    in_context = mem_context;
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -586,6 +596,8 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       ];
       r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
+    out_context = [];
+    out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
@@ -659,3 +671,6 @@ let () =
   let channel = open_out "./interface/bench_ed25519_plain_noinline.mem_interface" in
   let stack = External_layouts.StackLayout.from_file "./out/bench_ed25519_plain_noinline.stack_layout" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout bench_ed25519_plain_noinline stack));
+
+  let channel = open_out "./interface/bench_ed25519_plain_noinline.taint_api" in
+  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t bench_ed25519_plain_noinline_taint_api);

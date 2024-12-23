@@ -2284,7 +2284,8 @@ SHA512:                                 # @SHA512
 	.type	main,@function
 main:                                   # @main
 # %bb.0:
-	subq	$72, %rsp
+	pushq	%rbx
+	subq	$64, %rsp
 	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
 	movq	$message, 24(%rsp)
 	movq	$256, 32(%rsp)                  # imm = 0x100
@@ -2320,12 +2321,20 @@ main:                                   # @main
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
 	movq	$256, 16(%rsp)                  # imm = 0x100
+	movl	$256, %ebx                      # imm = 0x100
+	.p2align	4, 0x90
+.LBB7_1:                                # =>This Inner Loop Header: Depth=1
 	movl	$message, %edi
-	movl	$256, %esi                      # imm = 0x100
 	movl	$out, %edx
+	movq	%rbx, %rsi
 	callq	SHA512
+	decq	%rbx
+	cmpq	$206, %rbx
+	jne	.LBB7_1
+# %bb.2:
 	xorl	%eax, %eax
-	addq	$72, %rsp
+	addq	$64, %rsp
+	popq	%rbx
 	retq
 .Lfunc_end7:
 	.size	main, .Lfunc_end7-main
