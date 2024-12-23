@@ -115,6 +115,7 @@ module Transform = struct
   type basic_block = {
     label: Isa.label;
     insts: InstTransform.t list;
+    alive_inst_cnt: int;
   }
 
   (* Unity of memory of each base in a function *)
@@ -256,7 +257,7 @@ module Transform = struct
       (ti_state: TaintTypeInfer.t)
       (init_mem_unity: mem_unity_t)
       : func_state =
-    let extended_bbs = List.map (fun (bb: Isa.basic_block) ->
+    let extended_bbs = List.map2 (fun (bb: Isa.basic_block) (bb_type: TaintTypeInfer.ArchType.t) ->
       if (List.length bb.mnemonics) != (List.length bb.insts) ||
          (List.length bb.orig_asm) - 1 != (List.length bb.insts) then (* first orig_asm is a label *)
         transform_error (Printf.sprintf "Mismatch between mnemonics/orig_asm and instructions %d %d %d" (List.length bb.mnemonics) (List.length bb.orig_asm) (List.length bb.insts));
@@ -265,8 +266,9 @@ module Transform = struct
         insts = List.map2 (
           fun inst (mnemonic, orig_asm) -> InstTransform.init inst mnemonic orig_asm
         ) bb.insts (List.combine bb.mnemonics (List.tl bb.orig_asm (* first orig_asm is a label *)));
+        alive_inst_cnt = bb_type.dead_pc - bb_type.pc;
       }
-    ) ti_state.func in
+    ) ti_state.func ti_state.func_type in
     {
       func_name = ti_state.func_name;
       bbs = extended_bbs;
@@ -718,12 +720,13 @@ module Transform = struct
       (bb: basic_block)
       (css: callee_slot list)
       : basic_block * (callee_slot list) =
-    let new_insts, css' = List.fold_left (
-      fun (acc: (InstTransform.t list) * (callee_slot list)) (trans: InstTransform.t) ->
-        let acc_insts, acc_css = acc in
+    let new_insts, css', _ = List.fold_left (
+      fun (acc: (InstTransform.t list) * (callee_slot list) * int) (trans: InstTransform.t) ->
+        let acc_insts, acc_css, left = acc in
+        if left = 0 then acc else (* skip dead instructions *)
         let tf, css = transform_instruction func_state tv_ittt trans acc_css in
-        tf :: acc_insts, css
-    ) ([], css) bb.insts in
+        tf :: acc_insts, css, left - 1
+    ) ([], css, bb.alive_inst_cnt) bb.insts in
     { bb with insts = List.rev new_insts }, css'
 
   (* Step 2 *)

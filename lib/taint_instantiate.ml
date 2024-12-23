@@ -92,13 +92,13 @@ module TaintInstantiate = struct
         (acc: call_site_map_t) (inst: Isa.instruction) :
         call_site_map_t =
       match inst with
-      | Call (calee_name, call_anno_opt) ->
+      | Call (callee_name, call_anno_opt) ->
         begin match call_anno_opt with
-        | None -> taint_instantiate_error "get_call_site_map get None call anno"
+        | None -> taint_instantiate_error (Printf.sprintf "get_call_site_map get None call anno in caller=%s callee=%s\n" caller_name callee_name);
         | Some call_anno ->
           List.map (
             fun (func_name, var_set, call_site_list) ->
-              if func_name = calee_name then
+              if func_name = callee_name then
                 func_name, var_set, (caller_name, call_anno.taint_var_map) :: call_site_list
               else
                 func_name, var_set, call_site_list
@@ -106,13 +106,15 @@ module TaintInstantiate = struct
         end
       | _ -> acc
     in
+    let alive_infer_state_list = List.filter (fun (infer_state: TaintTypeInfer.t) -> Option.get infer_state.alive) infer_state_list in
     List.fold_left (
       fun (acc: call_site_map_t) (infer_state: TaintTypeInfer.t) ->
-        List.fold_left (
-          fun (acc: call_site_map_t) (block: Isa.basic_block) ->
+        List.fold_left2 (
+          fun (acc: call_site_map_t) (block: Isa.basic_block) (_: TaintTypeInfer.ArchType.t) ->
+            (* if block_type.pc >= block_type.dead_pc then acc else *)
             List.fold_left (helper infer_state.func_name) acc block.insts
-        ) acc infer_state.func
-    ) map infer_state_list
+        ) acc infer_state.func infer_state.func_type
+    ) map alive_infer_state_list
   
   let gen_call_site_map_from_taint_api
       (func_interface_list: FuncInterface.t list)
@@ -267,6 +269,33 @@ module TaintInstantiate = struct
       TaintTypeInfer.get_func_interface state, state
     ) instance_map_list infer_state_list |> List.split
 
+  let get_alive_functions (prog: Isa.prog) (fi_list: FuncInterface.t list) (taint_api: TaintApi.t) =
+    let entry_funcs = List.map (fun api -> let func_name, _, _ = api in func_name) taint_api in
+    let rec propagate_alive (funcs: Isa.label list) =
+      let old_funcs = funcs in
+      let funcs = List.fold_left (fun (acc: Isa.label list) (func: Isa.label) ->
+        match FuncInterface.find_fi fi_list func with
+        | None -> acc
+        | Some fi -> begin
+            match List.find_opt (fun (func: Isa.func) -> String.equal func.name fi.func_name) prog.funcs with
+            | None -> acc
+            | Some func ->
+              List.fold_left (fun (acc: Isa.label list) (callee: Isa.label) ->
+                if List.mem callee acc then
+                  acc
+                else
+                  callee :: acc
+              ) acc func.subfunctions
+          end
+      ) funcs funcs
+      in
+      if List.equal (fun x y -> String.equal x y) old_funcs funcs then
+        funcs
+      else
+        propagate_alive funcs
+    in
+    propagate_alive entry_funcs
+
   let instantiate
       (prog: Isa.prog)
       (taint_api: TaintApi.t)
@@ -291,15 +320,38 @@ module TaintInstantiate = struct
     ) taint_api
     in
 
+    let alive_function_list = get_alive_functions prog func_interface_list taint_api in
+    Printf.printf "alive functions:\n";
+    List.iter (fun name -> Printf.printf "\t%s\n" name) alive_function_list;
+    let infer_state_list = List.map (fun (infer_state: TaintTypeInfer.t) ->
+      let alive = List.mem infer_state.func_name alive_function_list in
+      {infer_state with alive = Some alive }
+    ) infer_state_list in
+
     let call_site_map_api = gen_call_site_map_from_taint_api func_interface_list taint_api in
     let call_site_map = gen_call_site_map func_interface_list infer_state_list in
     let call_site_map = merge_call_site_map call_site_map call_site_map_api in
+    Printf.printf "call_site_map =\n%s\n\n" (Sexplib.Sexp.to_string_hum (sexp_of_call_site_map_t call_site_map));
     Sexp.output_hum stdout (sexp_of_call_site_map_t call_site_map);
     Printf.printf "\n";
+
     let instance_map_list = get_all_instance_map call_site_map in
+    Printf.printf "\ninstance_map_list=\n";
     Sexp.output_hum stdout (sexp_of_instance_map_t instance_map_list);
     Printf.printf "\n";
-    update_all instance_map_list infer_state_list
+
+    let fi_list, tti_list = update_all instance_map_list infer_state_list in
+
+    let fi_list = List.fold_left (fun (acc: FuncInterface.t list) (fi: FuncInterface.t) ->
+      if List.exists (fun (fi2: FuncInterface.t) -> String.equal fi2.func_name fi.func_name) acc then
+        acc
+      else begin
+        Printf.printf "adding raw function interface of %s\n" fi.func_name;
+        fi :: acc
+      end
+    ) fi_list func_interface_list in
+
+    fi_list, tti_list
 
 end
 

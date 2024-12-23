@@ -36,6 +36,7 @@ module TaintTypeInfer = struct
     taint_sol: TaintExp.local_var_map_t;
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
+    alive: bool option;
   }
   [@@deriving sexp]
 
@@ -79,7 +80,7 @@ module TaintTypeInfer = struct
       acc, {
         label = block_single_type.label;
         pc = block_single_type.pc;
-        dead_pc = block_single_type.pc;
+        dead_pc = block_single_type.dead_pc;
         reg_type = new_reg_type;
         mem_type = new_mem_type;
         context = block_single_type.context;
@@ -110,6 +111,7 @@ module TaintTypeInfer = struct
       taint_sol = [];
       ret_subtype_list = range_infer_state.ret_subtype_list;
       smt_ctx = SmtEmitter.init_smt_ctx ();
+      alive = None;
     }
 
   let type_prop_all_blocks
@@ -124,6 +126,7 @@ module TaintTypeInfer = struct
       (* Prepare SMT context for the current block *)
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
+      ArchType.add_assertions infer_state.smt_ctx block_type;
       let (_, block_subtype), new_block =
         ArchType.type_prop_block infer_state.smt_ctx 
           (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set) *)

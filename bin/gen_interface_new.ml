@@ -36,43 +36,37 @@ let standalone_salsa20 : Base_func_interface.t = [
 ]
 
 let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
-  "salsa20_words",
-  get_reg_taint [
-    RDI, false;
-    RSI, false;
-  ],
+  "_start",
+  get_reg_taint [],
   [
     r RSP, [];
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], Some true) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], Some true) ];
   ];
+]
 
-  "salsa20_block",
-  get_reg_taint [
-    RDI, false;
-    RSI, false;
-    RDX, true;
-    RCX, true;
-  ],
-  [
-    r RSP, [];
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], Some true) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], Some true) ];
+let standalone_salsa20_noinline_global : External_layouts.GlobalSymbolLayout.t = [
+  "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], (SingleTop, TaintConst true)) ];
+  "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], (SingleTop, TaintConst true)) ];
+  "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], (SingleTop, TaintConst true)) ];
+]
+
+let standalone_salsa20_noinline : Base_func_interface.t = [
+  "salsa20_words", [
+    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
-
-  "salsa20",
-  get_reg_taint [
-    RDI, false;
-    RSI, false;
-    RDX, false;
-    RCX, true;
-  ],
-  [
-    r RSP, [];
-    r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], Some true) ];
-    r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], Some true) ]
+  "salsa20_block", [
+    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
+  "salsa20", [
+    r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
+    r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
+  ];
+  "_start", [
+  ]
+]
 
+let standalone_salsa20_noinline_taint_api : Taint_api.TaintApi.t = [
   "_start",
   get_reg_taint [],
   [
@@ -110,6 +104,14 @@ let bench_sha512_plain : Base_func_interface.t = [
   ];
   "main", [
   ]
+]
+
+let bench_sha512_plain_taint_api : Taint_api.TaintApi.t = [
+  "main",
+  get_reg_taint [],
+  [
+    r RSP, [];
+  ];
 ]
 
 let bench_ed25519_plain_global : External_layouts.GlobalSymbolLayout.t = [
@@ -467,9 +469,152 @@ let bench_ed25519_plain_noinline : Base_func_interface.t = [
   ];
 ]
 
+let update_reg_taint 
+    (reg_type: Taint_type_infer.TaintTypeInfer.ArchType.RegType.t) 
+    (reg_taint: (bool option) list) :
+    Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+  List.map2 (
+    fun (single, taint) (taint_opt: bool option) ->
+      match taint_opt with
+      | Some b -> single, Taint_exp.TaintExp.TaintConst b
+      | None -> single, taint
+  ) reg_type reg_taint
+
+
+let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t = 
+  let start_var: Taint_entry_type.TaintEntryType.t = (SingleVar 0, TaintVar 0) in
+  let _, default_reg_type = Taint_type_infer.TaintTypeInfer.ArchType.RegType.init_reg_type start_var in
+  let in_reg : Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+    update_reg_taint default_reg_type
+      (get_reg_taint [
+        RDI, false;
+        RDX, false;
+      ])
+  in
+  let out_reg = List.mapi (
+    fun (i: int) entry ->
+      if Isa_basic.IsaBasic.is_reg_idx_callee_saved i then entry
+      else Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintConst true 
+  ) in_reg
+  in
+  let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+    r RDI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+    r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+  ] in
+  let mem_context = 
+    Taint_type_infer.TaintTypeInfer.ArchType.MemType.get_all_mem_constraint
+      (Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_ret_addr_stack_slot in_mem)
+  in
+  {
+    func_name = "memset";
+    in_reg = in_reg;
+    in_mem = in_mem;
+    context = mem_context;
+    out_reg = out_reg;
+    out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+    ];
+    base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [], 
+        Call_anno_type.CallAnno.BaseAsReg RDI
+      ];
+      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
+    ];
+  }
+
+let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t = 
+  let start_var: Taint_entry_type.TaintEntryType.t = (SingleVar 0, TaintVar 0) in
+  let _, default_reg_type = Taint_type_infer.TaintTypeInfer.ArchType.RegType.init_reg_type start_var in
+  let in_reg : Taint_type_infer.TaintTypeInfer.ArchType.RegType.t =
+    update_reg_taint default_reg_type
+      (get_reg_taint [
+        RDI, false; (* dest ptr *)
+        RSI, false; (* src ptr *)
+        RDX, false;
+      ])
+  in
+  let out_reg = List.mapi (
+    fun (i: int) entry ->
+      if Isa_basic.IsaBasic.is_reg_idx_callee_saved i then entry
+      else Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintConst true 
+  ) in_reg
+  in
+  let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+    r RDI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+    r RSI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+    ];
+    r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+  ] in
+  let mem_context = 
+    Taint_type_infer.TaintTypeInfer.ArchType.MemType.get_all_mem_constraint
+      (Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_ret_addr_stack_slot in_mem)
+  in
+  {
+    func_name = "memcpy";
+    in_reg = in_reg;
+    in_mem = in_mem;
+    context = mem_context;
+    out_reg = out_reg;
+    out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+      r RSI, [ 
+      (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+      RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      ];
+      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+    ];
+    base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
+      r RDI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [], 
+        Call_anno_type.CallAnno.BaseAsReg RDI
+      ];
+      r RSI, [ 
+        (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
+        RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
+        Call_anno_type.CallAnno.BaseAsReg RSI 
+      ];
+      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
+    ];
+  }
+
+
+let add_general_func_suffix
+    (func_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t) :
+    Taint_type_infer.TaintTypeInfer.FuncInterface.t list =
+  [func_interface;
+  {func_interface with func_name = func_interface.func_name ^ "@PLT"}]
+
 let () = 
   (* Stack_layout.StackLayout.test(); *)
   let open Sexplib in
+
+  let channel = open_out "./interface/general_func_interface.func_interface" in
+  Sexp.output_hum channel (Sexplib.Std.sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t 
+    (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface]));
 
   let channel = open_out "./interface/standalone_salsa20.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t standalone_salsa20_global);
@@ -481,12 +626,25 @@ let () =
   let channel = open_out "./interface/standalone_salsa20.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
 
+  let channel = open_out "./interface/standalone_salsa20_noinline.symbol_layout" in
+  Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t standalone_salsa20_noinline_global);
+
+  let channel = open_out "./interface/standalone_salsa20_noinline.mem_interface" in
+  let stack = External_layouts.StackLayout.from_file "./out/standalone_salsa20_noinline.stack_layout" in
+  Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout standalone_salsa20_noinline stack));
+
+  let channel = open_out "./interface/standalone_salsa20_noinline.taint_api" in
+  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_noinline_taint_api);
+
   let channel = open_out "./interface/bench_sha512_plain.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_sha512_plain_global);
 
   let channel = open_out "./interface/bench_sha512_plain.mem_interface" in
   let stack = External_layouts.StackLayout.from_file "./out/bench_sha512_plain.stack_layout" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout bench_sha512_plain stack));
+
+  let channel = open_out "./interface/bench_sha512_plain.taint_api" in
+  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t bench_sha512_plain_taint_api);
 
   let channel = open_out "./interface/bench_ed25519_plain.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_ed25519_plain_global);
