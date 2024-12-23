@@ -1141,7 +1141,14 @@ module ArchType (Entry: EntryType) = struct
     in
     let reg_var_set = List.fold_left helper SingleExp.SingleVarSet.empty a_type.reg_type in
     let mem_var_set = MemType.fold_left helper SingleExp.SingleVarSet.empty a_type.mem_type in
-    SingleExp.SingleVarSet.union reg_var_set mem_var_set
+    let extra_call_exp_list = List.concat_map (fun (_, var_map) -> List.map snd var_map) a_type.extra_call_context_map_list in
+    let extra_call_var_set =
+      List.fold_left (
+        fun (acc: SingleExp.SingleVarSet.t) (e: SingleExp.t) ->
+          SingleExp.SingleVarSet.union (SingleExp.get_vars e) acc
+      ) SingleExp.SingleVarSet.empty extra_call_exp_list
+    in
+    SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union reg_var_set mem_var_set) extra_call_var_set
 
   let update_reg_mem_type (update_func: entry_t -> entry_t) (a_type: t) : t =
     { a_type with

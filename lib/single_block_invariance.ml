@@ -111,6 +111,8 @@ module SingleBlockInvariance = struct
     SingleContext.add_assertions smt_ctx br_block_info.br_context;
     
     (* 2. Get target_block's tmp cxt (invariance) that needs to be satisfied under branch_block's context *)
+    (* Note: if target block added extra call var related variables to its tmp context, 
+      then the repl_context_var will fail due to missing var in context map when trying to pass the tmp_ctx to its entrance *)
     let invariance_list = 
       List.map (SingleContext.repl (SingleExp.repl_context_var br_block_info.br_var_map)) target_block.tmp_context 
     in
@@ -163,6 +165,7 @@ module SingleBlockInvariance = struct
   let solve_one_block
       (smt_ctx: SmtEmitter.t)
       (allow_add_new_input_context: bool)
+      (input_var_set: SingleExp.SingleVarSet.t)
       (single_subtype: SingleSubtype.t)
       (func_type: ArchType.t list)
       (block_input: block_input_t) : ArchType.t list =
@@ -182,10 +185,16 @@ module SingleBlockInvariance = struct
         else
           Printf.printf "Func entry %s, add tmp_context to context tmp_context\n%s\n" target_label (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t target_block.tmp_context)));
         if allow_add_new_input_context then
+          let resolved, not_resolved =
+            List.partition (
+              fun (x: SingleContext.t) ->
+                SingleContext.is_val (SingleExp.is_val input_var_set) x
+            ) target_block.tmp_context
+          in
           ArchType.set_arch_type func_type
           { target_block with 
-            context = target_block.context @ target_block.tmp_context;
-            tmp_context = [] }
+            context = target_block.context @ resolved;
+            tmp_context = not_resolved }
         else func_type
       end else begin
         Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (ArchType.sexp_of_t target_block));
@@ -208,6 +217,7 @@ module SingleBlockInvariance = struct
   let rec solve_iter
       (smt_ctx: SmtEmitter.t)
       (allow_add_new_input_context: bool)
+      (input_var_set: SingleExp.SingleVarSet.t)
       (func_type: ArchType.t list) (block_input_list: t)
       (single_subtype: SingleSubtype.t)
       (iter: int) : ArchType.t list * bool =
@@ -215,8 +225,8 @@ module SingleBlockInvariance = struct
     let resolved = is_tmp_resolved func_type in
     if iter = 0 || resolved then func_type, resolved
     else
-    let func_type = List.fold_left (solve_one_block smt_ctx allow_add_new_input_context single_subtype) func_type block_input_list in
-    solve_iter smt_ctx allow_add_new_input_context func_type block_input_list single_subtype (iter - 1)
+    let func_type = List.fold_left (solve_one_block smt_ctx allow_add_new_input_context input_var_set single_subtype) func_type block_input_list in
+    solve_iter smt_ctx allow_add_new_input_context input_var_set func_type block_input_list single_subtype (iter - 1)
 
   let solve
       (smt_ctx: SmtEmitter.t)
@@ -228,7 +238,7 @@ module SingleBlockInvariance = struct
       (iter: int) : ArchType.t list * bool =
     let block_input_list = init input_var_set func_type block_subtype_list single_subtype in
     Printf.printf "Br Context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t block_input_list));
-    solve_iter smt_ctx allow_add_new_input_context func_type block_input_list single_subtype iter
+    solve_iter smt_ctx allow_add_new_input_context input_var_set func_type block_input_list single_subtype iter
 
   (* TODO: We may need to use tighter/weaker invariance when adding tmp_context to context.
           Currently I did not take branch history into consideration. *)

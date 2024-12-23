@@ -141,18 +141,21 @@ module SingleTypeInfer = struct
         (next_var: int)
         (call_info: int * Isa.label) : int * (int * SingleExp.local_var_map_t) =
       let call_pc, callee_name = call_info in
-      let func_interface =
-        List.find (
+      let func_interface_opt =
+        List.find_opt (
           fun (x: FuncInterface.t) -> x.func_name = callee_name
         ) func_interface_list
       in
-      let next_var, var_map =
-        List.fold_left_map (
-          fun (next_var: int) (child_var_id, _) ->
-            next_var + 1, (child_var_id, SingleExp.SingleVar next_var)
-        ) next_var func_interface.out_single_subtype_list
-      in
-      next_var, (call_pc, var_map)
+      match func_interface_opt with
+      | None -> single_type_infer_error (Printf.sprintf "Func %s not found\n" callee_name)
+      | Some func_interface ->
+        let next_var, var_map =
+          List.fold_left_map (
+            fun (next_var: int) (child_var_id, _) ->
+              next_var + 1, (child_var_id, SingleExp.SingleVar next_var)
+          ) next_var func_interface.out_single_subtype_list
+        in
+        next_var, (call_pc, var_map)
     in
     let update_one_block_callee_var_map
         (next_var: int)
@@ -846,15 +849,21 @@ module SingleTypeInfer = struct
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    let func_mem_interface_list = 
+    (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
-        "sha512_block_data_order";
+        (* "sha512_block_data_order";
         "SHA512_Init";
         "SHA512_Final";
         "SHA512_Update";
-        "SHA512"
+        "OPENSSL_cleanse";
+        "SHA512"; *)
+        "fe_mul_impl";
+        "fe_mul_impl_self2";
+        "fe_mul_ttt_self1";
+        "fe_tobytes";
+        "ge_p3_tobytes";
       ] 
-    in
+    in *)
 
     let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
       let label, _ = interface in

@@ -495,7 +495,7 @@ module FuncInterface (Entry: EntryType) = struct
         | Right unsat_cond ->
           let unsat_cond_expr = SingleContext.to_smt_expr smt_ctx unsat_cond in
           Printf.printf "p_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (List.map fst p_context)));
-          Printf.printf "%s\n%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond)) (Z3.Expr.to_string unsat_cond_expr);
+          Printf.printf "unsat cond\n%s\n%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond)) (Z3.Expr.to_string unsat_cond_expr);
           (* (
             match SmtEmitter.check_compliance smt_ctx [unsat_cond_expr] with
             | SatYes -> Printf.printf "Should be sat\n"

@@ -284,14 +284,16 @@ let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t 
   "private_key", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
   "message", [ (SingleConst 0L, SingleConst 256L), RangeConst [(SingleConst 0L, SingleConst 256L)], (SingleTop, TaintConst true) ];
   "signature", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
-  ".LCPI10_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI10_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI12_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI12_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI13_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI15_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
-  ".LCPI18_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
+  ".LCPI10_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI10_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI12_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI12_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI13_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI15_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI18_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI20_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  ".LCPI21_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
 ]
 
 let bench_ed25519_plain_noinline : Base_func_interface.t = [
@@ -331,6 +333,14 @@ let bench_ed25519_plain_noinline : Base_func_interface.t = [
     r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
     r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
+  "fe_mul_impl_self2", [
+    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
+  "fe_mul_ttt_self1", [
+    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "ge_madd", [
     r RDI, [
@@ -438,6 +448,15 @@ let bench_ed25519_plain_noinline : Base_func_interface.t = [
     r RSI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
     r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
     r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+  ];
+  "ge_p3_tobytes", [
+    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    r RSI, [
+      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+    ];
   ];
   "ED25519_sign", [
     r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];

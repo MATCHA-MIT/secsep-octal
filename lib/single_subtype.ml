@@ -264,7 +264,7 @@ module SingleSubtype = struct
               let acc_tv_rel, acc_useful = acc in
               if SingleEntryType.SingleVarSet.mem sup_idx useful_var then
                 let sub = SingleEntryType.repl_local_var sup_block.local_var_map sub in
-                add_sub_sub_super_super var_pc_map acc_tv_rel (sub, []) sup_idx,
+                add_sub_sub_super_super var_pc_map acc_tv_rel (sub, [sup_block.pc]) sup_idx,
                 SingleEntryType.SingleVarSet.union acc_useful (SingleEntryType.get_vars sub)
               else acc
           ) acc sub_list
@@ -811,6 +811,7 @@ module SingleSubtype = struct
     in
     match r with
     | Single exp -> exp
+    | SingleSet _ -> e
     | _ -> SingleTop
 
   let find_list_correlation
