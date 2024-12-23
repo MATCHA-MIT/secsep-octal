@@ -22,6 +22,7 @@ module TaintSubtype = struct
   [@@deriving sexp]
 
   module ArchType = ArchType (TaintEntryType)
+  module VarSet = TaintExp.TaintVarSet
 
   type sub_t = TaintExp.t * TaintExp.t
   [@@deriving sexp]
@@ -222,9 +223,18 @@ module TaintSubtype = struct
     | TaintConst false -> taint_subtype_error (Printf.sprintf "update find %s -> TaintConst false" (TaintExp.to_string sub))
     | _ -> tv_rel_list, Some subtype
 
+  (* let find_one_var_sol 
+      (input_var: VarSet.t) (tv_rel_list: t) 
+      (tv_rel: type_rel) (untaint_var: VarSet.t) (taint_var: VarSet.t) : type_rel =
+    if tv_rel.sol <> None then tv_rel
+    else if VarSet.mem tv_rel.var_idx input_var then
+      {tv_rel with sol = Some (TaintVar tv_rel.var_idx)}
+    else
+      let equal_var_set = VarSet.inter tv_rel.subtype tv_rel.suptype *)
+
   let find_var_sol (input_var: TaintExp.TaintVarSet.t) (tv_rel_list: t) : t =
     (* We solve all vars following their dependency order:
-      1. If x -> y, then y's solution depends on x, then solver x first.
+      1. If x -> y, then y's solution depends on x, then solve x first.
       2. If x = y, then we need to decide the solution to be either {x: x, y: x} or {x: y, y: y}
         1. Use positive vars to represent negative ones (since neg vars are local vars).
         2. If both positive, use the smaller one to represent the larger one (since smaller ones are likely to be input vars). *)
@@ -235,8 +245,8 @@ module TaintSubtype = struct
     in
 
     let tv_rel_list = List.sort (fun x y -> compare_idx x.var_idx y.var_idx) tv_rel_list in
-    Printf.printf "find_var_sol\n";
-    pp_subtype 0 tv_rel_list;
+    (* Printf.printf "find_var_sol\n";
+    pp_subtype 0 tv_rel_list; *)
 
     let helper_inner
         (acc: TaintExp.TaintVarSet.t * TaintExp.TaintVarSet.t * TaintExp.TaintVarSet.t * TaintExp.TaintVarSet.t) (tv_rel: type_rel) : 
@@ -305,13 +315,16 @@ module TaintSubtype = struct
 
   let check_sub_t (entry: sub_t) : bool =
     match entry with
+    | TaintUnknown, _ | _, TaintUnknown -> taint_subtype_error "should not have unknown"
     | TaintConst false, _ -> true
+    | _, TaintConst false -> false
     | TaintConst true, TaintConst true -> true
-    | TaintVar _, TaintConst true -> true
+    | _, TaintConst true -> true
+    | TaintConst true, _ -> false
     | TaintVar v1, TaintVar v2 -> v1 = v2
     | TaintVar v1, TaintExp s2 -> TaintExp.TaintVarSet.mem v1 s2
+    | TaintExp _, TaintVar _ -> false
     | TaintExp s1, TaintExp s2 -> TaintExp.TaintVarSet.subset s1 s2
-    | _ -> true
 
   let check_and_filter (subtype_list: sub_t list) : sub_t list =
     List.filter (
@@ -321,12 +334,15 @@ module TaintSubtype = struct
   let rec solve_subtype_list_helper
       (input_var: TaintExp.TaintVarSet.t)
       (tv_rel_list: t) (subtype_list: sub_t list) : TaintExp.local_var_map_t =
+    Printf.printf "solve_subtype_list_helper\n";
     let orig_subtype_len = List.length subtype_list in
     (* Update tv_rel_list (which is expected to contain all constraints) *)
     let tv_rel_list, subtype_opt_list = List.fold_left_map update tv_rel_list subtype_list in
     let subtype_list = List.filter_map (fun x -> x) subtype_opt_list in
     (* Find sol based on current (might be incomplete) tv_rel_list *)
     let tv_rel_list = find_var_sol input_var tv_rel_list in
+    Printf.printf "After solve tv_rel_list\n";
+    pp_subtype 0 tv_rel_list;
     let sol_list = List.map (fun x -> x.var_idx, Option.get x.sol) tv_rel_list in
     (* Simplify subtype_list with current sol (the sol might be incomplete) *)
     let subtype_list = 
