@@ -2292,6 +2292,7 @@ main:                                   # @main
 	movq	$0, 40(%rsp)
 	movq	$0, 48(%rsp)
 	movq	$0, 56(%rsp)
+	xorl	%ebx, %ebx
 	leaq	16(%rsp), %rax
 	xorl	%edx, %edx
 	#APP
@@ -2321,15 +2322,17 @@ main:                                   # @main
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
 	movq	$256, 16(%rsp)                  # imm = 0x100
-	movl	$256, %ebx                      # imm = 0x100
 	.p2align	4, 0x90
 .LBB7_1:                                # =>This Inner Loop Header: Depth=1
+	movl	%ebx, %eax
+	andl	$15, %eax
+	movl	$256, %esi                      # imm = 0x100
+	subl	%eax, %esi
 	movl	$message, %edi
 	movl	$out, %edx
-	movq	%rbx, %rsi
 	callq	SHA512
-	decq	%rbx
-	cmpq	$206, %rbx
+	incl	%ebx
+	cmpl	$100, %ebx
 	jne	.LBB7_1
 # %bb.2:
 	xorl	%eax, %eax

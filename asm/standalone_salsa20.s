@@ -351,6 +351,7 @@ _start:                                 # @_start
 	movq	$0, 40(%rsp)
 	movq	$0, 48(%rsp)
 	movq	$0, 56(%rsp)
+	xorl	%r14d, %r14d
 	leaq	16(%rsp), %rax
 	xorl	%edx, %edx
 	#APP
@@ -396,17 +397,19 @@ _start:                                 # @_start
 	#NO_APP
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
-	movl	$128, %ebx
-	movq	nonce(%rip), %r14
+	movq	nonce(%rip), %rbx
 	.p2align	4, 0x90
 .LBB3_1:                                # =>This Inner Loop Header: Depth=1
+	movl	%r14d, %eax
+	andl	$15, %eax
+	movl	$128, %esi
+	subl	%eax, %esi
 	movl	$msg, %edi
 	movl	$key, %edx
-	movq	%rbx, %rsi
-	movq	%r14, %rcx
+	movq	%rbx, %rcx
 	callq	salsa20
-	decq	%rbx
-	cmpq	$78, %rbx
+	incl	%r14d
+	cmpl	$100, %r14d
 	jne	.LBB3_1
 # %bb.2:
 	#APP
