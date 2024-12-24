@@ -18,6 +18,9 @@ module TaintExp = struct
     | TaintUnknown
   [@@deriving sexp]
 
+  type sub_t = t * t
+  [@@deriving sexp]
+
   type local_var_map_t = (taint_var_id * t) list
   [@@deriving sexp]
 

@@ -1224,6 +1224,7 @@ module ArchType (Entry: EntryType) = struct
       in_reg = in_state.reg_type;
       in_mem = in_mem;
       in_context = context;
+      in_taint_context = [];
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
       out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type);
       out_context = out_state.context;

@@ -522,6 +522,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_reg = in_reg;
     in_mem = in_mem;
     in_context = mem_context;
+    in_taint_context = [];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -560,16 +561,18 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       else Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintConst true 
   ) in_reg
   in
+  let dest_taint = Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num) in
+  let src_taint = Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num + 1) in
   let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
     r RDI, [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [], 
-      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      (Single_exp.SingleExp.SingleTop, dest_taint) 
     ];
     r RSI, [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
-      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      (Single_exp.SingleExp.SingleTop, src_taint) 
     ];
     r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
   ] in
@@ -582,17 +585,18 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_reg = in_reg;
     in_mem = in_mem;
     in_context = mem_context;
+    in_taint_context = [ src_taint, dest_taint ];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
-        (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+        (Single_exp.SingleExp.SingleTop, dest_taint) 
       ];
       r RSI, [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
-      (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
+      (Single_exp.SingleExp.SingleTop, src_taint) 
       ];
       r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];

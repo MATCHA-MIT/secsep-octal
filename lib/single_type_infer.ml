@@ -851,17 +851,13 @@ module SingleTypeInfer = struct
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
-        (* "sha512_block_data_order";
-        "SHA512_Init";
-        "SHA512_Final";
-        "SHA512_Update";
-        "OPENSSL_cleanse";
-        "SHA512"; *)
         "fe_mul_impl";
-        "fe_mul_impl_self2";
-        "fe_mul_ttt_self1";
-        "fe_tobytes";
-        "ge_p3_tobytes";
+        "table_select";
+        "ge_madd";
+        "ge_p2_dbl";
+        "x25519_ge_p1p1_to_p3";
+        "x25519_ge_p1p1_to_p2";
+        "x25519_ge_scalarmult_base";
       ] 
     in *)
 

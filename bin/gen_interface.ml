@@ -288,6 +288,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_reg = in_reg;
     in_mem = in_mem;
     in_context = mem_context;
+    in_taint_context = [];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 
@@ -348,6 +349,7 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_reg = in_reg;
     in_mem = in_mem;
     in_context = mem_context;
+    in_taint_context = [];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       r RDI, [ 

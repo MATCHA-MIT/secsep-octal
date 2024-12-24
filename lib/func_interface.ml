@@ -1,5 +1,6 @@
 open Isa_basic
 open Single_exp
+open Taint_exp
 open Entry_type
 open Mem_offset_new
 open Single_context
@@ -29,6 +30,7 @@ module FuncInterface (Entry: EntryType) = struct
     in_reg: RegType.t;
     in_mem: MemType.t;
     in_context: SingleContext.t list;
+    in_taint_context: TaintExp.sub_t list;
     out_reg: RegType.t;
     out_mem: MemType.t;
     out_context: SingleContext.t list;
@@ -215,7 +217,9 @@ module FuncInterface (Entry: EntryType) = struct
       if Entry.is_val2 var_map reg_out then
         Entry.repl_context_var var_map reg_out
       else begin
-        Printf.printf "set_reg_type get_top_type for %s\n" (Entry.to_string reg_out);
+        Printf.printf "set_reg_type: reg_out %s is not val, call get_top_type\n" (Entry.to_string reg_out);
+        Entry.pp_local_var 0 var_map;
+        (* Printf.printf "set_reg_type get_top_type for %s\n" (Entry.to_string reg_out); *)
         Entry.get_top_type ()
       end
     in
@@ -368,6 +372,19 @@ module FuncInterface (Entry: EntryType) = struct
         (Entry.get_eq_taint_constraint p_entry (Entry.repl_context_var var_map c_entry)) @ acc
     ) [] parent_mem child_mem
 
+  let get_callee_taint_context_constraint
+      (var_map: Entry.local_var_map_t)
+      (child_taint_context: TaintExp.sub_t list) : Constraint.t list =
+    match Entry.get_taint_var_map var_map with
+    | None -> []
+    | Some taint_var_map ->
+      List.map (
+        fun (sub, sup) ->
+          let p_sub = TaintExp.repl_context_var taint_var_map sub in
+          let p_sup = TaintExp.repl_context_var taint_var_map sup in
+          Constraint.TaintSub (p_sub, p_sup)
+      ) child_taint_context  
+
   let get_slot_map_info
       (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
       (child_mem: MemType.t) : CallAnno.slot_info MemType.mem_content option =
@@ -412,6 +429,7 @@ module FuncInterface (Entry: EntryType) = struct
       (extra_single_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (child_mem: MemType.t)
       (child_context: SingleContext.t list)
+      (child_taint_context: TaintExp.sub_t list)
       (child_out_reg: RegType.t) (child_out_mem: MemType.t)
       (child_out_context: SingleContext.t list) (child_out_single_subtype_list: (IsaBasic.imm_var_id * (SingleExp.t list)) list)
       (parent_reg: RegType.t) (parent_mem: MemType.t) :
@@ -442,6 +460,7 @@ module FuncInterface (Entry: EntryType) = struct
 
     let constraint_list = 
       get_reg_taint_constraint var_map parent_reg child_reg @
+      get_callee_taint_context_constraint var_map child_taint_context @
       (* get_mem_taint_constraint var_map parent_mem child_mem @ *)
       constraint_list
     in
@@ -587,6 +606,7 @@ module FuncInterface (Entry: EntryType) = struct
       extra_single_var_map
       func_interface.in_reg func_interface.in_mem
       func_interface.in_context
+      func_interface.in_taint_context
       func_interface.out_reg func_interface.out_mem
       func_interface.out_context func_interface.out_single_subtype_list
       reg_type mem_type
@@ -619,6 +639,7 @@ module FuncInterfaceConverter = struct
       in_reg = List.map TaintEntryType.get_single_exp interface.in_reg;
       in_mem = mem_map TaintEntryType.get_single_exp interface.in_mem;
       in_context = interface.in_context;
+      in_taint_context = [];
       out_reg = List.map TaintEntryType.get_single_exp interface.out_reg;
       out_mem = mem_map TaintEntryType.get_single_exp interface.out_mem;
       out_context = interface.out_context;

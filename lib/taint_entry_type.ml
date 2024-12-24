@@ -97,13 +97,19 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let single, taint = e in
     let new_single, new_taint = new_e in
     (Entry.get_eq_taint_constraint single new_single) @
-    [ Constraint.TaintSub (taint, new_taint); Constraint.TaintSub (new_taint, taint) ]
+    (
+      if TaintExp.cmp new_taint taint = 0 then []
+      else [ Constraint.TaintSub (taint, new_taint); Constraint.TaintSub (new_taint, taint) ]
+    )
 
   let get_sub_taint_constraint (sub: t) (sup: t) : Constraint.t list =
     let sub_s, sub_t = sub in
     let sup_s, sup_t = sup in
-    (Entry.get_eq_taint_constraint sub_s sup_s) @
-    [ Constraint.TaintSub (sub_t, sup_t) ]
+    (Entry.get_sub_taint_constraint sub_s sup_s) @
+    (
+      if TaintExp.cmp sub_t sup_t = 0 then []
+      else [ Constraint.TaintSub (sub_t, sup_t) ]
+    )
 
   let get_untaint_constraint (e: t) : Constraint.t list =
     let _, taint = e in

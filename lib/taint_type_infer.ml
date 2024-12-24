@@ -34,6 +34,7 @@ module TaintTypeInfer = struct
     input_single_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
     taint_sol: TaintExp.local_var_map_t;
+    taint_context: TaintExp.sub_t list;
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
     alive: bool option;
@@ -109,6 +110,7 @@ module TaintTypeInfer = struct
       input_single_var_set = range_infer_state.input_single_var_set;
       context = range_infer_state.context;
       taint_sol = [];
+      taint_context = [];
       ret_subtype_list = range_infer_state.ret_subtype_list;
       smt_ctx = SmtEmitter.init_smt_ctx ();
       alive = None;
@@ -162,13 +164,25 @@ module TaintTypeInfer = struct
       let single, taint = taint_entry in
       sub_sol pc single, taint
     in
-    ArchType.get_func_interface
-      infer_state.smt_ctx
-      infer_state.func_name
-      infer_state.func_type
-      infer_state.context
-      infer_state.ret_subtype_list
-      sub_sol_for_taint
+    let func_interface = 
+      ArchType.get_func_interface
+        infer_state.smt_ctx
+        infer_state.func_name
+        infer_state.func_type
+        infer_state.context
+        infer_state.ret_subtype_list
+        sub_sol_for_taint
+    in
+
+    (* Note: our taint typing rules already constrain that input output mem has the same taint.
+       For the simpilicity of taint infer of other functions on calling this function,
+       we manually set its out_mem taint with its in_mem taint. *)
+    let simplified_out_mem =
+      ArchType.MemType.map2 TaintEntryType.set_taint_with_other func_interface.out_mem func_interface.in_mem
+    in
+    { func_interface with
+      in_taint_context = infer_state.taint_context;
+      out_mem = simplified_out_mem }
 
   let update_with_taint_sol
       (taint_sol: TaintExp.local_var_map_t)
@@ -190,6 +204,7 @@ module TaintTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (range_infer_state: RangeTypeInfer.t) : t =
     let state = init range_infer_state in
+    Printf.printf "Infer func %s\n" range_infer_state.func_name;
     (* Printf.printf "Before infer, func\n";
     let buf = Buffer.create 1000 in
     Isa.pp_ocaml_block_list 0 buf state.func;
@@ -214,7 +229,7 @@ module TaintTypeInfer = struct
 
     (* 2. Get unknown variable *)
     let unknown_var_set = TaintUnknownInfer.get_unknown_var_set block_subtype in
-    let unkown_sol = List.map (fun (x: TaintExp.taint_var_id) -> x, TaintExp.TaintUnknown) (TaintExp.TaintVarSet.to_list unknown_var_set) in
+    let unknown_sol = List.map (fun (x: TaintExp.taint_var_id) -> x, TaintExp.TaintUnknown) (TaintExp.TaintVarSet.to_list unknown_var_set) in
     Printf.printf "TaintUnknown list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (TaintExp.TaintVarSet.to_list unknown_var_set)));
 
     (* 2. Taint type infer *)
@@ -227,12 +242,18 @@ module TaintTypeInfer = struct
       fun acc (_, entry) -> TaintExp.TaintVarSet.union acc (TaintExp.get_var_set entry)
     ) in
     let input_var = List.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type in
-    let input_var = ArchType.MemType.fold_left merge_helper input_var input_arch.mem_type in
+    SmtEmitter.push state.smt_ctx;
+    SingleContext.add_assertions state.smt_ctx state.context;
+    let input_var = 
+      ArchType.MemType.fold_left merge_helper input_var 
+        (ArchType.MemType.merge_local_mem_quick_cmp state.smt_ctx input_arch.mem_type) 
+    in
+    SmtEmitter.pop state.smt_ctx 1;
     Printf.printf "Input var: %s\n" (TaintExp.to_string (TaintExp.TaintExp input_var));
 
-    let taint_sol = TaintSubtype.solve_subtype_list input_var subtype_list in
-    let taint_sol = taint_sol @ unkown_sol in
-    update_with_taint_sol taint_sol { state with taint_sol = taint_sol }
+    let taint_sol, taint_context = TaintSubtype.solve input_var subtype_list in
+    let taint_sol = taint_sol @ unknown_sol in
+    update_with_taint_sol taint_sol { state with taint_sol = taint_sol; taint_context = taint_context }
     (* let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
     let func = 
