@@ -295,7 +295,18 @@ module FuncInterface (Entry: EntryType) = struct
           let new_entry, new_constraints, new_useful_vars = 
             set_one_entry smt_ctx var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_entry 
           in
-          helper (new_entry :: finished_parent_entry) (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) parent_entry_tl read_hint_tl write_mem_tl
+          if is_full then
+            helper 
+              (new_entry :: finished_parent_entry) 
+              (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) 
+              parent_entry_tl 
+              read_hint_tl write_mem_tl
+          else
+            helper 
+              finished_parent_entry 
+              (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) 
+              (new_entry :: parent_entry_tl) 
+              read_hint_tl write_mem_tl
         else
           helper ((p_off, p_range, p_entry) :: finished_parent_entry) constraint_list useful_vars parent_entry_tl read_hint write_mem
       | _ -> func_interface_error "write_one_ptr_entries: unexpected case"
