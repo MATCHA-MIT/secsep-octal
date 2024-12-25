@@ -135,6 +135,8 @@ module Transform = struct
 
   type tv_ittt = TaintExp.t -> TaintExp.t
 
+  type tv_fault_t = Isa_basic.IsaBasic.label * Isa_basic.IsaBasic.label * TaintExp.taint_var_id * string
+
   let delta: int64 = -0x100000L (* -1MB *)
 
   let is_bb_transformed (bb: basic_block) : bool =
@@ -308,13 +310,13 @@ module Transform = struct
       (tv_ittt: tv_ittt)
       (tf: InstTransform.t)
       (css: callee_slot list) (* css == callee_saving_slots *)
-      : InstTransform.t * (callee_slot list) =
+      : InstTransform.t * (callee_slot list) * ((TaintExp.taint_var_id * string) list) =
     let helper_add_callee_saving_slot (l: callee_slot list) (reg: Isa.register) (offset: MemOffset.t) : callee_slot list =
       match List.find_opt (fun (r, _) -> r = reg) l with
       | Some _ -> l
       | None -> (reg, offset) :: l
     in
-    let helper_prepare_memop (operand: Isa.operand) : Isa.operand =
+    let helper_prepare_memop (operand: Isa.operand) : Isa.operand * ((TaintExp.taint_var_id * string) list) =
       (* if not ld/st, do nothing *)
       (* otherwise, return instructions for preparation and transformed operand *)
       match operand with
@@ -327,7 +329,7 @@ module Transform = struct
           let taint_anno = Option.get taint_anno in
           let taint_anno = tv_ittt taint_anno in (* mocking *)
           match get_slot_unity func_state.init_mem_unity slot_base with
-          | Unified -> operand
+          | Unified -> operand, []
           | Ununified -> begin
               match taint_anno with
               | TaintConst true -> begin
@@ -335,24 +337,26 @@ module Transform = struct
                   (* Printf.printf "transforming operand %s\n" (Isa.string_of_operand operand); *)
                   let (d', b', i', s') = add_delta_on_disp (d, b, i, s) in
                   match operand with
-                    | LdOp _ -> LdOp (d', b', i', s', w, mem_anno)
-                    | StOp _ -> StOp (d', b', i', s', w, mem_anno)
+                    | LdOp _ -> LdOp (d', b', i', s', w, mem_anno), []
+                    | StOp _ -> StOp (d', b', i', s', w, mem_anno), []
                     | _ -> transform_error "Unexpected memory operand accessing ununified memory"
                 end
-              | TaintConst false -> operand
-              | _ -> transform_error (Printf.sprintf "Unexpected taint annotation for memory operand %s accessing ununified memory" (Isa.string_of_operand operand));
+              | TaintConst false -> operand, []
+              | TaintVar v -> operand, [(v, "ld/st with variable taint")] (* soft fault *)
+              | TaintExp v_set -> operand, TaintExp.TaintVarSet.to_list v_set |> List.map (fun x -> (x, "ld/st with variable taint")) (* soft fault *)
+              | TaintUnknown -> transform_error (Printf.sprintf "ld/st encounters unknown taint status: %s" (Isa.string_of_operand operand));
             end
         end
-      | _ -> operand
+      | _ -> operand, []
     in
     let orig = tf.orig in
-    let (inst, inst_pre, inst_post, use_orig_mnemonic), css = match orig with
+    let (inst, inst_pre, inst_post, use_orig_mnemonic), css, sf = match orig with
     | BInst (bop, o1, o2, o3) -> begin
-        let o1' = helper_prepare_memop o1 in
-        let o2' = helper_prepare_memop o2 in
-        let o3' = helper_prepare_memop o3 in
+        let o1', sf1 = helper_prepare_memop o1 in
+        let o2', sf2 = helper_prepare_memop o2 in
+        let o3', sf3 = helper_prepare_memop o3 in
         let inst' = Isa.BInst (bop, o1', o2', o3') in
-        (inst', [], [], true), css
+        (inst', [], [], true), css, (sf1 @ sf2 @ sf3)
       end
     | UInst (uop, o1, o2) -> begin
         (* find potential instrucitons saving callee-saved registers *)
@@ -368,38 +372,45 @@ module Transform = struct
             css
         | _ -> css
         in
-        let o1' = helper_prepare_memop o1 in
-        let o2' = helper_prepare_memop o2 in
+        let o1', sf1 = helper_prepare_memop o1 in
+        let o2', sf2 = helper_prepare_memop o2 in
         let inst' = Isa.UInst (uop, o1', o2') in
-        (inst', [], [], true), css'
+        (inst', [], [], true), css', (sf1 @ sf2)
       end
-    | TInst _ -> transform_error "not implemented yet" (* TODO *)
+    | TInst (top, o_dst, o_srcs) ->
+        let o_dst', sf1 = helper_prepare_memop o_dst in
+        let sf2, o_srcs' = List.fold_left_map (fun acc_sf o_src ->
+          let o_src', sf = helper_prepare_memop o_src in
+          sf @ acc_sf, o_src'
+        ) [] o_srcs in
+        let inst' = Isa.TInst (top, o_dst', o_srcs') in
+        (inst', [], [], true), css, (sf1 @ sf2)
     | Xchg (o1, o2, o3, o4) -> begin
-        let o1' = helper_prepare_memop o1 in
-        let o2' = helper_prepare_memop o2 in
-        let o3' = helper_prepare_memop o3 in
-        let o4' = helper_prepare_memop o4 in
+        let o1', sf1 = helper_prepare_memop o1 in
+        let o2', sf2 = helper_prepare_memop o2 in
+        let o3', sf3 = helper_prepare_memop o3 in
+        let o4', sf4 = helper_prepare_memop o4 in
         let inst' = Isa.Xchg (o1', o2', o3', o4') in
-        (inst', [], [], true), css
+        (inst', [], [], true), css, (sf1 @ sf2 @ sf3 @ sf4)
       end
     | Cmp (o1, o2) -> begin
-        let o1' = helper_prepare_memop o1 in
-        let o2' = helper_prepare_memop o2 in
+        let o1', sf1 = helper_prepare_memop o1 in
+        let o2', sf2 = helper_prepare_memop o2 in
         let inst' = Isa.Cmp (o1', o2') in
-        (inst', [], [], true), css
+        (inst', [], [], true), css, (sf1 @ sf2)
       end
     | Test (o1, o2) -> begin
-        let o1' = helper_prepare_memop o1 in
-        let o2' = helper_prepare_memop o2 in
+        let o1', sf1 = helper_prepare_memop o1 in
+        let o2', sf2 = helper_prepare_memop o2 in
         let inst' = Isa.Test (o1', o2') in
-        (inst', [], [], true), css
+        (inst', [], [], true), css, (sf1 @ sf2)
       end
     | Jmp _
     | Jcond _
     | Nop
     | Syscall
     | Annotation _
-    | Hlt -> (orig, [], [], true), css
+    | Hlt -> (orig, [], [], true), css, []
     | Push (o, mem_anno)
     | Pop (o, mem_anno) -> begin
         let slot_anno, taint_anno = mem_anno in
@@ -414,20 +425,21 @@ module Transform = struct
           transform_error "Push/Pop not accessing full slot";
         let taint_anno = Option.get taint_anno in
         let taint_anno = tv_ittt taint_anno in (* mocking *)
-        let offset_as_disp = match taint_anno with
-        | TaintConst true -> Some (Isa.ImmNum delta)
-        | TaintConst false -> None
-        | TaintVar x ->
-          transform_error (Printf.sprintf "func=%s, taint_var=%d: TaintVar not expected for Push/Pop simulation: " func_state.func_name x)
-        | _ -> transform_error "Unexpected taint annotation for Push/Pop simulation"
+        let offset_as_disp, sf1 = match taint_anno with
+        | TaintConst true -> Some (Isa.ImmNum delta), []
+        | TaintConst false -> None, []
+        | TaintVar v -> None, [(v, "push/pop with variable taint")] (* soft fault *)
+        | TaintExp v_set -> None, TaintExp.TaintVarSet.to_list v_set |> List.map (fun x -> (x, "ld/st with variable taint")) (* soft fault *)
+        | TaintUnknown -> transform_error (Printf.sprintf "push/pop encounters unknown taint status: %s" (Isa.string_of_instruction orig));
         in
-        let o' = helper_prepare_memop o in
+        let o', sf2 = helper_prepare_memop o in
         let o_size = match o' with
         | RegOp reg -> Isa.get_reg_size reg
         | LdOp (_, _, _, _, w, _)
         | StOp (_, _, _, _, w, _) -> w
         | _ -> transform_error "Operand not supported for Push/Pop simulation"
         in
+        let sf = sf1 @ sf2 in
         match orig with
         | Push _ ->
           let inst_rsp_sub = Isa.make_inst_add_i_r (Int64.neg o_size) Isa.RSP in
@@ -438,21 +450,21 @@ module Transform = struct
           else
             css
           in
-          (inst_st, [inst_rsp_sub], [], false), css'
+          (inst_st, [inst_rsp_sub], [], false), css', sf
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
-          (inst_ld, [], [inst_rsp_add], false), css
+          (inst_ld, [], [inst_rsp_add], false), css, sf
         | _ -> transform_error "Expecting only Push/Pop here"
       end
-    | Call _ -> (orig, [], [], true), css (* handled in another pass *)
+    | Call _ -> (orig, [], [], true), css, [] (* handled in another pass *)
     | RepMovs _ -> transform_error "RepMovs unimplemented"
     | RepLods _ -> transform_error "RepLods unimplemented"
     | RepStos _ -> transform_error "RepStos unimplemented"
     (* | RepStosq -> transform_error "RepStosq unimplemented"
     | RepMovsq -> transform_error "RepStosq unimplemented" *)
     in
-    (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css
+    (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css, sf
 
   let get_child_slot_taint
       (child_fi_in_mem: FuncInterface.MemType.t)
@@ -567,10 +579,11 @@ module Transform = struct
       (tv_ittt: tv_ittt)
       (func_interfaces: FuncInterface.t list)
       (bb: basic_block)
-      : basic_block =
-    let insts' = List.fold_left (
-      fun (acc_tf: InstTransform.t list) (* processed insts (all previous inst), reversed *)
+      : basic_block * (tv_fault_t list) =
+    let insts', sf = List.fold_left (
+      fun (acc: (InstTransform.t list) * (tv_fault_t list)) (* processed insts (all previous inst), reversed *)
           (tf: InstTransform.t) (* current inst *) ->
+        let acc_tf, acc_sf = acc in
         match tf.orig with
         | Call (child_label, anno) -> begin
             let child_fi = FuncInterface.find_fi func_interfaces child_label |> Option.get in
@@ -605,16 +618,17 @@ module Transform = struct
             ) ([], bases_to_change) acc_tf
             in
             (* deal with all BaseAsSlot stuff here *)
-            let inst_pre, inst_post = List.fold_left (
-              fun (acc: (Isa.instruction list * Isa.instruction list)) (base_info: CallAnno.base_info) ->
-                let acc_inst_pre, acc_inst_post = acc in
+            let inst_pre, inst_post, sf = List.fold_left (
+              fun (acc: (Isa.instruction list * Isa.instruction list * tv_fault_t list)) (base_info: CallAnno.base_info) ->
+                let acc_inst_pre, acc_inst_post, acc_sf = acc in
                 match base_info with
                 | BaseAsReg reg ->
                   if Isa.is_reg_callee_saved reg then
                     transform_error "trying to temporarily transform a callee saved register, unexpceted";
                   (
                     (Isa.make_inst_add_i_r delta reg) :: acc_inst_pre,
-                    acc_inst_post (* no need to restore, since the register is caller saved *)
+                    acc_inst_post (* no need to restore, since the register is caller saved *),
+                    acc_sf
                   )
                 | BaseAsSlot (ch_base, ch_base_off) ->
                   (* where it is in child's memory slot *)
@@ -644,21 +658,24 @@ module Transform = struct
                     (Some (Isa.ImmBExp (Isa.ImmLabel pa_base, Isa.ImmNum off_of_base)), None, None, None)
                   in
                   (* get the memory operand of the slot to be changed *)
-                  let mem_op = match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
+                  let mem_op, sf = match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
                   | TaintConst true -> begin
                       transform_error "we assert the base is untainted";
                       (* let d, b, i, s = mem_op in     *)
                       (* add_delta_on_disp (d, b, i, s) *)
                     end
-                  | TaintConst false -> mem_op
-                  | _ -> transform_error "Unexpected taint annotation for BaseAsSlot"
+                  | TaintConst false -> mem_op, []
+                  | TaintVar v -> mem_op, [(func_state.func_name, bb.label, v, "call finds child's slot has variable taint")] (* soft fault *)
+                  | TaintExp v_set -> mem_op, v_set |> TaintExp.TaintVarSet.to_list |> List.map (fun v -> func_state.func_name, bb.label, v, "call finds child's slot has variable taint") (* soft fault *)
+                  | TaintUnknown -> transform_error "Unexpected unknown taint annotation for BaseAsSlot"
                   in
                   (
                     (Isa.make_inst_add_i_m64 delta mem_op) :: acc_inst_pre,
-                    (Isa.make_inst_add_i_m64 (Int64.neg delta) mem_op) :: acc_inst_post
+                    (Isa.make_inst_add_i_m64 (Int64.neg delta) mem_op) :: acc_inst_post,
+                    sf @ acc_sf
                   )
                 | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
-            ) ([], []) bases_to_change in
+            ) ([], [], []) bases_to_change in
             (* save/restore active callee-saved registers in caller's scope *)
             let (curr_rsp, curr_rsp_taint) = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
             let curr_rsp_taint = tv_ittt curr_rsp_taint in (* mocking *)
@@ -679,12 +696,11 @@ module Transform = struct
             let inst_post = inst_post @ restores in
             (* transformation done *)
             let tf = InstTransform.assign tf tf.orig inst_pre inst_post true in
-            tf :: (List.rev new_prev_tfs)
+            tf :: (List.rev new_prev_tfs), sf @ acc_sf
           end
-        | _ -> tf :: acc_tf
-    ) [] bb.insts |> List.rev
-    in
-    { bb with insts = insts' }
+        | _ -> tf :: acc_tf, acc_sf
+    ) ([], []) bb.insts in
+    { bb with insts = List.rev insts' }, sf
 
   let pp_ocaml_block_list (lvl: int) (buf: Buffer.t) (block_list: basic_block list) =
     PP.bprint_lvl lvl buf "[\n";
@@ -719,15 +735,16 @@ module Transform = struct
       (tv_ittt: tv_ittt)
       (bb: basic_block)
       (css: callee_slot list)
-      : basic_block * (callee_slot list) =
-    let new_insts, css', _ = List.fold_left (
-      fun (acc: (InstTransform.t list) * (callee_slot list) * int) (trans: InstTransform.t) ->
-        let acc_insts, acc_css, left = acc in
+      : basic_block * (callee_slot list) * (tv_fault_t list) =
+    let new_insts, css', sf, _ = List.fold_left (
+      fun (acc: (InstTransform.t list) * (callee_slot list) * (tv_fault_t list) * int) (trans: InstTransform.t) ->
+        let acc_insts, acc_css, acc_sf, left = acc in
         if left = 0 then acc else (* skip dead instructions *)
-        let tf, css = transform_instruction func_state tv_ittt trans acc_css in
-        tf :: acc_insts, css, left - 1
-    ) ([], css, bb.alive_inst_cnt) bb.insts in
-    { bb with insts = List.rev new_insts }, css'
+        let tf, css, sf = transform_instruction func_state tv_ittt trans acc_css in
+        let sf = List.map (fun (v, reason) -> func_state.func_name, bb.label, v, reason) sf in
+        tf :: acc_insts, css, sf @ acc_sf, left - 1
+    ) ([], css, [], bb.alive_inst_cnt) bb.insts in
+    { bb with insts = List.rev new_insts }, css', sf
 
   (* Step 2 *)
   let get_func_init_mem_unity (ti_state: TaintTypeInfer.t) : mem_unity_t =
@@ -804,7 +821,7 @@ module Transform = struct
       (fi_list: FuncInterface.t list)
       (ti_state: TaintTypeInfer.t)
       (init_mem_unity: mem_unity_t)
-      : func_state =
+      : func_state * (tv_fault_t list) =
     let func_state = init_func_state ti_state init_mem_unity in
 
     (* mocking tv ittt *)
@@ -813,12 +830,12 @@ module Transform = struct
     let tv_ittt = taint_var_ittt ittt_map in
 
     (* basic pass *)
-    let bbs, css = List.fold_left (
+    let bbs, css, sf1 = List.fold_left (
       fun acc (bb: basic_block) ->
-        let acc_bbs, acc_css = acc in
-        let bb', css = transform_basic_block_basic func_state tv_ittt bb acc_css in
-        bb' :: acc_bbs, css
-    ) ([], []) func_state.bbs in
+        let acc_bbs, acc_css, acc_sf = acc in
+        let bb', css, sf = transform_basic_block_basic func_state tv_ittt bb acc_css in
+        bb' :: acc_bbs, css, sf @ acc_sf
+    ) ([], [], []) func_state.bbs in
     let func_state = {
       func_state with
       bbs = List.rev bbs;
@@ -827,9 +844,11 @@ module Transform = struct
     in
 
     (* call handling pass *)
-    let bbs = List.map (
-      fun bb -> transform_basic_block_calls func_state tv_ittt fi_list bb
-    ) func_state.bbs in
+    let sf2, bbs = List.fold_left_map (
+      fun acc_sf bb ->
+        let bb', sf = transform_basic_block_calls func_state tv_ittt fi_list bb in
+        sf @ acc_sf, bb'
+    ) [] func_state.bbs in
     let func_state = {
       func_state with
       bbs = bbs;
@@ -848,8 +867,17 @@ module Transform = struct
     in
     *)
 
+    let sf = sf1 @ sf2 |> List.sort_uniq (fun info1 info2 ->
+      let f1, b1, v1, r1 = info1 in
+      let f2, b2, v2, r2 = info2 in
+      if not (String.equal f1 f2) then String.compare f1 f2 else
+      if not (String.equal b1 b2) then String.compare b1 b2 else
+      if v1 != v2 then Int.compare v1 v2 else
+      String.compare r1 r2
+    ) in
+
     pp_func_state func_state;
-    func_state
+    func_state, sf
 
   (* was use to call transformation on single function benchmark
   let transform_functions

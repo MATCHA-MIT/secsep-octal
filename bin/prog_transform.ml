@@ -29,10 +29,23 @@ let () =
       None
   ) taint_infer_result_states in
 
-  (* print into output_name *)
-  let oc = open_out !output_name in
-  Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
-  ()
+  let soft_faults, tf_func_states = List.fold_left_map (fun acc data ->
+    let func_tf, sf = data in
+    sf @ acc, func_tf
+  ) [] tf_func_states in
+
+  if List.length soft_faults > 0 then begin
+    Printf.printf "Transformation failed, taint variables require instantiation:\n";
+    List.iter (fun (soft_fault: Transform.Transform.tv_fault_t) ->
+      let f, b, v, r = soft_fault in
+      Printf.printf "\tF=%-30s B=%-30s TaintVar %-10d %s\n" f b v r;
+    ) soft_faults;
+    raise Exit;
+  end else begin
+    (* print into output_name *)
+    let oc = open_out !output_name in
+    Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
+  end
 
   (* in
   Taint_type_infer.TaintTypeInfer.state_list_to_file (get_related_filename !program_name "out" "taint_infer") range_infer_result *)
