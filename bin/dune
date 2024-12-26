@@ -10,6 +10,7 @@
   infer_taint
   instantiate_taint
   prog_transform
+  gen_csvt_taint_api
   )
  (names 
   main 
@@ -22,5 +23,6 @@
   infer_taint
   instantiate_taint
   prog_transform
+  gen_csvt_taint_api
   )
  (libraries core type))
