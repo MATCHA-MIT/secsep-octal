@@ -716,7 +716,7 @@ module SingleTypeInfer = struct
         in
         Printf.printf "\n\n%s: Infer iter %d after update dead_pc%!\n\n" func_name curr_iter;
 
-        (* 6. Add extra ret invariance (after resolve everything) *)
+        (* 7. Add extra ret invariance (after resolve everything) *)
         let func_type, ret_subtype_list =
           let sub_range_func = 
             SingleSubtype.sub_sol_single_to_range 
@@ -733,7 +733,7 @@ module SingleTypeInfer = struct
 
         let state = { state with func_type = func_type; ret_subtype_list = ret_subtype_list } in
 
-        (* 7. Single type infer *)
+        (* 8. Single type infer *)
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
