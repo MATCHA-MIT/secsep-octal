@@ -32,6 +32,7 @@ module InstTransform = struct
     (* extra info *)
     changed: bool;
     use_orig_mne: bool; (* when output, whether to use t.mnemonic as mnemonic or let t.inst to decide *)
+    failed: bool;
   }
 
   let init (orig: Isa.instruction) (mnemonic: string) (orig_asm: string option) : t =
@@ -44,6 +45,7 @@ module InstTransform = struct
       inst_post = [];
       changed = false;
       use_orig_mne = true;
+      failed = false;
     }
 
   (* make sure to set values through this function, so that extra info can be updated *)
@@ -61,6 +63,18 @@ module InstTransform = struct
       inst_post = inst_post;
       changed = changed;
       use_orig_mne = use_orig_mne;
+    }
+
+  let set_failed (t: t) : t =
+    Printf.printf "transformation on inst failed: %s\n" (Isa.string_of_instruction t.orig);
+    {
+      t with
+      inst = t.orig;
+      inst_pre = [];
+      inst_post = [];
+      changed = false;
+      use_orig_mne = true;
+      failed = true;
     }
 
   let get_res_rev (t: t) : Isa.instruction list =
@@ -695,7 +709,10 @@ module Transform = struct
             let inst_pre = saves @ inst_pre in
             let inst_post = inst_post @ restores in
             (* transformation done *)
-            let tf = InstTransform.assign tf tf.orig inst_pre inst_post true in
+            let tf =
+              if List.length sf > 0 then InstTransform.set_failed tf
+              else InstTransform.assign tf tf.orig inst_pre inst_post true
+            in
             tf :: (List.rev new_prev_tfs), sf @ acc_sf
           end
         | _ -> tf :: acc_tf, acc_sf
@@ -739,9 +756,14 @@ module Transform = struct
     let new_insts, css', sf, _ = List.fold_left (
       fun (acc: (InstTransform.t list) * (callee_slot list) * (tv_fault_t list) * int) (trans: InstTransform.t) ->
         let acc_insts, acc_css, acc_sf, left = acc in
+
         if left = 0 then acc else (* skip dead instructions *)
+
         let tf, css, sf = transform_instruction func_state tv_ittt trans acc_css in
+
         let sf = List.map (fun (v, reason) -> func_state.func_name, bb.label, v, reason) sf in
+        let tf = if List.length sf > 0 then InstTransform.set_failed tf else tf in
+
         tf :: acc_insts, css, sf @ acc_sf, left - 1
     ) ([], css, [], bb.alive_inst_cnt) bb.insts in
     { bb with insts = List.rev new_insts }, css', sf

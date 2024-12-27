@@ -73,7 +73,7 @@ module AsmGen = struct
     else if is_src_same_as_dst dst src2 then
       Printf.sprintf "%s, %s" (str_of_operand' src1) (str_of_operand' dst)
     else
-      asm_gen_error "str_of_binst_operands: dst is not the same as src1 or src2" (* may have 3 distinct operands? *)
+      Printf.sprintf "%s, %s, %s" (str_of_operand' src1) (str_of_operand' src2) (str_of_operand' dst)
 
   let str_of_uinst_operands (ctx: context) (_: Isa.uop) (dst: Isa.operand) (src: Isa.operand) : string =
     Printf.sprintf "%s, %s" (str_of_operand ctx src) (str_of_operand ctx dst)
@@ -141,6 +141,8 @@ module AsmGen = struct
         ) lines it.inst_post in
         let lines = "" :: lines in
         (true, lines)
+      else if it.failed then
+        (false, [""; "#   " ^ orig_asm; ""])
       else
         (false, ["\t" ^ orig_asm])
 

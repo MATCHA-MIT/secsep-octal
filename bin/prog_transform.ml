@@ -39,13 +39,12 @@ let () =
     List.iter (fun (soft_fault: Transform.Transform.tv_fault_t) ->
       let f, b, v, r = soft_fault in
       Printf.printf "\tF=%-30s B=%-30s TaintVar %-10d %s\n" f b v r;
-    ) soft_faults;
-    raise Exit;
-  end else begin
-    (* print into output_name *)
-    let oc = open_out !output_name in
-    Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
-  end
+    ) soft_faults
+  end;
+
+  (* print into output_name *)
+  let oc = open_out !output_name in
+  Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
 
   (* in
   Taint_type_infer.TaintTypeInfer.state_list_to_file (get_related_filename !program_name "out" "taint_infer") range_infer_result *)
