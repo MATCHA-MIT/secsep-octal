@@ -116,6 +116,8 @@ include SingleExp
     | Shrd -> SingleTop |> set_flag_helper
     | Pshufd | Pshuflw | Pshufhw -> SingleTop, flags
 
+  let get_taint_exp (_: t) : TaintExp.t option = None
+
   let get_single_taint_exp (_: t) : t * TaintExp.t =
     single_exp_error "Cannot get single taint exp on a single entry type"
 

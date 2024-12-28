@@ -259,6 +259,31 @@ module TaintInstantiate = struct
         (func_name, (gen_instance_map acc instantiate_set call_site_list)) :: acc
     ) [] (List.rev call_site_map)
 
+  let further_instantiate_instance_map
+      (fi_list: FuncInterface.t list)
+      (instance_map_list: instance_map_t) : instance_map_t =
+    List.map (
+      fun (entry: Isa.label * TaintExp.local_var_map_t) ->
+        let label, instance_map = entry in
+        match List.find_opt (fun (fi: FuncInterface.t) -> fi.func_name = label) fi_list with
+        | None -> entry
+        | Some fi ->
+          let can_be_taint_set = FuncInterface.get_var_can_be_taint fi in
+          let known_var_set =
+            List.fold_left (
+              fun (acc: TaintExp.TaintVarSet.t) (entry: TaintExp.taint_var_id * 'a) ->
+                TaintExp.TaintVarSet.add (fst entry) acc
+            ) TaintExp.TaintVarSet.empty instance_map
+          in
+          let new_taint_var_set = TaintExp.TaintVarSet.diff can_be_taint_set known_var_set in
+          Printf.printf "further_instantiate_instance_map: %s extra taint var\n%s\n" label (Sexplib.Sexp.to_string_hum (TaintExp.TaintVarSet.sexp_of_t new_taint_var_set));
+          label,
+          List.fold_left (
+            fun (instance_map: TaintExp.local_var_map_t) (taint_var_id: TaintExp.taint_var_id) ->
+              TaintExp.add_local_var instance_map (TaintVar taint_var_id) (TaintConst true)
+          ) instance_map (TaintExp.TaintVarSet.to_list new_taint_var_set)
+    ) instance_map_list
+
   let update_all
       (instance_map_list: instance_map_t)
       (infer_state_list: TaintTypeInfer.t list) :
@@ -336,9 +361,9 @@ module TaintInstantiate = struct
     Printf.printf "\n";
 
     let instance_map_list = get_all_instance_map call_site_map in
-    Printf.printf "\ninstance_map_list=\n";
-    Sexp.output_hum stdout (sexp_of_instance_map_t instance_map_list);
-    Printf.printf "\n";
+    Printf.printf "\ninstance_map_list=\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_instance_map_t instance_map_list));
+    let instance_map_list = further_instantiate_instance_map func_interface_list instance_map_list in
+    Printf.printf "after further_instantiate_instance_map instance_map_list=\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_instance_map_t instance_map_list));
 
     let fi_list, tti_list = update_all instance_map_list infer_state_list in
 

@@ -636,6 +636,56 @@ module FuncInterface (Entry: EntryType) = struct
   let find_fi (fi_list: t list) (l: IsaBasic.label) : t option =
     List.find_opt (fun fi -> fi.func_name = l) fi_list
 
+  let get_var_can_be_taint (fi: t) : TaintExp.TaintVarSet.t =
+    (* This function find taint var that can be instantiated as TaintConst true,
+       while does not affect the caller's taint infer result *)
+    let get_taint_var_helper (acc: TaintExp.TaintVarSet.t) (entry: entry_t) : TaintExp.TaintVarSet.t =
+      match Entry.get_taint_exp entry with
+      | Some taint -> TaintExp.TaintVarSet.union (TaintExp.get_var_set taint) acc
+      | _ -> acc
+    in
+    let cannot_change_var_set = List.fold_left get_taint_var_helper TaintExp.TaintVarSet.empty fi.out_reg in
+    let cannot_change_var_set = MemType.fold_left get_taint_var_helper cannot_change_var_set fi.in_mem in
+    let cannot_change_var_set = MemType.fold_left get_taint_var_helper cannot_change_var_set fi.out_mem in
+    let cannot_change_var_set = 
+      List.fold_left (
+        fun acc (x, y) ->
+          TaintExp.TaintVarSet.union (TaintExp.TaintVarSet.union (TaintExp.get_var_set x) (TaintExp.get_var_set y)) acc
+      ) cannot_change_var_set fi.in_taint_context
+    in
+    let helper
+        (acc: TaintExp.TaintVarSet.t * TaintExp.TaintVarSet.t * int)
+        (entry: entry_t) : TaintExp.TaintVarSet.t * TaintExp.TaintVarSet.t * int =
+      let cannot_change_var_set, can_taint_var_set, reg_idx = acc in
+      match Entry.get_taint_exp entry with
+      | None -> cannot_change_var_set, can_taint_var_set, reg_idx + 1
+      | Some (TaintVar v) ->
+        if TaintExp.TaintVarSet.mem v cannot_change_var_set then
+          cannot_change_var_set, can_taint_var_set, reg_idx + 1
+        else if TaintExp.TaintVarSet.mem v can_taint_var_set then
+          TaintExp.TaintVarSet.add v cannot_change_var_set,
+          TaintExp.TaintVarSet.remove v can_taint_var_set,
+          reg_idx + 1
+        else if IsaBasic.is_reg_idx_callee_saved reg_idx then
+          TaintExp.TaintVarSet.add v cannot_change_var_set,
+          can_taint_var_set,
+          reg_idx + 1
+        else
+          cannot_change_var_set,
+          TaintExp.TaintVarSet.add v can_taint_var_set,
+          reg_idx + 1
+      | Some taint ->
+        let var_set = TaintExp.get_var_set taint in
+        TaintExp.TaintVarSet.union cannot_change_var_set var_set,
+        TaintExp.TaintVarSet.diff can_taint_var_set var_set,
+        reg_idx + 1
+    in
+    let _, can_taint_var_set, total_reg_num = List.fold_left helper (cannot_change_var_set, TaintExp.TaintVarSet.empty, 0) fi.in_reg in
+    if total_reg_num <> IsaBasic.total_reg_num then
+      func_interface_error "get_var_can_be_taint: total reg num is incorrect, callee judgement might be wrong"
+    else
+      can_taint_var_set
+
 end
 
 module FuncInterfaceConverter = struct

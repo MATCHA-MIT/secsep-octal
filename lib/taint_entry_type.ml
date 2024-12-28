@@ -188,6 +188,9 @@ module TaintBaseEntryType (Entry: EntryType) = struct
   let get_single_exp (e: t) : SingleExp.t =
     let single, _ = e in Entry.get_single_exp single
 
+  let get_taint_exp (e: t) : TaintExp.t option =
+    let _, taint = e in Some taint
+
   let get_single_taint_exp (e: t) : SingleExp.t * TaintExp.t =
     let single, taint = e in Entry.get_single_exp single, taint
 

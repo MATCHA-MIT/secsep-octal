@@ -51,6 +51,7 @@ module type EntryType = sig
   val exe_top_inst: IsaBasic.top -> t list -> flag_t -> t * flag_t
 
   val get_single_exp: t -> SingleExp.t (* Used for get address, must be 8-byte dep type *)
+  val get_taint_exp: t -> TaintExp.t option
   val get_single_taint_exp: t -> (SingleExp.t * TaintExp.t)
   val set_taint_with_other: t -> t -> t
   val get_single_var_map: local_var_map_t -> SingleExp.local_var_map_t
