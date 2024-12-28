@@ -66,8 +66,11 @@ module AsmGen = struct
     let _, _, _ = ctx, dst, oprs in
     asm_gen_error "str_of_tinst_operands: not implemented"
 
-  let str_of_binst_operands (ctx: context) (_: Isa.bop) (dst: Isa.operand) (src2: Isa.operand) (src1: Isa.operand) : string =
+  let str_of_binst_operands (ctx: context) (bop: Isa.bop) (dst: Isa.operand) (src2: Isa.operand) (src1: Isa.operand) : string =
     let str_of_operand' = str_of_operand ctx in
+    if bop = Isa.Mul then begin
+      Printf.sprintf "%s" (str_of_operand' src1)
+    end else
     if is_src_same_as_dst dst src1 then
       Printf.sprintf "%s, %s" (str_of_operand' src2) (str_of_operand' dst)
     else if is_src_same_as_dst dst src2 then

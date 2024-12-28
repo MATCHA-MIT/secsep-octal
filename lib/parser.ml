@@ -524,6 +524,22 @@ module Parser = struct
     (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
     parse_tokens imm_var_map tokens
 
+  let rec find_comment_start (line: string) : int option =
+    let res = match String.rindex_opt line '#', String.rindex_opt line '"' with
+    | Some x, Some y ->
+      if x < y then None else Some x
+    | None, Some _ -> None
+    | Some x, None -> Some x
+    | None, None -> None
+    in
+    match res with
+    | None -> None
+    | Some x -> begin
+      match find_comment_start (String.sub line 0 x) with
+      | None -> Some x
+      | Some z -> Some z
+      end
+
   let parse_basic_block (info: (Isa.imm_var_map * (Isa.label option) * (IsaBasic.imm_var_id list))) (lines: string list)
   : (Isa.imm_var_map * (Isa.label option) * (IsaBasic.imm_var_id list)) * Isa.basic_block =
     let imm_var_map, func, symbols = info in
@@ -565,7 +581,7 @@ module Parser = struct
 
     List.filter_map (fun (line: string) ->
       (* get rid of comments *)
-      let line = match String.index_opt line '#' with
+      let line = match find_comment_start line with
       | Some pos -> String.sub line 0 pos
       | None -> line
       in
