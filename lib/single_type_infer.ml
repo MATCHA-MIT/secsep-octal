@@ -4,6 +4,7 @@ open Single_exp
 open Single_entry_type
 open Mem_offset_new
 (* open Range_exp *)
+open Stack_spill_info
 open Cond_type_new
 open Single_context
 open Constraint
@@ -35,6 +36,7 @@ module SingleTypeInfer = struct
     func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
+    stack_spill_info: StackSpillInfo.t;
     alive_blocks: StringSet.t;
     single_subtype: SingleSubtype.t;
     block_subtype: ArchType.block_subtype_t list; (* Tmp field: gen pipeline output for fast test. *)
@@ -184,6 +186,7 @@ module SingleTypeInfer = struct
       (prog: Isa.prog)
       (func_name: string)
       (func_mem_interface: ArchType.MemType.t)
+      (stack_spill_info: StackSpillInfo.t)
       (func_interface_list: FuncInterface.t list) : t =
     let func_body = (Isa.get_func prog func_name).body in
     let func_mem_interface = fix_func_mem_interface func_name func_body func_mem_interface in
@@ -242,6 +245,7 @@ module SingleTypeInfer = struct
       func_name = func_name;
       func = func_body;
       func_type = arch_type_list;
+      stack_spill_info = stack_spill_info;
       alive_blocks = StringSet.of_list (List.map (fun (x: ArchType.t) -> x.label) arch_type_list);
       single_subtype = [];
       block_subtype = [];
@@ -296,6 +300,7 @@ module SingleTypeInfer = struct
         ArchType.type_prop_block infer_state.smt_ctx 
           sub_sol_func sub_sol_list_func
           (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_subtype infer_state.input_var_set)  *)
+          (StackSpillInfo.is_spill infer_state.stack_spill_info)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)
@@ -571,9 +576,10 @@ module SingleTypeInfer = struct
       (func_interface_list: FuncInterface.t list)
       (func_name: Isa.label)
       (func_mem_interface: ArchType.MemType.t)
+      (stack_spill_info: StackSpillInfo.t)
       (iter: int)
       (solver_iter: int) : t =
-    let init_infer_state = init prog func_name func_mem_interface func_interface_list in
+    let init_infer_state = init prog func_name func_mem_interface stack_spill_info func_interface_list in
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
@@ -818,25 +824,25 @@ module SingleTypeInfer = struct
     PP.bprint_lvl lvl buf "]\n"
 
   let filter_func_interface
-      (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
-      (func_name_list: Isa.label list) : (Isa.label * ArchType.MemType.t) list =
+      (func_mem_interface_list: Base_func_interface.t)
+      (func_name_list: Isa.label list) : Base_func_interface.t =
     let func_name_set = StringSet.of_list func_name_list in
     List.filter (
-      fun (x, _) -> StringSet.mem x func_name_set
+      fun (x, _, _) -> StringSet.mem x func_name_set
     ) func_mem_interface_list
 
   let infer
       (prog: Isa.prog)
-      (func_mem_interface_list: (Isa.label * ArchType.MemType.t) list)
+      (func_mem_interface_list: Base_func_interface.t)
       (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
       (global_symbol_layout: External_layouts.GlobalSymbolLayout.t)
       (iter: int)
       (solver_iter: int) : t list =
     let helper 
-        (acc: FuncInterface.t list) (entry: Isa.label * ArchType.MemType.t) :
+        (acc: FuncInterface.t list) (entry: Base_func_interface.entry_t) :
         (FuncInterface.t list) * t =
-      let func_name, func_mem_interface = entry in
-      let infer_state = infer_one_func prog acc func_name func_mem_interface iter solver_iter in
+      let func_name, func_mem_interface, stack_spill_info = entry in
+      let infer_state = infer_one_func prog acc func_name func_mem_interface stack_spill_info iter solver_iter in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;
       pp_func_type 0 infer_state;
@@ -849,27 +855,32 @@ module SingleTypeInfer = struct
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    (* let func_mem_interface_list = 
+    let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
+        "ge_p3_tobytes";
+        "fe_tobytes";
         "fe_mul_impl";
+        "fe_mul_impl_self2";
+        "fe_mul_ttt_self1";
+        (* "fe_mul_impl";
         "table_select";
         "ge_madd";
         "ge_p2_dbl";
         "x25519_ge_p1p1_to_p3";
         "x25519_ge_p1p1_to_p2";
-        "x25519_ge_scalarmult_base";
+        "x25519_ge_scalarmult_base"; *)
       ] 
-    in *)
+    in
 
     let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
-      let label, _ = interface in
+      let label, _, _ = interface in
       let func = List.find (fun (f: Parser.Parser.Isa.func) -> String.equal f.name label) prog.funcs in
       Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsymbols global_symbol_layout
     ) func_mem_interface_list
     in
 
     Printf.printf "%d\n" (List.length func_mem_interface_list);
-    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map snd func_mem_interface_list)));
+    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map (fun (_, x, _) -> x) func_mem_interface_list)));
 
     let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
     (* let buf = Buffer.create 1000 in

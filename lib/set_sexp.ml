@@ -8,7 +8,8 @@ include Set.Make(Int)
 
   let sexp_of_t (s: t) : Sexp.t = 
     sexp_of_list sexp_of_int (elements s)
-  end
+
+end
 
 module StringSet = struct
 include Set.Make(String)
@@ -17,4 +18,23 @@ include Set.Make(String)
 
   let sexp_of_t (s: t) : Sexp.t = 
     sexp_of_list sexp_of_string (elements s)
+
+end
+
+module Int64PairSet = struct
+include Set.Make(
+  struct
+    let compare = compare
+    type t = int64 * int64
   end
+)
+  type entry_t = int64 * int64
+  [@@deriving sexp]
+
+  let t_of_sexp (s_exp: Sexp.t) : t = 
+    of_list (list_of_sexp entry_t_of_sexp s_exp)
+
+  let sexp_of_t (s: t) : Sexp.t = 
+    sexp_of_list sexp_of_entry_t (elements s)
+
+end

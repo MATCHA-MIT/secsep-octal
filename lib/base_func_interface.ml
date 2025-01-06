@@ -1,28 +1,40 @@
 open Isa_basic
 open External_layouts
+open Stack_spill_info
 open Single_subtype
 open Sexplib.Std
 
 exception BaseFuncInterfaceError of string
 let base_func_interface_error msg = raise (BaseFuncInterfaceError ("[Base Func Interface Error] " ^ msg))
 
-type entry_t = IsaBasic.label * SingleSubtype.ArchType.MemType.t
+type entry_t = IsaBasic.label * SingleSubtype.ArchType.MemType.t * StackSpillInfo.t
 [@@deriving sexp]
 
 type t = entry_t list
 [@@deriving sexp]
 
+type mem_entry_t = IsaBasic.label * SingleSubtype.ArchType.MemType.t
+[@@deriving sexp]
+
+type mem_t = mem_entry_t list
+[@@deriving sexp]
+
+let parse_mem (source: string) : mem_t =
+  let open Sexplib in
+  mem_t_of_sexp (Sexp.of_string source)
+
 let parse (source: string) : t =
   let open Sexplib in
   t_of_sexp (Sexp.of_string source)
 
-let add_stack_layout (interface: t) (stack_layout: StackLayout.t) : t =
+let add_stack_layout (interface: mem_t) (stack_layout: StackLayout.t) : t =
   List.map (
-    fun (one_func: entry_t) ->
+    fun (one_func: mem_entry_t) ->
       let label1, mem = one_func in
       let one_stack = List.find (fun one_stack -> String.equal (fst one_stack) label1) stack_layout in
-      let _, stack = one_stack in
-      label1, (IsaBasic.get_reg_idx IsaBasic.RSP, stack) :: mem
+      let _, stack_spill_info = one_stack in
+      let stack, spill_info = StackLayout.split_layout stack_spill_info in
+      label1, (IsaBasic.get_reg_idx IsaBasic.RSP, stack) :: mem, StackSpillInfo.init spill_info
   ) interface
 
 let add_global_symbol_layout
@@ -31,7 +43,7 @@ let add_global_symbol_layout
     (used_symbols: IsaBasic.label list)
     (global_symbol_layout: GlobalSymbolLayout.t)
     : entry_t =
-  let func_label, func_mem = func_interface in
+  let func_label, func_mem, func_spill_info = func_interface in
   let symbol_layouts = List.map (fun symbol ->
     let var_id = IsaBasic.StrM.find symbol imm_var_map in
     let layout = List.find_map (fun layout ->
@@ -51,7 +63,7 @@ let add_global_symbol_layout
     ) slots in
     var_id, slots
   ) used_symbols in
-  func_label, (func_mem @ symbol_layouts)
+  func_label, (func_mem @ symbol_layouts), func_spill_info
 
 let add_global_symbol_taint
     (func_label: IsaBasic.label)

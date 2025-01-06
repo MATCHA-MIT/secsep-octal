@@ -18,7 +18,7 @@ let standalone_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
   "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], (SingleTop, TaintConst true)) ];
 ]
 
-let standalone_salsa20 : Base_func_interface.t = [
+let standalone_salsa20 : Base_func_interface.mem_t = [
   "salsa20_words", [
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
@@ -49,7 +49,7 @@ let standalone_salsa20_noinline_global : External_layouts.GlobalSymbolLayout.t =
   "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], (SingleTop, TaintConst true)) ];
 ]
 
-let standalone_salsa20_noinline : Base_func_interface.t = [
+let standalone_salsa20_noinline : Base_func_interface.mem_t = [
   "salsa20_words", [
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
@@ -80,7 +80,7 @@ let bench_sha512_plain_global : External_layouts.GlobalSymbolLayout.t = [
   "out", [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], (SingleTop, TaintConst true) ];
 ]
 
-let bench_sha512_plain : Base_func_interface.t = [
+let bench_sha512_plain : Base_func_interface.mem_t = [
   "sha512_block_data_order", [
     r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
     r RSI, [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
@@ -131,7 +131,7 @@ let bench_ed25519_plain_global : External_layouts.GlobalSymbolLayout.t = [
   ".LCPI16_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst true) ];
 ]
 
-let bench_ed25519_plain : Base_func_interface.t = [
+let bench_ed25519_plain : Base_func_interface.mem_t = [
   "SHA512_Init", [
     r RDI, [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
@@ -298,7 +298,7 @@ let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t 
   ".LCPI21_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
 ]
 
-let bench_ed25519_plain_noinline : Base_func_interface.t = [
+let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
   "SHA512_Init", [
     r RDI, [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
@@ -625,7 +625,7 @@ let add_general_func_suffix
   {func_interface with func_name = func_interface.func_name ^ "@PLT"}]
 
 let () = 
-  (* Stack_layout.StackLayout.test(); *)
+  (* External_layouts.StackLayout.test(); *)
   let open Sexplib in
 
   let channel = open_out "./interface/general_func_interface.func_interface" in

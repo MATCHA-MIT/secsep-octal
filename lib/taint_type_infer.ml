@@ -3,6 +3,7 @@ open Taint_exp
 open Single_entry_type
 open Taint_entry_type
 open Mem_offset_new
+open Stack_spill_info
 open Single_context
 open Constraint
 open Func_interface
@@ -31,6 +32,7 @@ module TaintTypeInfer = struct
     func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
+    stack_spill_info: StackSpillInfo.t;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
@@ -108,6 +110,7 @@ module TaintTypeInfer = struct
       func_name = range_infer_state.func_name;
       func = func;
       func_type = func_type;
+      stack_spill_info = range_infer_state.stack_spill_info;
       single_sol = range_infer_state.single_sol;
       input_single_var_set = range_infer_state.input_single_var_set;
       context = range_infer_state.context;
@@ -140,6 +143,7 @@ module TaintTypeInfer = struct
           (SingleSubtype.sub_sol_single_to_offset_list
             (SingleEntryType.eval_align ptr_align_list)
             infer_state.single_sol infer_state.input_single_var_set)
+          (StackSpillInfo.is_spill infer_state.stack_spill_info)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)

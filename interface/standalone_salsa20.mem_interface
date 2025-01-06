@@ -22,7 +22,10 @@
    (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
    (6
     ((((SingleConst 0) (SingleConst 64))
-      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))))
+      (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
+  ((-144 -136) (-136 -128) (-124 -120) (-120 -112) (-112 -104) (-104 -96)
+   (-96 -88) (-88 -80) (-80 -72) (-72 -64) (-64 -56) (-56 -48) (-48 -40)
+   (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (salsa20_block
   ((4
     ((((SingleConst -136) (SingleConst -72)) (RangeConst ()) SingleTop)
@@ -32,7 +35,8 @@
    (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
    (6
     ((((SingleConst 0) (SingleConst 32))
-      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop))))
+  ((-8 0)))
  (salsa20
   ((4
     ((((SingleConst -248) (SingleConst -184)) (RangeConst ()) SingleTop)
@@ -50,7 +54,8 @@
       (RangeConst (((SingleConst 0) (SingleVar 6)))) SingleTop)))
    (2
     ((((SingleConst 0) (SingleConst 32))
-      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))))
+      (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop))))
+  ((-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (_start
   ((4
     ((((SingleConst -80) (SingleConst -72)) (RangeConst ()) SingleTop)
@@ -62,4 +67,5 @@
      (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
-     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop))))))
+     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop))))
+  ((-16 -8) (-8 0))))

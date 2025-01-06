@@ -450,6 +450,7 @@ module MemType (Entry: EntryType) = struct
 
   let get_part_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_spill_func: MemOffset.t -> bool)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (orig_addr_off: MemOffset.t)
       (simp_addr_off: MemOffset.t) :
@@ -458,9 +459,13 @@ module MemType (Entry: EntryType) = struct
       fun (off, range, entry) ->
         match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpSubset with
         | Subset ->
+          (* Note: here we compare read range with s-alloc since s-valid (init range) is not ready in single infer.
+             The typing rule actually consider reading full s-valid as full read. *)
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> Some (true, (off, range, entry)) (* full read *)
           | Subset -> 
+            if is_spill_func off then Some (false, (off, range, entry)) (* although not equal to s-alloc, but spill should be equal to s-valid *)
+            else
             (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
             Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
           | _ -> 
@@ -498,6 +503,7 @@ module MemType (Entry: EntryType) = struct
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (try_mult_slot_lookup: bool)
       (mem: t)
       (orig_addr_off: MemOffset.t)
@@ -516,7 +522,7 @@ module MemType (Entry: EntryType) = struct
       if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else 
         let part_mem = get_part_mem mem b_l in
-        begin match get_part_mem_type smt_ctx part_mem orig_addr_off simp_addr_off with
+        begin match get_part_mem_type smt_ctx (is_spill_func b_l) part_mem orig_addr_off simp_addr_off with
         | Some (is_full, find_entry) -> Some (is_full, b_l, find_entry, 1, [])
         | None -> (* Decide whether we want to try get_mult_slot_part_mem_type *)
           if try_mult_slot_lookup && enable_mult_slot_lookup smt_ctx b_l orig_addr_off simp_addr_off then begin
@@ -547,7 +553,7 @@ module MemType (Entry: EntryType) = struct
       in
       List.find_map (
         fun (ptr, part_mem) -> 
-          match get_part_mem_type smt_ctx part_mem orig_addr_off simp_addr_off with
+          match get_part_mem_type smt_ctx (is_spill_func ptr) part_mem orig_addr_off simp_addr_off with
           | Some (is_full, find_entry) -> Some (is_full, ptr, find_entry, 1, [])
           | None -> None
       ) sorted_mem
@@ -557,6 +563,7 @@ module MemType (Entry: EntryType) = struct
 
   let get_slot_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (check_addr: bool)
       (mem: t)
       (orig_addr_off: MemOffset.t)
@@ -578,13 +585,14 @@ module MemType (Entry: EntryType) = struct
             List.find_map (
               fun (off, range, entry) ->
                 if MemOffset.cmp off s_off = 0 then
-                  if is_full then Some (off, range, entry)
-                  else Some (off, range, Entry.mem_partial_read_val entry)
+                  if is_full then Some ((off, range, entry), [])
+                  else if is_spill_func s_ptr off then Some ((off, range, entry), [Constraint.RangeEq (orig_addr_off, range)])
+                  else Some ((off, range, Entry.mem_partial_read_val entry), [])
                 else None
             ) part_mem
           in
           begin match lookup with
-          | Some result -> result, [], true
+          | Some (result, cons) -> result, cons, true
           | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
           end
         else if not is_full then mem_type_error "get_slot_mem_type: get multiple slot is not full" 
@@ -803,7 +811,8 @@ module MemType (Entry: EntryType) = struct
   let is_shared_mem_full_cmp = is_shared_mem_helper false
 
   let set_mult_slot_part_mem_type_helper
-      (smt_ctx: SmtEmitter.t)
+      (* (smt_ctx: SmtEmitter.t) *)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (update_init_range: bool)
       (s_ptr: IsaBasic.imm_var_id)
       (part_mem: entry_t mem_slot list)
@@ -814,7 +823,7 @@ module MemType (Entry: EntryType) = struct
       (entry_t mem_slot list * (Constraint.t list) * FullMemAnno.slot_t) option =
     let s_left, s_right = s_off in
     (* let s_ptr, (s_left, s_right), is_full, num_slot = slot_info in *)
-    let is_shared_mem = is_shared_mem_full_cmp smt_ctx s_ptr (s_left, s_right) in
+    (* let is_shared_mem = is_shared_mem_full_cmp smt_ctx s_ptr (s_left, s_right) in *)
     (* if num_slot <= 1 then mem_type_error "set_mult_slot_part_mem_type get incorrect num slot"
     else if not is_full then mem_type_error "set_mult_slot_part_mem_type: set multiple slot is not full"
     else *)
@@ -853,7 +862,7 @@ module MemType (Entry: EntryType) = struct
           let off, range, entry_val = entry in
           let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
           let idx_new_val = List.nth split_val_list idx in
-          if is_shared_mem then
+          if not (is_spill_func s_ptr off) then
             (* All slots taint are equal to the same new taint (required by st), so they are the same*)
             (off, range, Entry.set_taint_with_other idx_new_val entry_val), 
             (Entry.get_must_known_taint_constraint entry_val) @
@@ -861,7 +870,7 @@ module MemType (Entry: EntryType) = struct
           else
             (* All slots taint are updated to the new taint, so they are the same after update *)
             (off, range, idx_new_val), 
-            Entry.get_overwritten_taint_constraint entry_val
+            Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val)
       in
       let part_mem, constraint_list_list =
         List.map2 update_helper part_mem update_idx_list |> List.split
@@ -870,6 +879,7 @@ module MemType (Entry: EntryType) = struct
 
   let set_part_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (update_init_range: bool)
       (ptr: IsaBasic.imm_var_id)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
@@ -889,15 +899,20 @@ module MemType (Entry: EntryType) = struct
         | Subset ->
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
           | Eq -> 
-            let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
-            if is_shared_mem_full_cmp smt_ctx ptr off then
-              (Some (ptr, off, true, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, new_val)
+            let new_range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
+            if not (is_spill_func ptr off) then
+              (Some (ptr, off, true, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, new_val)
             else
-              (Some (ptr, off, true, 1), cons), (off, range, new_val)
+              (Some (ptr, off, true, 1), cons), (off, new_range, new_val)
           | Subset -> 
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
-            (Some (ptr, off, false, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, range, Entry.mem_partial_write_val entry_val new_val)
+            if is_spill_func ptr off then begin
+              let new_range: MemRange.t = RangeConst [orig_addr_off] in
+              (Some (ptr, off, false, 1), cons), (off, new_range, new_val)
+            end else begin
+              let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
+              (Some (ptr, off, false, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, Entry.mem_partial_write_val entry_val new_val)
+            end
           | _ -> acc, entry
           end
         | _ -> acc, entry
@@ -914,6 +929,7 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
       (simp_entry_func: Entry.t -> Entry.t) (* Only used for set mult entries *)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (try_mult_slot_lookup: bool)
       (update_init_range: bool)
       (mem: t)
@@ -932,7 +948,7 @@ module MemType (Entry: EntryType) = struct
       | Some b_l, Some b_r ->
         if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
         else let part_mem = get_part_mem mem b_l in
-        begin match set_part_mem_type smt_ctx update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
+        begin match set_part_mem_type smt_ctx is_spill_func update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
         | Some (new_part_mem, new_cons, slot_anno) ->
           Some (
             List.map (fun (p, entry) -> if p = b_l then (p, new_part_mem) else (p, entry)) mem,
@@ -940,7 +956,7 @@ module MemType (Entry: EntryType) = struct
           )
         | None ->
           if try_mult_slot_lookup && enable_mult_slot_lookup smt_ctx b_l orig_addr_off simp_addr_off then begin
-            match set_mult_slot_part_mem_type_helper smt_ctx update_init_range b_l part_mem simp_addr_off (simp_entry_func new_type) with
+            match set_mult_slot_part_mem_type_helper is_spill_func update_init_range b_l part_mem simp_addr_off (simp_entry_func new_type) with
             | Some (new_part_mem, new_cons, slot_anno) ->
               Some (
                 List.map (fun (p, entry) -> if p = b_l then (p, new_part_mem) else (p, entry)) mem,
@@ -973,7 +989,7 @@ module MemType (Entry: EntryType) = struct
           | Some _, _ -> acc, entry
           | None, cons ->
             let ptr, part_mem, orig_order = entry in 
-            begin match set_part_mem_type smt_ctx update_init_range ptr part_mem orig_addr_off simp_addr_off new_type with
+            begin match set_part_mem_type smt_ctx is_spill_func update_init_range ptr part_mem orig_addr_off simp_addr_off new_type with
             | None -> acc, entry
             | Some (new_part_mem, new_cons, slot_anno) -> (Some slot_anno, cons @ new_cons), (ptr, new_part_mem, orig_order)
             end
@@ -996,6 +1012,7 @@ module MemType (Entry: EntryType) = struct
 
   let set_slot_part_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (update_init_range: bool)
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (orig_addr_off: MemOffset.t)
@@ -1015,21 +1032,26 @@ module MemType (Entry: EntryType) = struct
         let off, range, entry_val = entry in
         if MemOffset.cmp off s_off = 0 then
           if is_full then
-            let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
-            if is_shared_mem_full_cmp smt_ctx s_ptr s_off then
+            let new_range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
+            if not (is_spill_func s_ptr s_off) then
               Some (
                 (Entry.get_must_known_taint_constraint entry_val) @ 
                 (Entry.get_eq_taint_constraint entry_val new_val)), 
-              (off, range, Entry.set_taint_with_other new_val entry_val)
+              (off, new_range, Entry.set_taint_with_other new_val entry_val)
             else
-              Some (Entry.get_overwritten_taint_constraint entry_val), (off, range, new_val)
+              Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val)), 
+              (off, new_range, new_val)
+          else if is_spill_func s_ptr s_off then
+            let new_range: MemRange.t = RangeConst [orig_addr_off] in
+            Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val)), 
+            (off, new_range, new_val) 
           else
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
+            let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
             Some (
               (Entry.get_must_known_taint_constraint entry_val) @ 
               (Entry.get_eq_taint_constraint entry_val new_val)), 
-            (off, range, Entry.set_taint_with_other (Entry.mem_partial_write_val entry_val new_val) entry_val)
+            (off, new_range, Entry.set_taint_with_other (Entry.mem_partial_write_val entry_val new_val) entry_val)
         else
           None, entry
     in
@@ -1038,7 +1060,8 @@ module MemType (Entry: EntryType) = struct
     | Some constaints, part_mem -> part_mem, constaints
 
   let set_mult_slot_part_mem_type
-      (smt_ctx: SmtEmitter.t)
+      (* (smt_ctx: SmtEmitter.t) *)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (update_init_range: bool)
       (part_mem: entry_t mem_slot list)
       (* (orig_addr_off: MemOffset.t) *) (* We check the slot correctness outside, so orig_addr_off is useless here *)
@@ -1049,7 +1072,7 @@ module MemType (Entry: EntryType) = struct
     if num_slot <= 1 then mem_type_error "set_mult_slot_part_mem_type get incorrect num slot"
     else if not is_full then mem_type_error "set_mult_slot_part_mem_type: set multiple slot is not full"
     else
-      match set_mult_slot_part_mem_type_helper smt_ctx update_init_range s_ptr part_mem s_off new_val with
+      match set_mult_slot_part_mem_type_helper is_spill_func update_init_range s_ptr part_mem s_off new_val with
       | Some (new_part_mem, new_cons_list, (new_s_ptr, new_s_off, new_is_full, new_num_slot)) ->
         if s_ptr = new_s_ptr && MemOffset.cmp new_s_off s_off = 0 && new_is_full = is_full && new_num_slot = num_slot then
           new_part_mem, new_cons_list
@@ -1060,6 +1083,7 @@ module MemType (Entry: EntryType) = struct
   let set_slot_mem_type
       (smt_ctx: SmtEmitter.t)
       (simp_entry_func: Entry.t -> Entry.t) (* Only used for set mult entries *)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (check_addr: bool)
       (update_init_range: bool)
       (mem: t)
@@ -1078,9 +1102,9 @@ module MemType (Entry: EntryType) = struct
       | Some (_, part_mem) ->
         let part_mem, constraints = 
           if num_slot = 1 then
-            set_slot_part_mem_type smt_ctx update_init_range part_mem orig_addr_off slot_info new_type
+            set_slot_part_mem_type smt_ctx is_spill_func update_init_range part_mem orig_addr_off slot_info new_type
           else
-            set_mult_slot_part_mem_type smt_ctx update_init_range part_mem slot_info (simp_entry_func new_type)
+            set_mult_slot_part_mem_type is_spill_func update_init_range part_mem slot_info (simp_entry_func new_type)
         in
         List.map (fun (ptr, p_mem) -> if ptr = s_ptr then (ptr, part_mem) else (ptr, p_mem)) mem,
         constraints,

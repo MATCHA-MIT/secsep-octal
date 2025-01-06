@@ -6059,7 +6059,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$9, %eax
 	.p2align	4, 0x90
 .LBB15_1:                               # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -6169,7 +6169,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx
@@ -6320,7 +6320,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$19, %eax
 	.p2align	4, 0x90
 .LBB15_3:                               # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -6430,7 +6430,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx
@@ -6581,7 +6581,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$9, %eax
 	.p2align	4, 0x90
 .LBB15_5:                               # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -6691,7 +6691,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx
@@ -6842,7 +6842,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$49, %eax
 	.p2align	4, 0x90
 .LBB15_7:                               # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -6952,7 +6952,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx
@@ -7103,7 +7103,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$99, %eax
 	.p2align	4, 0x90
 .LBB15_9:                               # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -7213,7 +7213,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx
@@ -7364,7 +7364,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	movl	$49, %eax
 	.p2align	4, 0x90
 .LBB15_11:                              # =>This Inner Loop Header: Depth=1
-	movq	%rax, 128(%rsp)                 # 4-byte Spill
+	movl	%eax, 128(%rsp)                 # 4-byte Spill
 	leaq	(%rsi,%rsi,8), %rax
 	leaq	(%rsi,%rax,2), %rax
 	imulq	$38, %rsi, %r10
@@ -7474,7 +7474,7 @@ ge_p3_tobytes:                          # @ge_p3_tobytes
 	shldq	$13, %r10, %r15
 	leaq	(%r15,%r15,8), %rax
 	leaq	(%r15,%rax,2), %r9
-	movq	128(%rsp), %rax                 # 4-byte Reload
+	movl	128(%rsp), %eax                 # 4-byte Reload
 	addq	%r11, %r9
 	movq	%r9, %rbx
 	shrq	$51, %rbx

@@ -11,7 +11,7 @@ let r = Isa_basic.IsaBasic.get_reg_idx
 let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 
 (* Note that salsa20_global is not real global var, so I only put it in _start's mem interface *)
-let standalone_salsa20 : Base_func_interface.t = [
+let standalone_salsa20 : Base_func_interface.mem_t = [
   "salsa20_words", [
     r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
@@ -57,13 +57,13 @@ let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
   ]
 ]
 
-let demo : Base_func_interface.t = [
+let demo : Base_func_interface.mem_t = [
   "table_select", [
     -2, [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], SingleTop) ];
   ];
 ]
 
-let bench_ed25519_plain : Base_func_interface.t = [
+let bench_ed25519_plain : Base_func_interface.mem_t = [
   "fiat_25519_carry_mul", [
     r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
     r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
@@ -391,13 +391,13 @@ let add_general_func_suffix
 let () = 
   let open Sexplib in
   let channel = open_out "./interface/standalone_salsa20.mem_interface" in
-  Sexp.output_hum channel (Base_func_interface.sexp_of_t standalone_salsa20);
+  Sexp.output_hum channel (Base_func_interface.sexp_of_mem_t standalone_salsa20);
   let channel = open_out "./interface/standalone_salsa20.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
   let channel = open_out "./interface/demo.mem_interface" in
-  Sexp.output_hum channel (Base_func_interface.sexp_of_t demo);
+  Sexp.output_hum channel (Base_func_interface.sexp_of_mem_t demo);
   let channel = open_out "./interface/bench_ed25519_plain.mem_interface" in
-  Sexp.output_hum channel (Base_func_interface.sexp_of_t bench_ed25519_plain);
+  Sexp.output_hum channel (Base_func_interface.sexp_of_mem_t bench_ed25519_plain);
   let channel = open_out "./interface/general_func_interface.func_interface" in
   Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t 
     (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface]))

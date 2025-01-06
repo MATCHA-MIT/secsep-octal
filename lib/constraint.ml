@@ -10,6 +10,8 @@ module Constraint = struct
   type t =
     | Unknown of MemOffset.t
     | Subset of MemOffset.t * MemRange.t * MemOffset.t
+    | RangeEq of MemOffset.t * MemRange.t
+    | RangeOverwritten of MemRange.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
     | TaintOverwritten of TaintExp.t
     | TaintMustKnown of TaintExp.t

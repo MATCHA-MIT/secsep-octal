@@ -1,6 +1,7 @@
 open Isa
 open Single_entry_type
 open Mem_offset_new
+open Stack_spill_info
 open Constraint
 open Single_context
 open Single_subtype
@@ -27,6 +28,7 @@ module RangeTypeInfer = struct
     func_name: Isa.label;
     func: Isa.basic_block list;
     func_type: ArchType.t list;
+    stack_spill_info: StackSpillInfo.t;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
     context: SingleContext.t list;
@@ -87,6 +89,7 @@ module RangeTypeInfer = struct
       func_name = single_infer_state.func_name;
       func = single_infer_state.func;
       func_type = func_type;
+      stack_spill_info = single_infer_state.stack_spill_info;
       single_sol = single_infer_state.single_subtype;
       input_single_var_set = single_infer_state.input_var_set;
       context = single_infer_state.context;
@@ -118,6 +121,7 @@ module RangeTypeInfer = struct
           (SingleSubtype.sub_sol_single_to_offset_list
             (SingleEntryType.eval_align ptr_align_list)
             infer_state.single_sol infer_state.input_single_var_set)
+          (StackSpillInfo.is_spill infer_state.stack_spill_info)
           func_interface_list block_type block.insts block_subtype
       in
       (* Printf.printf "After prop block %s\n" block.label; *)

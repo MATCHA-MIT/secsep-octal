@@ -111,6 +111,7 @@ module FuncInterface (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (simp_local_var: SingleExp.t -> SingleExp.t)
       (* Simp local var of the parent context, not changed, so keep it as a separate parameter *)
       (* (local_var_map: SingleExp.local_var_map_t)  *)
@@ -147,8 +148,11 @@ module FuncInterface (Entry: EntryType) = struct
           begin match sub_sol_func m_off_l, sub_sol_func m_off_r with
           | Some (m_off_l, _), Some (_, m_off_r) ->
             let simp_m_off = m_off_l, m_off_r in
-            begin match MemType.get_mem_type smt_ctx sub_sol_list_func false parent_mem orig_m_off simp_m_off with
+            begin match MemType.get_mem_type smt_ctx sub_sol_list_func is_spill_func false parent_mem orig_m_off simp_m_off with
             | Some (is_full, p_ptr, (p_off, _, p_entry), _, _) ->
+              if is_spill_func p_ptr p_off then
+                func_interface_error "Func call pass stack spill to callee"
+              else
               let c_exp = Entry.get_single_exp c_entry in
               let p_exp = Entry.get_single_exp p_entry in
               ( (* acc *)
@@ -434,6 +438,7 @@ module FuncInterface (Entry: EntryType) = struct
       (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (global_var_set: SingleExp.SingleVarSet.t)
       (simp_local_var: SingleExp.t -> SingleExp.t)
       (* (local_var_map: SingleExp.local_var_map_t) *)
@@ -450,6 +455,7 @@ module FuncInterface (Entry: EntryType) = struct
       Entry.local_var_map_t *
       ((IsaBasic.imm_var_id * (SingleExp.t list)) list) *
       (SingleContext.t list) =
+    let _ = is_spill_func in
     let single_var_map, var_map = add_reg_var_map simp_local_var extra_single_var_map child_reg parent_reg in
     let single_var_set = 
       SingleExp.SingleVarSet.union 
@@ -459,7 +465,7 @@ module FuncInterface (Entry: EntryType) = struct
     let single_var_map = SingleExp.add_local_global_var single_var_map global_var_set in
     let var_map = Entry.add_local_global_var var_map global_var_set in
     let ((single_var_map, single_var_set, var_map), read_useful_vars), mem_read_hint =
-      add_mem_var_map smt_ctx sub_sol_func sub_sol_list_func simp_local_var (single_var_map, single_var_set, var_map) child_mem parent_mem
+      add_mem_var_map smt_ctx sub_sol_func sub_sol_list_func is_spill_func simp_local_var (single_var_map, single_var_set, var_map) child_mem parent_mem
     in
     (* Printf.printf "!!! set_reg_type\n"; *)
     RegType.pp_reg_type 0 child_out_reg;
@@ -595,6 +601,7 @@ module FuncInterface (Entry: EntryType) = struct
       (check_context: bool)
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (sub_sol_list_func: SingleExp.t -> (MemOffset.t list) option)
+      (is_spill_func: IsaBasic.imm_var_id -> MemOffset.t -> bool)
       (func_interface: t)
       (global_var_set: SingleExp.SingleVarSet.t)
       (local_var_map: Entry.local_var_map_t)
@@ -612,7 +619,7 @@ module FuncInterface (Entry: EntryType) = struct
       (* TODO: Check context!!! *)
     func_call_helper 
       smt_ctx check_context 
-      sub_sol_func sub_sol_list_func 
+      sub_sol_func sub_sol_list_func is_spill_func
       global_var_set (SingleExp.repl_local_var (Entry.get_single_var_map local_var_map)) 
       extra_single_var_map
       func_interface.in_reg func_interface.in_mem

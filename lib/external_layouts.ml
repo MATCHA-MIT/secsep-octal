@@ -9,7 +9,7 @@ module StackLayout = struct
 
   module MemType = MemType (SingleEntryType)
 
-  type entry_t = IsaBasic.label * ((SingleEntryType.t MemTypeBasic.mem_slot) list)
+  type entry_t = IsaBasic.label * (((SingleEntryType.t * bool) MemTypeBasic.mem_slot) list)
   [@@deriving sexp]
 
   type t = entry_t list
@@ -21,17 +21,27 @@ module StackLayout = struct
     let s_exp = Sexp.input_sexp channel in
     t_of_sexp s_exp
 
+  let split_layout 
+      (one_layout: ((SingleEntryType.t * bool) MemTypeBasic.mem_slot) list) :
+      ((SingleEntryType.t MemTypeBasic.mem_slot) list) *
+      ((bool MemTypeBasic.mem_slot) list) =
+    List.map (
+      fun (off, range, (entry, is_spill)) ->
+        (off, range, entry), (off, range, is_spill)
+    ) one_layout |> List.split
+
   let test () : unit = 
     let x : t = [
       "hh", [
-        (SingleVar 0, SingleVar 0), RangeConst [], SingleTop;
-        (SingleVar 0, SingleVar 0), RangeConst [], SingleTop;
+        (SingleVar 0, SingleVar 0), RangeConst [], (SingleTop, true);
+        (SingleVar 0, SingleVar 0), RangeConst [], (SingleTop, true);
       ];
       "bb", [
-        (SingleVar 0, SingleVar 0), RangeConst [], SingleTop;
+        (SingleVar 0, SingleVar 0), RangeConst [], (SingleTop, false);
       ]
     ] in
-    Printf.printf "%s" (Sexplib.Sexp.to_string_hum (sexp_of_t x))
+    Printf.printf "!!!\n%s%!\n" (Sexplib.Sexp.to_string_hum (sexp_of_t x))
+
 
 end
 
