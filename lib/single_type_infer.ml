@@ -124,7 +124,7 @@ module SingleTypeInfer = struct
     in
     List.map (
         fun (ptr, slots) ->
-          if ptr = Isa.rsp_idx then
+          if fst ptr = Isa.rsp_idx then
             ptr, fix_stack slots
           else ptr, slots
       ) func_mem_interface

@@ -1,4 +1,5 @@
 open Isa_basic
+open Ptr_info
 open External_layouts
 open Stack_spill_info
 open Single_subtype
@@ -34,7 +35,7 @@ let add_stack_layout (interface: mem_t) (stack_layout: StackLayout.t) : t =
       let one_stack = List.find (fun one_stack -> String.equal (fst one_stack) label1) stack_layout in
       let _, stack_spill_info = one_stack in
       let stack, spill_info = StackLayout.split_layout stack_spill_info in
-      label1, (IsaBasic.get_reg_idx IsaBasic.RSP, stack) :: mem, StackSpillInfo.init spill_info
+      label1, (PtrInfo.get_default_info IsaBasic.rsp_idx, stack) :: mem, StackSpillInfo.init spill_info
   ) interface
 
 let add_global_symbol_layout
@@ -61,7 +62,8 @@ let add_global_symbol_layout
       let off, range, (se, _) = slot in
       (off, range, se)
     ) slots in
-    var_id, slots
+    (* If symbol start with "."*)
+    PtrInfo.get_read_write_info var_id true (not (IsaBasic.is_compiler_gen_rom symbol)), slots
   ) used_symbols in
   func_label, (func_mem @ symbol_layouts), func_spill_info
 
@@ -93,6 +95,7 @@ let add_global_symbol_taint
       in
       (off, range, bool_val)
     ) slots in
-    var_id, slots
+    (* If symbol start with "."*)
+    PtrInfo.get_read_write_info var_id true (not (IsaBasic.is_compiler_gen_rom symbol)), slots
   ) used_symbols in
   mem_api @ symbol_layouts

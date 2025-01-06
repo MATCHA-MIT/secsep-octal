@@ -1,4 +1,4 @@
-open Type
+(* open Type
 open Sexplib.Std
 
 let salsa20_global : Single_type_infer.SingleTypeInfer.ArchType.MemType.t = [
@@ -400,6 +400,6 @@ let () =
   Sexp.output_hum channel (Base_func_interface.sexp_of_mem_t bench_ed25519_plain);
   let channel = open_out "./interface/general_func_interface.func_interface" in
   Sexp.output_hum channel (sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t 
-    (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface]))
+    (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface])) *)
 
 

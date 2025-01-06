@@ -560,6 +560,8 @@ module IsaBasic = struct
 
   let is_label_function_entry (l: label) = l.[0] <> '.'
 
+  let is_compiler_gen_rom (l: label) = l.[0] = '.'
+
   let is_label (line: string) : bool =
     not (String.exists (fun c -> c = ':' || c = ' ') (String.sub line 0 (String.length line - 1))) &&
     line.[(String.length line) - 1] = ':'

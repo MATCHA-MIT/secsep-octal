@@ -1,4 +1,5 @@
 open Isa_basic
+open Ptr_info
 open Single_exp
 open Taint_exp
 open Entry_type
@@ -122,7 +123,7 @@ module FuncInterface (Entry: EntryType) = struct
          single_var_set: child global single var and mapped single var
          var_map: child var -> parent exp (not only for single var/exp) *)
       (child_mem: MemType.t) (parent_mem: MemType.t) :
-      (var_map_set_t * SingleExp.SingleVarSet.t) * ((IsaBasic.imm_var_id * (read_hint_t list)) list) =
+      (var_map_set_t * SingleExp.SingleVarSet.t) * ((PtrInfo.t * (read_hint_t list)) list) =
     let helper_inner
         (acc: var_map_set_t * SingleExp.SingleVarSet.t)
         (entry: read_hint_t) :
@@ -183,19 +184,19 @@ module FuncInterface (Entry: EntryType) = struct
     in
     let helper_outer
         (acc: var_map_set_t * SingleExp.SingleVarSet.t)
-        (entry: IsaBasic.imm_var_id * (read_hint_t list)) :
-        (var_map_set_t * SingleExp.SingleVarSet.t) * (IsaBasic.imm_var_id * (read_hint_t list)) =
+        (entry: PtrInfo.t * (read_hint_t list)) :
+        (var_map_set_t * SingleExp.SingleVarSet.t) * (PtrInfo.t * (read_hint_t list)) =
       let (_, single_var_set, _), _ = acc in
       let c_ptr, c_part_mem = entry in
-      if SingleExp.SingleVarSet.mem c_ptr single_var_set then
+      if SingleExp.SingleVarSet.mem (fst c_ptr) single_var_set then
         let acc, c_part_mem = List.fold_left_map helper_inner acc c_part_mem in
         acc, (c_ptr, c_part_mem)
       else
         acc, (c_ptr, c_part_mem)
     in
     let rec helper
-        (acc: var_map_set_t * SingleExp.SingleVarSet.t) (child_mem: (IsaBasic.imm_var_id * (read_hint_t list)) list) :
-        (var_map_set_t * SingleExp.SingleVarSet.t) * ((IsaBasic.imm_var_id * (read_hint_t list)) list) =
+        (acc: var_map_set_t * SingleExp.SingleVarSet.t) (child_mem: (PtrInfo.t * (read_hint_t list)) list) :
+        (var_map_set_t * SingleExp.SingleVarSet.t) * ((PtrInfo.t * (read_hint_t list)) list) =
       let (single_var_map, _, _), _ = acc in
       let l = List.length single_var_map in
       let ((single_var_map, single_var_set, var_map), useful_vars), child_mem =
@@ -325,18 +326,18 @@ module FuncInterface (Entry: EntryType) = struct
       (* (local_var_map: SingleExp.local_var_map_t) *)
       (var_map_set: var_map_set_t)
       (parent_mem: MemType.t)
-      (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
+      (read_hint: (PtrInfo.t * (read_hint_t list)) list)
       (write_mem: MemType.t) :
       MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
     let single_var_map, single_var_set, _ = var_map_set in
     let helper
         (acc: MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t)
-        (read_hint_entry: IsaBasic.imm_var_id * (read_hint_t list))
-        (write_mem_entry: IsaBasic.imm_var_id * ((MemOffset.t * MemRange.t * entry_t) list)) :
+        (read_hint_entry: PtrInfo.t * (read_hint_t list))
+        (write_mem_entry: PtrInfo.t * ((MemOffset.t * MemRange.t * entry_t) list)) :
         MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
       let p_mem, constraint_list, acc_useful_vars = acc in
-      let ptr, read_hint = read_hint_entry in
-      let ptr2, write_mem = write_mem_entry in
+      let (ptr, _), read_hint = read_hint_entry in
+      let (ptr2, _), write_mem = write_mem_entry in
       if ptr = ptr2 then
         if SingleExp.SingleVarSet.mem ptr single_var_set then
           let p_base = SingleExp.repl_context_var single_var_map (SingleVar ptr) in
@@ -346,7 +347,7 @@ module FuncInterface (Entry: EntryType) = struct
             | Some p_ptr ->
               let find_result =
                 List.find_map (
-                  fun (x, part_mem) ->
+                  fun ((x, _), part_mem) ->
                     if x = p_ptr then Some (set_part_mem smt_ctx var_map_set part_mem read_hint write_mem)
                     else None
                 ) p_mem
@@ -354,8 +355,8 @@ module FuncInterface (Entry: EntryType) = struct
               begin match find_result with
               | Some (new_part_mem, new_constraints, new_useful_vars) ->
                 List.map (
-                  fun (x, part_mem) -> 
-                    if x = p_ptr then x, new_part_mem else x, part_mem
+                  fun ((x, x_info), part_mem) -> 
+                    if x = p_ptr then (x, x_info), new_part_mem else (x, x_info), part_mem
                 ) p_mem, 
                 new_constraints @ constraint_list,
                 SingleExp.SingleVarSet.union acc_useful_vars new_useful_vars
@@ -401,7 +402,7 @@ module FuncInterface (Entry: EntryType) = struct
       ) child_taint_context  
 
   let get_slot_map_info
-      (read_hint: (IsaBasic.imm_var_id * (read_hint_t list)) list)
+      (read_hint: (PtrInfo.t * (read_hint_t list)) list)
       (child_mem: MemType.t) : CallAnno.slot_info MemType.mem_content option =
     let find_unresolved =
       List.find_map (
@@ -418,9 +419,9 @@ module FuncInterface (Entry: EntryType) = struct
     | Some _ -> None
     | None ->
       Some (List.map2 (
-        fun (ptr1, part_hint) (ptr2, part_mem) ->
+        fun ((ptr1, ptr1_info), part_hint) ((ptr2, _), part_mem) ->
           if ptr1 = ptr2 then
-            ptr1,
+            (ptr1, ptr1_info), (* Double check: I think here ptr1_info does not matter *)
             List.map2 (
               fun (hint: read_hint_t) (entry: MemOffset.t * MemRange.t * entry_t) ->
                 match hint with

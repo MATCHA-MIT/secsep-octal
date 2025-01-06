@@ -174,7 +174,7 @@ let () =
       (* filter out global symbols, as their taint API will be provided separately *)
       let mem_api = List.filter (
         fun mem_part ->
-          let base_id, _ = mem_part in
+          let (base_id, _), _ = mem_part in
           base_id >= 0
       ) mem_api in
 

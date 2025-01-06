@@ -1182,7 +1182,7 @@ module ArchType (Entry: EntryType) = struct
     | None ->
       let find_mem_entry =
         List.find_map (
-          fun (ptr, part_mem) ->
+          fun ((ptr, _), part_mem) ->
             List.find_map (
               fun (off, _, entry) ->
                 if SingleExp.cmp (Entry.get_single_exp entry) (SingleVar base) = 0 then
@@ -1201,9 +1201,9 @@ module ArchType (Entry: EntryType) = struct
   let find_all_base_info 
       (reg_type: RegType.t) (mem_type: MemType.t) : CallAnno.base_info MemType.mem_content =
     List.map (
-      fun (ptr, part_mem) ->
+      fun ((ptr, ptr_info), part_mem) ->
         let base_info = find_one_base_info ptr reg_type mem_type in
-        ptr,
+        (ptr, ptr_info),
         List.map (
           fun (off, range, _) -> off, range, base_info
         ) part_mem

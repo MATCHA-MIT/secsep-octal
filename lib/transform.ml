@@ -178,7 +178,7 @@ module Transform = struct
       (mem_part: 'a MemTypeBasic.mem_part)
       (get_entry_taint: Isa.imm_var_id -> MemOffset.t -> 'a -> TaintExp.t)
       : int * int * ((TaintExp.taint_var_id option) option) (* Counter for taint true, taint false, taint var *) =
-    let mem_part_base, mem_slots = mem_part in
+    let (mem_part_base, _), mem_slots = mem_part in
     List.fold_left(
       fun (acc: int * int * ((TaintExp.taint_var_id option) option)) (slot: 'a MemTypeBasic.mem_slot) ->
         let acc_t, acc_f, acc_var = acc in
@@ -204,7 +204,7 @@ module Transform = struct
       (mem_part: 'a MemTypeBasic.mem_part)
       (get_entry_taint: Isa.imm_var_id -> MemOffset.t -> 'a -> TaintExp.t)
       : unity =
-    let base_id, slots = mem_part in
+    let (base_id, _), slots = mem_part in
     let tot = List.length slots in
     if tot = 0 then transform_error "Empty memory part";
     match mem_part_taint_counter mem_part get_entry_taint with
@@ -497,8 +497,8 @@ module Transform = struct
     let child_rsp_var_id = get_rsp_var_from_reg_type child_fi.in_reg in
     let res = List.fold_left (
       fun (acc: CallAnno.base_info list) (mem_part: CallAnno.slot_t MemType.mem_part) : CallAnno.base_info list ->
-        let child_base, slots = mem_part in
-        if List.length slots = 0 && child_base != child_rsp_var_id then transform_error "Empty memory part";
+        let (child_base, _), slots = mem_part in
+        if List.length slots = 0 && child_base <> child_rsp_var_id then transform_error "Empty memory part";
         if List.length slots = 0 then acc else
 
         (* sample the first slot to get info of base pointer, should be the same accross all slots *)
@@ -772,7 +772,7 @@ module Transform = struct
   let get_func_init_mem_unity (ti_state: TaintTypeInfer.t) : mem_unity_t =
     let rsp_var_id = get_func_init_rsp_var ti_state in
     List.map (fun (mem_part: (MemType.entry_t MemType.mem_part)) ->
-      let base_id, _ = mem_part in
+      let (base_id, _), _ = mem_part in
       if base_id = rsp_var_id then (base_id, Ununified) else
       let unity =
         get_mem_part_unity mem_part (fun _ _ (entry: MemType.entry_t) -> let (_, taint) = entry in taint)

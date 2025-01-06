@@ -3,6 +3,10 @@ open Type
 let r = Isa_basic.IsaBasic.get_reg_idx
 let total_reg_num = Isa_basic.IsaBasic.total_reg_num
 
+let get_default_info = Ptr_info.PtrInfo.get_default_info
+let get_const_default_info = Ptr_info.PtrInfo.get_const_default_info
+let get_input_info = Ptr_info.PtrInfo.get_input_info
+
 let get_reg_taint (reg_taint: (Isa_basic.IsaBasic.register * bool) list) : (bool option) list =
   List.fold_left (
     fun (acc: (bool option) list) (reg, taint) ->
@@ -20,16 +24,16 @@ let standalone_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
 
 let standalone_salsa20 : Base_func_interface.mem_t = [
   "salsa20_words", [
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    get_default_info (r RSI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
   "salsa20_block", [
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    get_default_info (r RSI), [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
   "salsa20", [
-    r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
-    r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
+    get_default_info (r RDX), [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
   "_start", [
   ]
@@ -39,7 +43,7 @@ let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
   "_start",
   get_reg_taint [],
   [
-    r RSP, [];
+    get_default_info (r RSP), [];
   ];
 ]
 
@@ -51,16 +55,16 @@ let standalone_salsa20_noinline_global : External_layouts.GlobalSymbolLayout.t =
 
 let standalone_salsa20_noinline : Base_func_interface.mem_t = [
   "salsa20_words", [
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    get_default_info (r RSI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
   ];
   "salsa20_block", [
-    r RDI, [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
-    r RSI, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
+    get_default_info (r RSI), [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ];
   ];
   "salsa20", [
-    r RDI, [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
-    r RDX, [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
+    get_default_info (r RDI), [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
+    get_default_info (r RDX), [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
   "_start", [
   ]
@@ -70,7 +74,7 @@ let standalone_salsa20_noinline_taint_api : Taint_api.TaintApi.t = [
   "_start",
   get_reg_taint [],
   [
-    r RSP, [];
+    get_default_info (r RSP), [];
   ];
 ]
 
@@ -82,14 +86,14 @@ let bench_sha512_plain_global : External_layouts.GlobalSymbolLayout.t = [
 
 let bench_sha512_plain : Base_func_interface.mem_t = [
   "sha512_block_data_order", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
   ];
   "SHA512_Final", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_default_info (r RSI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
@@ -99,8 +103,8 @@ let bench_sha512_plain : Base_func_interface.mem_t = [
     ];
   ];
   "SHA512", [
-    r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    get_const_default_info (r RDI), [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
+    get_default_info (r RDX), [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
   ];
   "main", [
   ]
@@ -110,7 +114,7 @@ let bench_sha512_plain_taint_api : Taint_api.TaintApi.t = [
   "main",
   get_reg_taint [],
   [
-    r RSP, [];
+    get_default_info (r RSP), [];
   ];
 ]
 
@@ -133,7 +137,7 @@ let bench_ed25519_plain_global : External_layouts.GlobalSymbolLayout.t = [
 
 let bench_ed25519_plain : Base_func_interface.mem_t = [
   "SHA512_Init", [
-    r RDI, [ 
+    get_default_info (r RDI), [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [], SingleVar (total_reg_num + 2);
@@ -143,14 +147,14 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
     ];
   ];
   "sha512_block_data_order", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
   ];
   "SHA512_Final", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_default_info (r RSI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
@@ -160,58 +164,58 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
     ];
   ];
   "OPENSSL_cleanse", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop;
     ];
   ];
   "fe_mul_impl", [
-    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RDI) [r RSI; r RDX] true, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
+    get_input_info (r RSI) [r RDI; r RDX] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RDX) [r RDI; r RSI] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "ge_madd", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
     ];
-    r RDX, [
+    get_const_default_info (r RDX), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
     ];
   ];
   "ge_p2_dbl", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
     ];
   ];
   "fe_tobytes", [
-    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "x25519_ge_p1p1_to_p2", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
@@ -219,13 +223,13 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
     ];
   ];
   "x25519_ge_p1p1_to_p3", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
@@ -233,11 +237,11 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
     ];
   ];
   "CRYPTO_memcmp", [
-    r RDI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RDI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
   ];
   "SHA512_Update", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
@@ -245,35 +249,35 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
   ];
   "SHA512", [
-    r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    get_const_default_info (r RDI), [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
+    get_default_info (r RDX), [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
   ];
   "x25519_sc_reduce", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "table_select", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
     ];
   ];
   "x25519_ge_scalarmult_base", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
   ];
   "ED25519_sign", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
-    r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RCX), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "main", [
   ];
@@ -300,7 +304,7 @@ let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t 
 
 let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
   "SHA512_Init", [
-    r RDI, [ 
+    get_default_info (r RDI), [ 
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [], SingleVar (total_reg_num + 2);
@@ -310,14 +314,14 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     ];
   ];
   "sha512_block_data_order", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX))), RangeConst [(SingleConst 0L, SingleBExp (SingleMul, SingleConst 128L, SingleVar (r RDX)))], SingleTop ];
   ];
   "SHA512_Final", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_default_info (r RSI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
@@ -327,66 +331,71 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     ];
   ];
   "OPENSSL_cleanse", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleVar (r RSI)), RangeConst [], SingleTop;
     ];
   ];
   "fe_mul_impl", [
-    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RDI) [r RSI; r RDX] true, [ (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop ];
+    get_input_info (r RSI) [r RDI; r RDX] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RDX) [r RDI; r RSI] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "fe_mul_impl_self2", [
-    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+  ];
+  "fe_mul_ttt", [
+    get_input_info (r RDI) [r RSI; r RDX] true, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RSI) [r RDI; r RDX] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_input_info (r RDX) [r RDI; r RSI] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "fe_mul_ttt_self1", [
-    r RDI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "ge_madd", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
     ];
-    r RDX, [
+    get_const_default_info (r RDX), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
     ];
   ];
   "ge_p2_dbl", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
     ];
   ];
   "fe_tobytes", [
-    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
   "x25519_ge_p1p1_to_p2", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
@@ -394,13 +403,13 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     ];
   ];
   "x25519_ge_p1p1_to_p3", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
@@ -408,11 +417,11 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     ];
   ];
   "CRYPTO_memcmp", [
-    r RDI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RDI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
   ];
   "SHA512_Update", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
@@ -420,40 +429,40 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
   ];
   "SHA512", [
-    r RDI, [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    get_const_default_info (r RDI), [ (SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop ];
+    get_default_info (r RDX), [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
   ];
   "x25519_sc_reduce", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "table_select", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
     ];
   ];
   "x25519_ge_scalarmult_base", [
-    r RDI, [
+    get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
       (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
     ];
-    r RSI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
   ];
   "sc_muladd", [
-    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-    r RDX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
-    r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_const_default_info (r RDX), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_const_default_info (r RCX), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "ge_p3_tobytes", [
-    r RDI, [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
-    r RSI, [
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    get_const_default_info (r RSI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
       (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
       (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
@@ -461,9 +470,9 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     ];
   ];
   "ED25519_sign", [
-    r RDI, [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
-    r RSI, [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
-    r RCX, [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop ];
+    get_const_default_info (r RSI), [ (SingleConst 0L, SingleVar (r RDX)), RangeConst [(SingleConst 0L, SingleVar (r RDX))], SingleTop ];
+    get_const_default_info (r RCX), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "main", [
   ];
@@ -473,7 +482,7 @@ let bench_ed25519_plain_noinline_taint_api : Taint_api.TaintApi.t = [
   "main",
   get_reg_taint [],
   [
-    r RSP, [];
+    get_default_info (r RSP), [];
   ];
 ]
 
@@ -506,12 +515,12 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
   ) in_reg
   in
   let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-    r RDI, [ 
+    get_default_info (r RDI), [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [], 
       (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
     ];
-    r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+    get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
   ] in
   let mem_context = 
     Taint_type_infer.TaintTypeInfer.ArchType.MemType.get_all_mem_constraint
@@ -525,22 +534,22 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_taint_context = [];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-      r RDI, [ 
+      get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
         (Single_exp.SingleExp.SingleTop, Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num)) 
       ];
-      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+      get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
     out_context = [];
     out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-      r RDI, [ 
+      get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [], 
         Call_anno_type.CallAnno.BaseAsReg RDI
       ];
-      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
+      get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
     ];
   }
 
@@ -564,17 +573,17 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
   let dest_taint = Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num) in
   let src_taint = Taint_exp.TaintExp.TaintVar (Isa_basic.IsaBasic.total_reg_num + 1) in
   let in_mem : Taint_type_infer.TaintTypeInfer.ArchType.MemType.t = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-    r RDI, [ 
+    get_default_info (r RDI), [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [], 
       (Single_exp.SingleExp.SingleTop, dest_taint) 
     ];
-    r RSI, [ 
+    get_const_default_info (r RSI), [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
       (Single_exp.SingleExp.SingleTop, src_taint) 
     ];
-    r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+    get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
   ] in
   let mem_context = 
     Taint_type_infer.TaintTypeInfer.ArchType.MemType.get_all_mem_constraint
@@ -588,32 +597,32 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_taint_context = [ src_taint, dest_taint ];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-      r RDI, [ 
+      get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
         (Single_exp.SingleExp.SingleTop, dest_taint) 
       ];
-      r RSI, [ 
+      get_const_default_info (r RSI), [ 
       (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
       RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
       (Single_exp.SingleExp.SingleTop, src_taint) 
       ];
-      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
+      get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], (SingleTop, TaintConst true) ];
     ];
     out_context = [];
     out_single_subtype_list = [];
     base_info = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
-      r RDI, [ 
+      get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [], 
         Call_anno_type.CallAnno.BaseAsReg RDI
       ];
-      r RSI, [ 
+      get_const_default_info (r RSI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
         Call_anno_type.CallAnno.BaseAsReg RSI 
       ];
-      r RSP, [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
+      get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
     ];
   }
 

@@ -1,4 +1,5 @@
 open Isa
+open Ptr_info
 open Single_entry_type
 open Taint_exp
 open Taint_entry_type
@@ -65,7 +66,8 @@ module TaintApi = struct
           (MemOffset.add_base (SingleVar var_id) off, MemRange.add_base (SingleVar var_id) range, bool_val)
         ) slots 
       in
-      var_id, slots
+      (* If symbol start with "."*)
+      PtrInfo.get_read_write_info var_id true (not (Isa.is_compiler_gen_rom symbol)), slots
     ) used_symbols in
     mem_api @ symbol_layouts
 
