@@ -10,10 +10,11 @@ open Cond_type_new
 open Single_context
 open Constraint
 (* open Arch_type *)
+open Set_sexp
 open Sexplib.Std
 
 module MemKeySet = struct
-include Set.Make(Int)
+include IntSet
   
   exception MemKeySetError of string
   let mem_key_set_error msg = raise (MemKeySetError ("[Mem Key Set Error] " ^ msg))
@@ -1272,25 +1273,25 @@ module MemType (Entry: EntryType) = struct
         SingleContext.Cond (Eq, SingleBExp (SingleAnd, SingleVar ptr, SingleConst (Int64.sub align 1L)), SingleConst 0L)
     ) (get_mem_align_constraint_helper mem_type)
 
-  let get_mem_boundary_list (mem_type: t) : MemOffset.t list =
+  let get_mem_boundary_list (mem_type: t) : (PtrInfo.t * MemOffset.t) list =
     let helper 
         (part_mem: 'a mem_part) :
-        MemOffset.t option =
-      let _, offset_list = part_mem in
+        (PtrInfo.t * MemOffset.t) option =
+      let ptr_info, offset_list = part_mem in
       match offset_list with
       | [] -> None
       | ((l, r), _, _) :: [] ->
         if SingleExp.cmp l r = 0 then None
-        else Some (l, r)
+        else Some (ptr_info, (l, r))
       | ((l, _), _, _) :: tl ->
         let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
-        Some (l, r)
+        Some (ptr_info, (l, r))
     in
     List.filter_map helper mem_type
 
-  let get_mem_boundary_constraint_helper (boundary_list: MemOffset.t list) : SingleContext.t list =
+  let get_mem_boundary_constraint_helper (boundary_list: (PtrInfo.t * MemOffset.t) list) : SingleContext.t list =
     List.concat_map (
-        fun (l, r) -> 
+        fun (_, (l, r)) -> 
           (* get_num_entry_constraint (SingleExp.eval (SingleBExp (SingleSub, r, l))) @  *)
           let len = SingleExp.eval (SingleBExp (SingleSub, r, l)) in
           let len_no_overflow_constraint =
@@ -1305,18 +1306,20 @@ module MemType (Entry: EntryType) = struct
 
   let rec get_mem_non_overlap_constraint_helper
       (acc: SingleContext.t list)
-      (boundary_list: MemOffset.t list) :
+      (boundary_list: (PtrInfo.t * MemOffset.t) list) :
       SingleContext.t list =
     match boundary_list with
     | [] -> acc
-    | (hd_l, hd_r) :: tl ->
+    | ((_, (hd_overlap_set, _, _)), (hd_l, hd_r)) :: tl ->
       let acc = get_mem_non_overlap_constraint_helper acc tl in
       List.fold_left (
-          fun (acc: SingleContext.t list) (l, r) ->
-            (SingleContext.Or [
-              Cond (Le, hd_r, l);
-              Cond (Le, r, hd_l);
-            ]) :: acc
+          fun (acc: SingleContext.t list) ((ptr, _), (l, r)) ->
+            if IntSet.mem ptr hd_overlap_set then acc
+            else 
+              (SingleContext.Or [
+                Cond (Le, hd_r, l);
+                Cond (Le, r, hd_l);
+              ]) :: acc
         ) acc tl
 
   let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
