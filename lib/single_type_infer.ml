@@ -855,7 +855,7 @@ module SingleTypeInfer = struct
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
     (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    let func_mem_interface_list = 
+    (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
         "ge_p3_tobytes";
         "fe_tobytes";
@@ -870,7 +870,7 @@ module SingleTypeInfer = struct
         "x25519_ge_p1p1_to_p2";
         "x25519_ge_scalarmult_base"; *)
       ] 
-    in
+    in *)
 
     let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
       let label, _, _ = interface in
