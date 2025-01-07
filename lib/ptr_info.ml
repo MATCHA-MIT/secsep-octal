@@ -33,6 +33,12 @@ module PtrInfo = struct
     else
       info
 
+  let invalidate (invalid_set: IntSet.t) (info: t) : t =
+    let info_ptr, (info_set, _, info_write) = info in
+    if IntSet.mem info_ptr invalid_set then
+      info_ptr, (info_set, false, info_write)
+    else info
+
   let can_read_info (info: info_t) : bool =
     let _, read, _ = info in read
   

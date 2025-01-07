@@ -14,6 +14,7 @@ open Single_subtype
 open Single_input_var_cond_subtype
 open Single_block_invariance
 open Single_ret_invariance
+open Mem_alive
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
@@ -31,6 +32,7 @@ module SingleTypeInfer = struct
   module ArchType = SingleSubtype.ArchType
   module FuncInterface = ArchType.FuncInterface
   module BlockAlive = BlockAlive (SingleEntryType)
+  module MemAlive = MemAlive (SingleEntryType)
 
   type t = {
     func_name: Isa.label;
@@ -737,9 +739,12 @@ module SingleTypeInfer = struct
             func_type, []
         in
 
+        (* 8. Prop not alive ptr *)
+        let func_type = MemAlive.solve block_subtype func_type in
+
         let state = { state with func_type = func_type; ret_subtype_list = ret_subtype_list } in
 
-        (* 8. Single type infer *)
+        (* 9. Single type infer *)
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
