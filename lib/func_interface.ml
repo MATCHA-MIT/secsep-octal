@@ -338,7 +338,7 @@ module FuncInterface (Entry: EntryType) = struct
       let p_mem, constraint_list, acc_useful_vars = acc in
       let (ptr, _), read_hint = read_hint_entry in
       let (ptr2, _), write_mem = write_mem_entry in
-      if ptr = ptr2 then
+      if ptr = ptr2 then (* both ptr and ptr2 refer to ptr under child context *)
         if SingleExp.SingleVarSet.mem ptr single_var_set then
           let p_base = SingleExp.repl_context_var single_var_map (SingleVar ptr) in
           match sub_sol_func p_base with

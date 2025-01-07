@@ -364,8 +364,9 @@ module MemType (Entry: EntryType) = struct
     let ptr_list = List.map (fun ((x, _), _) -> x) mem in
     SingleExp.SingleVarSet.of_list ptr_list
 
-  let get_part_mem (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : (MemOffset.t * MemRange.t * 'a) list =
-    let _, part_mem = List.find (fun ((x, _), _) -> x = ptr) mem in part_mem
+  let get_part_mem (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : 'a mem_part =
+    List.find (fun ((x, _), _) -> x = ptr) mem
+    (* let _, part_mem = List.find (fun ((x, _), _) -> x = ptr) mem in part_mem *)
 
   (* get the entry from memory type using strict comparison *)
   let get_mem_type_strict
@@ -523,7 +524,9 @@ module MemType (Entry: EntryType) = struct
     | Some b_l, Some b_r ->
       if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else 
-        let part_mem = get_part_mem mem b_l in
+        let ptr_info, part_mem = get_part_mem mem b_l in
+        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
+        else
         begin match get_part_mem_type smt_ctx (is_spill_func b_l) part_mem orig_addr_off simp_addr_off with
         | Some (is_full, find_entry) -> Some (is_full, b_l, find_entry, 1, [])
         | None -> (* Decide whether we want to try get_mult_slot_part_mem_type *)
@@ -581,7 +584,9 @@ module MemType (Entry: EntryType) = struct
       let s_ptr, s_off, is_full, num_slot = slot_info in
       match List.find_opt (fun ((ptr, _), _) -> ptr = s_ptr) mem with
       | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
-      | Some (_, part_mem) ->
+      | Some (ptr_info, part_mem) ->
+        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
+        else
         if num_slot = 1 then
           let lookup =
             List.find_map (
@@ -668,7 +673,9 @@ module MemType (Entry: EntryType) = struct
     | Some b_l, Some b_r ->
       if b_l <> b_r (* || b_l = IsaBasic.rsp_idx *) then None
       else
-        let part_mem = get_part_mem mem b_l in
+        let ptr_info, part_mem = get_part_mem mem b_l in
+        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
+        else
         begin match part_mem with
         | [ target_offset, _, _] -> Some target_offset
         | _ -> 
@@ -949,7 +956,9 @@ module MemType (Entry: EntryType) = struct
       match SingleExp.find_base_adv sub_sol_list_func simp_l ptr_set, SingleExp.find_base_adv sub_sol_list_func simp_r ptr_set with
       | Some b_l, Some b_r ->
         if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
-        else let part_mem = get_part_mem mem b_l in
+        else let ptr_info, part_mem = get_part_mem mem b_l in
+        if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot write to ptr %d" b_l)
+        else
         begin match set_part_mem_type smt_ctx is_spill_func update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
         | Some (new_part_mem, new_cons, slot_anno) ->
           Some (
@@ -961,7 +970,11 @@ module MemType (Entry: EntryType) = struct
             match set_mult_slot_part_mem_type_helper is_spill_func update_init_range b_l part_mem simp_addr_off (simp_entry_func new_type) with
             | Some (new_part_mem, new_cons, slot_anno) ->
               Some (
-                List.map (fun ((p, p_info), entry) -> if p = b_l then ((p, p_info), new_part_mem) else ((p, p_info), entry)) mem,
+                List.map (
+                  fun ((p, p_info), entry) -> 
+                    if p = b_l then ((p, p_info), new_part_mem) 
+                    else (PtrInfo.invalidate_on_write b_l (p, p_info), entry)
+                ) mem,
                 new_cons, slot_anno
               )
             | None -> None
@@ -1106,14 +1119,20 @@ module MemType (Entry: EntryType) = struct
       let s_ptr, _, _, num_slot = slot_info in
       match List.find_opt (fun ((ptr, _), _) -> ptr = s_ptr) mem with
       | None -> mem_type_error (Printf.sprintf "set_slot_mem_type cannot find slot %s" (MemAnno.slot_to_string (Some slot_info)))
-      | Some (_, part_mem) ->
+      | Some (ptr_info, part_mem) ->
+        if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
+        else
         let part_mem, constraints = 
           if num_slot = 1 then
             set_slot_part_mem_type smt_ctx is_spill_func update_init_range part_mem orig_addr_off slot_info new_type
           else
             set_mult_slot_part_mem_type is_spill_func update_init_range part_mem slot_info (simp_entry_func new_type)
         in
-        List.map (fun ((ptr, ptr_info), p_mem) -> if ptr = s_ptr then ((ptr, ptr_info), part_mem) else ((ptr, ptr_info), p_mem)) mem,
+        List.map (
+          fun ((ptr, ptr_info), p_mem) -> 
+            if ptr = s_ptr then ((ptr, ptr_info), part_mem) 
+            else (PtrInfo.invalidate_on_write s_ptr (ptr, ptr_info), p_mem)
+        ) mem,
         constraints,
         true
 
