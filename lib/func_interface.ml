@@ -236,38 +236,45 @@ module FuncInterface (Entry: EntryType) = struct
       (var_map_set: var_map_set_t)
       (parent_entry: MemOffset.t * MemRange.t * entry_t)
       (read_hint: bool * MemRange.t * entry_t)
+      (write_mem_can_write: bool)
       (write_mem: MemOffset.t * MemRange.t * entry_t) :
       (MemOffset.t * MemRange.t * entry_t) * (Constraint.t list) * SingleExp.SingleVarSet.t =
     let single_var_map, single_var_set, var_map = var_map_set in
     let p_off, p_range, p_entry = parent_entry in
-    let is_full, m_in_range, _ = read_hint in
-    let _, c_out_range, c_out_entry = write_mem in 
+    (* Note: m_in_range = repl_context_var c_in_range *)
+    let is_full, m_in_range, c_in_entry = read_hint in
+    (* let _, c_out_range, c_out_entry = write_mem in  *)
     let read_range_constraint = Constraint.gen_range_subset m_in_range p_range p_off in
-    let p_range, out_range_constraint, out_range_useful_var =
-      if MemRange.is_val single_var_set c_out_range then
-        let m_out_range = MemRange.repl_context_var single_var_map c_out_range in
-        MemRange.merge smt_ctx p_range m_out_range, [], MemRange.get_vars m_out_range
-      else p_range, [ Constraint.Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
+    let m_in_entry =
+      if Entry.is_val2 var_map c_in_entry then Entry.repl_context_var var_map c_in_entry
+      else Entry.get_top_type () (* Here we somehow assert during taint infer we always get full map so that we do not call this with TaintEntryType. *)
     in
-    (* Question: do we need this optimization? *)
-    (* if Entry.cmp c_in_entry c_out_entry = 0 && Entry.cmp c_in_entry Entry.get_top_type <> 0 then 
-      (* NOTE: if not top and unchanged, then is not overwritten *)
-      (p_off, p_range, p_entry), read_range_constraint @ out_range_constraint
-    else  *)
-      begin
-      let m_out_entry = 
-        if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
-        else Entry.get_top_type ()
+    (* We compare with m_in_entry to generate constraints, since m_out_entry may be invalid for read-only entries. *)
+    (* We don't need to compare with m_out_entry since it is ensured by taint type check/inference of the child function!!! *)
+    let taint_val_constraint = Entry.get_eq_taint_constraint p_entry m_in_entry in
+    if not write_mem_can_write then (* We do not upate mem slot type for read-only entries *)
+      parent_entry,
+      read_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+      SingleExp.SingleVarSet.empty
+    else begin
+      let _, c_out_range, c_out_entry = write_mem in
+      let p_range, out_range_constraint, out_range_useful_var =
+        if MemRange.is_val single_var_set c_out_range then
+          let m_out_range = MemRange.repl_context_var single_var_map c_out_range in
+          MemRange.merge smt_ctx p_range m_out_range, [], MemRange.get_vars m_out_range
+        else p_range, [ Constraint.Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
       in
-      (* We don't need to compare with m_in_entry since it is ensured by taint type check/inference of the child function!!! *)
-      let write_val_constraint = Entry.get_eq_taint_constraint p_entry m_out_entry in
+      let m_out_entry = (* m_out_entry is only used to update the slot when the corresponding part_mem is writable *)
+        if Entry.is_val2 var_map c_out_entry then Entry.repl_context_var var_map c_out_entry
+        else Entry.get_top_type () (* Here we somehow assert during taint infer we always get full map so that we do not call this with TaintEntryType. *)
+      in
       if is_full then 
-        (p_off, p_range, m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
-        out_range_useful_var
+      (p_off, p_range, m_out_entry), 
+      read_range_constraint @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+      out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
-        read_range_constraint @ out_range_constraint @ write_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+        read_range_constraint @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
         out_range_useful_var
     end
 
@@ -277,6 +284,7 @@ module FuncInterface (Entry: EntryType) = struct
       (var_map_set: var_map_set_t)
       (parent_entry: (MemOffset.t * MemRange.t * entry_t) list)
       (read_hint: read_hint_t list)
+      (write_mem_can_write: bool)
       (write_mem: (MemOffset.t * MemRange.t * entry_t) list) :
       ((MemOffset.t * MemRange.t * entry_t) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
     let rec helper
@@ -298,7 +306,7 @@ module FuncInterface (Entry: EntryType) = struct
         write_entry :: write_mem_tl ->
         if MemOffset.cmp p_off mp_off = 0 then
           let new_entry, new_constraints, new_useful_vars = 
-            set_one_entry smt_ctx var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_entry 
+            set_one_entry smt_ctx var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_mem_can_write write_entry 
           in
           if is_full then
             helper 
@@ -337,7 +345,8 @@ module FuncInterface (Entry: EntryType) = struct
         MemType.t * (Constraint.t list) * SingleExp.SingleVarSet.t =
       let p_mem, constraint_list, acc_useful_vars = acc in
       let (ptr, _), read_hint = read_hint_entry in
-      let (ptr2, _), write_mem = write_mem_entry in
+      let (ptr2, write_ptr_info), write_mem = write_mem_entry in
+      let callee_write_mem_can_write = PtrInfo.can_write_info write_ptr_info in
       if ptr = ptr2 then (* both ptr and ptr2 refer to ptr under child context *)
         if SingleExp.SingleVarSet.mem ptr single_var_set then
           let p_base = SingleExp.repl_context_var single_var_map (SingleVar ptr) in
@@ -347,8 +356,12 @@ module FuncInterface (Entry: EntryType) = struct
             | Some p_ptr ->
               let find_result =
                 List.find_map (
-                  fun ((x, _), part_mem) ->
-                    if x = p_ptr then Some (set_part_mem smt_ctx var_map_set part_mem read_hint write_mem)
+                  fun ((x, p_ptr_info), part_mem) ->
+                    if x = p_ptr then
+                      if callee_write_mem_can_write && not (PtrInfo.can_write_info p_ptr_info) then
+                        func_interface_error (Printf.sprintf "Child want to write not writable parent mem with ptr %d" p_ptr)
+                      else
+                        Some (set_part_mem smt_ctx var_map_set part_mem read_hint callee_write_mem_can_write write_mem)
                     else None
                 ) p_mem
               in
@@ -356,7 +369,8 @@ module FuncInterface (Entry: EntryType) = struct
               | Some (new_part_mem, new_constraints, new_useful_vars) ->
                 List.map (
                   fun ((x, x_info), part_mem) -> 
-                    if x = p_ptr then (x, x_info), new_part_mem else (x, x_info), part_mem
+                    if x = p_ptr then (x, x_info), new_part_mem 
+                    else PtrInfo.invalidate_on_write p_ptr (x, x_info), part_mem
                 ) p_mem, 
                 new_constraints @ constraint_list,
                 SingleExp.SingleVarSet.union acc_useful_vars new_useful_vars
