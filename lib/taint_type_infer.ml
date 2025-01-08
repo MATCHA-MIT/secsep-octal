@@ -184,7 +184,7 @@ module TaintTypeInfer = struct
        For the simpilicity of taint infer of other functions on calling this function,
        we manually set its out_mem taint with its in_mem taint. *)
     let simplified_out_mem =
-      ArchType.MemType.map2 TaintEntryType.set_taint_with_other func_interface.out_mem func_interface.in_mem
+      ArchType.MemType.map2 true TaintEntryType.set_taint_with_other func_interface.out_mem func_interface.in_mem
     in
     { func_interface with
       in_taint_context = infer_state.taint_context;

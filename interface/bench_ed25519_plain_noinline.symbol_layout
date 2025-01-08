@@ -53,12 +53,4 @@
  (.LCPI18_0
   ((((SingleConst 0) (SingleConst 16))
     (RangeConst (((SingleConst 0) (SingleConst 16))))
-    (SingleTop (TaintConst false)))))
- (.LCPI20_0
-  ((((SingleConst 0) (SingleConst 16))
-    (RangeConst (((SingleConst 0) (SingleConst 16))))
-    (SingleTop (TaintConst false)))))
- (.LCPI21_0
-  ((((SingleConst 0) (SingleConst 16))
-    (RangeConst (((SingleConst 0) (SingleConst 16))))
     (SingleTop (TaintConst false))))))

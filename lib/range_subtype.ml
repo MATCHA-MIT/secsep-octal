@@ -108,7 +108,7 @@ module RangeSubtype = struct
         (acc: ('a * type_exp_t list) ArchType.MemType.mem_content)
         (sub_block: ArchType.t) :
         ('a * type_exp_t list) ArchType.MemType.mem_content =
-      ArchType.MemType.map2_full (
+      ArchType.MemType.map2_full true (
         fun (off, range, (sup, sub_list)) (_, sub_range, _) ->
           off, range, (sup, (sub_range, sub_block.pc) :: sub_list)
       ) acc sub_block.mem_type

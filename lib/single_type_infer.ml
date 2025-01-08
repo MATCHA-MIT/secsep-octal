@@ -865,8 +865,8 @@ module SingleTypeInfer = struct
         "ge_p3_tobytes";
         "fe_tobytes";
         "fe_mul_impl";
-        "fe_mul_impl_self2";
-        "fe_mul_ttt_self1";
+        (* "fe_mul_impl_self2";
+        "fe_mul_ttt_self1"; *)
         (* "fe_mul_impl";
         "table_select";
         "ge_madd";

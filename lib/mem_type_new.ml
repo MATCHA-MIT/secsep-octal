@@ -94,6 +94,7 @@ module MemTypeBasic = struct
     List.map helper_outer mem
 
   let map2 
+      (keep_first_ptr_info: bool)
       (func: 'a -> 'b -> 'c) 
       (mem1: 'a mem_content) (mem2: 'b mem_content) : 
       'c mem_content =
@@ -112,16 +113,18 @@ module MemTypeBasic = struct
         (entry1: 'a mem_part)
         (entry2: 'b mem_part) :
         'c mem_part =
-      let ptr1, part_mem1 = entry1 in
-      let ptr2, part_mem2 = entry2 in
+      let (ptr1, ptr1_info), part_mem1 = entry1 in
+      let (ptr2, ptr2_info), part_mem2 = entry2 in
       if ptr1 = ptr2 then
-        ptr1, List.map2 helper_inner part_mem1 part_mem2
+        let ptr_info = if keep_first_ptr_info then ptr1_info else ptr2_info in
+        (ptr1, ptr_info), List.map2 helper_inner part_mem1 part_mem2
       else
         mem_type_error "[map2] ptr does not match"
     in
     List.map2 helper_outer mem1 mem2
 
   let map2_full
+      (keep_first_ptr_info: bool)
       (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b ->
               MemOffset.t * MemRange.t * 'c)
       (mem1: 'a mem_content) (mem2: 'b mem_content) : 'c mem_content =
@@ -129,10 +132,11 @@ module MemTypeBasic = struct
         (entry1: 'a mem_part)
         (entry2: 'b mem_part) :
         'c mem_part =
-      let ptr1, part_mem1 = entry1 in
-      let ptr2, part_mem2 = entry2 in
+      let (ptr1, ptr1_info), part_mem1 = entry1 in
+      let (ptr2, ptr2_info), part_mem2 = entry2 in
       if ptr1 = ptr2 then
-        ptr1, List.map2 func part_mem1 part_mem2
+        let ptr_info = if keep_first_ptr_info then ptr1_info else ptr2_info in
+        (ptr1, ptr_info), List.map2 func part_mem1 part_mem2
       else
         mem_type_error "[map2_full] ptr does not match"
     in
@@ -216,8 +220,8 @@ module MemTypeBasic = struct
         (acc: 'acc) 
         (entry1: 'a mem_part)
         (entry2: 'b mem_part) : 'acc =
-      let v1, l1 = entry1 in
-      let v2, l2 = entry2 in
+      let (v1, _), l1 = entry1 in
+      let (v2, _), l2 = entry2 in
       if v1 = v2 then List.fold_left2 helper_inner acc l1 l2
       else mem_type_error "[fold_left2] ptr does not match"
     in
@@ -232,8 +236,8 @@ module MemTypeBasic = struct
         (acc: 'acc)
         (entry1: 'a mem_part)
         (entry2: 'b mem_part) : 'acc =
-      let v1, l1 = entry1 in
-      let v2, l2 = entry2 in
+      let (v1, _), l1 = entry1 in
+      let (v2, _), l2 = entry2 in
       if v1 = v2 then List.fold_left2 func acc l1 l2
       else mem_type_error "[fold_left2_full] ptr does not match"
     in
@@ -377,7 +381,7 @@ module MemType (Entry: EntryType) = struct
     List.find_map (
       fun mem_part ->
         let (base', _), slots = mem_part in
-        if base' != base then None else
+        if base' <> base then None else
         List.find_map (
           fun (off', _, entry) ->
             if MemOffset.cmp off' off = 0 then Some entry
@@ -547,7 +551,7 @@ module MemType (Entry: EntryType) = struct
         ((x, x_info), x_mem, SingleExp.SingleVarSet.exists (fun z -> z = x) related_vars, List.length x_mem)
       ) mem
       in
-      let sorted_mem = List.sort (fun (x, _, x_related, x_len) (y, _, y_related, y_len) ->
+      let sorted_mem = List.sort (fun ((x, _), _, x_related, x_len) ((y, _), _, y_related, y_len) ->
         if x = y then 0 else
         let len_cmp = Int.compare x_len y_len in
         if x_related && y_related then len_cmp else
@@ -962,7 +966,9 @@ module MemType (Entry: EntryType) = struct
         begin match set_part_mem_type smt_ctx is_spill_func update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
         | Some (new_part_mem, new_cons, slot_anno) ->
           Some (
-            List.map (fun ((p, p_info), entry) -> if p = b_l then ((p, p_info), new_part_mem) else ((p, p_info), entry)) mem,
+            List.map (fun ((p, p_info), entry) -> 
+              if p = b_l then ((p, p_info), new_part_mem) 
+              else (PtrInfo.invalidate_on_write b_l (p, p_info), entry)) mem,
             new_cons, slot_anno
           )
         | None ->

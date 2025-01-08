@@ -370,7 +370,11 @@ module FuncInterface (Entry: EntryType) = struct
                 List.map (
                   fun ((x, x_info), part_mem) -> 
                     if x = p_ptr then (x, x_info), new_part_mem 
-                    else PtrInfo.invalidate_on_write p_ptr (x, x_info), part_mem
+                    else
+                      if callee_write_mem_can_write then
+                        PtrInfo.invalidate_on_write p_ptr (x, x_info), part_mem
+                      else
+                        (x, x_info), part_mem
                 ) p_mem, 
                 new_constraints @ constraint_list,
                 SingleExp.SingleVarSet.union acc_useful_vars new_useful_vars

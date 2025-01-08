@@ -1,6 +1,7 @@
 ((SHA512_Init
-  ((4 ((((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+  (((4 (() true true))
+    ((((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)
      (((SingleConst 64) (SingleConst 72)) (RangeConst ()) (SingleVar 25))
      (((SingleConst 72) (SingleConst 80)) (RangeConst ()) (SingleVar 26))
@@ -9,7 +10,7 @@
      (((SingleConst 212) (SingleConst 216)) (RangeConst ()) (SingleVar 28)))))
   ())
  (sha512_block_data_order
-  ((4
+  (((4 (() true true))
     ((((SingleConst -376) (SingleConst -368)) (RangeConst ()) SingleTop)
      (((SingleConst -368) (SingleConst -360)) (RangeConst ()) SingleTop)
      (((SingleConst -360) (SingleConst -352)) (RangeConst ()) SingleTop)
@@ -58,10 +59,10 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0)
        (SingleBExp SingleMul (SingleConst 128) (SingleVar 2)))
       (RangeConst
@@ -77,14 +78,15 @@
    (-88 -80) (-80 -72) (-72 -64) (-64 -56) (-56 -48) (-48 -40) (-40 -32)
    (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (SHA512_Final
-  ((4
+  (((4 (() true true))
     ((((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
-   (6
+   ((7 (() true true))
+    ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+   ((6 (() true true))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)
      (((SingleConst 64) (SingleConst 72))
@@ -99,13 +101,14 @@
       (RangeConst (((SingleConst 212) (SingleConst 216)))) (SingleVar 28)))))
   ((-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (OPENSSL_cleanse
-  ((4
+  (((4 (() true true))
     ((((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleVar 6)) (RangeConst ()) SingleTop))))
+   ((7 (() true true))
+    ((((SingleConst 0) (SingleVar 6)) (RangeConst ()) SingleTop))))
   ((-8 0)))
  (fe_mul_impl
-  ((4
+  (((4 (() true true))
     ((((SingleConst -368) (SingleConst -360)) (RangeConst ()) SingleTop)
      (((SingleConst -360) (SingleConst -352)) (RangeConst ()) SingleTop)
      (((SingleConst -352) (SingleConst -344)) (RangeConst ()) SingleTop)
@@ -153,136 +156,12 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)))
-   (6
+   ((7 ((2 6) true true))
+    ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)))
+   ((6 ((2 7) true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)))
-   (2
-    ((((SingleConst 0) (SingleConst 40))
-      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop))))
-  ((-368 -360) (-360 -352) (-352 -344) (-344 -336) (-336 -328) (-328 -320)
-   (-320 -312) (-312 -304) (-304 -296) (-296 -288) (-288 -280) (-280 -272)
-   (-272 -264) (-264 -256) (-256 -248) (-248 -240) (-240 -232) (-232 -224)
-   (-224 -216) (-216 -208) (-208 -200) (-200 -192) (-192 -184) (-184 -176)
-   (-176 -168) (-168 -160) (-160 -152) (-152 -144) (-144 -136) (-136 -128)
-   (-128 -120) (-120 -112) (-112 -104) (-104 -96) (-96 -88) (-88 -80)
-   (-80 -72) (-72 -64) (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24)
-   (-24 -16) (-16 -8) (-8 0)))
- (fe_mul_impl_self2
-  ((4
-    ((((SingleConst -360) (SingleConst -352)) (RangeConst ()) SingleTop)
-     (((SingleConst -352) (SingleConst -344)) (RangeConst ()) SingleTop)
-     (((SingleConst -344) (SingleConst -336)) (RangeConst ()) SingleTop)
-     (((SingleConst -336) (SingleConst -328)) (RangeConst ()) SingleTop)
-     (((SingleConst -328) (SingleConst -320)) (RangeConst ()) SingleTop)
-     (((SingleConst -320) (SingleConst -312)) (RangeConst ()) SingleTop)
-     (((SingleConst -312) (SingleConst -304)) (RangeConst ()) SingleTop)
-     (((SingleConst -304) (SingleConst -296)) (RangeConst ()) SingleTop)
-     (((SingleConst -296) (SingleConst -288)) (RangeConst ()) SingleTop)
-     (((SingleConst -288) (SingleConst -280)) (RangeConst ()) SingleTop)
-     (((SingleConst -280) (SingleConst -272)) (RangeConst ()) SingleTop)
-     (((SingleConst -272) (SingleConst -264)) (RangeConst ()) SingleTop)
-     (((SingleConst -264) (SingleConst -256)) (RangeConst ()) SingleTop)
-     (((SingleConst -256) (SingleConst -248)) (RangeConst ()) SingleTop)
-     (((SingleConst -248) (SingleConst -240)) (RangeConst ()) SingleTop)
-     (((SingleConst -240) (SingleConst -232)) (RangeConst ()) SingleTop)
-     (((SingleConst -232) (SingleConst -224)) (RangeConst ()) SingleTop)
-     (((SingleConst -224) (SingleConst -216)) (RangeConst ()) SingleTop)
-     (((SingleConst -216) (SingleConst -208)) (RangeConst ()) SingleTop)
-     (((SingleConst -208) (SingleConst -200)) (RangeConst ()) SingleTop)
-     (((SingleConst -200) (SingleConst -192)) (RangeConst ()) SingleTop)
-     (((SingleConst -192) (SingleConst -184)) (RangeConst ()) SingleTop)
-     (((SingleConst -184) (SingleConst -176)) (RangeConst ()) SingleTop)
-     (((SingleConst -176) (SingleConst -168)) (RangeConst ()) SingleTop)
-     (((SingleConst -168) (SingleConst -160)) (RangeConst ()) SingleTop)
-     (((SingleConst -160) (SingleConst -152)) (RangeConst ()) SingleTop)
-     (((SingleConst -152) (SingleConst -144)) (RangeConst ()) SingleTop)
-     (((SingleConst -144) (SingleConst -136)) (RangeConst ()) SingleTop)
-     (((SingleConst -136) (SingleConst -128)) (RangeConst ()) SingleTop)
-     (((SingleConst -128) (SingleConst -120)) (RangeConst ()) SingleTop)
-     (((SingleConst -120) (SingleConst -112)) (RangeConst ()) SingleTop)
-     (((SingleConst -112) (SingleConst -104)) (RangeConst ()) SingleTop)
-     (((SingleConst -104) (SingleConst -96)) (RangeConst ()) SingleTop)
-     (((SingleConst -96) (SingleConst -88)) (RangeConst ()) SingleTop)
-     (((SingleConst -88) (SingleConst -80)) (RangeConst ()) SingleTop)
-     (((SingleConst -80) (SingleConst -72)) (RangeConst ()) SingleTop)
-     (((SingleConst -72) (SingleConst -64)) (RangeConst ()) SingleTop)
-     (((SingleConst -64) (SingleConst -56)) (RangeConst ()) SingleTop)
-     (((SingleConst -56) (SingleConst -48)) (RangeConst ()) SingleTop)
-     (((SingleConst -48) (SingleConst -40)) (RangeConst ()) SingleTop)
-     (((SingleConst -40) (SingleConst -32)) (RangeConst ()) SingleTop)
-     (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
-     (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
-     (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
-     (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
-     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
-    ((((SingleConst 0) (SingleConst 40))
-      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)))
-   (6
-    ((((SingleConst 0) (SingleConst 40))
-      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop))))
-  ((-360 -352) (-352 -344) (-344 -336) (-336 -328) (-328 -320) (-320 -312)
-   (-312 -304) (-304 -296) (-296 -288) (-288 -280) (-280 -272) (-272 -264)
-   (-264 -256) (-256 -248) (-248 -240) (-240 -232) (-232 -224) (-224 -216)
-   (-216 -208) (-208 -200) (-200 -192) (-192 -184) (-184 -176) (-176 -168)
-   (-168 -160) (-160 -152) (-152 -144) (-144 -136) (-136 -128) (-128 -120)
-   (-120 -112) (-112 -104) (-104 -96) (-96 -88) (-88 -80) (-80 -72) (-72 -64)
-   (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8)
-   (-8 0)))
- (fe_mul_ttt_self1
-  ((4
-    ((((SingleConst -368) (SingleConst -360)) (RangeConst ()) SingleTop)
-     (((SingleConst -360) (SingleConst -352)) (RangeConst ()) SingleTop)
-     (((SingleConst -352) (SingleConst -344)) (RangeConst ()) SingleTop)
-     (((SingleConst -344) (SingleConst -336)) (RangeConst ()) SingleTop)
-     (((SingleConst -336) (SingleConst -328)) (RangeConst ()) SingleTop)
-     (((SingleConst -328) (SingleConst -320)) (RangeConst ()) SingleTop)
-     (((SingleConst -320) (SingleConst -312)) (RangeConst ()) SingleTop)
-     (((SingleConst -312) (SingleConst -304)) (RangeConst ()) SingleTop)
-     (((SingleConst -304) (SingleConst -296)) (RangeConst ()) SingleTop)
-     (((SingleConst -296) (SingleConst -288)) (RangeConst ()) SingleTop)
-     (((SingleConst -288) (SingleConst -280)) (RangeConst ()) SingleTop)
-     (((SingleConst -280) (SingleConst -272)) (RangeConst ()) SingleTop)
-     (((SingleConst -272) (SingleConst -264)) (RangeConst ()) SingleTop)
-     (((SingleConst -264) (SingleConst -256)) (RangeConst ()) SingleTop)
-     (((SingleConst -256) (SingleConst -248)) (RangeConst ()) SingleTop)
-     (((SingleConst -248) (SingleConst -240)) (RangeConst ()) SingleTop)
-     (((SingleConst -240) (SingleConst -232)) (RangeConst ()) SingleTop)
-     (((SingleConst -232) (SingleConst -224)) (RangeConst ()) SingleTop)
-     (((SingleConst -224) (SingleConst -216)) (RangeConst ()) SingleTop)
-     (((SingleConst -216) (SingleConst -208)) (RangeConst ()) SingleTop)
-     (((SingleConst -208) (SingleConst -200)) (RangeConst ()) SingleTop)
-     (((SingleConst -200) (SingleConst -192)) (RangeConst ()) SingleTop)
-     (((SingleConst -192) (SingleConst -184)) (RangeConst ()) SingleTop)
-     (((SingleConst -184) (SingleConst -176)) (RangeConst ()) SingleTop)
-     (((SingleConst -176) (SingleConst -168)) (RangeConst ()) SingleTop)
-     (((SingleConst -168) (SingleConst -160)) (RangeConst ()) SingleTop)
-     (((SingleConst -160) (SingleConst -152)) (RangeConst ()) SingleTop)
-     (((SingleConst -152) (SingleConst -144)) (RangeConst ()) SingleTop)
-     (((SingleConst -144) (SingleConst -136)) (RangeConst ()) SingleTop)
-     (((SingleConst -136) (SingleConst -128)) (RangeConst ()) SingleTop)
-     (((SingleConst -128) (SingleConst -120)) (RangeConst ()) SingleTop)
-     (((SingleConst -120) (SingleConst -112)) (RangeConst ()) SingleTop)
-     (((SingleConst -112) (SingleConst -104)) (RangeConst ()) SingleTop)
-     (((SingleConst -104) (SingleConst -96)) (RangeConst ()) SingleTop)
-     (((SingleConst -96) (SingleConst -88)) (RangeConst ()) SingleTop)
-     (((SingleConst -88) (SingleConst -80)) (RangeConst ()) SingleTop)
-     (((SingleConst -80) (SingleConst -72)) (RangeConst ()) SingleTop)
-     (((SingleConst -72) (SingleConst -64)) (RangeConst ()) SingleTop)
-     (((SingleConst -64) (SingleConst -56)) (RangeConst ()) SingleTop)
-     (((SingleConst -56) (SingleConst -48)) (RangeConst ()) SingleTop)
-     (((SingleConst -48) (SingleConst -40)) (RangeConst ()) SingleTop)
-     (((SingleConst -40) (SingleConst -32)) (RangeConst ()) SingleTop)
-     (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
-     (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
-     (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
-     (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
-     (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
-    ((((SingleConst 0) (SingleConst 40))
-      (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)))
-   (6
+   ((2 ((6 7) true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop))))
   ((-368 -360) (-360 -352) (-352 -344) (-344 -336) (-336 -328) (-328 -320)
@@ -294,7 +173,7 @@
    (-80 -72) (-72 -64) (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24)
    (-24 -16) (-16 -8) (-8 0)))
  (ge_madd
-  ((4
+  (((4 (() true true))
     ((((SingleConst -192) (SingleConst -184)) (RangeConst ()) SingleTop)
      (((SingleConst -184) (SingleConst -176)) (RangeConst ()) SingleTop)
      (((SingleConst -176) (SingleConst -168)) (RangeConst ()) SingleTop)
@@ -308,12 +187,12 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
      (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
      (((SingleConst 40) (SingleConst 80))
@@ -322,7 +201,7 @@
       (RangeConst (((SingleConst 80) (SingleConst 120)))) SingleTop)
      (((SingleConst 120) (SingleConst 160))
       (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop)))
-   (2
+   ((2 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
      (((SingleConst 40) (SingleConst 80))
@@ -332,7 +211,7 @@
   ((-192 -184) (-184 -176) (-176 -168) (-48 -40) (-40 -32) (-32 -24)
    (-24 -16) (-16 -8) (-8 0)))
  (ge_p2_dbl
-  ((4
+  (((4 (() true true))
     ((((SingleConst -344) (SingleConst -336)) (RangeConst ()) SingleTop)
      (((SingleConst -336) (SingleConst -328)) (RangeConst ()) SingleTop)
      (((SingleConst -328) (SingleConst -320)) (RangeConst ()) SingleTop)
@@ -377,12 +256,12 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
      (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
      (((SingleConst 40) (SingleConst 80))
@@ -397,7 +276,7 @@
    (-104 -96) (-96 -88) (-88 -80) (-80 -72) (-72 -64) (-64 -56) (-56 -48)
    (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (fe_tobytes
-  ((4
+  (((4 (() true true))
     ((((SingleConst -120) (SingleConst -116)) (RangeConst ()) SingleTop)
      (((SingleConst -116) (SingleConst -112)) (RangeConst ()) SingleTop)
      (((SingleConst -112) (SingleConst -104)) (RangeConst ()) SingleTop)
@@ -415,24 +294,25 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 32)) (RangeConst ()) SingleTop)))
-   (6
+   ((7 (() true true))
+    ((((SingleConst 0) (SingleConst 32)) (RangeConst ()) SingleTop)))
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop))))
   ((-120 -116) (-116 -112) (-112 -104) (-104 -96) (-96 -88) (-88 -80)
    (-80 -72) (-72 -64) (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24)
    (-24 -16) (-16 -8) (-8 0)))
  (x25519_ge_p1p1_to_p2
-  ((4
+  (((4 (() true true))
     ((((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
      (((SingleConst 40) (SingleConst 80))
@@ -443,19 +323,19 @@
       (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop))))
   ((-24 -16) (-16 -8) (-8 0)))
  (x25519_ge_p1p1_to_p3
-  ((4
+  (((4 (() true true))
     ((((SingleConst -40) (SingleConst -32)) (RangeConst ()) SingleTop)
      (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
      (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40))
       (RangeConst (((SingleConst 0) (SingleConst 40)))) SingleTop)
      (((SingleConst 40) (SingleConst 80))
@@ -466,23 +346,24 @@
       (RangeConst (((SingleConst 120) (SingleConst 160)))) SingleTop))))
   ((-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (CRYPTO_memcmp
-  ((4 ((((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+  (((4 (() true true))
+    ((((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
+   ((7 (() true false))
     ((((SingleConst 0) (SingleVar 2))
       (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleVar 2))
       (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop))))
   ())
  (SHA512_Update
-  ((4
+  (((4 (() true true))
     ((((SingleConst -40) (SingleConst -32)) (RangeConst ()) SingleTop)
      (((SingleConst -32) (SingleConst -24)) (RangeConst ()) SingleTop)
      (((SingleConst -24) (SingleConst -16)) (RangeConst ()) SingleTop)
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)
      (((SingleConst 64) (SingleConst 72))
@@ -495,12 +376,12 @@
       (RangeConst (((SingleConst 208) (SingleConst 212)))) (SingleVar 27))
      (((SingleConst 212) (SingleConst 216))
       (RangeConst (((SingleConst 212) (SingleConst 216)))) (SingleVar 28))))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleVar 2))
       (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop))))
   ((-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (SHA512
-  ((4
+  (((4 (() true true))
     ((((SingleConst -248) (SingleConst -184)) (RangeConst ()) SingleTop)
      (((SingleConst -184) (SingleConst -176)) (RangeConst ()) SingleTop)
      (((SingleConst -176) (SingleConst -168)) (RangeConst ()) SingleTop)
@@ -512,13 +393,14 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true false))
     ((((SingleConst 0) (SingleVar 6))
       (RangeConst (((SingleConst 0) (SingleVar 6)))) SingleTop)))
-   (2 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop))))
+   ((2 (() true true))
+    ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop))))
   ((-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (x25519_sc_reduce
-  ((4
+  (((4 (() true true))
     ((((SingleConst -152) (SingleConst -144)) (RangeConst ()) SingleTop)
      (((SingleConst -144) (SingleConst -136)) (RangeConst ()) SingleTop)
      (((SingleConst -136) (SingleConst -128)) (RangeConst ()) SingleTop)
@@ -539,14 +421,14 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
   ((-152 -144) (-144 -136) (-136 -128) (-128 -120) (-120 -112) (-112 -104)
    (-104 -96) (-96 -88) (-88 -80) (-80 -72) (-72 -64) (-64 -56) (-56 -48)
    (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (table_select
-  ((4
+  (((4 (() true true))
     ((((SingleConst -216) (SingleConst -120)) (RangeConst ()) SingleTop)
      (((SingleConst -120) (SingleConst -112)) (RangeConst ()) SingleTop)
      (((SingleConst -112) (SingleConst -104)) (RangeConst ()) SingleTop)
@@ -564,7 +446,7 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop))))
@@ -572,7 +454,7 @@
    (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8)
    (-8 0)))
  (x25519_ge_scalarmult_base
-  ((4
+  (((4 (() true true))
     ((((SingleConst -528) (SingleConst -520)) (RangeConst ()) SingleTop)
      (((SingleConst -520) (SingleConst -456)) (RangeConst ()) SingleTop)
      (((SingleConst -456) (SingleConst -416)) (RangeConst ()) SingleTop)
@@ -592,17 +474,17 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
      (((SingleConst 120) (SingleConst 160)) (RangeConst ()) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 32))
       (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop))))
   ((-528 -520) (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (sc_muladd
-  ((4
+  (((4 (() true true))
     ((((SingleConst -408) (SingleConst -400)) (RangeConst ()) SingleTop)
      (((SingleConst -400) (SingleConst -392)) (RangeConst ()) SingleTop)
      (((SingleConst -392) (SingleConst -384)) (RangeConst ()) SingleTop)
@@ -655,14 +537,15 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 32)) (RangeConst ()) SingleTop)))
-   (6
+   ((7 (() true true))
+    ((((SingleConst 0) (SingleConst 32)) (RangeConst ()) SingleTop)))
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
-   (2
+   ((2 (() true false))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop)))
-   (1
+   ((1 (() true false))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
   ((-408 -400) (-400 -392) (-392 -384) (-384 -376) (-376 -368) (-368 -360)
@@ -675,7 +558,7 @@
    (-64 -56) (-56 -48) (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8)
    (-8 0)))
  (ge_p3_tobytes
-  ((4
+  (((4 (() true true))
     ((((SingleConst -480) (SingleConst -472)) (RangeConst ()) SingleTop)
      (((SingleConst -472) (SingleConst -464)) (RangeConst ()) SingleTop)
      (((SingleConst -464) (SingleConst -456)) (RangeConst ()) SingleTop)
@@ -712,10 +595,10 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7
+   ((7 (() true true))
     ((((SingleConst 0) (SingleConst 32))
       (RangeConst (((SingleConst 0) (SingleConst 32)))) SingleTop)))
-   (6
+   ((6 (() true false))
     ((((SingleConst 0) (SingleConst 40)) (RangeConst ()) SingleTop)
      (((SingleConst 40) (SingleConst 80)) (RangeConst ()) SingleTop)
      (((SingleConst 80) (SingleConst 120)) (RangeConst ()) SingleTop)
@@ -726,7 +609,7 @@
    (-256 -248) (-248 -240) (-240 -232) (-232 -224) (-144 -136) (-48 -40)
    (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (ED25519_sign
-  ((4
+  (((4 (() true true))
     ((((SingleConst -624) (SingleConst -616)) (RangeConst ()) SingleTop)
      (((SingleConst -616) (SingleConst -552)) (RangeConst ()) SingleTop)
      (((SingleConst -552) (SingleConst -488)) (RangeConst ()) SingleTop)
@@ -748,16 +631,17 @@
      (((SingleConst -16) (SingleConst -8)) (RangeConst ()) SingleTop)
      (((SingleConst -8) (SingleConst 0)) (RangeConst ()) SingleTop)
      (((SingleConst 0) (SingleConst 8)) (RangeConst ()) SingleTop)))
-   (7 ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
-   (6
+   ((7 (() true true))
+    ((((SingleConst 0) (SingleConst 64)) (RangeConst ()) SingleTop)))
+   ((6 (() true false))
     ((((SingleConst 0) (SingleVar 2))
       (RangeConst (((SingleConst 0) (SingleVar 2)))) SingleTop)))
-   (1
+   ((1 (() true false))
     ((((SingleConst 0) (SingleConst 64))
       (RangeConst (((SingleConst 0) (SingleConst 64)))) SingleTop))))
   ((-624 -616) (-48 -40) (-40 -32) (-32 -24) (-24 -16) (-16 -8) (-8 0)))
  (main
-  ((4
+  (((4 (() true true))
     ((((SingleConst -64) (SingleConst -56)) (RangeConst ()) SingleTop)
      (((SingleConst -56) (SingleConst -48)) (RangeConst ()) SingleTop)
      (((SingleConst -48) (SingleConst -40)) (RangeConst ()) SingleTop)

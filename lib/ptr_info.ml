@@ -25,6 +25,7 @@ module PtrInfo = struct
 
   let invalidate_on_write (ptr: IsaBasic.imm_var_id) (info: t) : t =
     (* ptr is the pointer that we write to, and we invalidate info if ptr might be overlapped with it *)
+    (* Printf.printf "invalidate_on_write: %d\n%s\n" ptr (Sexplib.Sexp.to_string_hum (sexp_of_t info)); *)
     let info_ptr, (info_set, info_read, info_write) = info in
     if ptr = info_ptr then info
     else if not info_read then info

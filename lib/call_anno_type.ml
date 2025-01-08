@@ -45,7 +45,7 @@ module CallAnno = struct
     | BaseAsReg r1, BaseAsReg r2 -> Int.compare (IsaBasic.get_reg_idx r1) (IsaBasic.get_reg_idx r2)
     | BaseAsSlot (v1, o1), BaseAsSlot (v2, o2) ->
       let cmp1 = Int.compare v1 v2 in
-      if cmp1 != 0 then cmp1
+      if cmp1 <> 0 then cmp1
       else MemOffset.cmp o1 o2
     | BaseAsReg _, BaseAsSlot _ -> -1
     | BaseAsSlot _, BaseAsReg _ -> 1
@@ -87,7 +87,7 @@ module CallAnno = struct
     | Some call_mem_read_hint, Some taint_map ->
       Some {
         pr_reg = pr_reg;
-        ch_mem = MemTypeBasic.map2 (fun x y -> (x, y)) call_mem_read_hint base_info;
+        ch_mem = MemTypeBasic.map2 false (fun x y -> (x, y)) call_mem_read_hint base_info;
         single_var_map = single_map;
         taint_var_map = taint_map;
       }

@@ -298,8 +298,8 @@ let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t 
   ".LCPI13_1", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
   ".LCPI15_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
   ".LCPI18_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
-  ".LCPI20_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
-  ".LCPI21_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ];
+  (* ".LCPI20_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ]; *)
+  (* ".LCPI21_0", [ (SingleConst 0L, SingleConst 16L), RangeConst [(SingleConst 0L, SingleConst 16L)], (SingleTop, TaintConst false) ]; *)
 ]
 
 let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
@@ -340,19 +340,19 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     get_input_info (r RSI) [r RDI; r RDX] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     get_input_info (r RDX) [r RDI; r RSI] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
   ];
-  "fe_mul_impl_self2", [
+  (* "fe_mul_impl_self2", [
     get_default_info (r RDI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-  ];
-  "fe_mul_ttt", [
+  ]; *)
+  (* "fe_mul_ttt", [
     get_input_info (r RDI) [r RSI; r RDX] true, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     get_input_info (r RSI) [r RDI; r RDX] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     get_input_info (r RDX) [r RDI; r RSI] false, [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-  ];
-  "fe_mul_ttt_self1", [
+  ]; *)
+  (* "fe_mul_ttt_self1", [
     get_default_info (r RDI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
     get_const_default_info (r RSI), [ (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop ];
-  ];
+  ]; *)
   "ge_madd", [
     get_default_info (r RDI), [
       (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
