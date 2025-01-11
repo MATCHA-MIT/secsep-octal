@@ -10,6 +10,7 @@ open Func_interface
 open Single_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Set_sexp
 open Sexplib.Std
 (* open Sexplib *)
 
@@ -59,7 +60,8 @@ module RangeTypeInfer = struct
         (acc: MemRange.t) (block_single_type: SingleTypeInfer.ArchType.t) :
         MemRange.t * ArchType.t =
       if block_single_type.label = func_name then
-        acc, block_single_type
+        acc, 
+        { block_single_type with prop_mode = ArchType.TypeInferInit }
       else
         let acc, mem_type =
           List.fold_left_map (
@@ -202,6 +204,11 @@ module RangeTypeInfer = struct
     Printf.printf "Range subtype of func %s\n" state.func_name;
     RangeSubtype.pp_range_subtype 0 subtype_list;
     (* TODO: Write a function to check whether all solutions are found *)
+
+    let unresolved_var_set = RangeSubtype.get_unresolved_var subtype_list in
+    Printf.printf "Unresolved var of func %s\n%s\n" state.func_name (Sexplib.Sexp.to_string_hum (IntSet.sexp_of_t unresolved_var_set));
+    if IntSet.cardinal unresolved_var_set = 0 then
+      Printf.printf "Successfully resolve func %s\n" state.func_name;
 
     (* 3. Substitute solution back to func type *)
     let func_type =

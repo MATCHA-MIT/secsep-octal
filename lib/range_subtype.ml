@@ -4,6 +4,7 @@ open Mem_offset_new
 open Arch_type
 open Pretty_print
 open Smt_emitter
+open Set_sexp
 open Sexplib.Std
 
 module RangeSubtype = struct
@@ -347,5 +348,14 @@ module RangeSubtype = struct
       | _ -> range_subtype_error (Printf.sprintf "We do not support repl sol for range exp %s" (MemRange.to_string range))
     in
     { a_type with mem_type = ArchType.MemType.map_full helper a_type.mem_type }
+
+  let get_unresolved_var
+      (tv_rel_list: t) : IntSet.t =
+    List.fold_left (
+      fun (acc: IntSet.t) (tv_rel: type_rel) ->
+        match tv_rel.sol with
+        | Some _ -> acc
+        | None -> IntSet.add (fst tv_rel.var_idx) acc
+    ) IntSet.empty tv_rel_list
 
 end
