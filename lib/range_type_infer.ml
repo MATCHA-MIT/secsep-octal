@@ -6,6 +6,7 @@ open Constraint
 open Single_context
 open Single_subtype
 open Range_subtype
+open Range_subset
 open Func_interface
 open Single_type_infer
 open Smt_emitter
@@ -187,6 +188,7 @@ module RangeTypeInfer = struct
         fun (x: RangeSubtype.type_rel) -> not (List.is_empty x.subtype_list)
       ) subtype_list
     in
+    let subtype_list = RangeSubset.update_subtype_list_equal_set subtype_list in
     let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list state.single_sol in
     (* Printf.printf "================1\n";
     RangeSubtype.pp_range_subtype 0 subtype_list; *)

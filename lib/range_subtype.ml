@@ -24,6 +24,7 @@ module RangeSubtype = struct
     off: MemOffset.t;
     subtype_list: type_exp_t list;
     (* supertype_list: MemRange.range_var_id list; *)
+    equal_var_set: IntSet.t;
   }
   [@@deriving sexp]
 
@@ -48,7 +49,8 @@ module RangeSubtype = struct
     PP.print_lvl (lvl + 1) "Off: %s\n" (MemOffset.to_string x.off);
     PP.print_lvl (lvl + 1) "Subtype: [\n";
     List.iter (fun sub -> PP.print_lvl (lvl + 2) "%s;\n" (type_exp_to_string sub)) x.subtype_list;
-    PP.print_lvl (lvl + 1) "]\n"
+    PP.print_lvl (lvl + 1) "]\n";
+    PP.print_lvl (lvl + 1) "EqualSet: %s\n" (Sexplib.Sexp.to_string (IntSet.sexp_of_t x.equal_var_set))
 
   let pp_range_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
@@ -68,7 +70,8 @@ module RangeSubtype = struct
         var_idx = sup;
         sol = None;
         off = off;
-        subtype_list = [ sub ]
+        subtype_list = [ sub ];
+        equal_var_set = IntSet.empty;
       } in
       new_tv_rel :: tv_rel_list
 
@@ -123,7 +126,7 @@ module RangeSubtype = struct
         | RangeExp _, _ -> 
           range_subtype_error (Printf.sprintf "add_range_subtype cannot add sup %s" (type_exp_to_string sup))
         | RangeVar sup_idx, sup_pc ->
-          { var_idx = (sup_idx, sup_pc); sol = None; off = off; subtype_list = sub_list } :: acc
+          { var_idx = (sup_idx, sup_pc); sol = None; off = off; subtype_list = sub_list; equal_var_set = IntSet.empty } :: acc
     ) [] mem_subtype
 
   
@@ -148,7 +151,7 @@ module RangeSubtype = struct
         List.filter (
           fun (x, _) -> 
             match x with
-            | MemRange.RangeVar v -> v != var_idx
+            | MemRange.RangeVar v -> v != var_idx && (not (IntSet.mem v tv_rel.equal_var_set))
             | _ -> true
         ) tv_rel.subtype_list
     }
@@ -212,6 +215,7 @@ module RangeSubtype = struct
           acc
         else
           let entry2 = SingleEntryType.repl_local_var sub_block.local_var_map entry2 in
+          (* TODO: Need to fix here to support different loops *)
           if SingleEntryType.SingleVarSet.mem sub_var_idx (SingleEntryType.get_vars entry2) && 
               SingleEntryType.cmp (SingleVar sub_var_idx) entry2 <> 0 then
             (entry1, entry2) :: acc
@@ -268,8 +272,8 @@ module RangeSubtype = struct
     match tv_rel.sol with
     | Some _ -> new_sol_list, tv_rel
     | None ->
-      let filter_tv_rel = filter_self_subtype tv_rel in
-      begin match List.find_map (fun rule -> rule filter_tv_rel) rule_list with
+      (* let filter_tv_rel = filter_self_subtype tv_rel in *)
+      begin match List.find_map (fun rule -> rule tv_rel) rule_list with
       | Some sol -> 
         (tv_rel.var_idx, sol) :: new_sol_list,
         { tv_rel with sol = Some sol }
