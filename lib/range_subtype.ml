@@ -274,53 +274,16 @@ module RangeSubtype = struct
       end else None
     | _ -> None
 
-  let try_solve_equal_var
-      (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
-      (* (block_subtype_t: ArchType.block_subtype_t list) *)
-      (tv_rel_list: t)
-      (tv_rel: type_rel) : MemRange.t option =
-    if List.is_empty tv_rel.subtype_list then
-      let sol_map =
-        List.filter_map (
-          fun (v, v_pc) ->
-            let v_sol =
-              List.find_map (
-                fun (entry: type_rel) ->
-                  if fst entry.var_idx = v then
-                    entry.sol
-                  else None
-              ) tv_rel_list
-            in
-            match v_sol with
-            | Some sol -> Some (v, v_pc, sol)
-            | None -> None
-        ) tv_rel.equal_subtype_list
-      in
-      let val_sol =
-        List.find_map (
-          fun (_, _, sol) ->
-            if SingleEntryType.SingleVarSet.is_empty (get_block_var sol) then
-              Some sol
-            else None
-        ) sol_map
-      in
-      match val_sol with
-      | Some sol -> Some sol
-      | None -> None
-    else None
-
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
       (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
       (block_subtype_list: ArchType.block_subtype_t list)
-      (tv_rel_list: t)
       (new_sol_list: (var_idx_t * MemRange.t) list) (tv_rel: type_rel) : 
       ((var_idx_t * MemRange.t) list) * type_rel =
     let rule_list = [
       try_solve_full;
       try_solve_empty get_block_var;
       try_solve_non_val smt_ctx get_block_var block_subtype_list;
-      try_solve_equal_var get_block_var tv_rel_list;
     ] in
     match tv_rel.sol with
     | Some _ -> new_sol_list, tv_rel
@@ -480,7 +443,7 @@ module RangeSubtype = struct
         in
         let new_sol, tv_rel_list =
           List.fold_left_map 
-            (solve_one_var smt_ctx get_block_var block_subtype_list tv_rel_list) 
+            (solve_one_var smt_ctx get_block_var block_subtype_list) 
             [] tv_rel_list
         in
         if List.length new_sol = 0 then tv_rel_list
