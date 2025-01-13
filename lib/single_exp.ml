@@ -507,7 +507,7 @@ include SingleExpBasic
 
   let repl_local_var (map: local_var_map_t) (e: t) : t =
     (* Only applied to repl local var with block vars *)
-    (* Recursive repl; if not found, then just leave the var there *)
+    (* Recursive repl; if not found, leave the var there *)
     let rec repl_helper (e: t) : t =
       match e with
       | SingleTop | SingleConst _ -> e
@@ -542,6 +542,23 @@ include SingleExpBasic
         begin match find_local_var_map map v with
         | Some e -> e
         | None -> SingleTop
+        end
+      | SingleBExp (bop, e1, e2) ->
+        eval (SingleBExp (bop, repl_helper e1, repl_helper e2))
+      | SingleUExp (uop, e) ->
+        eval (SingleUExp (uop, repl_helper e))
+    in
+    repl_helper e
+
+  let repl_var (map: local_var_map_t) (e: t) : t =
+    (* Non-recursive repl; if not found, leave the var there *)
+    let rec repl_helper (e: t) : t =
+      match e with
+      | SingleTop | SingleConst _ -> e
+      | SingleVar v ->
+        begin match find_local_var_map map v with
+        | Some e -> e
+        | None -> e
         end
       | SingleBExp (bop, e1, e2) ->
         eval (SingleBExp (bop, repl_helper e1, repl_helper e2))

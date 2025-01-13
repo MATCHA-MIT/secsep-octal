@@ -277,11 +277,19 @@ module MemOffset = struct
   let is_val (global_var: SingleExp.SingleVarSet.t) (o: t) : bool =
     let l, r = o in SingleExp.is_val global_var l && SingleExp.is_val global_var r
 
+  let repl_var_helper (repl_func: SingleExp.t -> SingleExp.t) (o: t) : t =
+    let l, r = o in repl_func l, repl_func r
+
   let repl_local_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
-    let l, r = o in SingleExp.repl_local_var local_var_map l, SingleExp.repl_local_var local_var_map r
+    repl_var_helper (SingleExp.repl_local_var local_var_map) o
+    (* let l, r = o in SingleExp.repl_local_var local_var_map l, SingleExp.repl_local_var local_var_map r *)
 
   let repl_context_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
-    let l, r = o in SingleExp.repl_context_var local_var_map l, SingleExp.repl_context_var local_var_map r
+    repl_var_helper (SingleExp.repl_context_var local_var_map) o
+    (* let l, r = o in SingleExp.repl_context_var local_var_map l, SingleExp.repl_context_var local_var_map r *)
+
+  let repl_var (local_var_map: SingleExp.local_var_map_t) (o: t) : t =
+    repl_var_helper (SingleExp.repl_var local_var_map) o
 
   let repl
       (repl_func: (SingleExp.t * int) -> SingleExp.t)
@@ -382,17 +390,28 @@ module MemRange = struct
       ) true o
     | _ -> false
 
-  let repl_local_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
+  let repl_var_helper (repl_func: SingleExp.t -> SingleExp.t) (r: t) : t =
     match r with
+    | RangeConst o -> RangeConst (List.map (MemOffset.repl_var_helper repl_func) o)
+    | RangeVar _ -> r
+    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_var_helper repl_func) o)
+
+  let repl_local_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
+    repl_var_helper (SingleExp.repl_local_var local_var_map) r
+    (* match r with
     | RangeConst o -> RangeConst (List.map (MemOffset.repl_local_var local_var_map) o)
     | RangeVar _ -> r
-    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_local_var local_var_map) o)
+    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_local_var local_var_map) o) *)
 
   let repl_context_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
-    match r with
+    repl_var_helper (SingleExp.repl_context_var local_var_map) r
+    (* match r with
     | RangeConst o -> RangeConst (List.map (MemOffset.repl_context_var local_var_map) o)
     | RangeVar _ -> r
-    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_context_var local_var_map) o)
+    | RangeExp (v, o) -> RangeExp (v, List.map (MemOffset.repl_context_var local_var_map) o) *)
+
+  let repl_var (local_var_map: SingleExp.local_var_map_t) (r: t) : t =
+    repl_var_helper (SingleExp.repl_var local_var_map) r
 
   let add_base (base_ptr: SingleExp.t) (r: t) : t =
     match r with

@@ -201,7 +201,7 @@ module RangeTypeInfer = struct
         single_sol_repl_helper
         (* (MemRange.is_val state.input_single_var_set)  *)
         range_get_block_var block_subtype 
-        subtype_list 3 
+        subtype_list 10 
     in
     Printf.printf "Range subtype of func %s\n" state.func_name;
     RangeSubtype.pp_range_subtype 0 subtype_list;
