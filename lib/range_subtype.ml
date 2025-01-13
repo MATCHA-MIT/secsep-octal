@@ -200,7 +200,10 @@ module RangeSubtype = struct
     if find_empty <> None then
       let find_not_val =
         List.find_opt (
-          fun (x, _) -> not (SingleEntryType.SingleVarSet.is_empty (get_block_var x))
+          fun (x, _) -> (* not (SingleEntryType.SingleVarSet.is_empty (get_block_var x)) *)
+            match x with
+            | MemRange.RangeExp _ -> not (SingleEntryType.SingleVarSet.is_empty (get_block_var x))
+            | _ -> false
         ) tv_rel.subtype_list
       in
       if find_not_val <> None then None
@@ -341,6 +344,7 @@ module RangeSubtype = struct
     end
 
   let repl_br_map_sol
+      (single_sol_repl_helper: (SingleEntryType.t * int) -> SingleEntryType.t)
       (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
       (block_subtype_list: ArchType.block_subtype_t list)
       (blk_pc: int) (sol_exp: type_exp_t) : type_exp_t =
@@ -351,7 +355,10 @@ module RangeSubtype = struct
       if IntSet.is_empty block_var_set then sol, blk_pc
       else begin
         match find_br_map block_subtype_list blk_pc br_pc block_var_set with
-        | Some var_map -> MemRange.repl_var var_map sol, blk_pc
+        | Some var_map -> 
+          let curr_block_sol = MemRange.repl_var var_map sol in
+          let simp_sol = MemRange.repl single_sol_repl_helper blk_pc curr_block_sol in
+          simp_sol, blk_pc
         | None -> sol_exp
       end
     | _ -> sol_exp
@@ -394,7 +401,7 @@ module RangeSubtype = struct
                         match subtype_pc_opt with
                         | Some br_pc ->
                           let _, blk_pc = x.var_idx in
-                          let sol, sub_sol_pc = repl_br_map_sol get_block_var block_subtype_list blk_pc (range_sol, br_pc) in
+                          let sol, sub_sol_pc = repl_br_map_sol single_sol_repl_helper get_block_var block_subtype_list blk_pc (range_sol, br_pc) in
                           if sub_sol_pc = blk_pc then Some sol
                           else None
                         | None -> None
@@ -412,7 +419,7 @@ module RangeSubtype = struct
                       if pc = (snd x.var_idx) then sub, pc
                       else
                         let sub = MemRange.repl_range_sol smt_ctx single_sol_repl_helper range_sol (sub, pc) in
-                        repl_br_map_sol get_block_var block_subtype_list (snd x.var_idx) (sub, pc)
+                        repl_br_map_sol single_sol_repl_helper get_block_var block_subtype_list (snd x.var_idx) (sub, pc)
                   ) x.subtype_list
                 in
                 { x with subtype_list = subtype_list }, None
