@@ -1,0 +1,5 @@
+(library
+ (name checker)
+ (libraries z3 core type)
+ (preprocess
+  (pps ppx_jane)))
