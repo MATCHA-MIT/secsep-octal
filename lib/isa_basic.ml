@@ -59,6 +59,10 @@ module IsaBasic = struct
     (* | R0 *)
   [@@deriving sexp]
 
+  type flag =
+    | CF | PF | AF | ZF | SF | OF
+  [@@deriving sexp]
+
   let reg_map = [
     ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
     ("rcx", RCX); ("ecx", ECX); ("cx", CX); ("ch", CH); ("cl", CL);

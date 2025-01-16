@@ -1,3 +1,4 @@
+open Type.Isa_basic
 open Z3
 open Z3_sexp
 open Sexplib.Std
@@ -15,15 +16,17 @@ module DepType = struct
     | Top of int
   [@@deriving sexp]
 
+  let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
+
   let is_bv (e: t) : bool =
     match e with
     | Exp e -> BitVector.is_bv e
-    | Top _ -> true
+    | Top size -> size <> top_bool_size
 
   let is_bool (e: t) : bool =
     match e with
     | Exp e -> Boolean.is_bool e
-    | Top size -> size = 1
+    | Top size -> size = top_bool_size
 
   let get_exp_bit_size (e: exp_t) : int =
     Z3.BitVector.get_size (Z3.Expr.get_sort e)
@@ -158,6 +161,134 @@ module DepType = struct
     if is_bool orig_e && is_bool new_e then new_e
     else dep_type_error "set_flag of non bool orig_e or new_e"
 
+  let get_top_flag () : t = Top top_bool_size
+
+  let extract_exp_or_top (e_list: t list) : (exp_t list * int, int) Either.t =
+    (* NOTE: I assume we can unify size of non-flag operands, so I assert sizes of all operands are the same.
+       We may need to change this later to accomodate for different cases. *)
+    let check_size_list (size_list: int list) : int =
+      List.fold_left (
+        fun (acc: int) (size: int) ->
+          if size = top_bool_size then acc
+          else if acc = top_bool_size then size
+          else if acc = size then acc
+          else begin
+            Printf.printf "extract_exp_or_top e_list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_t e_list));
+            dep_type_error "extract_exp_or_top invalid size"
+          end
+      ) top_bool_size size_list
+    in
+    let exp_size_list, top_size_list =
+      List.partition_map (
+        fun (x: t) ->
+          match x with
+          | Exp e -> Left (e, get_exp_bit_size e)
+          | Top size -> Right size
+      ) e_list
+    in
+    match top_size_list with
+    | [] ->
+      let exp_list, size_list = List.split exp_size_list in
+      let size = check_size_list size_list in
+      Left (exp_list, size)
+    | _ -> Right (check_size_list top_size_list)
+
+  (* NOTE: Actually, functions regarding bop, uop, and top should be merged.
+     The current ugly code is due to the imperfect definition in inference tool *)
+  let bop_update_flag_list (op: IsaBasic.bop) : IsaBasic.flag list =
+    match op with
+    | Add | Sub -> [ CF; PF; AF; ZF; SF; OF ]
+    | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let uop_update_flag_list (op: IsaBasic.uop) : IsaBasic.flag list =
+    match op with
+    | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let top_update_flag_list (op: IsaBasic.top) : IsaBasic.flag list =
+    match op with
+    | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let get_top_flag_list (flag_list: IsaBasic.flag list) : (IsaBasic.flag * t) list =
+    List.map (fun f -> f, get_top_flag ()) flag_list
+
+  let set_flag_list 
+      (orig_list: (IsaBasic.flag * t) list) 
+      (update_flag_list: (IsaBasic.flag * t) list) : (IsaBasic.flag * t) list =
+    List.fold_left (
+      fun (acc: (IsaBasic.flag * t) list) (update_entry: IsaBasic.flag * t) ->
+        let update_flag, _ = update_entry in
+        let find, acc =
+          List.fold_left_map (
+            fun (acc: bool) (entry: IsaBasic.flag * t) ->
+              if acc then acc, entry
+              else if update_flag = fst entry then
+                true, update_entry
+              else false, entry
+          ) false acc
+        in
+        if find then acc
+        else dep_type_error "set_flag_list cannot find flag in orig_list"
+    ) orig_list update_flag_list
+
+  let get_add_carry (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
+    BitVector.mk_add_no_overflow ctx e0 e1 false |> Boolean.mk_not ctx
+
+  let get_add_overflow (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
+    [ BitVector.mk_add_no_overflow ctx e0 e1 true; 
+      BitVector.mk_add_no_underflow ctx e0 e1 ]
+    |> Boolean.mk_and ctx |> Boolean.mk_not ctx
+
+  let get_sub_carry (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
+    BitVector.mk_sub_no_underflow ctx e0 e1 false |> Boolean.mk_not ctx
+
+  let get_sub_overflow (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
+    [ BitVector.mk_sub_no_underflow ctx e0 e1 true; 
+      BitVector.mk_sub_no_overflow ctx e0 e1 ]
+    |> Boolean.mk_and ctx |> Boolean.mk_not ctx
+
+  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+    let top_flag_list = bop_update_flag_list op |> get_top_flag_list in
+    match extract_exp_or_top e_list with
+    | Right size ->
+      Top size, top_flag_list
+    | Left (exp_list, _) ->
+      match op, exp_list with
+      | Add, [ e0; e1 ] ->
+        Exp (BitVector.mk_add ctx e0 e1),
+        set_flag_list top_flag_list [
+          CF, Exp (get_add_carry ctx e0 e1);
+          OF, Exp (get_add_overflow ctx e0 e1);
+        ]
+      | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let exe_uop (ctx: context) (op: IsaBasic.uop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+    let top_flag_list = uop_update_flag_list op |> get_top_flag_list in
+    match extract_exp_or_top e_list with
+    | Right size ->
+      Top size, top_flag_list
+    | Left (exp_list, exp_size) ->
+      match op, exp_list with
+      | Inc, [ e ] ->
+        let one = BitVector.mk_numeral ctx "1" exp_size in
+        Exp (BitVector.mk_add ctx e one),
+        set_flag_list top_flag_list [
+          OF, Exp (get_add_overflow ctx e one);
+        ]
+      | Dec, [ e ] ->
+        let one = BitVector.mk_numeral ctx "1" exp_size in
+        Exp (BitVector.mk_sub ctx e one),
+        set_flag_list top_flag_list [
+          OF, Exp (get_sub_overflow ctx e one);
+        ]
+      | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let exe_top (_: context) (op: IsaBasic.top) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+    let top_flag_list = top_update_flag_list op |> get_top_flag_list in
+    match extract_exp_or_top e_list with
+    | Right size ->
+      Top size, top_flag_list
+    | _ -> dep_type_error "<TODO> not implemented yet"
+
 end
 
 module TaintType = struct
@@ -173,6 +304,9 @@ module TaintType = struct
       (is_overwrite: bool) (orig_t: t) (new_t: t) : t =
     if is_overwrite then new_t
     else Boolean.mk_or ctx [orig_t; new_t]
+
+  let exe (ctx: context) (e_list: t list) : t =
+    Boolean.mk_or ctx e_list
 
 end
 
@@ -217,5 +351,12 @@ module BasicType = struct
     let orig_dep, _ = orig_e in
     let new_dep, new_taint = new_e in
     DepType.set_flag orig_dep new_dep, new_taint
+
+  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+    let dep_list, taint_list = List.split e_list in
+    let dep, dep_flag_list = DepType.exe_bop ctx op dep_list in
+    let taint = TaintType.exe ctx taint_list in
+    (dep, taint),
+    List.map (fun (flag, flag_dep) -> flag, (flag_dep, taint)) dep_flag_list
 
 end
