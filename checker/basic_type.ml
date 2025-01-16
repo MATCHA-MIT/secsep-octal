@@ -1,4 +1,3 @@
-open Type.Smt_emitter
 open Z3
 open Z3_sexp
 open Sexplib.Std
@@ -47,24 +46,24 @@ module DepType = struct
     else None
 
   let get_exp_start_end
-      (smt_ctx: SmtEmitter.t)
+      (ctx: context)
       (start_byte: int) (end_byte: int)
       (e: exp_t) : exp_t =
     match check_start_end start_byte end_byte (get_exp_bit_size e) None with
     | Some (start_bit, end_bit, _) ->
-      BitVector.mk_extract (fst smt_ctx) (end_bit - 1) start_bit e
+      BitVector.mk_extract ctx (end_bit - 1) start_bit e
     | None ->
       dep_type_error 
         (Printf.sprintf "get_exp_start_end invalid argument: start_byte %d, end_byte %d e %s\n" 
           start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_exp_t e)))
 
   let get_start_end
-      (smt_ctx: SmtEmitter.t)
+      (ctx: context)
       (start_byte: int) (end_byte: int)
       (e: t) : t =
     if not (is_bv e) then dep_type_error "get_start_end of non bv e" else
     match e with
-    | Exp e -> Exp (get_exp_start_end smt_ctx start_byte end_byte e)
+    | Exp e -> Exp (get_exp_start_end ctx start_byte end_byte e)
     | Top size ->
       begin match check_start_end start_byte end_byte size None with
       | Some (start_bit, end_bit, _) -> Top (end_bit - start_bit)
@@ -74,11 +73,11 @@ module DepType = struct
           start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_t e)))
       end
 
-  let get_start_len (smt_ctx: SmtEmitter.t) (start_byte: int) (len_byte: int) (e: t) : t =
-    get_start_end smt_ctx start_byte (start_byte + len_byte) e
+  let get_start_len (ctx: context) (start_byte: int) (len_byte: int) (e: t) : t =
+    get_start_end ctx start_byte (start_byte + len_byte) e
 
   let set_exp_start_end
-      (smt_ctx: SmtEmitter.t)
+      (ctx: context)
       (set_default_zero: bool)
       (start_byte: int) (end_byte: int)
       (orig_e: exp_t) (new_e: exp_t) : 
@@ -90,7 +89,6 @@ module DepType = struct
           start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_exp_t orig_e)))
     | Some (start_bit, end_bit, total_bit) ->
       let ext_bit = total_bit - end_bit in
-      let ctx, _ = smt_ctx in
       if set_default_zero then
         match start_bit, ext_bit with
         | (0, 0) -> new_e, true
@@ -115,14 +113,14 @@ module DepType = struct
           BitVector.mk_concat ctx new_e orig_low |> BitVector.mk_concat ctx orig_high, false
 
   let set_start_end 
-      (smt_ctx: SmtEmitter.t) (set_default_zero: bool)
+      (ctx: context) (set_default_zero: bool)
       (start_byte: int) (end_byte: int) 
       (orig_e: t) (new_e: t) : 
       t * bool = (* new_e, is_overwrite *)
     if not (is_bv orig_e && is_bv new_e) then dep_type_error "set_start_end of non bv orig_e or new_e" else
     match orig_e, new_e with
     | Exp orig_e, Exp new_e ->
-      let e, is_overwrite = set_exp_start_end smt_ctx set_default_zero start_byte end_byte orig_e new_e in
+      let e, is_overwrite = set_exp_start_end ctx set_default_zero start_byte end_byte orig_e new_e in
       Exp e, is_overwrite
     | _, Top new_size ->
       begin match check_start_end start_byte end_byte (get_bit_size orig_e) (Some new_size) with
@@ -148,9 +146,9 @@ module DepType = struct
       end
 
   let set_start_len
-      (smt_ctx: SmtEmitter.t) (set_default_zero: bool)
+      (ctx: context) (set_default_zero: bool)
       (start_byte: int) (len_byte: int) (orig_e: t) (new_e: t) : t * bool =
-    set_start_end smt_ctx set_default_zero start_byte (start_byte + len_byte) orig_e new_e
+    set_start_end ctx set_default_zero start_byte (start_byte + len_byte) orig_e new_e
 
   let get_flag (e: t) : t =
     if is_bool e then e
@@ -171,10 +169,10 @@ module TaintType = struct
   [@@deriving sexp]
 
   let set
-      (smt_ctx: SmtEmitter.t)
+      (ctx: context)
       (is_overwrite: bool) (orig_t: t) (new_t: t) : t =
     if is_overwrite then new_t
-    else Boolean.mk_or (fst smt_ctx) [orig_t; new_t]
+    else Boolean.mk_or ctx [orig_t; new_t]
 
 end
 
@@ -188,28 +186,28 @@ module BasicType = struct
   [@@deriving sexp]
 
   let get_start_end
-      (smt_ctx: SmtEmitter.t)
+      (ctx: context)
       (start_byte: int) (end_byte: int) (e: t) : t =
     let dep, taint = e in
-    DepType.get_start_end smt_ctx start_byte end_byte dep,
+    DepType.get_start_end ctx start_byte end_byte dep,
     taint
 
   let get_start_len 
-      (smt_ctx: SmtEmitter.t) 
+      (ctx: context) 
       (start_byte: int) (len_byte: int) (e: t) : t =
-    get_start_end smt_ctx start_byte (start_byte + len_byte) e
+    get_start_end ctx start_byte (start_byte + len_byte) e
 
   let set_start_end
-      (smt_ctx: SmtEmitter.t) (set_default_zero: bool)
+      (ctx: context) (set_default_zero: bool)
       (start_byte: int) (end_byte: int) 
       (orig_e: t) (new_e: t) : t =
     let orig_dep, orig_taint = orig_e in
     let new_dep, new_taint = new_e in
     let dep, is_overwrite = 
-      DepType.set_start_end smt_ctx set_default_zero start_byte end_byte orig_dep new_dep 
+      DepType.set_start_end ctx set_default_zero start_byte end_byte orig_dep new_dep 
     in
     dep,
-    TaintType.set smt_ctx is_overwrite orig_taint new_taint
+    TaintType.set ctx is_overwrite orig_taint new_taint
 
   let get_flag (e: t) : t =
     let dep, taint = e in
