@@ -59,10 +59,6 @@ module IsaBasic = struct
     (* | R0 *)
   [@@deriving sexp]
 
-  type flag =
-    | CF | PF | AF | ZF | SF | OF
-  [@@deriving sexp]
-
   let reg_map = [
     ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
     ("rcx", RCX); ("ecx", ECX); ("cx", CX); ("ch", CH); ("cl", CL);
@@ -286,6 +282,7 @@ module IsaBasic = struct
     | AH | CH | DH | BH -> (1L, 1L)
     | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
     | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> isa_error "should not get_reg_offset_size for xmm registers"
+    (* <TODO> Change XMM definition to includef size offset information, and chagne parser correspondingly. *)
 
   let get_reg_full_size (r: register) : int64 =
     match r with
@@ -335,6 +332,27 @@ module IsaBasic = struct
     match r with
     | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> true
     | _ -> false
+
+  let is_partial_update_reg_set_default_zero (r: register) : bool =
+    not (is_xmm r) && get_reg_size r = 4L
+
+  type flag =
+    | CF | PF | AF | ZF | SF | OF
+  [@@deriving sexp]
+
+  let total_flag_num = 6
+
+  let get_flag_idx (f: flag) : int =
+    match f with
+    | CF -> 0
+    | PF -> 1
+    | AF -> 2
+    | ZF -> 3
+    | SF -> 4
+    | OF -> 5
+
+  let is_valid_flag_idx (f_idx: int) : bool =
+    f_idx >= 0 && f_idx < total_flag_num
 
   type immediate =
     | ImmNum of int64
