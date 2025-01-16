@@ -42,6 +42,7 @@ let _ = Printf.printf "%s\n" (result_to_string (Z3.Solver.check solver [ Boolean
 
 let s7 = BitVector.mk_const_s ctx "s7" bit_width
 let s27 = BitVector.mk_const_s ctx "s27" bit_width
+let s115 = BitVector.mk_const_s ctx "s115" bit_width
 let eight = BitVector.mk_numeral ctx "8" bit_width
 let neg8 = BitVector.mk_numeral ctx "-8" bit_width
 let seven = BitVector.mk_numeral ctx "7" bit_width
@@ -71,7 +72,7 @@ let _ = Printf.printf "%s\n" (result_to_string (Z3.Solver.check solver [
 ]))
 
 let e1 = BitVector.mk_and ctx (BitVector.mk_add ctx s7 s27) neg8
-let e2 = BitVector.mk_add ctx s7 (BitVector.mk_and ctx s27 neg8)
+let e2 = BitVector.mk_add ctx s27 (BitVector.mk_and ctx s7 s115)
 
 let _ = Solver.add solver [ Boolean.mk_eq ctx (BitVector.mk_and ctx s7 seven) zero ]
 
@@ -113,3 +114,10 @@ let _ =
   Printf.printf "is bool %b\n" (Boolean.is_bool (BitVector.mk_add_no_overflow ctx num num2 true));
   Printf.printf "x size %d\n" (BitVector.get_size (Expr.get_sort x));
   Printf.printf "e2 %s size %d\n" (Expr.to_string e2) (BitVector.get_size (Expr.get_sort e2));
+  Printf.printf "e1 %s num args %d\n%s\n" 
+    (Expr.to_string e1) (Expr.get_num_args e1)
+    (String.concat " " (List.map Expr.to_string (Expr.get_args e1)));
+  Printf.printf "e2 %s num args %d\n%s\n" 
+    (Expr.to_string e2) (Expr.get_num_args e2)
+    (String.concat " " (List.map Expr.to_string (Expr.get_args e2)));
+  Printf.printf "e2 repl %s\n" (Expr.to_string (Expr.substitute e2 [ s27 ] [ neg8 ]));

@@ -16,6 +16,8 @@ module DepType = struct
     | Top of int
   [@@deriving sexp]
 
+  type map_t = (int * t) list (* Check the dict type *)
+
   let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
   let top_unknown_size = 0 (* Intend to represent mem data type where size is not gained from basic types *)
 
@@ -81,6 +83,15 @@ module DepType = struct
 
   let get_start_len (ctx: context) (start_byte: int64) (len_byte: int64) (e: t) : t =
     get_start_end ctx start_byte (Int64.add start_byte len_byte) e
+
+  let get_top_len (len_byte: int64) (e: t) : t =
+    (* This is used for memory slot whose dependent type cannot be tracked *)
+    let len_bit = (Int64.to_int len_byte) * 8 in
+    match e with
+    | Top _ -> Top len_bit
+    | Exp _ -> dep_type_error "this should be only called when the entry is top"
+
+  let get_top () : t = Top top_unknown_size
 
   let set_exp_start_end
       (ctx: context)
@@ -320,6 +331,11 @@ module BasicType = struct
       (ctx: context) 
       (start_byte: int64) (len_byte: int64) (e: t) : t =
     get_start_end ctx start_byte (Int64.add start_byte len_byte) e
+
+  let get_top_len (len_byte: int64) (e: t) : t =
+    let dep, taint = e in
+    DepType.get_top_len len_byte dep,
+    taint
 
   let set_start_end
       (ctx: context) (set_default_zero: bool)
