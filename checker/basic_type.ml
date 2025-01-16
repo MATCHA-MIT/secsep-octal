@@ -17,6 +17,7 @@ module DepType = struct
   [@@deriving sexp]
 
   let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
+  let top_unknown_size = 0 (* Intend to represent mem data type where size is not gained from basic types *)
 
   let is_bv (e: t) : bool =
     match e with
