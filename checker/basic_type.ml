@@ -163,35 +163,20 @@ module DepType = struct
 
   let get_top_flag () : t = Top top_bool_size
 
-  let extract_exp_or_top (e_list: t list) : (exp_t list * int, int) Either.t =
+  let extract_exp_or_top (e_list: t list) : (exp_t list) option =
     (* NOTE: I assume we can unify size of non-flag operands, so I assert sizes of all operands are the same.
        We may need to change this later to accomodate for different cases. *)
-    let check_size_list (size_list: int list) : int =
-      List.fold_left (
-        fun (acc: int) (size: int) ->
-          if size = top_bool_size then acc
-          else if acc = top_bool_size then size
-          else if acc = size then acc
-          else begin
-            Printf.printf "extract_exp_or_top e_list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_t e_list));
-            dep_type_error "extract_exp_or_top invalid size"
-          end
-      ) top_bool_size size_list
-    in
-    let exp_size_list, top_size_list =
+    let exp_list, top_size_list =
       List.partition_map (
         fun (x: t) ->
           match x with
-          | Exp e -> Left (e, get_exp_bit_size e)
+          | Exp e -> Left e
           | Top size -> Right size
       ) e_list
     in
     match top_size_list with
-    | [] ->
-      let exp_list, size_list = List.split exp_size_list in
-      let size = check_size_list size_list in
-      Left (exp_list, size)
-    | _ -> Right (check_size_list top_size_list)
+    | [] -> Some exp_list
+    | _ -> None
 
   (* NOTE: Actually, functions regarding bop, uop, and top should be merged.
      The current ugly code is due to the imperfect definition in inference tool *)
@@ -246,12 +231,12 @@ module DepType = struct
       BitVector.mk_sub_no_overflow ctx e0 e1 ]
     |> Boolean.mk_and ctx |> Boolean.mk_not ctx
 
-  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = bop_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
-    | Right size ->
-      Top size, top_flag_list
-    | Left (exp_list, _) ->
+    | None ->
+      Top dest_size, top_flag_list
+    | Some exp_list ->
       match op, exp_list with
       | Add, [ e0; e1 ] ->
         Exp (BitVector.mk_add ctx e0 e1),
@@ -261,32 +246,32 @@ module DepType = struct
         ]
       | _ -> dep_type_error "<TODO> not implemented yet"
 
-  let exe_uop (ctx: context) (op: IsaBasic.uop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+  let exe_uop (ctx: context) (op: IsaBasic.uop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = uop_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
-    | Right size ->
-      Top size, top_flag_list
-    | Left (exp_list, exp_size) ->
+    | None ->
+      Top dest_size, top_flag_list
+    | Some exp_list ->
       match op, exp_list with
       | Inc, [ e ] ->
-        let one = BitVector.mk_numeral ctx "1" exp_size in
+        let one = BitVector.mk_numeral ctx "1" (get_exp_bit_size e) in
         Exp (BitVector.mk_add ctx e one),
         set_flag_list top_flag_list [
           OF, Exp (get_add_overflow ctx e one);
         ]
       | Dec, [ e ] ->
-        let one = BitVector.mk_numeral ctx "1" exp_size in
+        let one = BitVector.mk_numeral ctx "1" (get_exp_bit_size e) in
         Exp (BitVector.mk_sub ctx e one),
         set_flag_list top_flag_list [
           OF, Exp (get_sub_overflow ctx e one);
         ]
       | _ -> dep_type_error "<TODO> not implemented yet"
 
-  let exe_top (_: context) (op: IsaBasic.top) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+  let exe_top (_: context) (op: IsaBasic.top) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = top_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
-    | Right size ->
-      Top size, top_flag_list
+    | None ->
+      Top dest_size, top_flag_list
     | _ -> dep_type_error "<TODO> not implemented yet"
 
 end
@@ -352,11 +337,18 @@ module BasicType = struct
     let new_dep, new_taint = new_e in
     DepType.set_flag orig_dep new_dep, new_taint
 
-  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) : t * ((IsaBasic.flag * t) list) =
+  let exe_helper 
+      (dep_exe_op: context -> 'a -> DepType.t list -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
+      (ctx: context) (op: 'a) (e_list: t list) (dest_size: int) : 
+      t * ((IsaBasic.flag * t) list) =
     let dep_list, taint_list = List.split e_list in
-    let dep, dep_flag_list = DepType.exe_bop ctx op dep_list in
+    let dep, dep_flag_list = dep_exe_op ctx op dep_list dest_size in
     let taint = TaintType.exe ctx taint_list in
     (dep, taint),
     List.map (fun (flag, flag_dep) -> flag, (flag_dep, taint)) dep_flag_list
+
+  let exe_bop = exe_helper DepType.exe_bop
+  let exe_uop = exe_helper DepType.exe_uop
+  let exe_top = exe_helper DepType.exe_top
 
 end
