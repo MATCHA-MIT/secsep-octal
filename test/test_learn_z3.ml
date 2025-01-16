@@ -85,4 +85,31 @@ let _ = Printf.printf "%s\n" (result_to_string (Z3.Solver.check solver [
   Boolean.mk_not ctx (Boolean.mk_eq ctx e1 e2) 
 ]))
 
-
+let _ =
+  Printf.printf "==================\n";
+  let num = BitVector.mk_numeral ctx "1234567890" bit_width in
+  let num2 = BitVector.mk_numeral ctx "0987654321" bit_width in
+  Printf.printf "num = %s\n" (Expr.to_string num);
+  let get_extract (high_bit: int) (low_bit: int) : Expr.expr =
+    Expr.simplify (BitVector.mk_extract ctx high_bit low_bit num) None
+  in
+  Printf.printf "extract 4 0 num = %s\n" (get_extract 4 0 |> Expr.to_string);
+  Printf.printf "extract 3 0 num = %s\n" (get_extract 3 0 |> Expr.to_string);
+  Printf.printf "extract 4 1 num = %s\n" (get_extract 4 1 |> Expr.to_string);
+  Printf.printf "extract 8 4 num = %s\n" (get_extract 8 4 |> Expr.to_string);
+  Printf.printf "extract 7 4 num = %s\n" (get_extract 7 4 |> Expr.to_string);
+  Printf.printf "extract 5 2 num = %s\n" (get_extract 5 2 |> Expr.to_string);
+  let x = get_extract 8 4 in
+  let y = get_extract 7 3 in
+  let z = get_extract 9 5 in
+  let xy = Expr.simplify (BitVector.mk_add ctx x y) None in
+  let yz = Expr.simplify (BitVector.mk_concat ctx y z) None in
+  Printf.printf "x=%s\ny=%s\nz=%s\nx+y=%s\ny+z=%s\n" 
+    (Expr.to_string x) (Expr.to_string y) (Expr.to_string z) (Expr.to_string xy) (Expr.to_string yz);
+  Printf.printf "x+y no overflow =\n%s\n" (Expr.to_string (BitVector.mk_add_no_overflow ctx num num2 true));
+  Printf.printf "x+y no overflow =\n%s\n" (Expr.to_string (BitVector.mk_add_no_overflow ctx num num2 false));
+  Printf.printf "x+y no underflow =\n%s\n" (Expr.to_string (BitVector.mk_add_no_underflow ctx num num2));
+  Printf.printf "neg num mk_neg_no_overflow %s\n" (Expr.to_string (BitVector.mk_neg_no_overflow ctx num));
+  Printf.printf "is bool %b\n" (Boolean.is_bool (BitVector.mk_add_no_overflow ctx num num2 true));
+  Printf.printf "x size %d\n" (BitVector.get_size (Expr.get_sort x));
+  Printf.printf "e2 %s size %d\n" (Expr.to_string e2) (BitVector.get_size (Expr.get_sort e2));
