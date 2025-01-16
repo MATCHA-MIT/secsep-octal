@@ -62,8 +62,10 @@ module DepType = struct
 
   let get_start_end
       (ctx: context)
-      (start_byte: int) (end_byte: int)
+      (start_byte: int64) (end_byte: int64)
       (e: t) : t =
+    let start_byte = Int64.to_int start_byte in
+    let end_byte = Int64.to_int end_byte in
     if not (is_bv e) then dep_type_error "get_start_end of non bv e" else
     match e with
     | Exp e -> Exp (get_exp_start_end ctx start_byte end_byte e)
@@ -76,8 +78,8 @@ module DepType = struct
           start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_t e)))
       end
 
-  let get_start_len (ctx: context) (start_byte: int) (len_byte: int) (e: t) : t =
-    get_start_end ctx start_byte (start_byte + len_byte) e
+  let get_start_len (ctx: context) (start_byte: int64) (len_byte: int64) (e: t) : t =
+    get_start_end ctx start_byte (Int64.add start_byte len_byte) e
 
   let set_exp_start_end
       (ctx: context)
@@ -117,9 +119,11 @@ module DepType = struct
 
   let set_start_end 
       (ctx: context) (set_default_zero: bool)
-      (start_byte: int) (end_byte: int) 
+      (start_byte: int64) (end_byte: int64) 
       (orig_e: t) (new_e: t) : 
       t * bool = (* new_e, is_overwrite *)
+    let start_byte = Int64.to_int start_byte in
+    let end_byte = Int64.to_int end_byte in
     if not (is_bv orig_e && is_bv new_e) then dep_type_error "set_start_end of non bv orig_e or new_e" else
     match orig_e, new_e with
     | Exp orig_e, Exp new_e ->
@@ -150,8 +154,8 @@ module DepType = struct
 
   let set_start_len
       (ctx: context) (set_default_zero: bool)
-      (start_byte: int) (len_byte: int) (orig_e: t) (new_e: t) : t * bool =
-    set_start_end ctx set_default_zero start_byte (start_byte + len_byte) orig_e new_e
+      (start_byte: int64) (len_byte: int64) (orig_e: t) (new_e: t) : t * bool =
+    set_start_end ctx set_default_zero start_byte (Int64.add start_byte len_byte) orig_e new_e
 
   let get_flag (e: t) : t =
     if is_bool e then e
@@ -306,19 +310,19 @@ module BasicType = struct
 
   let get_start_end
       (ctx: context)
-      (start_byte: int) (end_byte: int) (e: t) : t =
+      (start_byte: int64) (end_byte: int64) (e: t) : t =
     let dep, taint = e in
     DepType.get_start_end ctx start_byte end_byte dep,
     taint
 
   let get_start_len 
       (ctx: context) 
-      (start_byte: int) (len_byte: int) (e: t) : t =
-    get_start_end ctx start_byte (start_byte + len_byte) e
+      (start_byte: int64) (len_byte: int64) (e: t) : t =
+    get_start_end ctx start_byte (Int64.add start_byte len_byte) e
 
   let set_start_end
       (ctx: context) (set_default_zero: bool)
-      (start_byte: int) (end_byte: int) 
+      (start_byte: int64) (end_byte: int64) 
       (orig_e: t) (new_e: t) : t =
     let orig_dep, orig_taint = orig_e in
     let new_dep, new_taint = new_e in
@@ -327,6 +331,12 @@ module BasicType = struct
     in
     dep,
     TaintType.set ctx is_overwrite orig_taint new_taint
+
+  let set_start_len
+      (ctx: context) (set_default_zero: bool)
+      (start_byte: int64) (len_byte: int64) 
+      (orig_e: t) (new_e: t) : t =
+    set_start_end ctx set_default_zero start_byte (Int64.add start_byte len_byte) orig_e new_e
 
   let get_flag (e: t) : t =
     let dep, taint = e in
