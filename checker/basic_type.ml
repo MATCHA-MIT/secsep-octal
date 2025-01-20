@@ -1,4 +1,5 @@
 open Type.Isa_basic
+open Type.Smt_emitter
 open Z3
 open Z3_sexp
 open Sexplib.Std
@@ -18,6 +19,7 @@ module DepType = struct
 
   type map_t = (int * t) list (* Check the dict type *)
 
+  type ctx_t = exp_t list (* Used to specify requirements on dep types *)
   let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
   let top_unknown_size = 0 (* Intend to represent mem data type where size is not gained from basic types *)
 
@@ -38,6 +40,61 @@ module DepType = struct
     match e with
     | Exp e -> get_exp_bit_size e
     | Top size -> size
+
+  let get_dep_var_string = SmtEmitter.expr_var_str_of_single_var
+
+  let substitute_exp_t
+      (ctx: context)
+      (context_var_map: map_t)
+      (e: exp_t) : t =
+    (* Used as repl_context_var *)
+    (* Dirty implementation to judge whether a variable mapped to top appears in the exp *)
+    let bv_top_var_str = "s-top-bv" in
+    let bool_top_var_str = "s-top-bool" in
+    let top_str = "s-top-" in
+    let var_list, exp_list =
+      List.map (
+        fun (var_idx, exp) ->
+          let var_exp =
+            if is_bool exp then
+              Boolean.mk_const_s ctx (get_dep_var_string var_idx)
+            else if is_bv exp then
+              BitVector.mk_const_s ctx (get_dep_var_string var_idx) (get_bit_size exp)
+            else
+              dep_type_error (Printf.sprintf "invalid dep exp %s" (Sexplib.Sexp.to_string_hum (sexp_of_t exp)))
+          in
+          match exp with
+          | Exp exp -> var_exp, exp
+          | Top size ->
+            if size = top_bool_size then 
+              var_exp, Boolean.mk_const_s ctx bool_top_var_str
+            else
+              var_exp, BitVector.mk_const_s ctx bv_top_var_str size
+      ) context_var_map |> List.split
+    in
+    let e_sub = Expr.substitute e var_list exp_list in
+    let e_sub_string = Expr.to_string e_sub in
+    if Str.string_match (Str.regexp top_str) e_sub_string 0 then
+      Top (get_exp_bit_size e)
+    else
+      Exp e_sub
+
+  let substitute_exp_exp
+      (exp_substitute: exp_t -> t)
+      (e: exp_t) : exp_t =
+    match exp_substitute e with
+    | Top _ -> 
+      dep_type_error 
+      (Printf.sprintf "substitute_exp_exp get top for e %s" (Sexplib.Sexp.to_string_hum (sexp_of_exp_t e)))
+    | Exp e -> e
+
+  let substitute
+      (exp_substitute: exp_t -> t)
+      (e: t) : t =
+    (* Used as repl_context_var *)
+    match e with
+    | Top _ -> e
+    | Exp e -> exp_substitute e
 
   let check_start_end
       (start_byte: int) (end_byte: int)
@@ -595,6 +652,16 @@ module DepType = struct
       | Pshufhw, []
       | _ -> dep_type_error "<TODO> not implemented yet"
 
+  let check_subtype
+      (smt_ctx: SmtEmitter.t)
+      (sub_exp: t) (sup_exp: t) : bool =
+    match sub_exp, sup_exp with
+    | _, Top _ -> true
+    | Top _, Exp _ -> false
+    | Exp sub_e, Exp sup_e ->
+      SmtEmitter.check_compliance smt_ctx
+        [ Boolean.mk_eq (fst smt_ctx) sub_e sup_e ] = SatYes
+
 end
 
 module TaintType = struct
@@ -605,6 +672,26 @@ module TaintType = struct
   type t = Z3Expr.expr (* Note: t must be a Boolean *)
   [@@deriving sexp]
 
+  type map_t = (int * t) list (* Check the dict type *)
+
+  type ctx_t = t list (* Used to specify requirements on taint types *)
+
+  let get_taint_var_string = SmtEmitter.expr_var_str_of_taint_var
+
+  let substitute
+      (ctx: context)
+      (context_var_map: map_t)
+      (e: t) : t =
+    (* Used as repl_context_var *)
+    let var_list, exp_list = List.split context_var_map in
+    let var_exp_list =
+      List.map (
+        fun (var_idx: int) ->
+          Boolean.mk_const_s ctx (get_taint_var_string var_idx)
+      ) var_list
+    in
+    Expr.substitute e var_exp_list exp_list
+
   let set
       (ctx: context)
       (is_overwrite: bool) (orig_t: t) (new_t: t) : t =
@@ -613,6 +700,20 @@ module TaintType = struct
 
   let exe (ctx: context) (e_list: t list) : t =
     Boolean.mk_or ctx e_list
+
+  let check_subtype
+    (smt_ctx: SmtEmitter.t)
+    (must_equal: bool)
+    (sub_exp: t) (sup_exp: t) : bool =
+  let ctx, _ = smt_ctx in
+  let check_target =
+    if must_equal then
+      (* <TODO> Difference between mk_eq and mk_iff? Which one should we use? *)
+      Boolean.mk_eq ctx sub_exp sup_exp
+    else
+      Boolean.mk_implies ctx sub_exp sup_exp
+  in
+  SmtEmitter.check_compliance smt_ctx [ check_target ] = SatYes
 
 end
 
@@ -624,6 +725,18 @@ module BasicType = struct
 
   type t = DepType.t * TaintType.t
   [@@deriving sexp]
+
+  type map_t = DepType.map_t * TaintType.map_t
+
+  type ctx_t = DepType.ctx_t * TaintType.ctx_t
+
+  let substitute
+      (dep_substitute: DepType.t -> DepType.t)
+      (taint_substitute: TaintType.t -> TaintType.t)
+      (e: t) : t =
+    (* Used as repl_context_var *)
+    let dep, taint = e in
+    dep_substitute dep, taint_substitute taint
 
   let get_start_end
       (ctx: context)
@@ -682,5 +795,14 @@ module BasicType = struct
   let exe_bop = exe_helper DepType.exe_bop
   let exe_uop = exe_helper DepType.exe_uop
   let exe_top = exe_helper DepType.exe_top
+
+  let check_subtype
+      (smt_ctx: SmtEmitter.t)
+      (taint_must_equal: bool)
+      (sub_exp: t) (sup_exp: t) : bool =
+    let sub_dep, sub_taint = sub_exp in
+    let sup_dep, sup_taint = sup_exp in
+    DepType.check_subtype smt_ctx sub_dep sup_dep &&
+    TaintType.check_subtype smt_ctx taint_must_equal sub_taint sup_taint
 
 end

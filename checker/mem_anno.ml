@@ -9,6 +9,7 @@ module MemAnno = struct
 
   let mem_anno_error msg = raise (MemAnnoError ("[Mem Anno Error]" ^ msg))
 
+  (* <TODO> I think checker does not need is_full. Double check!!! *)
   type slot_t = int * int * bool * int (* ptr, slot idx, is full, num slots*)
   [@@deriving sexp]
 

@@ -119,6 +119,12 @@ let get_model (smt_ctx: t) : Model.model option =
           SatNo
         end
 
+  let expr_var_str_of_single_var (var_idx: int) : string =
+    Printf.sprintf "s%d" var_idx
+
+  let expr_var_str_of_taint_var (var_idx: int) : string =
+    Printf.sprintf "t%d" var_idx
+
   let rec expr_of_single_exp (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =
     (* let add_constr = true in *)
     let z3_ctx, _ = smt_ctx in
