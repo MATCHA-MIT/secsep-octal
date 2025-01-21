@@ -15,12 +15,17 @@ module Isa (MemAnno: MemAnnoType) = struct
   type mem_op = immediate option * register option * register option * scale option
   [@@deriving sexp]
 
+  type ldst_op = immediate option * register option * register option * scale option * int64 * MemAnno.t
+  [@@deriving sexp]
+
   type operand =
     | ImmOp of immediate
     | RegOp of register
+    | RegMultOp of register list 
+      (* dirty fix to support the instructions that split results into two registers or have no dest reg *)
     | MemOp of mem_op
-    | LdOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
-    | StOp of immediate option * register option * register option * scale option * int64 * MemAnno.t
+    | LdOp of ldst_op
+    | StOp of ldst_op
     | LabelOp of label
   [@@deriving sexp]
 
@@ -38,6 +43,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     match op with
     | ImmOp imm -> string_of_immediate imm
     | RegOp r -> string_of_reg r
+    | RegMultOp r_list -> Printf.sprintf "(%s)" (String.concat " " (List.map string_of_reg r_list))
     | MemOp (disp, base, index, scale) ->
       let disp_str = string_of_option string_of_immediate disp in
       let base_str = string_of_option string_of_reg base in
@@ -56,6 +62,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     match op with
     | ImmOp imm -> ocaml_string_of_immediate_op imm
     | RegOp r -> ocaml_string_of_reg_op r
+    | RegMultOp r_list -> Printf.sprintf "RegMultOp (%s)" (String.concat " " (List.map ocaml_string_of_reg_op r_list))
     | MemOp (disp, base, index, scale) ->
       let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
       let base_str = ocaml_string_of_option ocaml_string_of_reg base in

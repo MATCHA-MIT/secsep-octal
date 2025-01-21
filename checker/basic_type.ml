@@ -1,5 +1,6 @@
 open Type.Isa_basic
 open Type.Smt_emitter
+open Isa_flag_config
 open Z3
 open Z3_sexp
 open Sexplib.Std
@@ -18,8 +19,10 @@ module DepType = struct
   [@@deriving sexp]
 
   type map_t = (int * t) list (* Check the dict type *)
+  [@@deriving sexp]
 
   type ctx_t = exp_t list (* Used to specify requirements on dep types *)
+  [@@deriving sexp]
   let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
   let top_unknown_size = 0 (* Intend to represent mem data type where size is not gained from basic types *)
 
@@ -95,6 +98,31 @@ module DepType = struct
     match e with
     | Top _ -> e
     | Exp e -> exp_substitute e
+
+  let get_const_exp (ctx: context) (c: int64) (size: int) : exp_t =
+    BitVector.mk_numeral ctx (Int64.to_string c) size
+
+  let get_const_type (ctx: context) (c: int64) (size: int) : t =
+    Exp (get_const_exp ctx c size)
+
+  let get_imm_exp (_: context) (_: IsaBasic.immediate) : exp_t =
+    dep_type_error "<TODO> implement this after adding size to IsaBasic.immediate, which should match other operand's size in the same inst"
+
+  let get_imm_type (ctx: context) (imm: IsaBasic.immediate) : t =
+    Exp (get_imm_exp ctx imm)
+
+  let get_mem_op_type 
+      (ctx: context) 
+      (disp: exp_t) (base: t)
+      (index: t) (scale: exp_t) : t =
+    match base, index with
+    | Top _, _ | _, Top _ -> Top 64
+    | Exp base, Exp index ->
+      Exp (
+        BitVector.mk_add ctx
+          (BitVector.mk_add ctx base disp)
+          (BitVector.mk_mul ctx index scale)
+      )
 
   let check_start_end
       (start_byte: int) (end_byte: int)
@@ -280,6 +308,9 @@ module DepType = struct
 
   let get_top_flag_list (flag_list: IsaBasic.flag list) : (IsaBasic.flag * t) list =
     List.map (fun f -> f, get_top_flag ()) flag_list
+
+  let get_top_flag_list_from_map (flag_list: (IsaBasic.flag * 'a) list) : (IsaBasic.flag * t) list =
+    List.map (fun (f, _) -> f, get_top_flag ()) flag_list
 
   let set_flag_list 
       (orig_list: (IsaBasic.flag * t) list) 
@@ -510,7 +541,7 @@ module DepType = struct
     ]
 
 
-  let exe_bop (ctx: context) (op: IsaBasic.bop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+  let exe_bop_old (ctx: context) (op: IsaBasic.bop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = bop_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
     | None ->
@@ -589,7 +620,7 @@ module DepType = struct
       | Psub, []
       | _ -> dep_type_error "<TODO> not implemented yet"
 
-  let exe_uop (ctx: context) (op: IsaBasic.uop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+  let exe_uop_old (ctx: context) (op: IsaBasic.uop) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = uop_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
     | None ->
@@ -638,7 +669,7 @@ module DepType = struct
         ]
       | _ -> dep_type_error "<TODO> not implemented yet"
 
-  let exe_top (ctx: context) (op: IsaBasic.top) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+  let exe_top_old (ctx: context) (op: IsaBasic.top) (e_list: t list) (dest_size: int) : t * ((IsaBasic.flag * t) list) =
     let top_flag_list = top_update_flag_list op |> get_top_flag_list in
     match extract_exp_or_top e_list with
     | None ->
@@ -651,6 +682,75 @@ module DepType = struct
       | Pshuflw, []
       | Pshufhw, []
       | _ -> dep_type_error "<TODO> not implemented yet"
+
+  (* <TODO> Check the following new API *)
+  let exe_bop 
+      (ctx: context) (op: IsaBasic.bop) 
+      (src_list: t list) 
+      (get_src_flag_func: IsaBasic.flag -> t) 
+      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+    let src_flag_list, dest_flag_list = IsaFlagConfig.get_bop_config op in
+    let src_flag_type_list = List.map get_src_flag_func src_flag_list in
+    let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+    match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
+    | None, _ | _, None ->
+      Top dest_size, top_flag_list
+    | Some src_exp_list, Some src_flag_list ->
+      let set_flags = set_flag_list top_flag_list in
+      match op, src_exp_list, src_flag_list with
+      | Add, [ dst; src ], [] ->
+        exe_additive ctx set_flags BitVector.mk_add dst src true
+      | Adc, [ dst; src], [ cflg ] ->
+        let flag_inc = bool_to_bv ctx cflg dest_size in
+        let addend = BitVector.mk_add ctx src flag_inc in
+        exe_additive ctx set_flags BitVector.mk_add dst addend true
+      | Sal, [ dst; cnt ], [] | Shl, [ dst; cnt ], [] ->
+        (* <TODO> Please check the following example that demonstrate how to get OF for Sal, Shl, Sar, Shr, Rol, Ror 
+           It's a dirty and tedious implementation, maybe wrap it into get_shl_overflow or somewhere *)
+        let orig_oflg = get_src_flag_func OF in
+        let new_oflg =
+          begin match orig_oflg with
+          | Top _ -> Top top_bool_size
+          | Exp oflg -> Exp (get_shl_overflow ctx dst cnt oflg)
+          end
+        in
+        let result = BitVector.mk_shl ctx dst cnt in
+        Exp result,
+        set_flags [
+          CF, Exp (get_shl_carry ctx dst cnt);
+          PF, Exp (get_parity ctx result); 
+          ZF, Exp (get_zero ctx result);
+          SF, Exp (get_sign ctx result);
+          OF, new_oflg;
+        ]
+      | _ -> dep_type_error "<TODO> not implemented yet"
+
+  let exe_uop
+      (_: context) (op: IsaBasic.uop) 
+      (src_list: t list) 
+      (get_src_flag_func: IsaBasic.flag -> t) 
+      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+    let src_flag_list, dest_flag_list = IsaFlagConfig.get_uop_config op in
+    let src_flag_type_list = List.map get_src_flag_func src_flag_list in
+    let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+    match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
+    | None, _ | _, None ->
+      Top dest_size, top_flag_list
+    | Some _, Some _ -> dep_type_error "<TODO> not implemented yet"
+    (* For Lea, it will not appear during type check since it is converted to mov xx, xx, feel free to ignore it *)
+
+  let exe_top
+      (_: context) (op: IsaBasic.top) 
+      (src_list: t list) 
+      (get_src_flag_func: IsaBasic.flag -> t) 
+      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+    let src_flag_list, dest_flag_list = IsaFlagConfig.get_top_config op in
+    let src_flag_type_list = List.map get_src_flag_func src_flag_list in
+    let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+    match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
+    | None, _ | _, None ->
+      Top dest_size, top_flag_list
+    | Some _, Some _ -> dep_type_error "<TODO> not implemented yet"
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
@@ -673,8 +773,10 @@ module TaintType = struct
   [@@deriving sexp]
 
   type map_t = (int * t) list (* Check the dict type *)
+  [@@deriving sexp]
 
   type ctx_t = t list (* Used to specify requirements on taint types *)
+  [@@deriving sexp]
 
   let get_taint_var_string = SmtEmitter.expr_var_str_of_taint_var
 
@@ -691,6 +793,12 @@ module TaintType = struct
       ) var_list
     in
     Expr.substitute e var_exp_list exp_list
+
+  let get_untaint_exp (ctx: context) : t =
+    Boolean.mk_false ctx
+
+  let get_taint_exp (ctx: context) : t =
+    Boolean.mk_true ctx
 
   let set
       (ctx: context)
@@ -715,6 +823,11 @@ module TaintType = struct
   in
   SmtEmitter.check_compliance smt_ctx [ check_target ] = SatYes
 
+  let check_untaint
+      (smt_ctx: SmtEmitter.t)
+      (exp: t) : bool =
+    check_subtype smt_ctx false exp (get_untaint_exp (fst smt_ctx))
+
 end
 
 
@@ -727,8 +840,10 @@ module BasicType = struct
   [@@deriving sexp]
 
   type map_t = DepType.map_t * TaintType.map_t
+  [@@deriving sexp]
 
   type ctx_t = DepType.ctx_t * TaintType.ctx_t
+  [@@deriving sexp]
 
   let substitute
       (dep_substitute: DepType.t -> DepType.t)
@@ -737,6 +852,23 @@ module BasicType = struct
     (* Used as repl_context_var *)
     let dep, taint = e in
     dep_substitute dep, taint_substitute taint
+
+  let get_const_type (ctx: context) (c: int64) (size: int) : t =
+    DepType.get_const_type ctx c size,
+    TaintType.get_untaint_exp ctx
+
+  let get_imm_type (ctx: context) (imm: IsaBasic.immediate) : t =
+    DepType.get_imm_type ctx imm,
+    TaintType.get_untaint_exp ctx
+
+  let get_mem_op_type 
+      (ctx: context) 
+      (disp: DepType.exp_t) (base: t)
+      (index: t) (scale: DepType.exp_t) : t =
+    let base_dep, base_taint = base in
+    let index_dep, index_taint = index in
+    DepType.get_mem_op_type ctx disp base_dep index_dep scale,
+    TaintType.exe ctx [ base_taint; index_taint ]
 
   let get_start_end
       (ctx: context)
@@ -783,18 +915,31 @@ module BasicType = struct
     DepType.set_flag orig_dep new_dep, new_taint
 
   let exe_helper 
-      (dep_exe_op: context -> 'a -> DepType.t list -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
-      (ctx: context) (op: 'a) (e_list: t list) (dest_size: int) : 
+      (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
+      (get_flag_conig: 'a -> IsaFlagConfig.t)
+      (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) : 
       t * ((IsaBasic.flag * t) list) =
+    (* <TODO> Please check whether this makes sense to you. *)
+    let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
+    let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
     let dep_list, taint_list = List.split e_list in
-    let dep, dep_flag_list = dep_exe_op ctx op dep_list dest_size in
+    let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
     let taint = TaintType.exe ctx taint_list in
+    let _, update_flag_map = get_flag_conig op in
     (dep, taint),
-    List.map (fun (flag, flag_dep) -> flag, (flag_dep, taint)) dep_flag_list
+    List.map2 (
+      fun (flag, flag_dep) (flag2, self_is_src) -> 
+        let flag_taint =
+          if flag <> flag2 then basic_type_error "update flag list does not match"
+          else if self_is_src then TaintType.exe ctx [ taint; get_src_flag_taint flag ]
+          else taint
+        in
+        flag, (flag_dep, flag_taint)
+      ) dep_flag_list update_flag_map
 
-  let exe_bop = exe_helper DepType.exe_bop
-  let exe_uop = exe_helper DepType.exe_uop
-  let exe_top = exe_helper DepType.exe_top
+  let exe_bop = exe_helper DepType.exe_bop IsaFlagConfig.get_bop_config
+  let exe_uop = exe_helper DepType.exe_uop IsaFlagConfig.get_uop_config
+  let exe_top = exe_helper DepType.exe_top IsaFlagConfig.get_top_config
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)

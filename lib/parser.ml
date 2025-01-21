@@ -345,13 +345,14 @@ module Parser = struct
   let get_binst_with_one_operand (op: Isa.bop) (opr: Isa.operand * (int64 option)) (default_size: int64 option) : Isa.instruction =
     match op with
     | Sal | Sar | Shr | Shl | Rol | Ror -> BInst (op, dst opr, src opr, src (ImmOp (ImmNum 1L), default_size))
-    | Mul ->
+    | Mul | Imul ->
       let default_opr : Isa.operand * (int64 option) = begin match default_size with
-      | Some 1L -> RegOp AL, default_size
+      | Some _ -> parse_error "<TODO> not implemented yet"
+      (* | Some 1L -> RegOp AL, default_size
       | Some 2L -> RegOp AX, default_size
       | Some 4L -> RegOp EAX, default_size
       | Some 8L -> RegOp RAX, default_size
-      | Some x -> parse_error ("cannot get default op with size " ^ (Int64.to_string x))
+      | Some x -> parse_error ("cannot get default op with size " ^ (Int64.to_string x)) *)
       | None -> parse_error "cannot get default op when size is unknown"
       end in
       BInst (op, dst default_opr, src default_opr, src opr)

@@ -55,6 +55,7 @@ module AsmGen = struct
     match op with
     | ImmOp imm -> str_of_immediate ctx true imm
     | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
+    | RegMultOp _ -> asm_gen_error "<TODO> not implemented yet"
     | LdOp (d, b, i, s, _, _)
     | StOp (d, b, i, s, _, _) -> 
       (* Printf.printf "operand = %s\n%!" (Isa.string_of_operand op); *)

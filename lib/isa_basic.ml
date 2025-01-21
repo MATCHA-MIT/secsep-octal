@@ -439,7 +439,7 @@ module IsaBasic = struct
     | Rol | Ror
     | Xor | And | Or
     | CmovEq
-    | Bt (* <TODO> @Tingzhen What is this? *)
+    | Bt
     | Punpck | Packus
     | Padd | Psub | Pxor | Pandn | Pand | Por
     | Psll | Psrl

@@ -1,0 +1,81 @@
+open Type.Isa_basic
+open Sexplib.Std
+
+module IsaFlagConfig = struct
+  exception IsaFlagConfigError of string
+
+  let isa_flag_config_error msg = raise (IsaFlagConfigError ("[Isa Flag Config Error] " ^ msg))
+
+  type 'a flag_map_t = (IsaBasic.flag * 'a) list
+  [@@deriving sexp]
+
+  type flag_list_t = IsaBasic.flag list
+  [@@deriving sexp]
+
+  type t = flag_list_t * (bool flag_map_t) 
+  (* src flag list, (dst flag, conditional update) list *)
+  [@@deriving sexp]
+
+  let set_flag_list 
+      (orig_list: 'a flag_map_t) 
+      (update_flag_list: 'a flag_map_t) : 'a flag_map_t =
+    (* A helper function for easy config, feel free to use or not use it. *)
+    (* <TODO> please check this, might containt bug *)
+    List.fold_left (
+      fun (acc: (IsaBasic.flag * t) list) (update_entry: IsaBasic.flag * 'a) ->
+        let update_flag, _ = update_entry in
+        let find, acc =
+          List.fold_left_map (
+            fun (acc: bool) (entry: IsaBasic.flag * 'a) ->
+              if acc then acc, entry
+              else if update_flag = fst entry then
+                true, update_entry
+              else false, entry
+          ) false acc
+        in
+        if find then acc
+        else isa_flag_config_error "set_flag_list cannot find flag in orig_list"
+    ) orig_list update_flag_list
+  
+  let get_bop_config (bop: IsaBasic.bop) : t =
+    (* <TODO> Please check this. There might be problems that does not match the x86 ISA spec. *)
+    match bop with
+    | Add | Sub -> 
+      [], (* flags used to calculate dest value *) 
+      [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
+      (* flags being updated and whether the new flag value depends on the old value *)
+    | Adc | Sbb ->
+      [ CF ],
+      [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
+    | Mul | Imul ->
+      [],
+      [ CF, false; OF, false ]
+    | Sal | Sar | Shl | Shr ->
+      [], (* the dest value does not depends on any flags *)
+      [ CF, false; PF, false; ZF, false; SF, false; OF, true ]
+      (* but the new OF value may depends on the old OF value, 
+         so if we calculate taint of OF, we need to include it as one of the taint src *)
+    | Rol | Ror ->
+      [],
+      [ CF, false; OF, true ]
+    | Xor | And | Or -> 
+      [],
+      [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
+    | CmovEq -> [], []
+    | Bt -> [], [ CF, false ]
+    | Punpck | Packus -> [], []
+    | Padd | Psub | Pxor | Pandn | Pand | Por -> [], []
+    | Psll | Psrl -> [], []
+    | Xorps -> [], []
+
+  let get_uop_config (uop: IsaBasic.uop) : t =
+    (* <TODO> Finish this *)
+    match uop with
+    | _ -> [], []
+
+  let get_top_config (top: IsaBasic.top) : t =
+    (* <TODO> Finish this *)
+    match top with
+    | _ -> [], []
+
+end

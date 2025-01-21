@@ -547,6 +547,7 @@ module ArchType (Entry: EntryType) = struct
     match src with
     | ImmOp imm -> Entry.get_const_type imm, curr_type, [], src
     | RegOp r -> get_reg_type curr_type r, curr_type, [], src
+    | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
     | MemOp (disp, base, index, scale) ->
       get_mem_op_type curr_type disp base index scale, curr_type, [], src
     | LdOp (disp, base, index, scale, size, (slot_anno, taint_anno) (* TODO: check offset and generate constraints *)) ->
@@ -562,8 +563,8 @@ module ArchType (Entry: EntryType) = struct
         ld_op_constraint @ src_constraint,
         LdOp (disp, base, index, scale, size, (slot_anno, taint_anno))
       )
-    | StOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a st op")
-    | LabelOp _ -> arch_type_error ("get_src_op_type: cannot get src op type of a label op")
+    | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
+    | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
   
   let set_dest_op_type_helper
       (allow_set_xmm: bool)
@@ -578,6 +579,7 @@ module ArchType (Entry: EntryType) = struct
       t * (Constraint.t list) * Isa.operand =
     match dest with
     | RegOp r -> set_reg_type_helper allow_set_xmm curr_type r new_type, [], dest
+    | RegMultOp _ -> arch_type_error "<TODO> not implemented"
     | StOp (disp, base, index, scale, size, (slot_anno, taint_anno)) ->
       let addr_type = get_mem_op_type curr_type disp base index scale in
       let size_type = Entry.get_const_type (ImmNum size) in

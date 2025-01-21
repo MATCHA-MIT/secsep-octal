@@ -97,6 +97,12 @@ module MemOffset = struct
     let l, r = off in
     substitute_func l, substitute_func r
 
+  let addr_size_to_offset
+      (ctx: context)
+      (addr_exp: DepType.exp_t) (size: int64) : t =
+    addr_exp,
+    BitVector.mk_add ctx addr_exp (DepType.get_const_exp ctx size 64)
+
 end
 
 module MemRange = struct
@@ -354,6 +360,32 @@ module MemType = struct
     match mem_map_opt with
     | None -> check_subtype_no_map smt_ctx is_spill_func sub_m_type sup_m_type
     | Some mem_map -> check_subtype_map smt_ctx is_spill_func sub_m_type sup_m_type mem_map
+
+  let get_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (mem_type: t)
+      (addr_off: MemOffset.t) 
+      (slot_info: MemAnno.slot_t) : entry_t option =
+    (* <TODO> 
+       1. Check read permission; 
+       2. get entry with slot; 
+       3. check slot_info *)
+    let _ = smt_ctx, mem_type, addr_off, slot_info in
+    None
+
+  let set_mem_type
+      (smt_ctx: SmtEmitter.t)
+      (is_spill_func: MemAnno.slot_t -> bool)
+      (mem_type: t)
+      (addr_off: MemOffset.t)
+      (slot_info: MemAnno.slot_t)
+      (new_type: BasicType.t) : t option =
+    (* <TODO> 
+       1. Check write permission; 
+       2. update entry and all read/write permission; 
+       3. check slot_info, taint constraint *)
+    let _ = smt_ctx, is_spill_func, mem_type, addr_off, slot_info, new_type in
+    None
 
 end
 

@@ -199,6 +199,7 @@ module StateType = struct
     match src with
     | ImmOp imm -> ([], get_imm_type imm, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | RegOp r -> ([RegOp (Isa.get_reg_idx r)], get_reg_type curr_state r, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
+    | RegMultOp _ -> state_type_error "not implemented"
     | MemOp (disp, base, index, scale) -> 
       (get_mem_op_ir_op base index, get_mem_op_type smt_ctx curr_state false disp base index scale, None, MemOffset.ConstraintSet.empty, TypeExp.TypeVarSet.empty)
     | LdOp (disp, base, index, scale, size, _) ->
