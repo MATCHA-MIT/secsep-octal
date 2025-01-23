@@ -38,7 +38,6 @@ module IsaFlagConfig = struct
     ) orig_list update_flag_list
   
   let get_bop_config (bop: IsaBasic.bop) : t =
-    (* <TODO> Please check this. There might be problems that does not match the x86 ISA spec. *)
     match bop with
     | Add | Sub -> 
       [], (* flags used to calculate dest value *) 
@@ -69,13 +68,15 @@ module IsaFlagConfig = struct
     | Xorps -> [], []
 
   let get_uop_config (uop: IsaBasic.uop) : t =
-    (* <TODO> Finish this *)
     match uop with
+    | Neg -> [], [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
+    | Inc -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
+    | Dec -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
     | _ -> [], []
 
   let get_top_config (top: IsaBasic.top) : t =
-    (* <TODO> Finish this *)
     match top with
+    | Shrd -> [], [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
     | _ -> [], []
 
 end
