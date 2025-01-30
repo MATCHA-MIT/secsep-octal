@@ -310,7 +310,7 @@ module ArchType (Entry: EntryType) = struct
         begin match try_get_slot_type with
         | Some ((off_w, off_r, e_t), mult_slot_cons, true) ->
           e_t, 
-          Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons,
+          (Constraint.gen_off_subset smt_ctx orig_addr_offset off_r off_w) @ mult_slot_cons @ addr_untaint_cons,
           useful_vars,
           anno_opt
           (* NOTE: Possible problem: If previous is_full is false while it should be true, the current code cannot correct this over-conservative annotation!!! *)
@@ -320,7 +320,7 @@ module ArchType (Entry: EntryType) = struct
           begin match MemType.get_mem_type smt_ctx sub_sol_list_func is_spill_func true curr_type.mem_type orig_addr_offset simp_addr_offset with
           | Some (is_full, ptr, (off_w, off_r, e_t), num_slot, mult_slot_cons) ->
             e_t, 
-            Constraint.Subset (orig_addr_offset, off_r, off_w) :: mult_slot_cons @ addr_untaint_cons,
+            (Constraint.gen_off_subset smt_ctx orig_addr_offset off_r off_w) @ mult_slot_cons @ addr_untaint_cons,
             useful_vars,
             Some (ptr, off_w, is_full, num_slot)
           | None -> 
@@ -371,7 +371,7 @@ module ArchType (Entry: EntryType) = struct
       in
       let (off, range, entry), mult_slot_cons, pass_check = MemType.get_slot_mem_type smt_ctx is_spill_func check_addr curr_type.mem_type orig_addr_offset slot_info in
       if pass_check then
-        entry, Constraint.Subset (orig_addr_offset, range, off) :: mult_slot_cons @ addr_untaint_cons, useful_vars
+        entry, (Constraint.gen_off_subset smt_ctx orig_addr_offset range off) @ mult_slot_cons @ addr_untaint_cons, useful_vars
       else
         arch_type_error (Printf.sprintf "get_ld_op_type_slot: Annotation %s does not match memory slot %s"
           (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))

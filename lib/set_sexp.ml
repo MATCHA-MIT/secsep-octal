@@ -38,3 +38,5 @@ include Set.Make(
     sexp_of_list sexp_of_entry_t (elements s)
 
 end
+
+module IntMap = Map.Make(Int)

@@ -1,6 +1,8 @@
 open Mem_offset_new
 open Single_context
 open Taint_exp
+open Set_sexp
+open Smt_emitter
 open Sexplib.Std
 
 module Constraint = struct
@@ -9,7 +11,9 @@ module Constraint = struct
 
   type t =
     | Unknown of MemOffset.t
-    | Subset of MemOffset.t * MemRange.t * MemOffset.t
+    (* | Subset of MemOffset.t * MemRange.t * MemOffset.t *)
+    | RangeSubset of MemRange.range_var_id * (MemOffset.t list)
+    | RangeUnsat of MemOffset.t * (MemOffset.t list)
     | RangeEq of MemOffset.t * MemRange.t
     | RangeOverwritten of MemRange.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
@@ -55,10 +59,34 @@ module Constraint = struct
         | _ -> acc
     ) (TaintExp.TaintVarSet.empty, []) constraint_list
 
-  let gen_range_subset (sub_range: MemRange.t) (range: MemRange.t) (off: MemOffset.t) : t list =
+  let gen_off_subset (smt_ctx: SmtEmitter.t) (sub_off: MemOffset.t) (range: MemRange.t) (off: MemOffset.t) : t list =
+    match range with
+    | RangeConst ro_list ->
+      begin match MemOffset.diff smt_ctx sub_off ro_list with
+      | [] -> []
+      | remain_list -> [ RangeUnsat (off, remain_list) ]
+      end
+    | RangeVar v -> [ RangeSubset (v, [ sub_off ]) ]
+    | RangeExp (v, ro_list) -> [ RangeSubset (v, MemOffset.diff smt_ctx sub_off ro_list) ]
+
+  let gen_range_subset (smt_ctx: SmtEmitter.t) (sub_range: MemRange.t) (range: MemRange.t) (off: MemOffset.t) : t list =
     match sub_range with
-    | RangeConst o -> List.map (fun x -> Subset (x, range, off)) o
+    | RangeConst sub_o_list -> List.concat_map (fun x -> gen_off_subset smt_ctx x range off) sub_o_list
     | _ -> constraint_error (Printf.sprintf "Cannot gen range constraint for %s" (MemRange.to_string sub_range))
+
+  let get_range_subset (constriant_list: (t * int) list) : MemOffsetSet.t IntMap.t =
+    List.fold_left (
+      fun (acc: MemOffsetSet.t IntMap.t) (cons, _) ->
+        match cons with
+        | RangeSubset (v, o_list) ->
+          begin match IntMap.find_opt v acc with
+          | None -> IntMap.add v (MemOffsetSet.of_list o_list) acc
+          | Some o_set -> 
+            acc |>
+            IntMap.update v (Option.map (fun _ -> MemOffsetSet.union o_set (MemOffsetSet.of_list o_list)))
+          end
+        | _ -> acc
+    ) IntMap.empty constriant_list
 
   let get_callee_context (constraint_list: (t * int) list) : ((SingleContext.t list) * int) list =
     List.filter_map (

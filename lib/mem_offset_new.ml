@@ -5,6 +5,7 @@ open Range_exp
 open Pretty_print
 open Smt_emitter
 open Sexplib.Std
+open Sexplib
 
 module MemOffset = struct
   exception MemOffsetError of string
@@ -33,6 +34,7 @@ module MemOffset = struct
     | CmpAll (* cmp [a, b] [b, c] -> Le *)
     | CmpOverlap (* cmp [a, b] [b, c] -> LOverlap *)
     | CmpLeSubsetLoverlap
+    | CmpSupLoverlapRoverlapSub
   [@@deriving sexp]
 
   let off_rel_t_to_string (x: off_rel_t) : string =
@@ -82,13 +84,13 @@ module MemOffset = struct
     let subset_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, r1, r2) ] in
     let supset_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, r2, r1) ] in
     let loverlap_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, l2, r1) ] in
-    let goverlap_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, l1, r2) ] in
+    let goverlap_req = [ (SingleCondType.Le, l1, r2); (SingleCondType.Le, r2, r1) ] in
     let check = SingleCondType.check is_quick smt_ctx in
 
     (* let z3_ctx, _ = smt_ctx in
     let l1, r1 = to_smt_expr smt_ctx o1 in
     let l2, r2 = to_smt_expr smt_ctx o2 in
-    let check = SmtEmitter.check_compliance smt_ctx in
+    let check = SmtEmitter.check_compliance smt_ctx in 
     let zero = Z3.BitVector.mk_numeral z3_ctx "0" SmtEmitter.bv_width in
     let sub_helper e1 e2 = Z3.BitVector.mk_sub z3_ctx e1 e2 in 
     let eq_req = [ Z3.Boolean.mk_eq z3_ctx (sub_helper l1 l2) zero; Z3.Boolean.mk_eq z3_ctx (sub_helper r1 r2) zero ] in
@@ -151,6 +153,13 @@ module MemOffset = struct
           if check le_req = SatYes then Le
           else if check subset_req = SatYes then Subset
           else if check loverlap_req = SatYes then LOverlap
+          else Other
+        end
+      | CmpSupLoverlapRoverlapSub -> begin
+          if check supset_req = SatYes then Supset
+          else if check loverlap_req = SatYes then LOverlap
+          else if check goverlap_req = SatYes then GOverlap
+          else if check subset_req = SatYes then Subset
           else Other
         end
     end in
@@ -268,6 +277,29 @@ module MemOffset = struct
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 
+  let diff (smt_ctx: SmtEmitter.t) (o: t) (ro_list: t list) : t list =
+    (* o - ro_list *)
+    let remain_list, remain_off =
+      List.fold_left (
+        fun (acc: (t list) * (t option)) (r_o: t) ->
+          let remain_list, off_opt = acc in
+          match off_opt with
+          | None -> acc
+          | Some off ->
+            begin match offset_quick_cmp smt_ctx r_o off CmpSupLoverlapRoverlapSub with
+            | Supset -> remain_list, None
+            | LOverlap -> remain_list, Some (snd r_o, snd off)
+            | GOverlap -> (fst off, fst r_o) :: remain_list, None
+            | Subset -> (fst off, fst r_o) :: remain_list, Some (snd r_o, snd off)
+            | Other -> acc
+            | _ -> mem_offset_error "should not have this cmp result"
+            end
+      ) ([], Some o) ro_list
+    in
+    match remain_off with
+    | Some remain_off -> List.rev (remain_off :: remain_list)
+    | None -> List.rev remain_list
+
   let insert_new_offset_list_merge = insert_new_offset_list_helper true
 
   let get_vars (o: t) : SingleExp.SingleVarSet.t =
@@ -328,6 +360,22 @@ module MemOffset = struct
   let is_8byte_slot (o: t) : bool =
     SingleExp.cmp (snd o) (SingleExp.SingleBExp (SingleAdd, (fst o), SingleConst (IsaBasic.get_gpr_full_size ()))) = 0
   
+end
+
+module MemOffsetSet = struct
+  include Set.Make (
+    struct
+      let compare = MemOffset.cmp
+      type t = MemOffset.t
+    end
+  )
+
+let t_of_sexp (s_exp: Sexp.t) : t = 
+  of_list (list_of_sexp MemOffset.t_of_sexp s_exp)
+
+let sexp_of_t (s: t) : Sexp.t = 
+  sexp_of_list MemOffset.sexp_of_t (elements s)
+
 end
 
 module MemRange = struct

@@ -244,7 +244,7 @@ module FuncInterface (Entry: EntryType) = struct
     (* Note: m_in_range = repl_context_var c_in_range *)
     let is_full, m_in_range, c_in_entry = read_hint in
     (* let _, c_out_range, c_out_entry = write_mem in  *)
-    let read_range_constraint = Constraint.gen_range_subset m_in_range p_range p_off in
+    let read_range_constraint = Constraint.gen_range_subset smt_ctx m_in_range p_range p_off in
     let m_in_entry =
       if Entry.is_val2 var_map c_in_entry then Entry.repl_context_var var_map c_in_entry
       else Entry.get_top_type () (* Here we somehow assert during taint infer we always get full map so that we do not call this with TaintEntryType. *)

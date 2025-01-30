@@ -17,7 +17,8 @@ module MemOffset = struct
     | Eq 
     | Subset | Supset 
     | Le | Ge 
-    | LOverlap | GOverlap
+    | LOverlap (* l1 <= l2 <= r1 <= r2 or l1 <= l2 <= r2 <= r1*)
+    | GOverlap (* l2 <= l1 <= r2 <= r1 or l1 <= l2 <= r2 <= r1*)
     | Other
   [@@deriving sexp]
 
@@ -41,7 +42,7 @@ module MemOffset = struct
     let subset_req = [ BitVector.mk_sle ctx l2 l1; BitVector.mk_sle ctx r1 r2; ] in
     let supset_req = [ BitVector.mk_sle ctx l1 l2; BitVector.mk_sle ctx r2 r1 ] in
     let loverlap_req = [ BitVector.mk_sle ctx l1 l2; BitVector.mk_sle ctx l2 r1 ] in
-    let goverlap_req = [ BitVector.mk_sle ctx l2 l1; BitVector.mk_sle ctx l1 r2 ] in
+    let goverlap_req = [ BitVector.mk_sle ctx l1 r2; BitVector.mk_sle ctx r2 r1 ] in
 
     let check = SmtEmitter.check_compliance smt_ctx in
 

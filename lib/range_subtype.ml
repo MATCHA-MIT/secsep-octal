@@ -26,6 +26,7 @@ module RangeSubtype = struct
     equal_subtype_list: var_idx_t list;
     (* supertype_list: MemRange.range_var_id list; *)
     equal_var_set: IntSet.t;
+    read_constraint_list: MemOffset.t list;
   }
   [@@deriving sexp]
 
@@ -51,7 +52,8 @@ module RangeSubtype = struct
     PP.print_lvl (lvl + 1) "Subtype: [\n";
     List.iter (fun sub -> PP.print_lvl (lvl + 2) "%s;\n" (type_exp_to_string sub)) x.subtype_list;
     PP.print_lvl (lvl + 1) "]\n";
-    PP.print_lvl (lvl + 1) "EqualSet: %s\n" (Sexplib.Sexp.to_string (IntSet.sexp_of_t x.equal_var_set))
+    PP.print_lvl (lvl + 1) "EqualSet: %s\n" (Sexplib.Sexp.to_string (IntSet.sexp_of_t x.equal_var_set));
+    PP.print_lvl (lvl + 1) "ReadConstraintList: %s\n" (Sexplib.Sexp.to_string (sexp_of_list MemOffset.sexp_of_t x.read_constraint_list))
 
   let pp_range_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
@@ -74,6 +76,7 @@ module RangeSubtype = struct
         subtype_list = [ sub ];
         equal_subtype_list = [];
         equal_var_set = IntSet.empty;
+        read_constraint_list = [];
       } in
       new_tv_rel :: tv_rel_list
 
@@ -134,7 +137,8 @@ module RangeSubtype = struct
             off = off; 
             subtype_list = sub_list; 
             equal_subtype_list = []; 
-            equal_var_set = IntSet.empty 
+            equal_var_set = IntSet.empty;
+            read_constraint_list = [];
           } :: acc
     ) [] mem_subtype
 
@@ -152,6 +156,16 @@ module RangeSubtype = struct
       (block_subtype: ArchType.block_subtype_t list) : t =
     let tv_rel_list_list = List.map get_one_block_subtype_faster block_subtype in
     List.flatten tv_rel_list_list
+
+  let get_read_constraint
+      (tv_rel_list: t) (read_constraint_map: MemOffsetSet.t IntMap.t) : t =
+    List.map (
+      fun (tv_rel: type_rel) ->
+        match IntMap.find_opt (fst tv_rel.var_idx) read_constraint_map with
+        | Some read_set ->
+          { tv_rel with read_constraint_list = read_set |> MemOffsetSet.to_list }
+        | None -> tv_rel
+    ) tv_rel_list
 
   let filter_self_subtype (tv_rel: type_rel) : type_rel =
     let var_idx, _ = tv_rel.var_idx in
