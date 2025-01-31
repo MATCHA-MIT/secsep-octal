@@ -179,12 +179,6 @@ module Isa (MemAnno: MemAnnoType) = struct
   }
   [@@deriving sexp]
 
-  type program = {
-    bbs: basic_block list;
-    imm_var_map: imm_var_map;
-  }
-  [@@deriving sexp]
-
   let prog_to_file (filename: string) (p: prog) =
     let open Sexplib in
     let channel = open_out filename in

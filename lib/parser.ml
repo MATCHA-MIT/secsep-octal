@@ -713,19 +713,6 @@ module Parser = struct
       List.iter (fun symbol -> Printf.printf "\t%s\n" symbol) func.related_gsymbols;
     ) func_list;
 
-    (* let rec bb_spliter lines bb acc_bb =
-      match lines with
-      | [] -> List.rev (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
-      | line :: lines ->
-          if line.[(String.length line) - 1] <> ':'
-          then bb_spliter lines (line :: bb) acc_bb
-          else bb_spliter lines [line] (if bb = [] then acc_bb else (List.rev bb) :: acc_bb)
-    in
-    let bbs = bb_spliter lines [] [] in
-    let (imm_var_map, _), bbs = List.fold_left_map (
-      fun info bb -> parse_basic_block info bb
-    ) (Isa.StrM.empty, None) bbs in *)
-
     (* add jmp for two adjacent basic blocks if the previous one does not end with ret *)
     let rec add_jmp_for_adj_bb (bbs: Isa.basic_block list) (acc: Isa.basic_block list) =
       match bbs with
