@@ -595,12 +595,11 @@ include SingleExpBasic
   let is_val (global_var: SingleVarSet.t) (e: t) : bool =
     SingleVarSet.is_empty (SingleVarSet.diff (get_vars e) global_var)
 
+  let get_mapped_var_set (var_map: local_var_map_t) : SingleVarSet.t =
+    List.map fst var_map |>  SingleVarSet.of_list
+
   let is_val2 (var_map: local_var_map_t) (e: t) : bool =
-    let var_set = 
-      List.fold_left (
-        fun acc (x, _) -> SingleVarSet.add x acc
-      ) SingleVarSet.empty var_map 
-    in
+    let var_set = get_mapped_var_set var_map in
     is_val var_set e
 
   let rec repl_var_exp (e: t) (v_idx_exp: IsaBasic.imm_var_id * t) : t =

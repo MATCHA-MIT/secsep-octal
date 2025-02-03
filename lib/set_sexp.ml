@@ -40,3 +40,28 @@ include Set.Make(
 end
 
 module IntMap = Map.Make(Int)
+
+module type MapEntryType = sig
+  type t
+  val t_of_sexp : Sexp.t -> t
+  val sexp_of_t : t -> Sexp.t
+end
+
+module IntMapSexp (Entry: MapEntryType) = struct
+include IntMap
+
+  type val_t = Entry.t
+  [@@deriving sexp]
+
+  type key_val_t = int * val_t
+  [@@deriving sexp]
+
+  type t = val_t IntMap.t
+
+  let t_of_sexp (sexp: Sexp.t) : t =
+    list_of_sexp key_val_t_of_sexp sexp |> IntMap.of_list
+
+  let sexp_of_t (map: t) : Sexp.t =
+    sexp_of_list sexp_of_key_val_t (IntMap.to_list map)
+
+end

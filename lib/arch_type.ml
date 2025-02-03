@@ -66,6 +66,17 @@ module ArchType (Entry: EntryType) = struct
   type block_subtype_t = t * (t list)
   [@@deriving sexp]
 
+  type block_subtype_label_t = Isa.label * (Isa.label list)
+  [@@deriving sexp]
+
+  let get_block_subtype_label (block_subtype_list: block_subtype_t list) : block_subtype_label_t list =
+    List.map (
+      fun (entry: block_subtype_t) ->
+        let target, br_list = entry in
+        target.label,
+        List.map (fun (entry: t) -> entry.label) br_list
+    ) block_subtype_list
+
   let prop_mode_to_ocaml_string (prop_mode: prop_mode_t) : string =
     match prop_mode with
     | TypeInferDep -> "TypeInferDep"
@@ -1006,6 +1017,8 @@ module ArchType (Entry: EntryType) = struct
       ) in
       let new_constraints = List.map (fun x -> (x, curr_type.pc)) new_constraints in
       Printf.printf "new constraints\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list Constraint.sexp_of_t (List.map (fun (x, _) -> x) new_constraints)));
+      Printf.printf "new mem\n";
+      MemType.pp_mem_type 0 new_mem;
       let curr_type =
         { curr_type with
           reg_type = new_reg;

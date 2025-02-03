@@ -2,6 +2,7 @@ open Isa_basic
 open Single_entry_type
 open Mem_offset_new
 open Arch_type
+open Arch_context_map
 open Pretty_print
 open Smt_emitter
 open Set_sexp
@@ -290,6 +291,39 @@ module RangeSubtype = struct
         end
       end else None
     | _ -> None
+
+  let try_solve_extra_slot
+      (_: SmtEmitter.t)
+      (input_var_set: IntSet.t)
+      (ctx_map_map: ArchContextMap.t)
+      (tv_rel: type_rel) : MemRange.t option =
+    (* let get_context_map = ArchContextMap.get_context_map ctx_map_map in *)
+    let get_reverse_map = ArchContextMap.get_reverse_map ctx_map_map in
+    let filter_sol_template
+        (subtype_exp: type_exp_t) : (int * (MemOffset.t list)) option =
+      let sub_exp, br_pc = subtype_exp in
+      let reverse_map = get_reverse_map br_pc in
+      let known_var_set = SingleEntryType.get_mapped_var_set reverse_map |> IntSet.union input_var_set in
+      match sub_exp with
+      | RangeConst off_list ->
+        if MemRange.is_val known_var_set (RangeConst off_list) then
+          Some (br_pc, List.map (MemOffset.repl_var reverse_map) off_list)
+        else None
+      | RangeVar _ -> None
+      | RangeExp (_, [ off ]) ->
+        if MemOffset.is_val known_var_set off then
+          None (* TODO *)
+        else None
+      | RangeExp _ -> None
+    in
+    let test_sol_template
+        (br_sol_template: (int * (MemOffset.t list))) : MemRange.t option =
+      (* let br_pc, sol_template = br_sol_template in *)
+      let _ = br_sol_template in None (* TODO *)
+    in
+    let possible_sol_template_list = List.filter_map filter_sol_template tv_rel.subtype_list in
+    List.find_map test_sol_template possible_sol_template_list
+      
 
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
