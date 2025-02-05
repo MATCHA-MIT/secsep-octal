@@ -41,9 +41,21 @@ module ArchContextMap = struct
     ) IntMap.empty block_subtype_list
 
   let get_context_map (map: t) (br_pc: int) : map_t =
-    IntMap.find br_pc map |> fst
+    match IntMap.find_opt br_pc map with
+    | Some (ctx_map, _) -> ctx_map
+    | None ->
+      Printf.printf "get_context_map lookup br_pc %d\n%s\n" 
+        br_pc
+        (Sexplib.Sexp.to_string_hum (sexp_of_t map));
+      arch_context_map_error "get_context_map cannot find br_pc"
 
   let get_reverse_map (map: t) (br_pc: int) : map_t =
-    IntMap.find br_pc map |> snd
+    match IntMap.find_opt br_pc map with
+    | Some (_, reverse_map) -> reverse_map
+    | None ->
+      Printf.printf "get_reverse_map lookup br_pc %d\n%s\n" 
+        br_pc
+        (Sexplib.Sexp.to_string_hum (sexp_of_t map));
+      arch_context_map_error "get_reverse_map cannot find br_pc"
 
 end

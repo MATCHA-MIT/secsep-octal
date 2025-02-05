@@ -277,8 +277,13 @@ module MemOffset = struct
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
     result
 
+  let is_empty (smt_ctx: SmtEmitter.t) (o: t) : bool =
+    let l, r = o in
+    SingleCondType.check true smt_ctx [ SingleCondType.Eq, l, r ] = SatYes
+
   let diff (smt_ctx: SmtEmitter.t) (o: t) (ro_list: t list) : t list =
     (* o - ro_list *)
+    if is_empty smt_ctx o then [] else
     let remain_list, remain_off =
       List.fold_left (
         fun (acc: (t list) * (t option)) (r_o: t) ->
@@ -492,9 +497,11 @@ module MemRange = struct
 
   let repl_range_sol
       (smt_ctx: SmtEmitter.t)
-      (single_sol_repl_helper: (SingleExp.t * int) -> SingleExp.t)
-      (range_sol: ((range_var_id * int) * t) list) (r_pc: t * int) : t =
-    let r, pc = r_pc in
+      (* (single_sol_repl_helper: (SingleExp.t * int) -> SingleExp.t) *)
+      (range_sol: ((range_var_id * int) * t) list) 
+      (r: t) : t =
+      (* (r_pc: t * int) : t = *)
+    (* let r, pc = r_pc in *)
     let find_var =
       match r with
       | RangeConst _ -> None
@@ -512,7 +519,7 @@ module MemRange = struct
       in
       begin match find_sol with
       | Some sol -> 
-        let sol = repl single_sol_repl_helper pc sol in
+        (* let sol = repl single_sol_repl_helper pc sol in *)
         (* Printf.printf "!!! merge %s %s\n" (to_string sol) (to_string (RangeConst const_part)); *)
         merge smt_ctx sol (RangeConst const_part)
       | None -> r

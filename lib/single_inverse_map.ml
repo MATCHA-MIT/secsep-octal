@@ -38,6 +38,8 @@ module SingleInverseMap = struct
        1. it is a global or input var
        2. it is in context_map
        3. it is in target_var_set *)
+    (* TODO: Here we handle the case where v1 -> v2 + e2_shift,
+       we should also support the pattern for v1 -> e2_shift - v2 by doing filter_single_var on neg e2 *)
     let v1, e2 = v_exp in
     let base_var_set = SingleExp.filter_single_var e2 in
     let base_candidate_list = IntSet.inter target_var_set base_var_set |> IntSet.to_list in
@@ -58,11 +60,14 @@ module SingleInverseMap = struct
     (* context_map: ctx1 -> ctx2 *)
     (* 1. Get all local vars in ctx2 *)
     let ctx2_target_var_set =
-      List.fold_left (
+      IntSet.diff
+      (List.fold_left (
         fun acc (_, exp) -> 
           SingleExp.get_vars exp |> IntSet.union acc
-      ) IntSet.empty context_map |> IntSet.diff input_var_set
+      ) IntSet.empty context_map) input_var_set
     in
+    Printf.printf "context_map\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t context_map));
+    Printf.printf "ctx2_target_var_set\n%s\n" (Sexplib.Sexp.to_string_hum (IntSet.sexp_of_t ctx2_target_var_set));
     (* 2. Apply var_inverse and var_const_inverse to get naive map *)
     let simple_inverse_helper
         (inverse_func: IntSet.t -> var_id * exp_t -> (var_id * exp_t) option)

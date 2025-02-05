@@ -191,20 +191,22 @@ module RangeTypeInfer = struct
     let constraint_list = List.concat_map (fun (a_type: ArchType.t) -> a_type.constraint_list) state.func_type in
     let subtype_list = Constraint.get_range_subset constraint_list |> RangeSubtype.get_read_constraint subtype_list in
     let subtype_list = RangeSubset.update_subtype_list_equal_set subtype_list in
-    let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list state.single_sol in
+    (* let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list state.single_sol in *)
     Printf.printf "block_subtype_label_list\n%s\n" 
       (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_block_subtype_label_t (ArchType.get_block_subtype_label block_subtype)));
     Printf.printf "================1\n";
     RangeSubtype.pp_range_subtype 0 subtype_list;
-    let range_get_block_var (r: MemRange.t) : SingleEntryType.SingleVarSet.t =
+    (* let range_get_block_var (r: MemRange.t) : SingleEntryType.SingleVarSet.t =
       SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) state.input_single_var_set
-    in
+    in *)
     let subtype_list = 
       RangeSubtype.solve 
         state.smt_ctx 
-        single_sol_repl_helper
+        state.single_sol
+        state.input_single_var_set
         (* (MemRange.is_val state.input_single_var_set)  *)
-        range_get_block_var block_subtype 
+        (* range_get_block_var  *)
+        block_subtype 
         subtype_list 100 
     in
     Printf.printf "Range subtype of func %s\n" state.func_name;
