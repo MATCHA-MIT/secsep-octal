@@ -3,3 +3,4 @@ _build
 _opam
 out
 *.out
+test/asm/*.prog

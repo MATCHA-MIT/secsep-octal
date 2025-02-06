@@ -4,6 +4,7 @@
   gen_interface 
   gen_interface_new
   parse_prog
+  parse_test_prog
   infer_single
   infer_block_invariance
   infer_range
@@ -17,6 +18,7 @@
   gen_interface 
   gen_interface_new
   parse_prog
+  parse_test_prog
   infer_single
   infer_block_invariance
   infer_range

@@ -18,6 +18,11 @@ module DepType = struct
     | Top of int
   [@@deriving sexp]
 
+  let to_string (dep: t) : string =
+    match dep with
+    | Exp expr -> Expr.to_string (Expr.simplify expr None)
+    | Top size -> "Top " ^ (string_of_int size)
+
   type map_t = (int * t) list (* Check the dict type *)
   [@@deriving sexp]
 
@@ -463,6 +468,14 @@ module DepType = struct
   type exe_result = t * ((IsaBasic.flag * t) list)
   type flag_func = (IsaBasic.flag * t) list -> (IsaBasic.flag * t) list
   
+  let string_of_exe_result (result: exe_result) : string =
+    let string_of_flag_pair (pair: IsaBasic.flag * t) : string =
+      let flag, flag_val = pair in
+      (IsaBasic.string_of_flag flag) ^ " = " ^ (to_string flag_val)
+    in
+    let exe_res, flags = result in
+    (to_string exe_res) ^ "; " ^ (String.concat " " (List.map string_of_flag_pair flags))
+  
   let exe_additive (ctx: context) (set_flags: flag_func) (binop: z3_binop) (dst: exp_t) (src: exp_t) (add: bool) : exe_result =
     let result = binop ctx dst src in
     let get_carry = if add then get_add_carry else get_sub_carry in
@@ -573,7 +586,7 @@ module DepType = struct
       (ctx: context) (op: IsaBasic.bop) 
       (src_list: t list) 
       (get_src_flag_func: IsaBasic.flag -> t) 
-      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+      (dest_size: int) : exe_result =
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_bop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
