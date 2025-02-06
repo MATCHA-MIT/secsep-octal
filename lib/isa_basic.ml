@@ -23,16 +23,19 @@ module IsaBasic = struct
   type label = string
   [@@deriving sexp]
 
+  let sentry_func_label = "__sentry_func__"
   let ret_label = ".Ret"
-  let fake_bb_sentry_label = ".first_bb_sentry__:"
 
   type imm_var_id = int
   [@@deriving sexp]
+
+  let imm_var_unset: imm_var_id = -1
 
   module StrM = Map.Make(String)
   module IntM = Map.Make(Int)
   type imm_var_map = imm_var_id StrM.t
   type imm_var_rev_map = string IntM.t
+
   (* TODO: Fix this dirty implementation later!!! *)
   type list_t = (string * imm_var_id) list
   [@@deriving sexp]
@@ -50,14 +53,78 @@ module IsaBasic = struct
     ) IntM.empty kv_list in
     vk_map
 
+
+  (* size in bytes *)
+  type data_size = int64
+  [@@deriving sexp]
+
+  (* size and offset in bytes *)
+  type data_off_size = int64 * int64
+  [@@deriving sexp]
+
+  let gpr_full_off_size: data_off_size = (0L, 8L)
+  let xmm_full_off_size: data_off_size = (0L, 16L)
+
+  let data_off_size_to_size (os_opt: data_off_size option) : data_size option =
+    match os_opt with
+    | None -> None
+    | Some (_, sz) -> Some sz
+  
+  let data_size_to_off_size (sz_opt: data_size option) : data_off_size option =
+    match sz_opt with
+    | None -> None
+    | Some sz -> Some (0L, sz)
+
+  let string_of_data_off_size (os: data_off_size option) =
+    match os with
+    | None -> "[]"
+    | Some (off, size) ->
+      Printf.sprintf "[%s:%s]"
+        (off |> Int64.add size |> Int64.add (-1L) |> Int64.to_string)
+        (off |> Int64.to_string)
+
+  let string_of_data_size (sz: data_size option) =
+    match sz with
+    | None -> "(sz=unknown)"
+    | Some size -> Printf.sprintf "(sz=%s)" (size |> Int64.to_string)
+
+
   type register =
     |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9
+    | XMM0 of data_off_size option
+    | XMM1 of data_off_size option
+    | XMM2 of data_off_size option
+    | XMM3 of data_off_size option
+    | XMM4 of data_off_size option
+    | XMM5 of data_off_size option
+    | XMM6 of data_off_size option
+    | XMM7 of data_off_size option
+    | XMM8 of data_off_size option
+    | XMM9 of data_off_size option
     (* | R0 *)
   [@@deriving sexp]
+
+  let is_xmm (r: register) : bool =
+    match r with
+    | XMM0 _ | XMM1 _ | XMM2 _ | XMM3 _ | XMM4 _ | XMM5 _ | XMM6 _ | XMM7 _ | XMM8 _ | XMM9 _ -> true
+    | _ -> false
+
+  let get_xmm_off_size (r: register) : data_off_size option =
+    match r with
+    | XMM0 os -> os
+    | XMM1 os -> os
+    | XMM2 os -> os
+    | XMM3 os -> os
+    | XMM4 os -> os
+    | XMM5 os -> os
+    | XMM6 os -> os
+    | XMM7 os -> os
+    | XMM8 os -> os
+    | XMM9 os -> os
+    | _ -> isa_error "get_xmm_off_size: not xmm register"
 
   let reg_map = [
     ("rax", RAX); ("eax", EAX); ("ax", AX); ("ah", AH); ("al", AL);
@@ -76,12 +143,32 @@ module IsaBasic = struct
     ("r13", R13); ("r13d", R13D); ("r13w", R13W); ("r13b", R13B);
     ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
     ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
-    ("xmm0", XMM0); ("xmm1", XMM1); ("xmm2", XMM2); ("xmm3", XMM3); 
-    ("xmm4", XMM4); ("xmm5", XMM5); ("xmm6", XMM6); ("xmm7", XMM7);
-    ("xmm8", XMM8); ("xmm9", XMM9);
+    ("xmm0", XMM0 None); ("xmm1", XMM1 None); ("xmm2", XMM2 None); ("xmm3", XMM3 None); 
+    ("xmm4", XMM4 None); ("xmm5", XMM5 None); ("xmm6", XMM6 None); ("xmm7", XMM7 None);
+    ("xmm8", XMM8 None); ("xmm9", XMM9 None);
   ]
 
-  let string_of_reg (r: register) : string = Option.get (string_of_sth reg_map r)
+  let string_of_reg (r: register) : string =
+    if not (is_xmm r) then
+      r |> string_of_sth reg_map |> Option.get
+    else begin
+      match r with
+      | XMM0 os -> "xmm0" ^ (string_of_data_off_size os)
+      | XMM1 os -> "xmm1" ^ (string_of_data_off_size os)
+      | XMM2 os -> "xmm2" ^ (string_of_data_off_size os)
+      | XMM3 os -> "xmm3" ^ (string_of_data_off_size os)
+      | XMM4 os -> "xmm4" ^ (string_of_data_off_size os)
+      | XMM5 os -> "xmm5" ^ (string_of_data_off_size os)
+      | XMM6 os -> "xmm6" ^ (string_of_data_off_size os)
+      | XMM7 os -> "xmm7" ^ (string_of_data_off_size os)
+      | XMM8 os -> "xmm8" ^ (string_of_data_off_size os)
+      | XMM9 os -> "xmm9" ^ (string_of_data_off_size os)
+      | _ -> isa_error "expecting xmm register"
+    end
+
+  (* parser uses this to convert reg name to register *)
+  (* XMM's offset & size is initialized to None *)
+  let string_to_reg = string_to_sth reg_map
 
   let ocaml_string_of_reg (r: register) : string =
     (* make uppercase *)
@@ -91,129 +178,8 @@ module IsaBasic = struct
   let ocaml_string_of_reg_op (r: register) : string =
     Printf.sprintf "RegOp %s" (ocaml_string_of_reg r)
 
-  let string_to_reg = string_to_sth reg_map
-
-  let fix_reg_size (r: register) (s: int64) : register =
-    if s = 1L then
-      match r with
-      | RAX | EAX | AX | AL -> AL
-      | RCX | ECX | CX | CL -> CL
-      | RDX | EDX | DX | DL -> DL
-      | RBX | EBX | BX | BL -> BL
-      | RSP | ESP | SP | SPL -> SPL
-      | RBP | EBP | BP | BPL -> BPL
-      | RSI | ESI | SI | SIL -> SIL
-      | RDI | EDI | DI | DIL -> DIL
-      | R8 | R8D | R8W | R8B -> R8B
-      | R9 | R9D | R9W | R9B -> R9B
-      | R10 | R10D | R10W | R10B -> R10B
-      | R11 | R11D | R11W | R11B -> R11B
-      | R12 | R12D | R12W | R12B -> R12B
-      | R13 | R13D | R13W | R13B -> R13B
-      | R14 | R14D | R14W | R14B -> R14B
-      | R15 | R15D | R15W | R15B -> R15B
-      (* TODO: Check *)
-      | XMM0 -> XMM0
-      | XMM1 -> XMM1
-      | XMM2 -> XMM2
-      | XMM3 -> XMM3
-      | XMM4 -> XMM4
-      | XMM5 -> XMM5
-      | XMM6 -> XMM6
-      | XMM7 -> XMM7
-      | XMM8 -> XMM8
-      | XMM9 -> XMM9
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 2L then
-      match r with
-      | RAX | EAX | AX | AL -> AX
-      | RCX | ECX | CX | CL -> CX
-      | RDX | EDX | DX | DL -> DX
-      | RBX | EBX | BX | BL -> BX
-      | RSP | ESP | SP | SPL -> SP
-      | RBP | EBP | BP | BPL -> BP
-      | RSI | ESI | SI | SIL -> SI
-      | RDI | EDI | DI | DIL -> DI
-      | R8 | R8D | R8W | R8B -> R8W
-      | R9 | R9D | R9W | R9B -> R9W
-      | R10 | R10D | R10W | R10B -> R10W
-      | R11 | R11D | R11W | R11B -> R11W
-      | R12 | R12D | R12W | R12B -> R12W
-      | R13 | R13D | R13W | R13B -> R13W
-      | R14 | R14D | R14W | R14B -> R14W
-      | R15 | R15D | R15W | R15B -> R15W
-      | XMM0 -> XMM0
-      | XMM1 -> XMM1
-      | XMM2 -> XMM2
-      | XMM3 -> XMM3
-      | XMM4 -> XMM4
-      | XMM5 -> XMM5
-      | XMM6 -> XMM6
-      | XMM7 -> XMM7
-      | XMM8 -> XMM8
-      | XMM9 -> XMM9
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 4L then
-      match r with
-      | RAX | EAX | AX | AL -> EAX
-      | RCX | ECX | CX | CL -> ECX
-      | RDX | EDX | DX | DL -> EDX
-      | RBX | EBX | BX | BL -> EBX
-      | RSP | ESP | SP | SPL -> ESP
-      | RBP | EBP | BP | BPL -> EBP
-      | RSI | ESI | SI | SIL -> ESI
-      | RDI | EDI | DI | DIL -> EDI
-      | R8 | R8D | R8W | R8B -> R8D
-      | R9 | R9D | R9W | R9B -> R9D
-      | R10 | R10D | R10W | R10B -> R10D
-      | R11 | R11D | R11W | R11B -> R11D
-      | R12 | R12D | R12W | R12B -> R12D
-      | R13 | R13D | R13W | R13B -> R13D
-      | R14 | R14D | R14W | R14B -> R14D
-      | R15 | R15D | R15W | R15B -> R15D
-      | XMM0 -> XMM0
-      | XMM1 -> XMM1
-      | XMM2 -> XMM2
-      | XMM3 -> XMM3
-      | XMM4 -> XMM4
-      | XMM5 -> XMM5
-      | XMM6 -> XMM6
-      | XMM7 -> XMM7
-      | XMM8 -> XMM8
-      | XMM9 -> XMM9
-      | _ -> isa_error "should not use high 1-byte reg"
-    else if s = 8L then
-      match r with
-      | RAX | EAX | AX | AL -> RAX
-      | RCX | ECX | CX | CL -> RCX
-      | RDX | EDX | DX | DL -> RDX
-      | RBX | EBX | BX | BL -> RBX
-      | RSP | ESP | SP | SPL -> RSP
-      | RBP | EBP | BP | BPL -> RBP
-      | RSI | ESI | SI | SIL -> RSI
-      | RDI | EDI | DI | DIL -> RDI
-      | R8 | R8D | R8W | R8B -> R8
-      | R9 | R9D | R9W | R9B -> R9
-      | R10 | R10D | R10W | R10B -> R10
-      | R11 | R11D | R11W | R11B -> R11
-      | R12 | R12D | R12W | R12B -> R12
-      | R13 | R13D | R13W | R13B -> R13
-      | R14 | R14D | R14W | R14B -> R14
-      | R15 | R15D | R15W | R15B -> R15
-      | XMM0 -> XMM0
-      | XMM1 -> XMM1
-      | XMM2 -> XMM2
-      | XMM3 -> XMM3
-      | XMM4 -> XMM4
-      | XMM5 -> XMM5
-      | XMM6 -> XMM6
-      | XMM7 -> XMM7
-      | XMM8 -> XMM8
-      | XMM9 -> XMM9
-      | _ -> isa_error "should not use high 1-byte reg"
-    else
-      isa_error "invalid register size"
-
+  (* aliased registers share the same index, but they have unique offset & size *)
+  (* see get_reg_off_size for details *)
   let get_reg_idx (r: register) = 
     match r with
     | RAX | EAX | AX | AH | AL -> 0
@@ -232,17 +198,21 @@ module IsaBasic = struct
     | R13 | R13D | R13W | R13B -> 13
     | R14 | R14D | R14W | R14B -> 14
     | R15 | R15D | R15W | R15B -> 15
-    | XMM0 -> 16
-    | XMM1 -> 17
-    | XMM2 -> 18
-    | XMM3 -> 19
-    | XMM4 -> 20
-    | XMM5 -> 21
-    | XMM6 -> 22
-    | XMM7 -> 23
-    | XMM8 -> 24
-    | XMM9 -> 25
+    | XMM0 _ -> 16
+    | XMM1 _ -> 17
+    | XMM2 _ -> 18
+    | XMM3 _ -> 19
+    | XMM4 _ -> 20
+    | XMM5 _ -> 21
+    | XMM6 _ -> 22
+    | XMM7 _ -> 23
+    | XMM8 _ -> 24
+    | XMM9 _ -> 25
     (* | R0 -> 16 *)
+
+  let total_reg_num : int = 26
+
+  let rsp_idx = get_reg_idx RSP
 
   let get_full_reg_by_idx (idx: int) : register =
     match idx with
@@ -262,35 +232,65 @@ module IsaBasic = struct
     | 13 -> R13
     | 14 -> R14
     | 15 -> R15
-    | 16 -> XMM0
-    | 17 -> XMM1
-    | 18 -> XMM2
-    | 19 -> XMM3
-    | 20 -> XMM4
-    | 21 -> XMM5
-    | 22 -> XMM6
-    | 23 -> XMM7
-    | 24 -> XMM8
-    | 25 -> XMM9
+    | 16 -> XMM0 (Some xmm_full_off_size)
+    | 17 -> XMM1 (Some xmm_full_off_size)
+    | 18 -> XMM2 (Some xmm_full_off_size)
+    | 19 -> XMM3 (Some xmm_full_off_size)
+    | 20 -> XMM4 (Some xmm_full_off_size)
+    | 21 -> XMM5 (Some xmm_full_off_size)
+    | 22 -> XMM6 (Some xmm_full_off_size)
+    | 23 -> XMM7 (Some xmm_full_off_size)
+    | 24 -> XMM8 (Some xmm_full_off_size)
+    | 25 -> XMM9 (Some xmm_full_off_size)
     | _ -> isa_error "get_full_reg_by_idx: invalid idx"
 
-  let get_reg_offset_size (r: register) : int64 * int64 =
+  let get_reg_offset_size_opt (r: register) : data_off_size option =
     match r with
-    | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> (0L, 8L)
-    | EAX | ECX | EDX | EBX | ESP | EBP | ESI | EDI | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> (0L, 4L)
-    | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> (0L, 2L)
-    | AH | CH | DH | BH -> (1L, 1L)
-    | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> (0L, 1L)
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> isa_error "should not get_reg_offset_size for xmm registers"
-    (* <TODO> Change XMM definition to includef size offset information, and chagne parser correspondingly. *)
-
-  let get_reg_full_size (r: register) : int64 =
-    match r with
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> 16L
-    | _ -> 8L (* Note: vector reg has different full sizes!!! *)
+    | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> Some (0L, 8L)
+    | EAX | ECX | EDX | EBX | ESP | EBP | ESI | EDI | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> Some (0L, 4L)
+    | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> Some (0L, 2L)
+    | AH | CH | DH | BH -> Some (1L, 1L)
+    | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> Some (0L, 1L)
+    | XMM0 os -> os
+    | XMM1 os -> os
+    | XMM2 os -> os
+    | XMM3 os -> os
+    | XMM4 os -> os
+    | XMM5 os -> os
+    | XMM6 os -> os
+    | XMM7 os -> os
+    | XMM8 os -> os
+    | XMM9 os -> os
   
-  let get_gpr_full_size () : int64 = get_reg_full_size RAX
+  let fill_os_for_reg (r: register) (os: data_off_size) : register =
+    match r with
+    | XMM0 _ -> XMM0 (Some os)
+    | XMM1 _ -> XMM1 (Some os)
+    | XMM2 _ -> XMM2 (Some os)
+    | XMM3 _ -> XMM3 (Some os)
+    | XMM4 _ -> XMM4 (Some os)
+    | XMM5 _ -> XMM5 (Some os)
+    | XMM6 _ -> XMM6 (Some os)
+    | XMM7 _ -> XMM7 (Some os)
+    | XMM8 _ -> XMM8 (Some os)
+    | XMM9 _ -> XMM9 (Some os)
+    | _ -> r
 
+  let get_reg_offset_size (r: register) : data_off_size = get_reg_offset_size_opt r |> Option.get
+
+  let get_reg_size (r: register) : data_size = r |> get_reg_offset_size |> snd
+
+  (* full size of the physical register that r belongs to *)
+  let get_reg_full_size (r: register) : data_size =
+    let os = match r with
+    | XMM0 _ | XMM1 _ | XMM2 _ | XMM3 _ | XMM4 _ | XMM5 _ | XMM6 _ | XMM7 _ | XMM8 _ | XMM9 _ -> xmm_full_off_size
+    | _ -> gpr_full_off_size
+    in
+    os |> snd
+  
+  let get_gpr_full_size () : data_size = gpr_full_off_size |> snd
+
+  (* physical registers *)
   let reg_name_list = [
     "rax"; "rcx"; "rdx"; "rbx";
     "rsp"; "rbp"; "rsi"; "rdi";
@@ -298,29 +298,19 @@ module IsaBasic = struct
     "r12"; "r13"; "r14"; "r15";
     "xmm0"; "xmm1"; "xmm2"; "xmm3";
     "xmm4"; "xmm5"; "xmm6"; "xmm7";
+    "xmm8"; "xmm9";
   ]
 
+  (* physical registers *)
   let string_of_reg_idx (idx: int) : string =
     List.nth reg_name_list idx
 
-  let rsp_idx = get_reg_idx RSP
-
-  let total_reg_num : int = 24
-
-  let get_reg_size (r: register) : int64 =
-    match r with
-    |     RAX |     RCX |     RDX |     RBX | RSP  | RBP  | RSI  | RDI  | R8  | R9  | R10  | R11  | R12  | R13  | R14  | R15  -> 8L
-    |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D -> 4L
-    |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> 2L
-    | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> 1L
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> 16L
-
   let callee_saved_reg_idx = [
-      3; (* RBX *)
-      4; (* RSP *)
-      5; (* RBP *)
-      12; 13; 14; 15
-    ]
+    3; (* RBX *)
+    4; (* RSP *)
+    5; (* RBP *)
+    12; 13; 14; 15
+  ]
 
   let is_reg_idx_callee_saved (r_idx: int) : bool =
     List.mem r_idx callee_saved_reg_idx
@@ -328,13 +318,9 @@ module IsaBasic = struct
   let is_reg_callee_saved (r: register) : bool =
     is_reg_idx_callee_saved (get_reg_idx r)
 
-  let is_xmm (r: register) : bool =
-    match r with
-    | XMM0 | XMM1 | XMM2 | XMM3 | XMM4 | XMM5 | XMM6 | XMM7 | XMM8 | XMM9 -> true
-    | _ -> false
-
   let is_partial_update_reg_set_default_zero (r: register) : bool =
     not (is_xmm r) && get_reg_size r = 4L
+
 
   type flag =
     | CF | PF | AF | ZF | SF | OF
@@ -366,7 +352,7 @@ module IsaBasic = struct
   type immediate =
     | ImmNum of int64
     | ImmLabel of imm_var_id
-    | ImmBExp of immediate * immediate
+    | ImmBExp of immediate * immediate (* sum of two immediates *)
   [@@deriving sexp]
 
   let rec string_of_immediate (i: immediate) : string =
@@ -389,6 +375,7 @@ module IsaBasic = struct
 
   let ocaml_string_of_immediate_op (i: immediate) : string =
     Printf.sprintf "ImmOp (%s)" (ocaml_string_of_immediate i)
+
 
   type scale = Scale1 | Scale2 | Scale4 | Scale8
   [@@deriving sexp]
@@ -419,22 +406,59 @@ module IsaBasic = struct
     | Some x -> Printf.sprintf "Some (%s)" (to_ocaml_string x)
     | None -> "None"
 
+  (*
+    # Current supported instructions that does not have single-letter size suffix
+  
+    mov[sz](bq|wq|lq|bl|wl|bw): move with signed/zero extension
+
+    c(btw|wtl|ltq): size conversion
+
+    xorp[sd]: xor packed
+  
+    p(xor|andn|and|or): logical operations, bitwise, no suffix 
+
+    pshufb: packed shuffle, 2 operands
+    pshuf[wd]: packed shuffle, 3 operands
+    pshuf[lh]w: 3 operands
+
+    punpck[hl](bw|wd|dq|qdq)
+
+    pack[us]s(dw|wb)
+
+    mov[ua]p[sd]
+    movdq[ua]
+
+    # Future TODOs:
+
+    (* ps[lr]ldq : shift double quadword logical, no suffix *)
+    "pslldq"; "psrldq";
+
+    "movss";  (* movss *)
+  *)
+
+  (* mnemonics that has a single-letter size suffix *)
+  (* other cases are pre-handled in `decode_operand_size` *)
   let common_opcode_list = [
-    "xorps"; (* For the parser to work, this has to appear before xor *)
-    "movabs"; "mov"; "movz"; "lea";
-    "xchg";
-    "add"; "adc"; "sub"; "sbb"; "mul"; "imul";
-    "shrd";
-    "sal"; "sar"; "shl"; "shr"; "rol"; "ror";
+    (* packed integer operations *)
+    "padd"; "psub"; "psll"; "psrl";
+    
+    (* shift double *)
+    "shld"; "shrd";
+    (* shift *)
+    "sal"; "sar"; "shl"; "shr";
+
+    "movabs"; "mov";
+    "add"; "adc"; "sub"; "sbb";
+    "mul"; "imul";
+    "lea";
+    "rol"; "ror";
     "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
-    "cmp"; "test";
-    "push"; "pop";
-    "cmoveq"; (* TODO: add better support for parsing cmovxx *)
     "bt";
-    "punpck"; "packus";
-    "padd"; "psub"; "pxor"; "pandn"; "pand"; "por";
-    "psll"; "psrl";
-    "pshufd"; "pshuflw"; "pshufhw";
+    "cmove"; (* TODO: add better support for parsing cmovxx *)
+
+    "xchg";
+    "push"; "pop";
+    "cmp"; "test";
   ]
 
   let rep_opcode_list = [
@@ -449,10 +473,11 @@ module IsaBasic = struct
     | Xor | And | Or
     | CmovEq
     | Bt
-    | Punpck | Packus
-    | Padd | Psub | Pxor | Pandn | Pand | Por
-    | Psll | Psrl
-    | Xorps
+    | Punpck | Packxs
+    | Pshuf
+    | Padd | Psub | Psll | Psrl
+    | Pxor | Pandn | Pand | Por
+    | Xorp
   [@@deriving sexp]
 
   let bop_opcode_map = [
@@ -461,12 +486,14 @@ module IsaBasic = struct
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
-    ("cmoveq", CmovEq);
+    ("cmove", CmovEq);
     ("bt", Bt);
-    ("punpck", Punpck); ("packus", Packus);
+    ("punpckh", Punpck); ("punpckl", Punpck);
+    ("packus", Packxs); ("packss", Packxs);
     ("padd", Padd); ("psub", Psub); ("pxor", Pxor); ("pandn", Pandn); ("pand", Pand); ("por", Por);
     ("psll", Psll); ("psrl", Psrl);
-    ("xorps", Xorps);
+    ("xorp", Xorp);
+    ("pshuf", Pshuf)
   ]
 
   let bop_opcode_ocaml_str_map = [
@@ -477,17 +504,17 @@ module IsaBasic = struct
     ("Xor", Xor); ("And", And); ("Or", Or);
     ("CmovEq", CmovEq);
     ("Bt", Bt);
-    ("Punpck", Punpck); ("Packus", Packus);
+    ("Punpck", Punpck);
+    ("Packxs", Packxs);
     ("Padd", Padd); ("Psub", Psub); ("Pxor", Pxor); ("Pandn", Pandn); ("Pand", Pand); ("Por", Por);
     ("Psll", Psll); ("Psrl", Psrl);
-    ("Xorps", Xorps);
+    ("Xorp", Xorp);
+    ("Pshuf", Pshuf)
   ]
   
   type uop =
     | Mov 
-    (* | MovS *) 
-    (* NOTE: MovS is not simply mov sign, it also updates rsi and rdi. Removed and may need to be handled later*)
-    | MovZ
+    | MovS | MovZ
     | Lea
     | Not | Bswap
     | Neg
@@ -496,8 +523,7 @@ module IsaBasic = struct
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
-    (* ("movs", MovS);  *)
-    ("movz", MovZ);
+    ("movs", MovS); ("movz", MovZ);
     ("lea", Lea);
     ("not", Not); ("bswap", Bswap);
     ("neg", Neg);
@@ -506,8 +532,7 @@ module IsaBasic = struct
 
   let uop_opcode_ocaml_str_map = [
     ("Mov", Mov);
-    (* ("MovS", MovS);  *)
-    ("MovZ", MovZ);
+    ("MovS", MovS); ("MovZ", MovZ);
     ("Lea", Lea);
     ("Not", Not); ("Bswap", Bswap);
     ("Neg", Neg);
@@ -515,22 +540,18 @@ module IsaBasic = struct
   ]
 
   type top =
+    | Shld
     | Shrd
-    | Pshufd | Pshuflw | Pshufhw
   [@@deriving sexp]
 
   let top_opcode_map = [
+    ("shld", Shld);
     ("shrd", Shrd);
-    ("pshufd", Pshufd);
-    ("pshuflw", Pshuflw);
-    ("pshufhw", Pshufhw);
   ]
 
   let top_opcode_ocaml_str_map = [
+    ("Shld", Shld);
     ("Shrd", Shrd);
-    ("Pshufd", Pshufd);
-    ("Pshuflw", Pshuflw);
-    ("Pshufhw", Pshufhw);
   ]
 
   type branch_cond =
@@ -589,24 +610,49 @@ module IsaBasic = struct
   let op_of_tinst = string_to_sth top_opcode_map
   let op_of_cond_jump = string_to_sth cond_jump_opcode_map
 
+  let line_is_directive (line: string) : bool =
+    let line = String.trim line in
+    let pattern = Str.regexp {|^\.\([A-Za-z_][A-Za-z_0-9]*\)\b\([^:].*\)?$|} in
+    Str.string_match pattern line 0
+  
+  let line_is_label (line: string) : bool =
+    let line = String.trim line in
+    let pattern = Str.regexp {|^\([\.A-Za-z_][\.A-Za-z_0-9]*\):$|} in
+    Str.string_match pattern line 0
+
+  let get_label_in_line (line: string) : string option =
+    match line_is_label line with
+    | false -> None
+    | true ->
+      let l = Str.group_beginning 1 in
+      let r = Str.group_end 1 in
+      Some (String.sub line l (r - l))
+  
+  let line_is_global_label (line: string) : bool =
+    let line = String.trim line in
+    let pattern = Str.regexp {|^\([A-Za-z_][\.A-Za-z_0-9]*\):$|} in
+    Str.string_match pattern line 0
+
+  let get_global_label_in_line (line: string) : string option =
+    match line_is_global_label line with
+    | false -> None
+    | true ->
+      let l = Str.group_beginning 1 in
+      let r = Str.group_end 1 in
+      Some (String.sub line l (r - l))
+
   let is_label_function_entry (l: label) = l.[0] <> '.'
 
   let is_compiler_gen_rom (l: label) = l.[0] = '.'
 
-  let is_label (line: string) : bool =
-    not (String.exists (fun c -> c = ':' || c = ' ') (String.sub line 0 (String.length line - 1))) &&
-    line.[(String.length line) - 1] = ':'
-
+  (* instruction that has a single label as the operand *)
   (* We assume function label does not start with "."! *)
-  let is_func_label (line: string) : bool =
-    (is_label line) && line.[0] <> '.'
-
-  let inst_referring_label (m: string) : bool =
+  let inst_with_single_label (m: string) : bool =
     match m with
     | "call" | "callq"
     | "jmp" -> true
-    | "rep" -> true (* dirty impl *)
-    | _ -> (* Check if conditional branch opcode*)
+    | "rep" -> true (* dirty impl: we treat the mnemonic after rep as a label, and handle it specially later *)
+    | _ -> (* Check if conditional branch opcode *)
       opcode_is_cond_jump m
 
 end
