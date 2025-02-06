@@ -190,7 +190,7 @@ module SingleTypeInfer = struct
       (func_mem_interface: ArchType.MemType.t)
       (stack_spill_info: StackSpillInfo.t)
       (func_interface_list: FuncInterface.t list) : t =
-    let func_body = (Isa.get_func prog func_name).body in
+    let func_body = (Isa.get_func_of_prog prog func_name).body in
     let func_mem_interface = fix_func_mem_interface func_name func_body func_mem_interface in
     let global_var_list = List.map (fun (_, x) -> x) (Isa.StrM.to_list prog.imm_var_map) in
     let global_var_set = SingleExp.SingleVarSet.of_list global_var_list in
@@ -880,7 +880,7 @@ module SingleTypeInfer = struct
     let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
       let label, _, _ = interface in
       let func = List.find (fun (f: Parser.Parser.Isa.func) -> String.equal f.name label) prog.funcs in
-      Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsymbols global_symbol_layout
+      Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsyms global_symbol_layout
     ) func_mem_interface_list
     in
 

@@ -146,7 +146,7 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst is_check isa_bop s1 s2 (fl_entry, fr_entry) same_op in
     let (dest_taint_type: TaintExp.t) =
-      if (isa_bop = Xor || isa_bop = Xorps) && Entry.cmp s1 s2 = 0 then
+      if (isa_bop = Xor || isa_bop = Xorp) && Entry.cmp s1 s2 = 0 then
         TaintConst false
       else
         TaintExp.merge t1 t2
@@ -155,10 +155,11 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     | Add | Adc | Sub | Sbb | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or | Bt ->
       dest_taint_type, TaintConst false
     | CmovEq
-    | Punpck | Packus
+    | Punpck | Packxs
+    | Pshuf
     | Padd | Psub | Pxor | Pand | Pandn | Por
     | Psll | Psrl
-    | Xorps -> fl_taint, fr_taint
+    | Xorp -> fl_taint, fr_taint
     in
     (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
@@ -169,19 +170,19 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_uop_inst isa_uop single (fl_entry, fr_entry) in
     let dest_taint_type = taint in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_uop with
-    | Mov | MovZ | Lea | Not | Bswap -> fl_taint, fr_taint
+    | Mov | MovZ | MovS | Lea | Not | Bswap -> fl_taint, fr_taint
     | Neg | Inc | Dec -> dest_taint_type, TaintConst false
     in
     (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
   let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flags: flag_t) : t * flag_t =
     let single_list, t_list = List.split e_list in
-    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
+    let (fl_entry, _), (fr_entry, _) = flags in
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_top_inst isa_top single_list (fl_entry, fr_entry) in
     let dest_taint_type = List.fold_left TaintExp.merge (TaintConst false) t_list in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_top with
+    | Shld
     | Shrd -> dest_taint_type, TaintConst false
-    | Pshufd | Pshuflw | Pshufhw -> fl_taint, fr_taint
     in
     (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 

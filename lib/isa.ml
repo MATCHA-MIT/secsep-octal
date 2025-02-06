@@ -15,86 +15,44 @@ module Isa (MemAnno: MemAnnoType) = struct
   type mem_op = immediate option * register option * register option * scale option
   [@@deriving sexp]
 
-  type ldst_op = immediate option * register option * register option * scale option * int64 * MemAnno.t
+  type ldst_op = immediate option * register option * register option * scale option * data_size * MemAnno.t
   [@@deriving sexp]
 
   type operand =
-    | ImmOp of immediate
+    | ImmOp of immediate * data_size option
     | RegOp of register
-    | RegMultOp of register list 
-      (* dirty fix to support the instructions that split results into two registers or have no dest reg *)
-    | MemOp of mem_op
+    | RegMultOp of register list
+    | MemOp of mem_op * data_size option
     | LdOp of ldst_op
     | StOp of ldst_op
     | LabelOp of label
   [@@deriving sexp]
 
-  let memop_to_mem_operand (op: mem_op) =
-    let (disp, base, index, scale) = op in
-    MemOp (disp, base, index, scale)
+  (* operand utilities *)
 
-  let extract_memop_of_ldst (op: operand) =
+  let get_op_size (op: operand) : data_size =
     match op with
-    | LdOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
-    | StOp (d, b, i, s, _, _) -> MemOp (d, b, i, s)
-    | _ -> op
-
-  let rec string_of_operand (op: operand): string =
-    match op with
-    | ImmOp imm -> string_of_immediate imm
-    | RegOp r -> string_of_reg r
-    | RegMultOp r_list -> Printf.sprintf "(%s)" (String.concat " " (List.map string_of_reg r_list))
-    | MemOp (disp, base, index, scale) ->
-      let disp_str = string_of_option string_of_immediate disp in
-      let base_str = string_of_option string_of_reg base in
-      let index_str = string_of_option string_of_reg index in
-      let scale_str = string_of_option scale_to_string (scale) in
-      Printf.sprintf "%s(%s,%s,%s)" disp_str base_str index_str scale_str
-    | LdOp (disp, base, index, scale, size, mem_anno) ->
-      let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
-      Printf.sprintf "Ld(%s,%s,anno={%s})" addr_str (Int64.to_string size) (MemAnno.to_string mem_anno)
-    | StOp (disp, base, index, scale, size, mem_anno) ->
-      let addr_str = string_of_operand (MemOp (disp, base, index, scale)) in
-      Printf.sprintf "St(%s,%s,anno={%s})" addr_str (Int64.to_string size) (MemAnno.to_string mem_anno)
-    | LabelOp label -> label
-
-  let ocaml_string_of_operand (op: operand): string =
-    match op with
-    | ImmOp imm -> ocaml_string_of_immediate_op imm
-    | RegOp r -> ocaml_string_of_reg_op r
-    | RegMultOp r_list -> Printf.sprintf "RegMultOp (%s)" (String.concat " " (List.map ocaml_string_of_reg_op r_list))
-    | MemOp (disp, base, index, scale) ->
-      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
-      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
-      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
-      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
-      Printf.sprintf "MemOp (%s, %s, %s, %s)" disp_str base_str index_str scale_str
-    | LdOp (disp, base, index, scale, size, mem_anno)
-    | StOp (disp, base, index, scale, size, mem_anno) ->
-      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
-      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
-      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
-      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
-      Printf.sprintf "%s(%s, %s, %s, %s, %sL, %s)"
-        (match op with LdOp _ -> "LdOp" | StOp _ -> "StOp" | _ -> isa_error "ocaml_string_of_operand")
-        disp_str base_str index_str scale_str
-        (Int64.to_string size) (MemAnno.to_ocaml_string mem_anno)
-    | LabelOp label -> Printf.sprintf "LabelOp %s" label
-
-  let get_op_size (op: operand) : int64 =
-    match op with
+    | ImmOp (_, size) -> size |> Option.get
     | RegOp r -> get_reg_size r
     | LdOp (_, _, _, _, size, _)
     | StOp (_, _, _, _, size, _) -> size
     | _ -> isa_error "cannot get size for the given op"
 
+  let memop_to_mem_operand (sz_opt: data_size option) (op: mem_op) = MemOp (op, sz_opt)
+
+  let extract_memop_of_ldst (op: operand) =
+    match op with
+    | LdOp (d, b, i, s, sz, _) -> MemOp ((d, b, i, s), Some sz)
+    | StOp (d, b, i, s, sz, _) -> MemOp ((d, b, i, s), Some sz)
+    | _ -> op
+
   (* TODO: Remove this function *)
   let cmp_operand (op1: operand) (op2: operand) : bool = (* true for equal *)
     match op1, op2 with
-    | ImmOp i1, ImmOp i2 -> i1 = i2
+    | ImmOp (i1, s1), ImmOp (i2, s2) -> i1 = i2 && (Option.get s1) = (Option.get s2)
     | RegOp r1, RegOp r2 -> r1 = r2
-    | MemOp (d1, b1, i1, s1), MemOp (d2, b2, i2, s2) ->
-      d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2
+    | MemOp ((d1, b1, i1, s1), sz1), MemOp ((d2, b2, i2, s2), sz2) ->
+      d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && sz1 = sz2
     | LdOp (d1, b1, i1, s1, size1, _), LdOp (d2, b2, i2, s2, size2, _)
     | StOp (d1, b1, i1, s1, size1, _), StOp (d2, b2, i2, s2, size2, _) ->
         d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
@@ -114,29 +72,62 @@ module Isa (MemAnno: MemAnnoType) = struct
       else []
     | _ -> []
 
-  let is_ld_st_related (ld_op: operand) (st_op: operand) : bool = (* true if both operand operates on the same address *)
-    match ld_op, st_op with
-    | LdOp (d1, b1, i1, s1, size1, _), StOp(d2, b2, i2, s2, size2, _) ->
-      d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && size1 = size2
-    | _ -> false
+  let is_opr_callee_saved_reg (opr: operand) : register option =
+    match opr with
+    | RegOp r ->
+      if is_reg_callee_saved r && get_reg_size r = 8L then
+        Some r
+      else
+        None
+    | _ -> None
 
-  let get_reg_op_size (op_list: operand list) : int64 option =
-    let helper (acc: int64 option) (op: operand) : int64 option =
-      match op, acc with
-      | RegOp r, Some size ->
-        if is_xmm r then Some size else Some (get_reg_size r)
-        (* Note: the following note might be staled Note: this result should not be used when operand size does not match!!! *)
-        (* if get_reg_size r = size then acc else isa_error "reg size does not match" *)
-      | RegOp r, None -> Some (get_reg_size r)
-      | _, _ -> acc
-    in
-    List.fold_left helper None op_list
+  (* stringify *)
+
+  let rec string_of_operand (op: operand): string =
+    match op with
+    | ImmOp (imm, size) -> (string_of_immediate imm) ^ (string_of_data_size size)
+    | RegOp r -> string_of_reg r
+    | RegMultOp r_list -> Printf.sprintf "(%s)" (String.concat " " (List.map string_of_reg r_list))
+    | MemOp ((disp, base, index, scale), size) ->
+      let disp_str = string_of_option string_of_immediate disp in
+      let base_str = string_of_option string_of_reg base in
+      let index_str = string_of_option string_of_reg index in
+      let scale_str = string_of_option scale_to_string (scale) in
+      let size_str = string_of_data_size size in
+      Printf.sprintf "%s(%s,%s,%s)%s" disp_str base_str index_str scale_str size_str
+    | LdOp (disp, base, index, scale, size, mem_anno) ->
+      let addr_str = string_of_operand (MemOp ((disp, base, index, scale), Some size)) in
+      Printf.sprintf "Ld(%s,anno={%s})" addr_str (MemAnno.to_string mem_anno)
+    | StOp (disp, base, index, scale, size, mem_anno) ->
+      let addr_str = string_of_operand (MemOp ((disp, base, index, scale), Some size)) in
+      Printf.sprintf "St(%s,anno={%s})" addr_str (MemAnno.to_string mem_anno)
+    | LabelOp label -> label
+
+  let ocaml_string_of_operand (op: operand): string =
+    match op with
+    | ImmOp (imm, _) -> ocaml_string_of_immediate_op imm
+    | RegOp r -> ocaml_string_of_reg_op r
+    | RegMultOp r_list -> Printf.sprintf "RegMultOp (%s)" (String.concat " " (List.map ocaml_string_of_reg_op r_list))
+    | MemOp ((disp, base, index, scale), size) ->
+      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
+      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
+      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
+      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
+      let size_str = string_of_data_size size in
+      Printf.sprintf "MemOp ((%s, %s, %s, %s), %s)" disp_str base_str index_str scale_str size_str
+    | LdOp (disp, base, index, scale, size, mem_anno)
+    | StOp (disp, base, index, scale, size, mem_anno) ->
+      let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
+      let base_str = ocaml_string_of_option ocaml_string_of_reg base in
+      let index_str = ocaml_string_of_option ocaml_string_of_reg index in
+      let scale_str = ocaml_string_of_option ocaml_scale_to_string (scale) in
+      Printf.sprintf "%s(%s, %s, %s, %s, %sL, %s)"
+        (match op with LdOp _ -> "LdOp" | StOp _ -> "StOp" | _ -> isa_error "ocaml_string_of_operand")
+        disp_str base_str index_str scale_str
+        (Int64.to_string size) (MemAnno.to_ocaml_string mem_anno)
+    | LabelOp label -> Printf.sprintf "LabelOp %s" label
 
   type instruction =
-    (* | Mov of operand * operand
-    | MovS of operand * operand
-    | MovZ of operand * operand
-    | Lea of operand * operand *)
     | BInst of bop * operand * operand * operand
     | UInst of uop * operand * operand
     | TInst of top * operand * (operand list)
@@ -145,16 +136,16 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Test of operand * operand
     | Push of operand * MemAnno.t
     | Pop of operand * MemAnno.t
-    | RepMovs of (int64 * MemAnno.t * MemAnno.t)
-    | RepLods of (int64 * MemAnno.t)
-    | RepStos of (int64 * MemAnno.t)
+    | RepMovs of (data_size * MemAnno.t * MemAnno.t)
+    | RepLods of (data_size * MemAnno.t)
+    | RepStos of (data_size * MemAnno.t)
     | Jmp of label * BranchAnno.t
     | Jcond of branch_cond * label * BranchAnno.t
     | Call of label * CallAnno.t
     | Nop
     | Syscall
     | Hlt
-    | Annotation of string
+    | Directive of string
   [@@deriving sexp]
 
   type basic_block = {
@@ -168,7 +159,7 @@ module Isa (MemAnno: MemAnnoType) = struct
   type func = {
     name: label;
     body: basic_block list;
-    related_gsymbols: label list;
+    related_gsyms: label list;
     subfunctions: label list;
   }
   [@@deriving sexp]
@@ -179,12 +170,7 @@ module Isa (MemAnno: MemAnnoType) = struct
   }
   [@@deriving sexp]
 
-  let prog_to_file (filename: string) (p: prog) =
-    let open Sexplib in
-    let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_prog p)
-
-  let get_func (p: prog) (func_name: label) : func =
+  let get_func_of_prog (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
 
   let inst_is_uncond_jump (inst: instruction) : bool =
@@ -192,12 +178,88 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Jmp _ -> true
     | _ -> false
 
+  (* simple instruction builders *)
+
+  let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
+    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm, Some (get_reg_size reg)))
+
+  let make_inst_add_i_m64 (imm: int64) (mem_op: mem_op) : instruction =
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm, Some size))
+
+  let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
+    if get_reg_offset_size reg <> (0L, 8L) then
+      isa_error "make_inst_st_r64_m64: reg size does not match";
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
+
+  let make_inst_ld_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
+    if get_reg_offset_size reg <> (0L, 8L) then
+      isa_error "make_inst_st_r64_m64: reg size does not match";
+    let size = get_gpr_full_size () in
+    let d, b, i, s = mem_op in
+    let mem_anno = MemAnno.make_empty () in
+    UInst (Mov, RegOp reg, LdOp (d, b, i, s, size, mem_anno))
+
+  (* taint update *)
+
+  let update_op_taint (update_func: MemAnno.t -> MemAnno.t) (op: operand) : operand =
+    match op with
+    | LdOp (disp, base, index, scale, size, old_mem_anno) ->
+      LdOp (disp, base, index, scale, size, update_func old_mem_anno)
+    | StOp (disp, base, index, scale, size, old_mem_anno) ->
+      StOp (disp, base, index, scale, size, update_func old_mem_anno)
+    | _ -> op
+  
+  let update_inst_taint 
+      (update_func: MemAnno.t -> MemAnno.t)
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (inst: instruction) : instruction =
+    let update_helper = update_op_taint update_func in
+    match inst with
+    | BInst (bop, op1, op2, op3) ->
+      BInst (bop, update_helper op1, update_helper op2, update_helper op3)
+    | UInst (uop, op1, op2) ->
+      UInst (uop, update_helper op1, update_helper op2)
+    | Xchg (op1, op2, op3, op4) ->
+      Xchg (update_helper op1, update_helper op2, update_helper op3, update_helper op4)
+    | Cmp (op1, op2) ->
+      Cmp (update_helper op1, update_helper op2)
+    | Test (op1, op2) ->
+      Test (update_helper op1, update_helper op2)
+    | Push (op, mem_anno) ->
+      Push (update_helper op, update_func mem_anno)
+    | Pop (op, mem_anno) ->
+      Pop (update_helper op, update_func mem_anno)
+    | Call (op, call_anno) ->
+      Call (op, update_call_func call_anno)
+    | _ -> inst
+
+  let update_block_taint 
+      (update_func: MemAnno.t -> MemAnno.t) 
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (block: basic_block) : basic_block =
+    { block with insts = List.map (update_inst_taint update_func update_call_func) block.insts }
+
+  let update_block_list_taint 
+      (update_func: MemAnno.t -> MemAnno.t)
+      (update_call_func: CallAnno.t -> CallAnno.t)
+      (block_list: basic_block list) : basic_block list =
+    List.map (update_block_taint update_func update_call_func) block_list
+
+  (* stringify *)
+
+  let prog_to_file (filename: string) (p: prog) =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (sexp_of_prog p)
+
   let mnemonic_of_instruction (inst: instruction) : string =
     match inst with
-    (* | Mov _ -> "mov"
-    | MovS _ -> "movs"
-    | MovZ _ -> "movz"
-    | Lea _ -> "lea" *)
     | BInst (bop, _, _, _) ->
       begin match opcode_of_binst bop with
       | Some s -> s
@@ -231,7 +293,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
-    | Annotation anno -> anno
+    | Directive content -> content
 
   let string_of_instruction (inst: instruction) : string =
     let get_tab (opcode: string): string =
@@ -286,7 +348,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "nop"
     | Syscall -> "syscall"
     | Hlt -> "hlt"
-    | Annotation anno -> anno
+    | Directive content -> content
 
   let ocaml_string_of_instruction (inst: instruction) : string =
     match inst with
@@ -348,19 +410,8 @@ module Isa (MemAnno: MemAnnoType) = struct
     | Nop -> "Nop"
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
-    | Annotation anno-> Printf.sprintf "Annotation \"%s\"" anno
+    | Directive content -> Printf.sprintf "Directive \"%s\"" content
       
-
-  (* let get_op_list (inst: instruction) : operand list =
-    match inst with
-    | Mov (op0, op1) | MovS (op0, op1) | MovZ (op0, op1) 
-    | Lea (op0, op1) | Not (op0, op1) | Cmp (op0, op1) | Test (op0, op1) -> [op0; op1]
-    | Add (op0, op1, op2) | Sub (op0, op1, op2) | Sal (op0, op1, op2)
-    | Sar (op0, op1, op2) | Shr (op0, op1, op2) | Xor (op0, op1, op2)
-    | And (op0, op1, op2) | Or (op0, op1, op2) -> [op0; op1; op2]
-    | Push op | Pop op -> [op]
-    | _ -> [] *)
-
   let pp_block (lvl: int) (bb: basic_block) =
     PP.print_lvl lvl "%s\n" bb.label;
     List.iter (
@@ -392,80 +443,5 @@ module Isa (MemAnno: MemAnnoType) = struct
         PP.print_lvl lvl "<Func %d %s>\n" i func.name;
         pp_block_list (lvl + 1) func.body
     ) p.funcs
-
-
-  let update_op_taint (update_func: MemAnno.t -> MemAnno.t) (op: operand) : operand =
-    match op with
-    | LdOp (disp, base, index, scale, size, old_mem_anno) ->
-      LdOp (disp, base, index, scale, size, update_func old_mem_anno)
-    | StOp (disp, base, index, scale, size, old_mem_anno) ->
-      StOp (disp, base, index, scale, size, update_func old_mem_anno)
-    | _ -> op
-  
-  let update_inst_taint 
-      (update_func: MemAnno.t -> MemAnno.t)
-      (update_call_func: CallAnno.t -> CallAnno.t)
-      (inst: instruction) : instruction =
-    let update_helper = update_op_taint update_func in
-    match inst with
-    | BInst (bop, op1, op2, op3) ->
-      BInst (bop, update_helper op1, update_helper op2, update_helper op3)
-    | UInst (uop, op1, op2) ->
-      UInst (uop, update_helper op1, update_helper op2)
-    | Xchg (op1, op2, op3, op4) ->
-      Xchg (update_helper op1, update_helper op2, update_helper op3, update_helper op4)
-    | Cmp (op1, op2) ->
-      Cmp (update_helper op1, update_helper op2)
-    | Test (op1, op2) ->
-      Test (update_helper op1, update_helper op2)
-    | Push (op, mem_anno) ->
-      Push (update_helper op, update_func mem_anno)
-    | Pop (op, mem_anno) ->
-      Pop (update_helper op, update_func mem_anno)
-    | Call (op, call_anno) ->
-      Call (op, update_call_func call_anno)
-    | _ -> inst
-
-  let update_block_taint 
-      (update_func: MemAnno.t -> MemAnno.t) 
-      (update_call_func: CallAnno.t -> CallAnno.t)
-      (block: basic_block) : basic_block =
-    { block with insts = List.map (update_inst_taint update_func update_call_func) block.insts }
-
-  let update_block_list_taint 
-      (update_func: MemAnno.t -> MemAnno.t)
-      (update_call_func: CallAnno.t -> CallAnno.t)
-      (block_list: basic_block list) : basic_block list =
-    List.map (update_block_taint update_func update_call_func) block_list
-
-  let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
-    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm))
-
-  let make_inst_add_i_m64 (imm: int64) (mem_op: mem_op) : instruction =
-    let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
-    let mem_anno = MemAnno.make_empty () in
-    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm))
-
-  let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg <> (0L, 8L) then
-      isa_error "make_inst_st_r64_m64: reg size does not match";
-    let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
-    let mem_anno = MemAnno.make_empty () in
-    UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
-
-  let make_inst_ld_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
-    if get_reg_offset_size reg <> (0L, 8L) then
-      isa_error "make_inst_st_r64_m64: reg size does not match";
-    let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
-    let mem_anno = MemAnno.make_empty () in
-    UInst (Mov, RegOp reg, LdOp (d, b, i, s, size, mem_anno))
-
-  let is_opr_callee_saved_reg (o: operand) : register option =
-    match o with
-    | RegOp r -> if is_reg_callee_saved r && get_reg_offset_size r = (0L, 8L) then Some r else None
-    | _ -> None
 
 end

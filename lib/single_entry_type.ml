@@ -94,14 +94,15 @@ include SingleExp
     | Bt -> (* bit test, set CF to the bit *)
       let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
       e1, (result, get_const_type (IsaBasic.ImmNum 0L))
-    | Pxor | Xorps -> if same_op then SingleConst 0L, flags else SingleTop, flags
-    | Punpck | Packus
+    | Pxor | Xorp -> if same_op then SingleConst 0L, flags else SingleTop, flags
+    | Punpck | Packxs
+    | Pshuf
     | Padd | Psub | Pand | Pandn | Por
     | Psll | Psrl -> SingleTop, flags
 
   let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flags: flag_t) : t * flag_t =
     match isa_uop with
-    | Mov | MovZ | Lea -> e, flags
+    | Mov | MovZ | MovS | Lea -> e, flags
     | Not -> eval (SingleUExp (SingleNot, e)), flags
     | Bswap -> SingleTop, flags
     | Neg ->
@@ -111,10 +112,10 @@ include SingleExp
     | Dec ->
       eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) |> set_flag_helper
 
-  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (flags: flag_t) : t * flag_t =
+  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (_: flag_t) : t * flag_t =
     match isa_top with
+    | Shld
     | Shrd -> SingleTop |> set_flag_helper
-    | Pshufd | Pshuflw | Pshufhw -> SingleTop, flags
 
   let get_taint_exp (_: t) : TaintExp.t option = None
 

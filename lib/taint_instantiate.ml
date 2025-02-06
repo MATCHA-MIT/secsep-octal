@@ -338,7 +338,7 @@ module TaintInstantiate = struct
         func.name
         mem_api
         prog.imm_var_map
-        func.related_gsymbols
+        func.related_gsyms
         global_symbol_layout
       in
       (label, reg_api, mem_api)

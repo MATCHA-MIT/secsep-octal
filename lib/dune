@@ -1,5 +1,5 @@
 (library
  (name type)
- (libraries z3 core)
+ (libraries z3 core str)
  (preprocess
   (pps ppx_jane)))

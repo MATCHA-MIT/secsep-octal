@@ -544,11 +544,12 @@ module ArchType (Entry: EntryType) = struct
       (curr_type: t)
       (src: Isa.operand) :
       entry_t * t * (Constraint.t list) * Isa.operand =
+    (* TODO: Should we use data size here? *)
     match src with
-    | ImmOp imm -> Entry.get_const_type imm, curr_type, [], src
+    | ImmOp (imm, _ (* size *)) -> Entry.get_const_type imm, curr_type, [], src
     | RegOp r -> get_reg_type curr_type r, curr_type, [], src
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
-    | MemOp (disp, base, index, scale) ->
+    | MemOp ((disp, base, index, scale), _ (* size *)) ->
       get_mem_op_type curr_type disp base index scale, curr_type, [], src
     | LdOp (disp, base, index, scale, size, (slot_anno, taint_anno) (* TODO: check offset and generate constraints *)) ->
       let addr_type = get_mem_op_type curr_type  disp base index scale in
@@ -679,7 +680,7 @@ module ArchType (Entry: EntryType) = struct
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest =
         (* Dirty fix to allow clean up xmm reg with xor *)
-        if bop = Pxor || bop = Xorps then
+        if bop = Pxor || bop = Xorp then
           set_dest_op_type_helper true  smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type dest dest_type
         else
           set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type dest dest_type
@@ -692,8 +693,8 @@ module ArchType (Entry: EntryType) = struct
       let src_type, curr_type, src_constraint, src = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src in
       let dest_type, new_flag =
         begin match uop with
-        (* | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type *)
         | Mov -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
+        | MovS -> Entry.ext_val SignExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
         | MovZ -> Entry.ext_val ZeroExt 0L (Isa.get_op_size dest) src_type, curr_type.flag
         | _ -> Entry.exe_uop_inst uop src_type curr_type.flag
         end 
@@ -830,7 +831,7 @@ module ArchType (Entry: EntryType) = struct
       end
       (* next_type, src_constraint @ dest_constraint *)
     | Syscall -> { curr_type with flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ()) }, inst
-    | Nop | Hlt | Annotation _ -> curr_type, inst
+    | Nop | Hlt | Directive _ -> curr_type, inst
     | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
 
   let add_block_subtype

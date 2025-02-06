@@ -32,3 +32,20 @@ Where is taint expression used?
 * In memory operands and push/pop -> program
 * Inspecting child's `in_mem` in its interface -> child's FI
 * Caller's `rsp` upon call -> `CallAnno/pr_reg`
+
+
+# Parser Update
+
+* [ ] Go through each instruction, including the ones in uop, bop, top, and the definition of instruction type. See if they are compatible.
+* [ ] Extend `operand` with size field.
+* [ ] Fix dirty_op_size, use it as least as possible.
+
+
+* make sure they are supported
+  * mov[ua]p[sd], movdq[ua]
+  * punpck, pakkus
+
+
+# Unsure changes
+
+`lib/checker: ArchType.get_src_op_type`: Should we use data size here?

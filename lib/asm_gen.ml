@@ -49,11 +49,11 @@ module AsmGen = struct
     | Some _, Some base, Some index, None -> Printf.sprintf "%s(%%%s, %%%s, )" (str_of_disp d) (Isa.string_of_reg base) (Isa.string_of_reg index)
     | Some _, _, _, _ -> Printf.sprintf "%s(%s, %s, %s)" (str_of_disp d) (str_of_reg_option b) (str_of_reg_option i) (str_of_scale_option s)
     (* TODO: support more cases *)
-    | _ -> asm_gen_error (Printf.sprintf "str_of_memop: not implemented: %s\n" (Isa.string_of_operand(Isa.MemOp(d, b, i, s))))
+    | _ -> asm_gen_error (Printf.sprintf "str_of_memop: not implemented: %s\n" (Isa.string_of_operand(Isa.MemOp ((d, b, i, s), None))))
 
   let str_of_operand (ctx: context) (op: Isa.operand) : string =
     match op with
-    | ImmOp imm -> str_of_immediate ctx true imm
+    | ImmOp (imm, _) -> str_of_immediate ctx true imm
     | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
     | RegMultOp _ -> asm_gen_error "<TODO> not implemented yet"
     | LdOp (d, b, i, s, _, _)
@@ -83,10 +83,7 @@ module AsmGen = struct
     Printf.sprintf "%s, %s" (str_of_operand ctx src) (str_of_operand ctx dst)
   
   let str_of_operands (ctx: context) (oprs: Isa.operand list) : string =
-    String.concat ", " (List.map (str_of_operand ctx) oprs) (* TODO: check if need reverse *)
-
-  let get_tab (opcode: string): string =
-    if String.length opcode <= 3 then "\t\t" else "\t"
+    String.concat ", " (List.map (str_of_operand ctx) oprs)
 
   let asm_of_inst (ctx: context) (inst: Isa.instruction) (mnemonic: string option) : string =
     let get_tab (opcode: string): string =
@@ -123,7 +120,7 @@ module AsmGen = struct
     | RepLods _
     | RepStos _ -> asm_gen_error "not implemented"
 
-    | Annotation _ -> "" (* annotation is in mnemonic *)
+    | Directive _ -> "" (* directive content is in mnemonic *)
 
     in
 
@@ -131,11 +128,11 @@ module AsmGen = struct
 
   let asm_of_inst_tf (ctx: context) (it: InstTransform.t) (last_changed: bool): bool * (string list) =
     match it.orig_asm with
-    | None -> (false, [])
+    | None -> (false, []) (* this instruction does not exist in original program (e.g., auxiliary jmp) *)
     | Some orig_asm ->
       if it.changed then
-        let lines = if last_changed then [] else [""] in
-        let lines = ("#   " ^ orig_asm) :: lines in
+        let lines = if last_changed then [] else [""] in (* optional line break for beauty *)
+        let lines = ("#   " ^ orig_asm) :: lines in (* original instructions *)
         let lines = List.fold_left (fun acc_lines inst ->
           (asm_of_inst ctx inst None) :: acc_lines
         ) lines it.inst_pre in
@@ -146,11 +143,14 @@ module AsmGen = struct
         let lines = "" :: lines in
         (true, lines)
       else if it.failed then
-        (false, [""; "#   " ^ orig_asm; ""])
+        (false, ["#   TRANSFORMATION FAILED ON:"; "#   " ^ orig_asm; ""])
       else
         (false, ["\t" ^ orig_asm])
 
   let asm_of_basic_block (ctx: context) (bb: Transform.basic_block) : string list =
+    if bb.label = Isa.sentry_func_label then
+      asm_gen_error "unexpected fake sentry function encounted";
+
     let lines = [ Printf.sprintf "%s:" bb.label ] in
     let lines, _ = List.fold_left (fun acc it ->
       let acc_lines, changed = acc in
@@ -163,6 +163,7 @@ module AsmGen = struct
   let gen_asm (prog: Isa.prog) (tf_func_states: Transform.func_state list) : string =
     let ctx = { global_var_map = Isa.get_rev_imm_var_map prog.imm_var_map } in
 
+    prog.funcs |>
     List.map (fun (func: Isa.func) ->
       let helper_bb_orig_lines (bb: Isa.basic_block) =
         List.filter_map (fun line ->
@@ -170,43 +171,24 @@ module AsmGen = struct
           | None -> None
           | Some line ->
             let line = String.trim line in
-            if Isa.is_label line then
+            if Isa.line_is_label line then
               Some line
             else
               Some ("\t" ^ line)
         ) bb.orig_asm
       in
-      let helper_sentry_exist (func_lines: string list) : string option =
-        match List.find_opt (fun x -> String.equal (x |> String.trim) (Isa.fake_bb_sentry_label)) func_lines with
-        | Some _ ->
-          let first_label = List.hd func_lines in
-          if not (Isa.is_label_function_entry first_label) then
-            asm_gen_error "expecting first line to be a label when sentry exists";
-          Printf.printf "first_label = %s" first_label;
-          Some first_label
-        | None -> None
-      in
-
-      let helper_remove_sentry (sentry_replacing: string option) (lines: string list) =
-        List.filter_map (fun line ->
-          match sentry_replacing, line with
-          | Some real_entry, x when (String.equal x (Isa.fake_bb_sentry_label)) -> Some real_entry
-          | Some real_entry, x when (String.equal x real_entry) -> None
-          | _ -> Some line
-        ) lines
-      in
-      let func_state = List.find_opt (fun (fs: Transform.func_state) -> fs.func_name = func.name) tf_func_states in
 
       let func_orig_lines = List.map (fun (bb: Isa.basic_block) ->
         helper_bb_orig_lines bb
       ) func.body |> List.flatten in
-      let sentry_info = helper_sentry_exist func_orig_lines in
-      let func_orig_lines = helper_remove_sentry sentry_info func_orig_lines in
 
+      let func_state = List.find_opt (fun (fs: Transform.func_state) -> fs.func_name = func.name) tf_func_states in
       if Option.is_none func_state then func_orig_lines else
       let func_state = Option.get func_state in
-      if not (Transform.is_func_transformed func_state) then func_orig_lines else
 
+      (* function is not transformed, output original lines *)
+      if not (Transform.is_func_transformed func_state) then func_orig_lines else
+      (* function is transformed *)
       List.map (fun (bb: Isa.basic_block) ->
         let bb_state = List.find (fun (tf_bb: Transform.basic_block) -> tf_bb.label = bb.label) func_state.bbs in
         if not (Transform.is_bb_transformed bb_state) then
@@ -215,8 +197,7 @@ module AsmGen = struct
           asm_of_basic_block ctx bb_state
       ) func.body
       |> List.flatten
-      |> helper_remove_sentry sentry_info
-    ) prog.funcs
+    )
     |> List.flatten
     |> String.concat "\n"
 

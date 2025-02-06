@@ -62,10 +62,11 @@ module IsaFlagConfig = struct
       [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
     | CmovEq -> [], []
     | Bt -> [], [ CF, false ]
-    | Punpck | Packus -> [], []
+    | Punpck | Packxs -> [], []
+    | Pshuf -> [], []
     | Padd | Psub | Pxor | Pandn | Pand | Por -> [], []
     | Psll | Psrl -> [], []
-    | Xorps -> [], []
+    | Xorp -> [], []
 
   let get_uop_config (uop: IsaBasic.uop) : t =
     match uop with
@@ -76,7 +77,7 @@ module IsaFlagConfig = struct
 
   let get_top_config (top: IsaBasic.top) : t =
     match top with
+    | Shld
     | Shrd -> [], [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
-    | _ -> [], []
 
 end

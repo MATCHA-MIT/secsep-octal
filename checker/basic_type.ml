@@ -290,10 +290,11 @@ module DepType = struct
     | Xor | And | Or -> [ CF; PF; ZF; SF; OF ]
     | CmovEq -> []
     | Bt -> [ CF ]
-    | Punpck | Packus -> []
+    | Punpck | Packxs -> []
+    | Pshuf -> []
     | Padd | Psub | Pxor | Pandn | Pand | Por -> []
     | Psll | Psrl -> []
-    | Xorps -> []
+    | Xorp -> []
 
   let uop_update_flag_list (op: IsaBasic.uop) : IsaBasic.flag list =
     match op with
@@ -303,8 +304,8 @@ module DepType = struct
 
   let top_update_flag_list (op: IsaBasic.top) : IsaBasic.flag list =
     match op with
+    | Shld
     | Shrd -> [ CF; PF; ZF; SF; OF ]
-    | Pshufd | Pshuflw | Pshufhw -> [] 
 
   let get_top_flag_list (flag_list: IsaBasic.flag list) : (IsaBasic.flag * t) list =
     List.map (fun f -> f, get_top_flag ()) flag_list
@@ -681,7 +682,7 @@ module DepType = struct
       | CmovEq, [ dst; src ], [ zf ] -> Exp (Boolean.mk_ite ctx zf src dst), []
       | Bt, [ reg; idx ], [ ] -> exe_bittest ctx set_flags reg idx
       | Punpck, [ ], [ ] -> Top 128, [ ]
-      | Packus, [ ], [ ] -> Top 128, [ ]
+      | Packxs, [ ], [ ] -> Top 128, [ ]
       | Padd, [ ], [ ] -> Top 128, [ ]
       | Psub, [ ], [ ] -> Top 128, [ ]
       | _ -> dep_type_error "<TODO> not implemented yet"
@@ -756,9 +757,6 @@ module DepType = struct
       let set_flags = set_flag_list top_flag_list in
       match op, src_exp_list, src_flag_list with
       | Shrd, [ dst; src; cnt ], [ ] -> exe_shrd ctx set_flags dst src cnt
-      | Pshufd, [], [] -> Top 128, [ ]
-      | Pshuflw, [], [] -> Top 128, [ ]
-      | Pshufhw, [], [] -> Top 128, [ ]
       | _ -> dep_type_error "<TODO> not implemented yet"
 
   let check_subtype

@@ -84,11 +84,12 @@ include ArchTypeBasic
       (smt_ctx: SmtEmitter.t)
       (curr_type: t) (src: Isa.operand) : entry_t option =
     let ctx, _ = smt_ctx in
+    (* TODO: Should we use data size here? *)
     match src with
-    | ImmOp imm -> Some (BasicType.get_imm_type ctx imm)
+    | ImmOp (imm, _ (* size *)) -> Some (BasicType.get_imm_type ctx imm) 
     | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type r)
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
-    | MemOp mem_op -> Some (get_mem_op_type smt_ctx curr_type mem_op)
+    | MemOp (mem_op, _ (* size *)) -> Some (get_mem_op_type smt_ctx curr_type mem_op)
     | LdOp ld_op -> get_ld_op_type smt_ctx curr_type ld_op
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"

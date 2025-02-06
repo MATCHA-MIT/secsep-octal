@@ -1,5 +1,4 @@
 open Isa
-open Parser
 open Taint_exp
 open Taint_entry_type
 open Taint_type_infer
@@ -423,7 +422,7 @@ module Transform = struct
     | Jcond _
     | Nop
     | Syscall
-    | Annotation _
+    | Directive _
     | Hlt -> (orig, [], [], true), css, []
     | Push (o, mem_anno)
     | Pop (o, mem_anno) -> begin
@@ -448,7 +447,7 @@ module Transform = struct
         in
         let o', sf2 = helper_prepare_memop o in
         let o_size = match o' with
-        | RegOp reg -> Isa.get_reg_size reg
+        | RegOp r -> Isa.get_reg_size r
         | LdOp (_, _, _, _, w, _)
         | StOp (_, _, _, _, w, _) -> w
         | _ -> transform_error "Operand not supported for Push/Pop simulation"
@@ -475,8 +474,6 @@ module Transform = struct
     | RepMovs _ -> transform_error "RepMovs unimplemented"
     | RepLods _ -> transform_error "RepLods unimplemented"
     | RepStos _ -> transform_error "RepStos unimplemented"
-    (* | RepStosq -> transform_error "RepStosq unimplemented"
-    | RepMovsq -> transform_error "RepStosq unimplemented" *)
     in
     (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css, sf
 
@@ -535,8 +532,8 @@ module Transform = struct
     let res = match tf.orig with
     | BInst (Add, dst, src1, src2) -> begin
         let replaced = match src1, src2 with
-        | ImmOp imm, _ -> Some (Isa.ImmOp (add_delta_on_imm imm delta), src2)
-        | _, ImmOp imm -> Some (src1, Isa.ImmOp (add_delta_on_imm imm delta))
+        | ImmOp (imm, sz), _ -> Some (Isa.ImmOp (add_delta_on_imm imm delta, sz), src2)
+        | _, ImmOp (imm, sz) -> Some (src1, Isa.ImmOp (add_delta_on_imm imm delta, sz))
         | _ -> None (* TODO: not supported yet, can we do better? *)
         in
         match replaced with
@@ -551,9 +548,9 @@ module Transform = struct
       end
     | UInst (Lea, dst, src) -> begin
         match src with
-        | MemOp (d, b, i, s) -> Some (
+        | MemOp ((d, b, i, s), size) -> Some (
             InstTransform.assign tf
-              (UInst (Lea, dst, add_delta_on_disp (d, b, i, s) |> Isa.memop_to_mem_operand))
+              (UInst (Lea, dst, add_delta_on_disp (d, b, i, s) |> Isa.memop_to_mem_operand size))
               []
               []
               true
@@ -667,7 +664,7 @@ module Transform = struct
                       (MemOffset.to_string o)
                     )
                   | BaseAsGlobal ->
-                    if pa_base >= Parser.imm_var_unset then
+                    if pa_base >= Isa.imm_var_unset then
                       transform_error "Invalid var id for global label";
                     (Some (Isa.ImmBExp (Isa.ImmLabel pa_base, Isa.ImmNum off_of_base)), None, None, None)
                   in
@@ -794,7 +791,7 @@ module Transform = struct
     : basic_block =
     let extract_offset_helper (inst: Isa.instruction) =
       match inst with
-      | BInst (Add, RegOp reg1, RegOp reg2, ImmOp (ImmNum imm)) when reg1 = reg2 ->
+      | BInst (Add, RegOp reg1, RegOp reg2, ImmOp (ImmNum imm, _)) when reg1 = reg2 ->
         Some imm
       | _ -> None
     in
