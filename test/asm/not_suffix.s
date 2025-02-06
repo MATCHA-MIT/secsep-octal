@@ -15,5 +15,5 @@ main:
 	notw %r12w
 
 	# Byte (expected 0b01010011)
-	movb $0b10101100, %r14
+	movb $0b10101100, %r14b
 	notb %r14b

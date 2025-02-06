@@ -3,13 +3,10 @@
 .global main
 main:
 	# Quad (expected $0x9988776655443322)
-	cmoveqq $0x9988776655443322, %r8
+	cmoveq %r15, %r8
 
 	# Long (expected $0xaabbccdd)
-	cmoveql $0xaabbccdd, %r10
+	cmovel %r15d, %r10d
 
 	# Word (expected 0x7192)
-	cmoveqw $0x7192, %r12
-
-	# Byte (expected 0x33)
-	cmoveqb $0x33, %r14
+	cmovew %r15w, %r12w

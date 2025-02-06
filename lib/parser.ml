@@ -618,7 +618,6 @@ module Parser = struct
 
     let one_instr_pattern = Str.regexp {|^\(\(\([^;"']\)\|\("\([^"]\|\\"\)*"\)\|\('\([^']\|\\'\)*'\)\)*\)\(;.*\)$|} in
     let rec split_sub_instrs (acc: string list) (curr: string) =
-      Printf.printf "splitting %s" curr;
       match Str.string_match one_instr_pattern curr 0 with
       | false -> curr :: acc |> List.rev
       | true ->

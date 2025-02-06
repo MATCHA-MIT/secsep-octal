@@ -8,12 +8,12 @@ main:
 
 	# Long (expected $0x89898989)
 	movq $0x89898988, %r10
-	incl %r10
+	incl %r10d
 
 	# Word (expected 0b1100101101001110)
 	movq $0b1100101101001101, %r12
-	incw %r12
+	incw %r12w
 
 	# Byte (expected 0x00100000)
 	movq $0b00011111, %r14
-	incb %r14
+	incb %r14b

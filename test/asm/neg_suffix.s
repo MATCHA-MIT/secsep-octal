@@ -7,13 +7,13 @@ main:
 	negq %r8
 
 	# Long (expected $0xaabbccdd)
-	movl $0xaabbccdd, %r10
-	negl %r10
+	movq $0xaabbccdd, %r10
+	negl %r10d
 
 	# Word (expected 0x7192)
-	movw $0x7192, %r12
-	negw %r12
+	movq $0x7192, %r12
+	negw %r12w
 
 	# Byte (expected 0x33)
-	movb $0x33, %r14
-	negb %r14
+	movq $0x33, %r14
+	negb %r14b
