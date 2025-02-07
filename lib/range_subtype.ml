@@ -364,6 +364,9 @@ module RangeSubtype = struct
     let possible_sol_template_list = List.concat_map guess_sol_template tv_rel.subtype_list in
     List.find_map test_sol_template possible_sol_template_list
   
+  type offset_pc_t = MemOffset.t * int
+  [@@deriving sexp]
+
   let try_solve_const_slot
       (smt_ctx: SmtEmitter.t)
       (sub_sol_single_to_range_helper: SingleEntryType.t * int -> RangeExp.t)
@@ -418,43 +421,65 @@ module RangeSubtype = struct
     in
     (* Get sol template *)
     let get_sat_off_set
-        (sol_off_candidate: MemOffsetSet.t)
-        (sub_range_pc: MemOffset.t option * int) : MemOffsetSet.t =
+        (sol_off_candidate: int MemOffsetMap.t)
+        (sub_range_pc: MemOffset.t option * int) : int MemOffsetMap.t =
       let sub_range, sub_pc = sub_range_pc in
-      let check_subset (sol_candidate_off: MemOffset.t) : bool =
+      let check_subset (sol_candidate_off: MemOffset.t) : MemOffset.off_rel_t =
         match sub_range with
         | None ->
           let l, r = sol_candidate_off in 
-          SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes
+          if SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes then Eq else Other
         | Some sub_off -> 
-          MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpSubset = Subset
+          MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpEqSubset
       in
       SmtEmitter.push smt_ctx;
       update_block_smt_ctx sub_pc;
       let sol_off_candidate = List.fold_left (
-        fun (acc: MemOffsetSet.t) (other_sub, other_pc) ->
-          if other_pc = sub_pc then acc
-          else
-            match other_sub with
-            | None -> acc
-            | Some other_sub_off ->
-              if MemOffsetSet.mem other_sub_off acc then
-                if check_subset other_sub_off then acc
-                else MemOffsetSet.remove other_sub_off sol_off_candidate
+        fun (acc: int MemOffsetMap.t) (other_sub, other_pc) ->
+          match other_sub with
+          | None -> acc
+          | Some other_sub_off ->
+            let add_one () : int MemOffsetMap.t =
+              MemOffsetMap.update other_sub_off (
+                fun (count_opt: int option) -> Option.map (Int.add 1) count_opt
+              ) acc
+            in
+            if other_pc = sub_pc then add_one ()
+            else
+              if MemOffsetMap.mem other_sub_off acc then
+                if check_subset other_sub_off = Eq then  add_one ()
+                else if check_subset other_sub_off = Subset then acc
+                else MemOffsetMap.remove other_sub_off sol_off_candidate
               else acc
       ) sol_off_candidate single_naive_sub_list
       in
       SmtEmitter.pop smt_ctx 1;
       sol_off_candidate
     in
-    let sol_off_candidate = List.filter_map fst single_naive_sub_list |> MemOffsetSet.of_list in
+    let sol_off_candidate = List.filter_map fst single_naive_sub_list |> List.map (fun x -> x, 0) in
+    if fst tv_rel.var_idx = 80 then begin
+      Printf.printf "RangeVar 80 sol_off_candidate\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_offset_pc_t sol_off_candidate));
+    end;
     let sol_off_candidate = 
-      List.fold_left get_sat_off_set sol_off_candidate single_naive_sub_list
-      |> MemOffsetSet.to_list
+      List.fold_left get_sat_off_set (MemOffsetMap.of_list sol_off_candidate) single_naive_sub_list
+      |> MemOffsetMap.to_list
     in
+    if fst tv_rel.var_idx = 80 then begin
+      Printf.printf "RangeVar 80 sol_off_candidate\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_offset_pc_t sol_off_candidate));
+    end;
     match sol_off_candidate with
     | [] -> None
-    | hd :: _ -> Some (RangeConst [hd])
+    | (hd, _) :: [] -> Some (RangeConst [hd])
+    | _ ->
+      let hd, _ =
+        List.sort (
+          fun (off_a, count_a) (off_b, count_b) ->
+            let cmp_count = Int.compare count_a count_b in
+            if cmp_count = 0 then MemOffset.cmp off_a off_b
+            else cmp_count
+        ) sol_off_candidate |> List.hd
+      in
+      Some (RangeConst [hd])
 
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
