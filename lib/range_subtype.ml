@@ -418,60 +418,43 @@ module RangeSubtype = struct
     in
     (* Get sol template *)
     let get_sat_off_set
-        (sol_off_candidate: int MemOffsetMap.t)
-        (sub_range_pc: MemOffset.t option * int) : int MemOffsetMap.t =
+        (sol_off_candidate: MemOffsetSet.t)
+        (sub_range_pc: MemOffset.t option * int) : MemOffsetSet.t =
       let sub_range, sub_pc = sub_range_pc in
-      let check_subset (sol_candidate_off: MemOffset.t) : MemOffset.off_rel_t =
+      let check_subset (sol_candidate_off: MemOffset.t) : bool =
         match sub_range with
         | None ->
           let l, r = sol_candidate_off in 
-          if SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes then Eq
-          else Other
+          SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes
         | Some sub_off -> 
-          MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpEqSubset
+          MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpSubset = Subset
       in
       SmtEmitter.push smt_ctx;
       update_block_smt_ctx sub_pc;
       let sol_off_candidate = List.fold_left (
-        fun (acc: int MemOffsetMap.t) (other_sub, other_pc) ->
+        fun (acc: MemOffsetSet.t) (other_sub, other_pc) ->
           if other_pc = sub_pc then acc
           else
             match other_sub with
             | None -> acc
             | Some other_sub_off ->
-              if MemOffsetMap.mem other_sub_off acc then
-                let check_result = check_subset other_sub_off in
-                if check_result = Eq then
-                  MemOffsetMap.update other_sub_off (
-                    fun (count_eq_option: int option) ->
-                      Option.map (Int.add 1) count_eq_option
-                  ) acc
-                else if check_result = Subset then acc
-                else MemOffsetMap.remove other_sub_off acc
-                (* if check_subset other_sub_off then acc
-                else MemOffsetSet.remove other_sub_off sol_off_candidate *)
+              if MemOffsetSet.mem other_sub_off acc then
+                if check_subset other_sub_off then acc
+                else MemOffsetSet.remove other_sub_off sol_off_candidate
               else acc
       ) sol_off_candidate single_naive_sub_list
       in
       SmtEmitter.pop smt_ctx 1;
       sol_off_candidate
     in
+    let sol_off_candidate = List.filter_map fst single_naive_sub_list |> MemOffsetSet.of_list in
     let sol_off_candidate = 
-      List.filter_map (fun (x, _) -> Option.map (fun x -> x, 1) x) single_naive_sub_list  
-    in
-    if List.is_empty sol_off_candidate then Some (RangeConst []) (* This means sub is empty *) else
-    let sol_off_candidate = 
-      List.fold_left get_sat_off_set (MemOffsetMap.of_list sol_off_candidate) single_naive_sub_list
-      |> MemOffsetMap.to_list
+      List.fold_left get_sat_off_set sol_off_candidate single_naive_sub_list
+      |> MemOffsetSet.to_list
     in
     match sol_off_candidate with
     | [] -> None
-    | _ -> 
-      let hd =
-        List.sort (fun (_, a) (_, b) -> Int.compare a b) sol_off_candidate
-        |> List.hd |> fst
-      in
-      Some (RangeConst [hd])
+    | hd :: _ -> Some (RangeConst [hd])
 
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
