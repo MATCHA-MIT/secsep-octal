@@ -375,11 +375,11 @@ module MemOffsetSet = struct
     end
   )
 
-let t_of_sexp (s_exp: Sexp.t) : t = 
-  of_list (list_of_sexp MemOffset.t_of_sexp s_exp)
+  let t_of_sexp (s_exp: Sexp.t) : t = 
+    of_list (list_of_sexp MemOffset.t_of_sexp s_exp)
 
-let sexp_of_t (s: t) : Sexp.t = 
-  sexp_of_list MemOffset.sexp_of_t (elements s)
+  let sexp_of_t (s: t) : Sexp.t = 
+    sexp_of_list MemOffset.sexp_of_t (elements s)
 
 end
 

@@ -618,6 +618,22 @@ module SingleTypeInfer = struct
 
         (* Get alive blocks *)
         let state = { state with alive_blocks = BlockAlive.solve state.func_name block_subtype } in
+        (* NOTE: In single infer, prop does not use alive block info from last round to avoid symbolic exe/prop any blocks,
+           since the alive info might be out-of-date, and we do not want to miss any block that might be target.
+           Hence, a dead block (with no entry) can appear as a sub block due to symbolic executing it.
+           But if it is known to be dead in this round of prop, i.e., no entrance, then it will not appear as a sup block 
+           (we do not need to solve for its single vars).
+           Hence, we filiter out dead blocks from sub block list to avoid complicating single subtype solve. *)
+        let block_subtype =
+          List.map (
+            fun (sup_blk, sub_list) ->
+              sup_blk,
+              List.filter (
+                fun (sub_blk: ArchType.t) ->
+                  StringSet.mem sub_blk.label state.alive_blocks
+              ) sub_list
+          ) block_subtype
+        in
 
         (* 2. Get heuristic mem type or insert stack addr in unknown list to mem type *)
         let unknown_resolved = 
@@ -751,7 +767,10 @@ module SingleTypeInfer = struct
         Printf.printf "\n\n%s: Infer iter %d after init single_subtype%!\n\n" func_name curr_iter;
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
-        let single_subtype = SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter in
+        let single_subtype = 
+          SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter
+          |> SingleSubtype.remove_top_subtype (* Optimization to speedup sub_sol *)
+        in
         let state = 
           { state with 
             func_type = 
@@ -771,6 +790,11 @@ module SingleTypeInfer = struct
         if unknown_resolved && callee_context_resolved && tmp_context_resolved then begin
           (* Directly return if unknown are all resolved. *)
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
+          (* Printf.printf "After infer, single subtype%!\n";
+          SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
+          let single_subtype = SingleSubtype.merge_all_set_sol state.smt_ctx state.input_var_set block_subtype single_subtype in
+          Printf.printf "\n\nAfter merge single set sol\n";
+          SingleSubtype.pp_single_subtype 0 single_subtype;
           { state with 
             func = update_branch_anno block_subtype state.func;
             func_type = List.map (
@@ -778,12 +802,13 @@ module SingleTypeInfer = struct
                 { x with 
                   context = x.context 
                     @ x.blk_br_context 
-                    @ (SingleSubtype.get_block_context state.single_subtype x.useful_var)
+                    @ (SingleSubtype.get_block_context single_subtype x.useful_var)
                 }
             ) state.func_type;
+            single_subtype = single_subtype;
             context = state.context 
               @ (List.hd state.func_type).context 
-              @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) 
+              @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type);
           }
         end else begin
           let state = (

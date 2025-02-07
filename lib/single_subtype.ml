@@ -3,8 +3,10 @@ open Single_exp
 open Single_entry_type
 open Mem_offset_new
 open Range_exp
+open Cond_type_new
 open Single_context
 open Arch_type
+open Set_sexp
 open Smt_emitter
 open Pretty_print
 open Sexplib.Std
@@ -48,6 +50,10 @@ module SingleSol = struct
     | SolSimple e
     | SolCond (_, e, _, _) -> RangeExp.to_context v_idx e
 
+  let is_top (s: t) : bool =
+    match s with
+    | SolNone | SolSimple Top | SolSimple (Single SingleTop) -> true
+    | _ -> false
 end
 
 module SingleSubtype = struct
@@ -115,8 +121,13 @@ module SingleSubtype = struct
     match find_entry with
     | Some entry -> tv_rel, entry
     | None ->
+      let var_idx_pc =
+        match List.find_opt (fun (v_idx, _) -> v_idx = var_idx) var_pc_map with
+        | Some var_idx_pc -> var_idx_pc
+        | None -> single_subtype_error (Printf.sprintf "cannot find var %d" var_idx)
+      in
       let entry = 
-        { var_idx = List.find (fun (v_idx, _) -> v_idx = var_idx) var_pc_map; 
+        { var_idx = var_idx_pc; 
         sol = SingleSol.SolNone; 
         other_constraint = [];
         subtype_list = []; supertype_list = [];
@@ -364,35 +375,144 @@ module SingleSubtype = struct
       in
       add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
 
-  (* let rec add_all_useful_var_block_subtype
-      (var_pc_map: var_pc_t list)
-      (block_subtype_list: ArchType.block_subtype_t list)
-      (useful_var_list: useful_var_t list)
-      (* (tv_rel: t) : t * (ArchType.block_subtype_t list) = *)
-      (tv_rel: t) (count: int) : t * (ArchType.block_subtype_t list) =
-    Printf.printf "add_all_useful_var_block_subtype %d\n" count;
-    Printf.printf "before\n";
-    pp_useful_var_list 0 useful_var_list;
-    match useful_var_list with
-    | [] -> tv_rel, block_subtype_list
-    | hd :: tl ->
-      let tv_rel, block_subtype_list, new_useful_var_list =
-        add_one_useful_var_block_subtype var_pc_map block_subtype_list hd tv_rel
-      in
-      Printf.printf "new_useful_var_list\n";
-      pp_useful_var_list 0 new_useful_var_list;
-      let useful_var_list = merge_useful_var tl new_useful_var_list in
-      (* add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel *)
-      if count > 0 then
-        add_all_useful_var_block_subtype var_pc_map block_subtype_list useful_var_list tv_rel (count - 1)
-      else if List.length useful_var_list > 0 then begin
-        Printf.printf "Warning: useful vars not handled due to limited layers of recursive calls\n";
-        pp_useful_var_list 0 useful_var_list;
-        tv_rel, block_subtype_list
-      end
-      else
-        tv_rel, block_subtype_list *)
+  let get_all_useful_local_var (all_useful_var: IntSet.t) (block_subtype_list: ArchType.block_subtype_t list) : IntSet.t =
+    (* Get all useful var and local var derived from useful var *)
+    let add_uesful_local_var (useful_var: IntSet.t) (local_var_map: SingleExp.local_var_map_t) : IntSet.t =
+      List.fold_left (
+        fun (acc: IntSet.t) (var, exp) ->
+          if IntSet.mem var useful_var then
+            acc
+          else if SingleExp.is_val useful_var exp then
+            IntSet.add var acc
+          else acc
+      ) useful_var local_var_map
+    in
+    List.fold_left (
+      fun (acc: IntSet.t) (entry: ArchType.block_subtype_t) ->
+        let block, _ = entry in
+        (* let acc = IntSet.union acc block.useful_var in *)
+        add_uesful_local_var acc block.local_var_map
+    ) all_useful_var block_subtype_list
 
+  module VarSubMap = IntMapSexp (
+    struct
+      type t = (SingleEntryType.t * IsaBasic.label * int) list
+      [@@deriving sexp]
+    end
+  )
+  
+  let update_var_sub_map_one_block_subtype
+      (all_local_var_map: SingleExp.local_var_map_t StrMap.t)
+      (var_pc_map: var_pc_t list) 
+      (all_useful_var: IntSet.t)
+      (tv_rel_list: t)
+      (block_subtype: ArchType.block_subtype_t) :
+      IntSet.t * t * ArchType.block_subtype_t =
+    let target_block, sub_block_list = block_subtype in
+    let update_one_pair
+        (all_useful_var: IntSet.t) (sub_label: IsaBasic.label) (sub_pc: int)
+        (acc: VarSubMap.t) (sup: SingleExp.t) (sub: SingleExp.t) : VarSubMap.t =
+      match sup with
+      | SingleVar sup_v ->
+        if IntSet.mem sup_v all_useful_var then acc else
+        let new_sub = sub, sub_label, sub_pc in
+        VarSubMap.update sup_v (
+          fun (entry_opt: ((SingleEntryType.t * IsaBasic.label * int) list) option) ->
+            match entry_opt with
+            | None -> Some [ new_sub ]
+            | Some sub_list -> Some (new_sub :: sub_list)
+        ) acc
+      | SingleTop -> acc
+      | _ -> single_subtype_error 
+          (Printf.sprintf "update_var_sub_map: incorrect sub/super types (%s,%d)->%s"
+            (SingleEntryType.to_string sub) sub_pc (SingleEntryType.to_string sup))
+    in
+    let update_one_block_pair
+        (all_useful_var: IntSet.t)
+        (acc: VarSubMap.t) (sub_block: ArchType.t) : VarSubMap.t =
+      let helper = update_one_pair all_useful_var sub_block.label sub_block.pc in
+      let acc = List.fold_left2 helper acc target_block.reg_type sub_block.reg_type in
+      ArchType.MemType.fold_left2 helper acc target_block.mem_type sub_block.mem_type
+    in
+    let var_sub_map = 
+      List.fold_left (update_one_block_pair all_useful_var) VarSubMap.empty sub_block_list
+      |> VarSubMap.to_list
+    in
+    (* Check whether sub are all useful. If so, add them to all_useful_var and tv_rel_list *)
+    let all_useful_var, new_useful_var, tv_rel_list =
+      List.fold_left (
+        fun (acc: IntSet.t * IntSet.t * t) (var_id, sub_list) ->
+          let find_not_useful =
+            List.find_opt (
+              fun (e, _, _) ->
+                not (SingleExp.is_val all_useful_var e)
+            ) sub_list
+          in
+          if find_not_useful <> None then acc else
+          let sub_list =
+            List.map (
+              fun (sub_exp, sub_label, sub_pc) ->
+                SingleEntryType.repl_local_var (StrMap.find sub_label all_local_var_map) sub_exp,
+                [ sub_pc ]
+            ) sub_list
+          in
+          let acc_all_useful_var, acc_new_useful_var, acc_tv_rel_list = acc in
+          IntSet.add var_id acc_all_useful_var,
+          IntSet.add var_id acc_new_useful_var,
+          List.fold_left (
+            fun (acc_tv_rel_list: t) (entry: type_pc_list_t) ->
+              add_sub_sub_super_super var_pc_map acc_tv_rel_list entry var_id
+          ) acc_tv_rel_list sub_list
+      ) (all_useful_var, IntSet.empty, tv_rel_list) var_sub_map
+    in
+    if not (IntSet.is_empty new_useful_var) then
+      Printf.printf "Block %s %d new useful var %s\n" 
+        target_block.label target_block.pc 
+        (Sexplib.Sexp.to_string_hum (IntSet.sexp_of_t new_useful_var));
+    all_useful_var, tv_rel_list,
+    ({ target_block with useful_var = IntSet.union target_block.useful_var new_useful_var}, sub_block_list)
+    
+  let add_all_useful_var_forward_prop
+      (var_pc_map: var_pc_t list)
+      (tv_rel_list: t)
+      (block_subtype_list: ArchType.block_subtype_t list) :
+      t * (ArchType.block_subtype_t list) =
+    let all_useful_var =
+      List.fold_left (
+        fun (acc: IntSet.t) (entry: ArchType.block_subtype_t) ->
+          IntSet.union acc (fst entry).useful_var
+      ) IntSet.empty block_subtype_list
+    in
+    let all_local_var_map =
+      List.map (
+        fun (entry: ArchType.block_subtype_t) ->
+          let target_block, _ = entry in
+          target_block.label, target_block.local_var_map
+      ) block_subtype_list |> StrMap.of_list
+    in
+    let rec helper
+        (all_useful_var: IntSet.t)
+        (tv_rel_list: t)
+        (block_subtype_list: ArchType.block_subtype_t list) :
+        t * (ArchType.block_subtype_t list) =
+      let all_useful_var = get_all_useful_local_var all_useful_var block_subtype_list in
+      let old_useful_var_count = IntSet.cardinal all_useful_var in
+      let (all_useful_var, tv_rel_list), block_subtype_list =
+        List.fold_left_map (
+          fun (x, y) z -> 
+            let x, y, z = 
+              update_var_sub_map_one_block_subtype all_local_var_map var_pc_map x y z
+            in
+            (x, y), z
+        ) (all_useful_var, tv_rel_list) block_subtype_list
+      in
+      let new_useful_var_count = IntSet.cardinal all_useful_var in
+      if new_useful_var_count > old_useful_var_count then
+        helper all_useful_var tv_rel_list block_subtype_list
+      else tv_rel_list, block_subtype_list
+    in
+    helper all_useful_var tv_rel_list block_subtype_list
+  
   let init_useful_var_from_block_subtype
       (block_subtype_list: ArchType.block_subtype_t list) : useful_var_t list =
     List.map (
@@ -404,8 +524,17 @@ module SingleSubtype = struct
   let init
       (func_name: string)
       (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
+    (* Reverse local_var_map, which help to infer vars derived from useful vars and add them to useful_var_list *)
+    let block_subtype_list =
+      List.map (
+        fun (entry: ArchType.block_subtype_t) ->
+          let block, sub_list = entry in
+          { block with local_var_map = List.rev block.local_var_map },
+          sub_list
+      ) block_subtype_list
+    in
     let useful_var_list = init_useful_var_from_block_subtype block_subtype_list in
-    let useful_var_map_list =
+    let all_var_map_list =
       List.concat_map (
         fun (block_subtype: ArchType.block_subtype_t) ->
           let a_type, _ = block_subtype in
@@ -419,7 +548,10 @@ module SingleSubtype = struct
           )
       ) block_subtype_list
     in
-    add_all_useful_var_block_subtype useful_var_map_list block_subtype_list useful_var_list [] 200
+    let tv_rel_list, block_subtype_list = 
+      add_all_useful_var_block_subtype all_var_map_list block_subtype_list useful_var_list [] 200
+    in
+    add_all_useful_var_forward_prop all_var_map_list tv_rel_list block_subtype_list
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in
@@ -906,7 +1038,7 @@ module SingleSubtype = struct
               ) single_pc_list
             in
             let sol, _ = List.split single_pc_list in
-            { tv_rel with sol = SolSimple (SingleSet sol); set_sol = single_pc_list }
+            { tv_rel with sol = SolSimple (SingleSet (sol |> SingleExpSet.of_list |> SingleExpSet.to_list)); set_sol = single_pc_list }
             (* Printf.printf "Set sol for SymImm %d pc %d %s\n" target_idx target_pc (Sexplib.Sexp.to_string (sexp_of_list sexp_of_type_pc_list_t single_pc_list));
             find_other_sol_set_correlation target_idx target_pc single_pc_list tv_rel_list input_var_set *)
             (* SolSimple (SingleSet single_list) *)
@@ -938,7 +1070,7 @@ module SingleSubtype = struct
               end
           in
           match helper sub_range_list with
-          | single_list, [] -> { tv_rel with sol = SolSimple (SingleSet single_list) }
+          | single_list, [] -> { tv_rel with sol = SolSimple (SingleSet (single_list |> SingleExpSet.of_list |> SingleExpSet.to_list)) }
             (* TODO: I cannot resolve correlation between vars with this solution format!!! *)
             (* Printf.printf "!!! single list %s\n" (Sexplib.Sexp.to_string (sexp_of_list SingleEntryType.sexp_of_t single_list)); *)
             (* begin match List.sort_uniq SingleExp.cmp single_list with
@@ -1391,9 +1523,117 @@ module SingleSubtype = struct
     in
     helper tv_rel_list num_iter
 
-  (* TODO:
-    1. Handle calculation of range of a exp when var in the exp is not a single value.
-    2. Solve by merging several ranges.
-  *)
+  let merge_one_set_sol
+      (smt_ctx: SmtEmitter.t)
+      (input_var_set: IntSet.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (tv_rel_list: t)
+      (tv_rel: type_rel) : SingleExp.t option =
+    match tv_rel.sol with
+    | SolSimple (SingleSet sol_set) ->
+      begin match sol_set with
+      | [] -> single_subtype_error "empty sol set"
+      | [ sol ] -> Some sol
+      | _ ->
+        (* 1. Filter direct subtypes *)
+        let direct_subtype =
+          List.filter_map (
+            fun (sub, sub_pc_list) ->
+              match sub_pc_list with
+              | [] -> single_subtype_error "sub exp has empty pc hist"
+              | [ sub_pc ] -> Some (sub, sub_pc)
+              | _ -> None
+          ) tv_rel.subtype_list
+        in
+        (* 2. If sub cannot be simplified to one single exp, then skip *)
+        let single_direct_subtype =
+          List.filter_map (
+            fun (sub, sub_pc) ->
+              match sub_sol_single_to_range (fun x -> x) tv_rel_list input_var_set (sub, sub_pc) with
+              | Single e -> Some (e, sub_pc)
+              | _ -> None
+          ) direct_subtype
+        in
+        if List.length direct_subtype > List.length single_direct_subtype then None else
+        (* 3. For each sub_exp, get a set of other sub_exp that can replace this sub_exp *)
+        let sup_pc = snd tv_rel.var_idx in
+        let sub_block_list = 
+          List.find_map (
+            fun (entry: ArchType.block_subtype_t) -> 
+              let sup_block, sub_list = entry in
+              if sup_block.pc = sup_pc then Some sub_list else None
+          ) block_subtype_list
+          |> Option.get
+        in
+        let update_block_smt_ctx (sub_pc: int) : unit =
+          let sub_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
+          SingleContext.add_assertions smt_ctx sub_block.context;
+          SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
+        in
+        let get_equal_set 
+            (general_sol_candidate: SingleExpSet.t) 
+            (sub_exp_pc: type_pc_t) : SingleExpSet.t =
+          let sub, sub_pc = sub_exp_pc in
+          SmtEmitter.push smt_ctx;
+          update_block_smt_ctx sub_pc;
+          let general_sol_candidate = List.fold_left (
+            fun (acc: SingleExpSet.t) (other_sub, other_pc) ->
+              if other_pc = sub_pc then acc
+              else if SingleExpSet.mem other_sub acc then
+                if SingleCondType.check true smt_ctx [ Eq, sub, other_sub ] = SatYes then acc
+                else SingleExpSet.remove other_sub acc
+              else acc
+          ) general_sol_candidate single_direct_subtype
+          in
+          SmtEmitter.pop smt_ctx 1;
+          general_sol_candidate
+        in
+        let general_sol_candidate =
+          List.fold_left get_equal_set 
+            (List.map fst single_direct_subtype |> SingleExpSet.of_list)
+            single_direct_subtype
+          |> SingleExpSet.to_list
+        in
+        match general_sol_candidate with
+        | [] -> None
+        | hd :: _ -> 
+          Printf.printf "Merge sol for SymImm %d\n" (fst tv_rel.var_idx);
+          Some hd (* TODO: Consider to pick the best one later *)
+      end
+    | _ -> None
+
+  let merge_all_set_sol
+      (smt_ctx: SmtEmitter.t)
+      (input_var_set: IntSet.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (tv_rel_list: t) : t =
+    let all_useful_var =
+      List.fold_left (
+        fun (acc: IntSet.t) (entry: ArchType.block_subtype_t) ->
+          IntSet.union acc (fst entry).useful_var
+      ) IntSet.empty block_subtype_list
+    in
+    let rec helper (tv_rel_list: t) : t =
+      let merge_one_helper
+        (acc: bool) (tv_rel: type_rel) : bool * type_rel =
+        match merge_one_set_sol smt_ctx input_var_set block_subtype_list tv_rel_list tv_rel with
+        | Some single_sol ->
+          true,
+          { tv_rel with sol = SolSimple (Single single_sol) }
+        | _ -> acc, tv_rel
+      in
+      SmtEmitter.push smt_ctx;
+      update_block_smt_ctx smt_ctx tv_rel_list all_useful_var;
+      let find_new_sol, tv_rel_list =
+        List.fold_left_map merge_one_helper false tv_rel_list
+      in
+      SmtEmitter.pop smt_ctx 1;
+      if find_new_sol then helper tv_rel_list else tv_rel_list
+    in
+    helper tv_rel_list
+
+  let remove_top_subtype
+      (tv_rel_list: t) : t =
+    List.filter (fun (x: type_rel) -> SingleSol.is_top x.sol |> not) tv_rel_list
 
 end

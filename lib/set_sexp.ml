@@ -39,6 +39,7 @@ include Set.Make(
 
 end
 
+module StrMap = Map.Make (String)
 module IntMap = Map.Make(Int)
 
 module type MapEntryType = sig

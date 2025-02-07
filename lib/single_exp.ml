@@ -3,6 +3,7 @@ open Single_exp_basic
 open Smt_emitter
 open Pretty_print
 open Sexplib.Std
+open Sexplib
 
 module SingleExp = struct
 include SingleExpBasic
@@ -731,5 +732,21 @@ include SingleExpBasic
           val_list
       end
     | _ -> get_default_list SingleTop
+
+end
+
+module SingleExpSet = struct
+  include Set.Make (
+    struct
+      let compare = SingleExp.cmp
+      type t = SingleExp.t
+    end
+  )
+
+  let t_of_sexp (s_exp: Sexp.t) : t = 
+    of_list (list_of_sexp SingleExp.t_of_sexp s_exp)
+
+  let sexp_of_t (s: t) : Sexp.t = 
+    sexp_of_list SingleExp.sexp_of_t (elements s)
 
 end
