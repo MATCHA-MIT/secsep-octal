@@ -2,6 +2,9 @@ open Isa_basic
 open Single_entry_type
 open Mem_offset_new
 open Constraint
+open Range_exp
+open Cond_type_new
+open Single_context
 open Arch_type
 open Arch_context_map
 open Single_subtype
@@ -360,19 +363,129 @@ module RangeSubtype = struct
     in
     let possible_sol_template_list = List.concat_map guess_sol_template tv_rel.subtype_list in
     List.find_map test_sol_template possible_sol_template_list
-      
+  
+  let try_solve_const_slot
+      (smt_ctx: SmtEmitter.t)
+      (sub_sol_single_to_range_helper: SingleEntryType.t * int -> RangeExp.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (tv_rel: type_rel) : MemRange.t option =
+    let naive_sub_list =
+      List.filter_map (
+        fun (sub, sub_pc) ->
+          match sub with
+          | MemRange.RangeConst c_list ->
+            begin match c_list with
+            | [] -> Some (None, sub_pc)
+            | [ off ] -> Some (Some off, sub_pc)
+            | _ -> None
+            end
+          | _ -> None
+      ) tv_rel.subtype_list
+    in
+    if List.length tv_rel.subtype_list > List.length naive_sub_list then None else
+    (* Replace single solution *)
+    let single_naive_sub_list =
+      List.filter_map (
+        fun (sub, sub_pc) ->
+          match sub with
+          | None -> Some (sub, sub_pc)
+          | Some (l, r) ->
+            begin match sub_sol_single_to_range_helper (l, sub_pc) with
+            | Single simp_l ->
+              begin match sub_sol_single_to_range_helper (r, sub_pc) with
+              | Single simp_r -> Some (Some (simp_l, simp_r), sub_pc)
+              | _ -> None
+              end
+            | _ -> None
+            end
+      ) naive_sub_list
+    in
+    if List.length naive_sub_list > List.length single_naive_sub_list then None else
+    (* Get helper for update block context*)
+    let sup_pc = snd tv_rel.var_idx in
+    let sub_block_list = 
+      List.find_map (
+        fun (entry: ArchType.block_subtype_t) -> 
+          let sup_block, sub_list = entry in
+          if sup_block.pc = sup_pc then Some sub_list else None
+      ) block_subtype_list
+      |> Option.get
+    in
+    let update_block_smt_ctx (sub_pc: int) : unit =
+      let sub_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
+      SingleContext.add_assertions smt_ctx sub_block.context;
+      SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
+    in
+    (* Get sol template *)
+    let get_sat_off_set
+        (sol_off_candidate: int MemOffsetMap.t)
+        (sub_range_pc: MemOffset.t option * int) : int MemOffsetMap.t =
+      let sub_range, sub_pc = sub_range_pc in
+      let check_subset (sol_candidate_off: MemOffset.t) : MemOffset.off_rel_t =
+        match sub_range with
+        | None ->
+          let l, r = sol_candidate_off in 
+          if SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes then Eq
+          else Other
+        | Some sub_off -> 
+          MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpEqSubset
+      in
+      SmtEmitter.push smt_ctx;
+      update_block_smt_ctx sub_pc;
+      let sol_off_candidate = List.fold_left (
+        fun (acc: int MemOffsetMap.t) (other_sub, other_pc) ->
+          if other_pc = sub_pc then acc
+          else
+            match other_sub with
+            | None -> acc
+            | Some other_sub_off ->
+              if MemOffsetMap.mem other_sub_off acc then
+                let check_result = check_subset other_sub_off in
+                if check_result = Eq then
+                  MemOffsetMap.update other_sub_off (
+                    fun (count_eq_option: int option) ->
+                      Option.map (Int.add 1) count_eq_option
+                  ) acc
+                else if check_result = Subset then acc
+                else MemOffsetMap.remove other_sub_off acc
+                (* if check_subset other_sub_off then acc
+                else MemOffsetSet.remove other_sub_off sol_off_candidate *)
+              else acc
+      ) sol_off_candidate single_naive_sub_list
+      in
+      SmtEmitter.pop smt_ctx 1;
+      sol_off_candidate
+    in
+    let sol_off_candidate = 
+      List.filter_map (fun (x, _) -> Option.map (fun x -> x, 1) x) single_naive_sub_list  
+    in
+    if List.is_empty sol_off_candidate then Some (RangeConst []) (* This means sub is empty *) else
+    let sol_off_candidate = 
+      List.fold_left get_sat_off_set (MemOffsetMap.of_list sol_off_candidate) single_naive_sub_list
+      |> MemOffsetMap.to_list
+    in
+    match sol_off_candidate with
+    | [] -> None
+    | _ -> 
+      let hd =
+        List.sort (fun (_, a) (_, b) -> Int.compare a b) sol_off_candidate
+        |> List.hd |> fst
+      in
+      Some (RangeConst [hd])
 
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
+      (sub_sol_single_to_range_helper: SingleEntryType.t * int -> RangeExp.t)
       (* (single_sol_repl_to_range_helper: (SingleEntryType.t * int) -> SingleEntryType.t) *)
       (input_var_set: IntSet.t)
       (ctx_map_map: ArchContextMap.t)
       (* (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t) *)
-      (* (block_subtype_list: ArchType.block_subtype_t list) *)
+      (block_subtype_list: ArchType.block_subtype_t list)
       (new_sol_list: (var_idx_t * MemRange.t) list) (tv_rel: type_rel) : 
       ((var_idx_t * MemRange.t) list) * type_rel =
     let rule_list = [
       try_solve_extra_slot smt_ctx input_var_set ctx_map_map;
+      try_solve_const_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list;
       try_solve_full;
       try_solve_empty input_var_set;
       (* try_solve_non_val smt_ctx get_block_var block_subtype_list; *)
@@ -536,6 +649,7 @@ module RangeSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t) (iter: int) : t =
     (* let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list single_sol in *)
+    let sub_sol_single_to_range_helper = SingleSubtype.sub_sol_single_to_range (fun x -> x) single_sol input_var_set in
     let ctx_map_map = ArchContextMap.init input_var_set block_subtype_list in
     Printf.printf "ctx_map_map\n%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map));
     let get_block_var = fun r -> SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) input_var_set in
@@ -549,7 +663,7 @@ module RangeSubtype = struct
         in *)
         let new_sol, tv_rel_list =
           List.fold_left_map 
-            (solve_one_var smt_ctx input_var_set ctx_map_map) 
+            (solve_one_var smt_ctx sub_sol_single_to_range_helper input_var_set ctx_map_map block_subtype_list) 
             [] tv_rel_list
         in
         if List.length new_sol = 0 then tv_rel_list

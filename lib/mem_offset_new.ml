@@ -383,6 +383,13 @@ module MemOffsetSet = struct
 
 end
 
+module MemOffsetMap = Map.Make (
+  struct
+    let compare = MemOffset.cmp
+    type t = MemOffset.t
+  end
+)
+
 module MemRange = struct
   exception MemRangeError of string
   let mem_range_error msg = raise (MemRangeError ("[Mem Range Error] " ^ msg))
