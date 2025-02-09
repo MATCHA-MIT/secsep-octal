@@ -475,23 +475,45 @@ module DepType = struct
     in
     let exe_res, flags = result in
     (to_string exe_res) ^ "; " ^ (String.concat " " (List.map string_of_flag_pair flags))
+
+  let downsize_bv (ctx: context) (bv: exp_t) (size: int) : exp_t =
+    let bv_size = BitVector.get_size (Expr.get_sort bv) in
+    if bv_size <= size then bv
+    else BitVector.mk_extract ctx (size - 1) 0 bv
   
-  let exe_additive (ctx: context) (set_flags: flag_func) (binop: z3_binop) (dst: exp_t) (src: exp_t) (add: bool) : exe_result =
-    let result = binop ctx dst src in
-    let get_carry = if add then get_add_carry else get_sub_carry in
-    let get_aux = if add then get_add_aux else get_sub_aux in
-    let get_overflow = if add then get_add_overflow else get_sub_overflow in
-    Exp result,
-    set_flags [
-      CF, Exp (get_carry ctx dst src);
+  let exe_add (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) : exe_result =
+    let result = downsize_bv ctx (BitVector.mk_add ctx dst src) dest_size in
+    Exp result, [
+      CF, Exp (get_add_carry ctx dst src);
       PF, Exp (get_parity ctx result);
-      AF, Exp (get_aux ctx dst src);
+      AF, Exp (get_add_aux ctx dst src);
       ZF, Exp (get_zero ctx result);
       SF, Exp (get_sign ctx result);
-      OF, Exp (get_overflow ctx dst src);
+      OF, Exp (get_add_overflow ctx dst src);
     ]
 
-  let exe_multiplicative (ctx: context) (set_flags: flag_func) (dst: exp_t) (src: exp_t) (dest_size: int) (signed: bool) : exe_result = 
+  let exe_adc (ctx: context) (dst: exp_t) (src: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+    let flag_inc = bool_to_bv ctx cflg dest_size in
+    let addend = BitVector.mk_add ctx src flag_inc in
+    exe_add ctx dst addend dest_size
+
+  let exe_sub (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) : exe_result =
+    let result = downsize_bv ctx (BitVector.mk_sub ctx dst src) dest_size in
+    Exp result, [
+      CF, Exp (get_sub_carry ctx dst src);
+      PF, Exp (get_parity ctx result);
+      AF, Exp (get_sub_aux ctx dst src);
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_sub_overflow ctx dst src);
+    ]
+
+  let exe_sbb (ctx: context) (dst: exp_t) (src: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+    let flag_inc = bool_to_bv ctx cflg dest_size in
+    let subtrahend = BitVector.mk_add ctx src flag_inc in
+    exe_sub ctx dst subtrahend dest_size
+
+  let exe_multiplicative (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) (signed: bool) : exe_result = 
     let src_size = dest_size / 2 in
     let ext_func = if signed then BitVector.mk_sign_ext else BitVector.mk_zero_ext in
     let src_ext = ext_func ctx src_size src in
@@ -500,16 +522,58 @@ module DepType = struct
     let top_half = BitVector.mk_extract ctx (dest_size - 1) src_size result in
     let zero = BitVector.mk_numeral ctx "0" src_size in
     let flags = Boolean.mk_not ctx (Boolean.mk_eq ctx top_half zero) in 
-    Exp result,
-    set_flags [
+    Exp result, [
       CF, Exp flags;
       OF, Exp flags;
     ]
 
-  let exe_bitwise (ctx: context) (set_flags: flag_func) (binop: z3_binop) (dst: exp_t) (src: exp_t) : exe_result =
+  let exe_shl (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let result = BitVector.mk_shl ctx dst cnt in
+    Exp result, [
+      CF, Exp (get_shl_carry ctx dst cnt);
+      PF, Exp (get_parity ctx result); 
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_shl_overflow ctx dst cnt (flag_lookup OF));
+    ]
+
+  let exe_sar (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let result = BitVector.mk_ashr ctx dst cnt in
+    Exp result, [
+      CF, Exp (get_shr_carry ctx dst cnt);
+      PF, Exp (get_parity ctx result); 
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_ashr_overflow ctx cnt (flag_lookup OF));
+    ]
+
+  let exe_shr (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let result = BitVector.mk_lshr ctx dst cnt in
+    Exp result, [
+      CF, Exp (get_shr_carry ctx dst cnt);
+      PF, Exp (get_parity ctx result); 
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_lshr_overflow ctx dst cnt (flag_lookup OF));
+    ]
+     
+  let exe_rol (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let result = BitVector.mk_ext_rotate_left ctx dst cnt in
+    Exp result, [
+      CF, Exp (get_rol_carry ctx result);
+      OF, Exp (get_rol_overflow ctx result cnt (flag_lookup OF));
+    ]
+
+  let exe_ror (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let result = BitVector.mk_ext_rotate_right ctx dst cnt in
+    Exp result, [
+      CF, Exp (get_rol_carry ctx result);
+      OF, Exp (get_ror_overflow ctx result cnt (flag_lookup OF));
+    ]
+
+  let exe_bitwise (ctx: context) (binop: z3_binop) (dst: exp_t) (src: exp_t) : exe_result =
     let result = binop ctx dst src in
-    Exp result,
-    set_flags [
+    Exp result, [
       CF, Exp (Boolean.mk_false ctx);
       PF, Exp (get_parity ctx result);
       ZF, Exp (get_zero ctx result);
@@ -517,15 +581,14 @@ module DepType = struct
       OF, Exp (Boolean.mk_false ctx);
     ]
   
-  let exe_bittest (ctx: context) (set_flags: flag_func) (reg: exp_t) (idx: exp_t) : exe_result =
+  let exe_bittest (ctx: context) (reg: exp_t) (idx: exp_t) : exe_result =
     let reg_size = BitVector.get_size (Expr.get_sort reg) in
     let one = BitVector.mk_numeral ctx "1" reg_size in
     let zero = BitVector.mk_numeral ctx "0" reg_size in
     let mask = BitVector.mk_shl ctx one idx in
     let result = BitVector.mk_and ctx reg mask in
     let flag = Boolean.mk_not ctx (Boolean.mk_eq ctx result zero) in
-    Exp (BitVector.mk_numeral ctx "0" reg_size),
-    set_flags [
+    Exp (BitVector.mk_numeral ctx "0" reg_size), [
       CF, Exp flag
     ]
   
@@ -537,6 +600,10 @@ module DepType = struct
   let exe_movz (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
     let src_size = BitVector.get_size (Expr.get_sort src) in
     Exp (BitVector.mk_zero_ext ctx (dest_size - src_size) src), []
+
+  let exe_movs (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
+    let src_size = BitVector.get_size (Expr.get_sort src) in
+    Exp (BitVector.mk_sign_ext ctx (dest_size - src_size) src), []
 
   let exe_bswap (ctx: context) (src: exp_t) : exe_result =
     let byte_size = (BitVector.get_size (Expr.get_sort src)) / 8 in
@@ -555,15 +622,38 @@ module DepType = struct
     in
     Exp (concat_bytes (get_rev_bytes [])), []
 
-  let exe_shrd (ctx: context) (set_flags: flag_func) (dst: exp_t) (src: exp_t) (cnt: exp_t) : exe_result =
-    (* NOTE Currently assumes a nonzero cnt to simplify the flags *)
-    let dst_size = (BitVector.get_size (Expr.get_sort dst)) in
-    let cflg_bv = BitVector.mk_numeral ctx "0" 1 in 
+  let exe_shld (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+    let cflg_bv = bool_to_bv ctx cflg 1 in 
+    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx cflg_bv dst) src in
+    let cnt = BitVector.mk_extract ctx 4 0 cnt in
+    let shifted = BitVector.mk_shl ctx merged cnt in
+    let result = BitVector.mk_extract ctx (dest_size - 1) 0 shifted in
+    let dst_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) dst in
+    let result_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) result in
+    let cflg_bit = BitVector.mk_extract ctx dest_size dest_size shifted in
+    let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
+    let oflg =
+      let cnt_one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
+      Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt cnt_one)
+        (Boolean.mk_not ctx (Boolean.mk_eq ctx dst_sign result_sign))
+        (Boolean.mk_false ctx)
+    in
+    Exp result, [
+      CF, Exp cflg;
+      PF, Exp (get_parity ctx result);
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp oflg;
+    ]
+
+  let exe_shrd (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+    let cflg_bv = bool_to_bv ctx cflg 1 in 
     let merged = BitVector.mk_concat ctx src (BitVector.mk_concat ctx dst cflg_bv) in
+    let cnt = BitVector.mk_extract ctx 4 0 cnt in
     let shifted = BitVector.mk_lshr ctx merged cnt in
-    let result = BitVector.mk_extract ctx (dst_size + 1) 1 shifted in
-    let dst_sign = BitVector.mk_extract ctx (dst_size - 1) (dst_size - 1) dst in
-    let result_sign = BitVector.mk_extract ctx (dst_size - 1) (dst_size - 1) result in
+    let result = BitVector.mk_extract ctx dest_size 1 shifted in
+    let dst_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) dst in
+    let result_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) result in
     let cflg_bit = BitVector.mk_extract ctx 0 0 shifted in
     let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
     let oflg =
@@ -572,8 +662,7 @@ module DepType = struct
         (Boolean.mk_not ctx (Boolean.mk_eq ctx dst_sign result_sign))
         (Boolean.mk_false ctx)
     in
-    Exp result,
-    set_flags [
+    Exp result, [
       CF, Exp cflg;
       PF, Exp (get_parity ctx result);
       ZF, Exp (get_zero ctx result);
@@ -594,111 +683,46 @@ module DepType = struct
     | None, _ | _, None ->
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list ->
-      let set_flags = set_flag_list top_flag_list in
+      let flag_lookup (flag: IsaBasic.flag) : exp_t = 
+        match get_src_flag_func flag with
+        | Top _ -> Expr.mk_const_s ctx "top" (Boolean.mk_sort ctx) (* TODO Isn't there a get_top function somewhere? I should use that instead to keep things consistent. *)
+        | Exp flag_exp -> flag_exp
+      in
+      let dep_result, flag_vals = begin
       match op, src_exp_list, src_flag_list with
-      | Add, [ dst; src ], [] ->
-        exe_additive ctx set_flags BitVector.mk_add dst src true
-      | Adc, [ dst; src ], [ cflg ] ->
-        let flag_inc = bool_to_bv ctx cflg dest_size in
-        let addend = BitVector.mk_add ctx src flag_inc in
-        exe_additive ctx set_flags BitVector.mk_add dst addend true
-      | Sub, [ dst; src ], [] ->
-        exe_additive ctx set_flags BitVector.mk_sub dst src false
-      | Sbb, [ dst; src ], [ cflg ] ->
-        let flag_inc = bool_to_bv ctx cflg dest_size in
-        let subtrahend = BitVector.mk_add ctx src flag_inc in
-        exe_additive ctx set_flags BitVector.mk_sub dst subtrahend false
-      | Mul,  [ dst; src ], [ ] -> exe_multiplicative ctx set_flags dst src dest_size false
-      | Imul, [ dst; src ], [ ] -> exe_multiplicative ctx set_flags dst src dest_size true
-      | Sal, [ dst; cnt ], [ ] | Shl, [ dst; cnt ], [] ->
-        let orig_oflg = get_src_flag_func OF in
-        let new_oflg =
-          begin match orig_oflg with
-          | Top _ -> Top top_bool_size
-          | Exp oflg -> Exp (get_shl_overflow ctx dst cnt oflg)
-          end
-        in
-        let result = BitVector.mk_shl ctx dst cnt in
-        Exp result,
-        set_flags [
-          CF, Exp (get_shl_carry ctx dst cnt);
-          PF, Exp (get_parity ctx result); 
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, new_oflg;
-        ]
-      | Sar, [ dst; cnt ], [ ] ->
-        let orig_oflg = get_src_flag_func OF in
-        let new_oflg =
-          begin match orig_oflg with
-          | Top _ -> Top top_bool_size
-          | Exp oflg -> Exp (get_ashr_overflow ctx cnt oflg)
-          end
-        in
-        let result = BitVector.mk_ashr ctx dst cnt in
-        Exp result,
-        set_flags [
-          CF, Exp (get_shr_carry ctx dst cnt);
-          PF, Exp (get_parity ctx result); 
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, new_oflg;
-        ]
-      | Shr, [ dst; cnt ], [ ] ->
-        let orig_oflg = get_src_flag_func OF in
-        let new_oflg =
-          begin match orig_oflg with
-          | Top _ -> Top top_bool_size
-          | Exp oflg -> Exp (get_lshr_overflow ctx dst cnt oflg)
-          end
-        in
-        let result = BitVector.mk_lshr ctx dst cnt in
-        Exp result,
-        set_flags [
-          CF, Exp (get_shr_carry ctx dst cnt);
-          PF, Exp (get_parity ctx result); 
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, new_oflg;
-        ]
-      | Rol, [ dst; cnt ], [ ] ->
-        let result = BitVector.mk_ext_rotate_left ctx dst cnt in
-        let orig_oflg = get_src_flag_func OF in
-        let new_oflg =
-          begin match orig_oflg with
-          | Top _ -> Top top_bool_size
-          | Exp oflg -> Exp (get_rol_overflow ctx result cnt oflg)
-          end
-        in
-        Exp result,
-        set_flags [
-          CF, Exp (get_rol_carry ctx result);
-          OF, new_oflg;
-        ]
-      | Ror, [ dst; cnt ], [ ] ->
-        let result = BitVector.mk_ext_rotate_right ctx dst cnt in
-        let orig_oflg = get_src_flag_func OF in
-        let new_oflg =
-          begin match orig_oflg with
-          | Top _ -> Top top_bool_size
-          | Exp oflg -> Exp (get_ror_overflow ctx result cnt oflg)
-          end
-        in
-        Exp result,
-        set_flags [
-          CF, Exp (get_rol_carry ctx result);
-          OF, new_oflg;
-        ]
-      | Xor, [ dst; src ], [ ] -> exe_bitwise ctx set_flags BitVector.mk_xor dst src
-      | And, [ dst; src ], [ ] -> exe_bitwise ctx set_flags BitVector.mk_and dst src
-      | Or,  [ dst; src ], [ ] -> exe_bitwise ctx set_flags BitVector.mk_or  dst src
-      | CmovEq, [ dst; src ], [ zf ] -> Exp (Boolean.mk_ite ctx zf src dst), []
-      | Bt, [ reg; idx ], [ ] -> exe_bittest ctx set_flags reg idx
-      | Punpck, [ ], [ ] -> Top 128, [ ]
-      | Packxs, [ ], [ ] -> Top 128, [ ]
-      | Padd, [ ], [ ] -> Top 128, [ ]
-      | Psub, [ ], [ ] -> Top 128, [ ]
+      | Add,    [ dst; src ], [ ]      -> exe_add ctx dst src dest_size
+      | Adc,    [ dst; src ], [ cflg ] -> exe_adc ctx dst src cflg dest_size
+      | Sub,    [ dst; src ], [ ]      -> exe_sub ctx dst src dest_size
+      | Sbb,    [ dst; src ], [ cflg ] -> exe_sbb ctx dst src cflg dest_size
+      | Mul,    [ dst; src ], [ ]      -> exe_multiplicative ctx dst src dest_size false
+      | Imul,   [ dst; src ], [ ]      -> exe_multiplicative ctx dst src dest_size true
+      | Sal,    [ dst; cnt ], [ ]
+      | Shl,    [ dst; cnt ], [ ]      -> exe_shl ctx dst cnt flag_lookup
+      | Sar,    [ dst; cnt ], [ ]      -> exe_sar ctx dst cnt flag_lookup
+      | Shr,    [ dst; cnt ], [ ]      -> exe_shr ctx dst cnt flag_lookup
+      | Rol,    [ dst; cnt ], [ ]      -> exe_rol ctx dst cnt flag_lookup
+      | Ror,    [ dst; cnt ], [ ]      -> exe_ror ctx dst cnt flag_lookup
+      | Xor,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_xor dst src
+      | And,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_and dst src
+      | Or,     [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_or  dst src
+      | CmovEq, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
+      | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
+      | Punpck, [ ], [ ]               -> Top 128, [ ]
+      | Packxs, [ ], [ ]               -> Top 128, [ ]
+      | Padd,   [ ], [ ]               -> Top 128, [ ]
+      | Psub,   [ ], [ ]               -> Top 128, [ ]
+      | Pxor,   [ ], [ ]               -> Top 128, [ ]
+      | Pandn,  [ ], [ ]               -> Top 128, [ ]
+      | Pand,   [ ], [ ]               -> Top 128, [ ]
+      | Por,    [ ], [ ]               -> Top 128, [ ]
+      | Psll,   [ ], [ ]               -> Top 128, [ ]
+      | Psrl,   [ ], [ ]               -> Top 128, [ ]
+      | Xorp,   [ ], [ ]               -> Top 128, [ ]
+      | Pshuf,  [ ], [ ]               -> Top 128, [ ]
       | _ -> dep_type_error "<TODO> not implemented yet"
+      end
+      in
+      dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_uop
       (ctx: context) (op: IsaBasic.uop) 
@@ -716,6 +740,7 @@ module DepType = struct
       match op, src_exp_list, src_flag_list with
       | Mov, [ dst; src ], [ ] -> exe_mov ctx dst src dest_size
       | MovZ, [ src ], [ ] -> exe_movz ctx src dest_size
+      | MovS, [ src ], [ ] -> exe_movs ctx src dest_size
       | Lea, [ ], [ ] -> dep_type_error "lea should not be inputted into a type check (convert to mov instead)"
       | Not, [ src ], [ ] -> Exp (BitVector.mk_not ctx src), []
       | Bswap, [ src ], [ ] -> exe_bswap ctx src
@@ -767,9 +792,9 @@ module DepType = struct
     | None, _ | _, None ->
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list -> 
-      let set_flags = set_flag_list top_flag_list in
       match op, src_exp_list, src_flag_list with
-      | Shrd, [ dst; src; cnt ], [ ] -> exe_shrd ctx set_flags dst src cnt
+      | Shld, [ dst; src; cnt ], [ cflg ] -> exe_shld ctx dst src cnt cflg dest_size
+      | Shrd, [ dst; src; cnt ], [ cflg ] -> exe_shrd ctx dst src cnt cflg dest_size
       | _ -> dep_type_error "<TODO> not implemented yet"
 
   let check_subtype

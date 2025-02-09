@@ -2,18 +2,18 @@
 
 .global main
 main:
-	# Basic addition check
+	# Basic addition check (expected 0x64)
 	movq $0x34, %rax
 	movq $0x30, %rbx
 	addq %rax, %rbx
 
-	# Check if higher bits of %rdx remain unaffected (no overflow)
+	# Check if higher bits of %rdx remain unaffected (no overflow) (expected 0xfff...f00)
 	movq $0x00, %rcx
-	negq %rcx
 	movq $0x00, %rdx
-	addb %rcx, %rdx
+	notq %rdx
+	addb %cl, %dl
 
-	# Check if higher bits of %r9 remain unaffected (with overflow)
+	# Check if higher bits of %r9 remain unaffected (with overflow) (expected 0x200)
 	movq $0x99,  %r8
-	movq $0x167, %r9
-	addb %r8, %r9
+	movq $0x267, %r9
+	addb %r8b, %r9b
