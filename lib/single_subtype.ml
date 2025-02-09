@@ -1526,6 +1526,7 @@ module SingleSubtype = struct
   let merge_one_set_sol
       (smt_ctx: SmtEmitter.t)
       (input_var_set: IntSet.t)
+      (func_type: ArchType.t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t)
       (tv_rel: type_rel) : SingleExp.t option =
@@ -1566,9 +1567,12 @@ module SingleSubtype = struct
           |> Option.get
         in
         let update_block_smt_ctx (sub_pc: int) : unit =
-          let sub_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
+          let br_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
+          let sub_block = List.find (fun (block: ArchType.t) -> block.label = br_block.label) func_type in
+          (* For single infer, we need to get newest each block's entrance invariants from func_type,
+             and br hist from block_subtype_list *)
           SingleContext.add_assertions smt_ctx sub_block.context;
-          SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
+          SingleCondType.add_assertions smt_ctx (List.split br_block.branch_hist |> fst)
         in
         let get_equal_set 
             (general_sol_candidate: SingleExpSet.t) 
@@ -1605,29 +1609,21 @@ module SingleSubtype = struct
   let merge_all_set_sol
       (smt_ctx: SmtEmitter.t)
       (input_var_set: IntSet.t)
+      (func_type: ArchType.t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t) : t =
-    let all_useful_var =
-      List.fold_left (
-        fun (acc: IntSet.t) (entry: ArchType.block_subtype_t) ->
-          IntSet.union acc (fst entry).useful_var
-      ) IntSet.empty block_subtype_list
-    in
     let rec helper (tv_rel_list: t) : t =
       let merge_one_helper
         (acc: bool) (tv_rel: type_rel) : bool * type_rel =
-        match merge_one_set_sol smt_ctx input_var_set block_subtype_list tv_rel_list tv_rel with
+        match merge_one_set_sol smt_ctx input_var_set func_type block_subtype_list tv_rel_list tv_rel with
         | Some single_sol ->
           true,
           { tv_rel with sol = SolSimple (Single single_sol) }
         | _ -> acc, tv_rel
       in
-      SmtEmitter.push smt_ctx;
-      update_block_smt_ctx smt_ctx tv_rel_list all_useful_var;
       let find_new_sol, tv_rel_list =
         List.fold_left_map merge_one_helper false tv_rel_list
       in
-      SmtEmitter.pop smt_ctx 1;
       if find_new_sol then helper tv_rel_list else tv_rel_list
     in
     helper tv_rel_list

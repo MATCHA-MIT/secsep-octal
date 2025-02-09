@@ -12,7 +12,7 @@ module Constraint = struct
   type t =
     | Unknown of MemOffset.t
     (* | Subset of MemOffset.t * MemRange.t * MemOffset.t *)
-    | RangeSubset of MemRange.range_var_id * (MemOffset.t list)
+    | RangeSubset of MemRange.range_var_id * (MemOffset.t list) (* var, off_list: off_list is subset of var *)
     | RangeUnsat of MemOffset.t * (MemOffset.t list)
     | RangeEq of MemOffset.t * MemRange.t
     | RangeOverwritten of MemRange.t
@@ -67,7 +67,11 @@ module Constraint = struct
       | remain_list -> [ RangeUnsat (off, remain_list) ]
       end
     | RangeVar v -> [ RangeSubset (v, [ sub_off ]) ]
-    | RangeExp (v, ro_list) -> [ RangeSubset (v, MemOffset.diff smt_ctx sub_off ro_list) ]
+    | RangeExp (v, ro_list) -> 
+      begin match MemOffset.diff smt_ctx sub_off ro_list with
+      | [] -> []
+      | remain_list -> [ RangeSubset (v, remain_list) ]
+      end
 
   let gen_range_subset (smt_ctx: SmtEmitter.t) (sub_range: MemRange.t) (range: MemRange.t) (off: MemOffset.t) : t list =
     match sub_range with

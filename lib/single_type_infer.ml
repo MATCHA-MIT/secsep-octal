@@ -792,23 +792,30 @@ module SingleTypeInfer = struct
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
           (* Printf.printf "After infer, single subtype%!\n";
           SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
-          let single_subtype = SingleSubtype.merge_all_set_sol state.smt_ctx state.input_var_set block_subtype single_subtype in
-          Printf.printf "\n\nAfter merge single set sol\n";
-          SingleSubtype.pp_single_subtype 0 single_subtype;
-          { state with 
-            func = update_branch_anno block_subtype state.func;
-            func_type = List.map (
+          let func_type = 
+            List.map (
               fun (x: SingleSubtype.ArchType.t) ->
                 { x with 
                   context = x.context 
                     @ x.blk_br_context 
                     @ (SingleSubtype.get_block_context single_subtype x.useful_var)
                 }
-            ) state.func_type;
+            ) state.func_type
+          in
+          let single_subtype = 
+            SingleSubtype.merge_all_set_sol 
+              state.smt_ctx state.input_var_set 
+              func_type block_subtype single_subtype 
+          in
+          Printf.printf "\n\nAfter merge single set sol\n";
+          SingleSubtype.pp_single_subtype 0 single_subtype;
+          { state with 
+            func = update_branch_anno block_subtype state.func;
+            func_type = func_type;
             single_subtype = single_subtype;
             context = state.context 
-              @ (List.hd state.func_type).context 
-              @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type);
+              @ (List.hd func_type).context 
+              @ (ArchType.MemType.get_all_mem_constraint (List.hd func_type).mem_type);
           }
         end else begin
           let state = (

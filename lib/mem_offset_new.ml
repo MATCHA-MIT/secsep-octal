@@ -489,8 +489,11 @@ module MemRange = struct
     in
     match r1, r2 with
     | RangeConst o1, RangeConst o2 -> RangeConst (helper o1 o2)
-    | RangeVar v, RangeConst o | RangeConst o, RangeVar v -> RangeExp (v, o)
-    | RangeExp (v, o1), RangeConst o2 | RangeConst o1, RangeExp (v, o2) -> RangeExp (v, helper o1 o2)
+    | RangeVar v, RangeConst o | RangeConst o, RangeVar v -> 
+      if List.is_empty o then RangeVar v else RangeExp (v, o)
+    | RangeExp (v, o1), RangeConst o2 | RangeConst o1, RangeExp (v, o2) -> 
+      let merged_o = helper o1 o2 in
+      if List.is_empty merged_o then RangeVar v else RangeExp (v, merged_o)
     | _ -> mem_range_error (Printf.sprintf "Cannot merge %s and %s" (to_string r1) (to_string r2))
     (* let _ = smt_ctx in r1 @ r2 *)
 
