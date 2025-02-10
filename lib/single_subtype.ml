@@ -1567,12 +1567,16 @@ module SingleSubtype = struct
           |> Option.get
         in
         let update_block_smt_ctx (sub_pc: int) : unit =
-          let br_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
-          let sub_block = List.find (fun (block: ArchType.t) -> block.label = br_block.label) func_type in
-          (* For single infer, we need to get newest each block's entrance invariants from func_type,
-             and br hist from block_subtype_list *)
-          SingleContext.add_assertions smt_ctx sub_block.context;
-          SingleCondType.add_assertions smt_ctx (List.split br_block.branch_hist |> fst)
+          match List.find_opt (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list with
+          | Some br_block ->
+            let sub_block = List.find (fun (block: ArchType.t) -> block.label = br_block.label) func_type in
+            (* For single infer, we need to get newest each block's entrance invariants from func_type,
+              and br hist from block_subtype_list *)
+            SingleContext.add_assertions smt_ctx sub_block.context;
+            SingleCondType.add_assertions smt_ctx (List.split br_block.branch_hist |> fst)
+          | None ->
+            let sub_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) func_type in
+            SingleContext.add_assertions smt_ctx sub_block.context
         in
         let get_equal_set 
             (general_sol_candidate: SingleExpSet.t) 

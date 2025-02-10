@@ -814,7 +814,14 @@ module SingleTypeInfer = struct
             func_type = func_type;
             single_subtype = single_subtype;
             context = state.context 
-              @ (List.hd func_type).context 
+              @ (List.hd state.func_type).context 
+              (* Dirty Fix: Here we have to use List.hd state.func_type instead of List.hd func_type.
+                 This is because List.hd func_type may include the solution format of new block vars
+                 introduced by function calls inside the first block.
+                 They are not input vars, but are vars of the first block.
+                 We do not need to check constraints on them because they are solely determined by real input vars.
+                 We should filter it, but use state.func_type (whose context does not include single sol) 
+                 is just a quick but a dirty fix that works.*)
               @ (ArchType.MemType.get_all_mem_constraint (List.hd func_type).mem_type);
           }
         end else begin
@@ -894,9 +901,9 @@ module SingleTypeInfer = struct
     (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
     (* let func_mem_interface_list = 
       filter_func_interface func_mem_interface_list [
-        "ge_p3_tobytes";
+        (* "ge_p3_tobytes";
         "fe_tobytes";
-        "fe_mul_impl";
+        "fe_mul_impl"; *)
         (* "fe_mul_impl_self2";
         "fe_mul_ttt_self1"; *)
         (* "fe_mul_impl";
@@ -906,6 +913,11 @@ module SingleTypeInfer = struct
         "x25519_ge_p1p1_to_p3";
         "x25519_ge_p1p1_to_p2";
         "x25519_ge_scalarmult_base"; *)
+        "SHA512_Init";
+        "sha512_block_data_order";
+        "SHA512_Final";
+        "SHA512_Update";
+        "SHA512";
       ] 
     in *)
 

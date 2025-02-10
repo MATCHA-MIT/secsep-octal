@@ -44,6 +44,10 @@ module SingleBlockInvariance = struct
           branch_block.reg_type branch_block.mem_type branch_block.local_var_map
           target_block.reg_type target_block.mem_type target_block.useful_var
       in
+      Printf.printf "br_var_map branch_block\n%s\ntarget_block\n%s\n" 
+        (Sexplib.Sexp.to_string_hum (ArchType.sexp_of_t branch_block))
+        (Sexplib.Sexp.to_string_hum (ArchType.sexp_of_t target_block));
+      Printf.printf "br_var_map\n%s\n" (Sexplib.Sexp.to_string_hum (SingleExp.sexp_of_local_var_map_t br_var_map));
       let br_var_map = SingleExp.add_local_global_var br_var_map input_var_set in
       (* The following code replace loop counter with there solution (the bound) on exiting the loop.
          The key insight here is that the extra invariance is always about constraining the bound
