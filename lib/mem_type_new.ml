@@ -1292,12 +1292,6 @@ module MemType (Entry: EntryType) = struct
     in
     List.filter_map helper_outer mem_type
 
-  let get_mem_base_ptr_contraint (mem_type: t) : SingleContext.t list =
-    List.map (
-      fun ((ptr, _), _) ->
-        SingleContext.Cond (Ne, SingleVar ptr, SingleConst 0L)
-    ) mem_type
-
   let get_mem_align_constraint (mem_type: t) : SingleContext.t list =
     List.map (
       fun (ptr, align) -> 
@@ -1330,8 +1324,10 @@ module MemType (Entry: EntryType) = struct
             else [(SingleContext.NoOverflow len)]
           in
           len_no_overflow_constraint @ [
+            SingleContext.Cond (Lt, SingleExp.SingleConst 0L, l);
             SingleContext.Cond (Le, l, r); 
-            SingleContext.Cond (Le, SingleExp.SingleConst 0L, len)
+            SingleContext.Cond (Le, SingleExp.SingleConst 0L, len);
+            SingleContext.Cond (Le, len, SingleExp.SingleConst (Int64.shift_left 1L 32));
           ]
       ) boundary_list
 
@@ -1354,7 +1350,6 @@ module MemType (Entry: EntryType) = struct
         ) acc tl
 
   let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
-    (get_mem_base_ptr_contraint mem_type) @
     (get_mem_align_constraint mem_type) @
     (get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type))
 
@@ -1363,10 +1358,9 @@ module MemType (Entry: EntryType) = struct
 
   let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
     let boundary_list = get_mem_boundary_list mem_type in
-    let base_ptr_constraint = get_mem_base_ptr_contraint mem_type in
     let align_constraint = get_mem_align_constraint mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
-    let result = get_mem_non_overlap_constraint_helper (base_ptr_constraint @ align_constraint @ boundary_constraint) boundary_list in
+    let result = get_mem_non_overlap_constraint_helper (align_constraint @ boundary_constraint) boundary_list in
     Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result));
     result
 
