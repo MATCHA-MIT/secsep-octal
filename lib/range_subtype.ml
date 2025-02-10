@@ -415,6 +415,8 @@ module RangeSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list)
       (sup_pc: int)
       (* (test_sub_off_pc_list: (MemOffset.t option * int) list) *)
+      (sup_full_off: MemOffset.t)
+      (is_partial_candidate: bool)
       (sol_off_candidate: (MemOffset.t * int) list)
       (sub_range_pc: MemOffset.t option * int) : (MemOffset.t * int) list =
     let sub_range, sub_pc = sub_range_pc in
@@ -422,7 +424,16 @@ module RangeSubtype = struct
       match sub_range with
       | None ->
         let l, r = sol_candidate_off in 
-        if SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes then Eq else Other
+        if SingleCondType.check true smt_ctx [ Eq, l, r ] = SatYes
+          || (is_partial_candidate && (
+            (* We need this since sometimes RangeExp(v, [l, r]) can generate 
+               sol pattern [off_l, r] or [l, off_r] after v is resolved,
+               but [l, r] cannot be a sol pattern. *)
+            SingleCondType.check true smt_ctx [ Eq, (fst sup_full_off), r ] = SatYes
+            || SingleCondType.check true smt_ctx [ Eq, l, (snd sup_full_off) ] = SatYes
+          )) then 
+          Eq 
+      else Other
       | Some sub_off -> 
         MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpEqSubset
     in
@@ -502,7 +513,7 @@ module RangeSubtype = struct
     if List.length naive_sub_list > List.length single_naive_sub_list then None else
     let sup_pc = snd tv_rel.var_idx in
     (* Get sol template *)
-    let get_sat_off_set = get_sat_off_set_helper smt_ctx block_subtype_list sup_pc in
+    let get_sat_off_set = get_sat_off_set_helper smt_ctx block_subtype_list sup_pc tv_rel.off false in
     let sol_off_candidate = List.filter_map fst single_naive_sub_list |> List.map (fun x -> x, 0) in
     let sol_off_candidate = 
       List.fold_left get_sat_off_set sol_off_candidate single_naive_sub_list
@@ -549,30 +560,34 @@ module RangeSubtype = struct
       if List.length tv_rel.subtype_list > (List.length single_const_sub_list) + (List.length single_exp_sub_list) then None else
       let sup_pc = snd tv_rel.var_idx in
       (* Get sol template *)
-      let get_sat_off_set = get_sat_off_set_helper smt_ctx block_subtype_list sup_pc in
+      let get_sat_off_set = get_sat_off_set_helper smt_ctx block_subtype_list sup_pc tv_rel.off in
       let const_sol_candidate_0 =
         List.filter_map fst single_const_sub_list |> List.map (fun x -> x, 0)
       in
       let const_sol_candidate_1 =
-        List.fold_left get_sat_off_set const_sol_candidate_0 single_const_sub_list
+        List.fold_left (get_sat_off_set false) const_sol_candidate_0 single_const_sub_list
       in
       let const_sol_candidate_2 =
-        List.fold_left get_sat_off_set const_sol_candidate_1 single_exp_sub_list
+        List.fold_left (get_sat_off_set false) const_sol_candidate_1 single_exp_sub_list
       in
       (* If single_exp_sub_list has more constraints on solution range, then we might be too conservative.
          Our goal: find max sol that sol <= RangeVar U exp_off, but we can only use sol <= exp_off to constrain this conservatively.
          If exp_off does not add extra constraints, then we can go without knowing RangeVar, otherwise we cannot *)
       if List.length const_sol_candidate_1 > List.length const_sol_candidate_2 then None else
       let no_exp_sol_candidate () : bool =
+        Printf.printf "<RangeVar %d> call no_exp_sol_candidate\n" (fst tv_rel.var_idx);
         let exp_sol_candidate =
           List.filter_map fst single_exp_sub_list |> List.map (fun x -> x, 0)
         in
+        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
         let exp_sol_candidate =
-          List.fold_left get_sat_off_set exp_sol_candidate single_const_sub_list
+          List.fold_left (get_sat_off_set true) exp_sol_candidate single_const_sub_list
         in
+        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
         let exp_sol_candidate =
-          List.fold_left get_sat_off_set exp_sol_candidate single_const_sub_list
+          List.fold_left (get_sat_off_set true) exp_sol_candidate single_const_sub_list
         in
+        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
         List.is_empty exp_sol_candidate
       in
 
