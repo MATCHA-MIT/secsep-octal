@@ -1112,10 +1112,11 @@ module ArchType (Entry: EntryType) = struct
     if curr_type.label = Isa.ret_label then
       let curr_type = 
         { curr_type with 
-        useful_var = 
-          SingleExp.SingleVarSet.union
-            (RegType.get_callee_useful_var curr_type.reg_type)
-            (MemType.get_shared_useful_var_quick_cmp smt_ctx curr_type.mem_type) 
+          useful_var = 
+            SingleExp.SingleVarSet.union
+              (RegType.get_callee_useful_var curr_type.reg_type)
+              (MemType.get_shared_useful_var_quick_cmp smt_ctx curr_type.mem_type) 
+            |> SingleExp.SingleVarSet.union curr_type.useful_var
         } 
       in
       (curr_type, update_with_end_type curr_type block_subtype), block
