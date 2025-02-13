@@ -361,6 +361,12 @@ module MemOffset = struct
       fun (off, pc) ->
         PP.print_lvl (lvl + 1) "%d,\n%s\n" pc (Sexplib.Sexp.to_string_hum (sexp_of_t off))
     ) unknown_list *)
+    
+  let get_size (off: t) : int64 option =
+    let l, r = off in
+    match SingleExp.eval (SingleBExp (SingleSub, r, l)) with
+    | SingleConst diff -> Some diff
+    | _ -> None
 
   let is_8byte_slot (o: t) : bool =
     SingleExp.cmp (snd o) (SingleExp.SingleBExp (SingleAdd, (fst o), SingleConst (IsaBasic.get_gpr_full_size ()))) = 0
