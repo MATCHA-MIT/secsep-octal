@@ -227,20 +227,57 @@ let convert_input_var
   in
   input_var
 
-let convert_infer_to_checker
+let convert_function_interface
     (ctx: Z3.context)
-    (fi: TaintTypeInfer.FuncInterface.t list)
-    (tti: TaintTypeInfer.t)
-    : (FuncInterface.t list) * (ArchType.t list) =
-  (* TODO: convert function interfaces *)
-  let _ = fi in
-  let fi' = [] in
+    (fi: TaintTypeInfer.FuncInterface.t)
+    : FuncInterface.t =
+  let in_arch: ArchType.t = {
+    label = fi.func_name;
+    reg_type = convert_reg_type ctx fi.in_reg;
+    flag_type = convert_flag_type ctx;
+    mem_type = convert_mem_type ctx fi.in_mem;
+    context = convert_context ctx fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
+    (* ignored fields *)
+    pc = -1; 
+    dead_pc = -1;
+    stack_spill_info = IntSet.empty;
+    global_var = IntSet.empty;
+    input_var = TaintExp.TaintVarSet.empty;
+    local_var = TaintExp.TaintVarSet.empty;
+  }
+  in
+  let out_arch: ArchType.t = {
+    label = fi.func_name;
+    reg_type = convert_reg_type ctx fi.out_reg;
+    flag_type = convert_flag_type ctx;
+    mem_type = convert_mem_type ctx fi.out_mem;
+    context = convert_context ctx fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
+
+    (* ignored fields *)
+    pc = -1; 
+    dead_pc = -1;
+    stack_spill_info = IntSet.empty;
+    global_var = IntSet.empty;
+    input_var = TaintExp.TaintVarSet.empty;
+    local_var = TaintExp.TaintVarSet.empty;
+  }
+  in
+  {
+    func_name = fi.func_name;
+    in_type = in_arch;
+    out_type = out_arch;
+  }
+
+let convert_taint_type_infer
+    (ctx: Z3.context)
+    (tti: TaintTypeInfer.t)
+    : ArchType.t list =
+  (* currently we only convert arch types of TTI *)
   let stack_spill_info = convert_stack_spill_info tti in
   let input_var = convert_input_var tti in
   let archs = List.map (
     fun arch_type -> convert_arch_type ctx tti arch_type stack_spill_info input_var
   ) tti.func_type
   in
-
-  (fi', archs)
+  archs
