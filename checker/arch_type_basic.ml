@@ -38,6 +38,16 @@ module ArchTypeBasic = struct
   }
   [@@deriving sexp]
 
+  let arch_list_to_file (filename: string) (arch_list: t list) : unit =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (Std.sexp_of_list sexp_of_t arch_list)
+
+  let arch_list_list_to_file (filename: string) (arch_list_list: t list list) : unit =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (Std.sexp_of_list (Std.sexp_of_list sexp_of_t) arch_list_list)
+
   let check_subtype
       (smt_ctx: SmtEmitter.t)
       (sub_a_type: t) (sup_a_type: t)

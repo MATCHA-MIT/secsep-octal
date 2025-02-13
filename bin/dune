@@ -12,6 +12,7 @@
   instantiate_taint
   prog_transform
   gen_csvt_taint_api
+  convert
   )
  (names 
   main 
@@ -26,5 +27,6 @@
   instantiate_taint
   prog_transform
   gen_csvt_taint_api
+  convert
   )
- (libraries core type))
+ (libraries core type checker))

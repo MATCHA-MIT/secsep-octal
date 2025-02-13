@@ -14,4 +14,9 @@ module FuncInterface = struct
   }
   [@@deriving sexp]
 
+  let interface_list_to_file (filename: string) (fi_list: t list) : unit =
+    let open Sexplib in
+    let channel = open_out filename in
+    Sexp.output_hum channel (Std.sexp_of_list sexp_of_t fi_list)
+
 end
