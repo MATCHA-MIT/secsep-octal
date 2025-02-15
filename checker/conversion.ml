@@ -17,15 +17,14 @@ let rec convert_dep_type
     (ctx: Z3.context)
     (se: SingleEntryType.t)
     (size: int) (* assume that variables involved have consistent size *)
-    (top_size: int)
     : DepType.t =
   match se with
-  | SingleTop -> DepType.Top top_size
+  | SingleTop -> DepType.Top size
   | SingleConst c -> DepType.Exp (Z3Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx (size * 8)))
   | SingleVar v -> DepType.Exp (Z3Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (size * 8)))
   | SingleBExp (bop, e1, e2) ->
-    let e1 = convert_dep_type ctx e1 size top_size in
-    let e2 = convert_dep_type ctx e2 size top_size in
+    let e1 = convert_dep_type ctx e1 size in
+    let e2 = convert_dep_type ctx e2 size in
     (
       match bop, e1, e2 with
       | _, DepType.Top sz, _
@@ -72,12 +71,11 @@ let convert_taint_type
 let convert_basic_type
     (ctx: Z3.context)
     (taint_entry_type: TaintEntryType.t)
-    (size: int) (* size in bytes for variables involved in DepType *)
-    (top_size: int) (* size for top *)
+    (default_size: int) (* size in bytes for variables involved in DepType *)
     : BasicType.t =
   let se, te = taint_entry_type in
   (
-    convert_dep_type ctx se size top_size,
+    convert_dep_type ctx se default_size,
     convert_taint_type ctx te
   )
 
@@ -89,12 +87,12 @@ let convert_reg_type
     failwith "source reg_type's length is unexpected"
   else
     List.mapi (fun idx entry ->
-      let size = idx
+      convert_basic_type ctx entry (
+        idx
         |> TaintTypeInfer.ArchType.Isa.get_full_reg_by_idx
         |> TaintTypeInfer.ArchType.Isa.get_reg_size
         |> Int64.to_int
-      in
-      convert_basic_type ctx entry size size
+      )
     ) reg_type
 
 let convert_flag_type
@@ -110,9 +108,8 @@ let convert_mem_offset
     (off: Type.Mem_offset_new.MemOffset.t)
     : MemOffset.t =
   let off_l, off_r = off in
-  let size = TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int in
-  let off_l' = convert_dep_type ctx off_l size size in
-  let off_r' = convert_dep_type ctx off_r size size in
+  let off_l' = convert_dep_type ctx off_l (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int) in
+  let off_r' = convert_dep_type ctx off_r (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int) in
   match off_l', off_r' with
   | Exp e_l, Exp e_r -> (e_l, e_r)
   | _ -> failwith "unexpected Top found in input's MemOffset"
@@ -120,19 +117,11 @@ let convert_mem_offset
 let convert_mem_range
     (ctx: Z3.context)
     (range: Type.Mem_offset_new.MemRange.t)
-    : MemRange.t * (int64 list) = (* empty list is a hint that the slot's DepType can be treated as Top *)
+    : MemRange.t =
   match range with
   | Type.Mem_offset_new.MemRange.RangeConst off_list ->
-    off_list
-    |> List.map (fun off ->
-      let off' = convert_mem_offset ctx off in
-      let size = Type.Mem_offset_new.MemOffset.get_size off |> Option.get in
-      (off', size)
-    )
-    |> List.split
-  | _ ->
-    Printf.printf "warn: %s converted to empty list\n" (Type.Mem_offset_new.MemRange.to_string range);
-    ([], [])
+    List.map (fun off -> convert_mem_offset ctx off) off_list
+  | _ -> failwith "unexpected variable MemRange" (* TODO: is variable expected after inference? *)
 
 let convert_mem_type
     (ctx: Z3.context)
@@ -142,23 +131,9 @@ let convert_mem_type
     let ptr_info, mem_slots = mem_part in
     let mem_slots' = List.map (fun (mem_slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off, range, entry = mem_slot in
-
       let off' = convert_mem_offset ctx off in
-
-      let range', inited_range_sizes = convert_mem_range ctx range in
-
-      let default_top_type = (* DepType is top, TaintType is init accordingly *)
-        convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) DepType.top_unknown_size DepType.top_unknown_size
-      in
-      let entry' = match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
-      | [], _ -> default_top_type
-      | [_], None -> default_top_type (* non-const size slot *)
-      | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
-      | [inited_size], Some _ ->
-        convert_basic_type ctx entry (Int64.to_int inited_size) DepType.top_unknown_size
-      | _ -> default_top_type (* more than one inited range *)
-      in
-
+      let range' = convert_mem_range ctx range in
+      let entry' = convert_basic_type ctx entry DepType.top_unknown_size in
       (off', range', entry')
     ) mem_slots
     in
@@ -252,57 +227,20 @@ let convert_input_var
   in
   input_var
 
-let convert_function_interface
+let convert_infer_to_checker
     (ctx: Z3.context)
-    (fi: TaintTypeInfer.FuncInterface.t)
-    : FuncInterface.t =
-  let in_arch: ArchType.t = {
-    label = fi.func_name;
-    reg_type = convert_reg_type ctx fi.in_reg;
-    flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx fi.in_mem;
-    context = convert_context ctx fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
-
-    (* ignored fields *)
-    pc = -1; 
-    dead_pc = -1;
-    stack_spill_info = IntSet.empty;
-    global_var = IntSet.empty;
-    input_var = TaintExp.TaintVarSet.empty;
-    local_var = TaintExp.TaintVarSet.empty;
-  }
-  in
-  let out_arch: ArchType.t = {
-    label = fi.func_name;
-    reg_type = convert_reg_type ctx fi.out_reg;
-    flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx fi.out_mem;
-    context = convert_context ctx fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
-
-    (* ignored fields *)
-    pc = -1; 
-    dead_pc = -1;
-    stack_spill_info = IntSet.empty;
-    global_var = IntSet.empty;
-    input_var = TaintExp.TaintVarSet.empty;
-    local_var = TaintExp.TaintVarSet.empty;
-  }
-  in
-  {
-    func_name = fi.func_name;
-    in_type = in_arch;
-    out_type = out_arch;
-  }
-
-let convert_taint_type_infer
-    (ctx: Z3.context)
+    (fi: TaintTypeInfer.FuncInterface.t list)
     (tti: TaintTypeInfer.t)
-    : ArchType.t list =
-  (* currently we only convert arch types of TTI *)
+    : (FuncInterface.t list) * (ArchType.t list) =
+  (* TODO: convert function interfaces *)
+  let _ = fi in
+  let fi' = [] in
+
   let stack_spill_info = convert_stack_spill_info tti in
   let input_var = convert_input_var tti in
   let archs = List.map (
     fun arch_type -> convert_arch_type ctx tti arch_type stack_spill_info input_var
   ) tti.func_type
   in
-  archs
+
+  (fi', archs)
