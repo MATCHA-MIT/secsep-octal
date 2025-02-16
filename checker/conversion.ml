@@ -120,14 +120,19 @@ let convert_mem_offset
 let convert_mem_range
     (ctx: Z3.context)
     (range: Type.Mem_offset_new.MemRange.t)
-    : MemRange.t =
+    : MemRange.t * (int64 list) = (* empty list is a hint that the slot's DepType can be treated as Top *)
   match range with
   | Type.Mem_offset_new.MemRange.RangeConst off_list ->
-    List.map (fun off -> convert_mem_offset ctx off) off_list
-  | Type.Mem_offset_new.MemRange.RangeVar v ->
-    Printf.printf "warn: RangeVar %d detected, converted to empty list\n" v;
-    []
-  | _ -> failwith "unexpected variable MemRange" (* TODO: is variable expected after inference? *)
+    off_list
+    |> List.map (fun off ->
+      let off' = convert_mem_offset ctx off in
+      let size = Type.Mem_offset_new.MemOffset.get_size off |> Option.get in
+      (off', size)
+    )
+    |> List.split
+  | _ ->
+    Printf.printf "warn: %s converted to empty list\n" (Type.Mem_offset_new.MemRange.to_string range);
+    ([], [])
 
 let convert_mem_type
     (ctx: Z3.context)
@@ -137,16 +142,23 @@ let convert_mem_type
     let ptr_info, mem_slots = mem_part in
     let mem_slots' = List.map (fun (mem_slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off, range, entry = mem_slot in
+
       let off' = convert_mem_offset ctx off in
-      let range' = convert_mem_range ctx range in
-      let entry' = match Type.Mem_offset_new.MemOffset.get_size off with
-      | None -> (* non-const size slot *)
+
+      let range', inited_range_sizes = convert_mem_range ctx range in
+
+      let default_top_type = (* DepType is top, TaintType is init accordingly *)
         convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) DepType.top_unknown_size DepType.top_unknown_size
-      | Some size when size > 8L -> (* slot bigger than 8 bytes *)
-        convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) DepType.top_unknown_size DepType.top_unknown_size
-      | Some size ->
-        convert_basic_type ctx entry (Int64.to_int size) DepType.top_unknown_size
       in
+      let entry' = match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
+      | [], _ -> default_top_type
+      | [_], None -> default_top_type (* non-const size slot *)
+      | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
+      | [inited_size], Some _ ->
+        convert_basic_type ctx entry (Int64.to_int inited_size) DepType.top_unknown_size
+      | _ -> default_top_type (* more than one inited range *)
+      in
+
       (off', range', entry')
     ) mem_slots
     in
