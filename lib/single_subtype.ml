@@ -714,10 +714,15 @@ module SingleSubtype = struct
         | SingleAdd, Single e, Range (e1, e2, s)
         | SingleAdd, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleAdd, e, e1)), SingleEntryType.eval (SingleBExp (SingleAdd, e, e2)), s)
-        | SingleAdd, Range (e11, e12, s1), Range (e21, e22, s2) ->
-          (* TODO: Double check this!!! *)
-          let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
-          Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
+        | SingleAdd, Range (e11, e12, s1), Range (e21, e22, s2) -> begin
+            let e11, e12, s1 = RangeExp.canonicalize_range e11 e12 s1 in
+            let e21, e22, s2 = RangeExp.canonicalize_range e21 e22 s2 in
+            if (Int64.to_int s1) < 0 || (Int64.to_int s2) < 0 then
+              single_subtype_error "expecting left aligned now";
+
+            let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
+            Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
+          end
         (* | SingleAdd, Single e, SingleSet e_list
         | SingleAdd, SingleSet e_list, Single e ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleAdd, e, x))) e_list) *)
