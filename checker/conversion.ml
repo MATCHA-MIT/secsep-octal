@@ -2,6 +2,7 @@ open Arch_type
 open Reg_type
 open Basic_type
 open Flag_type
+open Mem_anno
 open Mem_type
 open Stack_spill_info
 open Func_interface
@@ -227,6 +228,42 @@ let convert_input_var
   in
   input_var
 
+let convert_slot
+    (ref_mem: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_content)
+    (ptr: Type.Isa_basic.IsaBasic.imm_var_id)
+    (off: Type.Mem_offset_new.MemOffset.t)
+    : MemAnno.slot_t =
+  let part = TaintTypeInfer.ArchType.MemType.get_mem_part ref_mem ptr |> Option.get in
+  let idx = List.find_index (
+    fun (slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
+      let off', _, _ = slot in
+      Type.Mem_offset_new.MemOffset.cmp off off' = 0
+  ) (snd part) |> Option.get
+  in
+  (ptr, idx, true, 1) (* based is passed by a single full slot *)
+
+let convert_base_info
+    (ctx: Z3.context)
+    (ref_mem: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_content)
+    (base_info: Type.Call_anno_type.CallAnno.base_info Type.Mem_type_new.MemTypeBasic.mem_content)
+    : FuncInterface.base_info MemType.mem_content =
+  List.map (fun (mem_part: Type.Call_anno_type.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_part) ->
+    let ptr_info, mem_slots = mem_part in
+    let mem_slots' = List.map (fun (mem_slot: Type.Call_anno_type.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_slot) ->
+      let off, range, entry = mem_slot in
+      let off' = convert_mem_offset ctx off in
+      let range' = convert_mem_range ctx range in
+      let entry' = match entry with
+      | Type.Call_anno_type.CallAnno.BaseAsReg r -> FuncInterface.BaseAsReg r
+      | Type.Call_anno_type.CallAnno.BaseAsSlot (ptr, off) -> FuncInterface.BaseAsSlot (convert_slot ref_mem ptr off)
+      | Type.Call_anno_type.CallAnno.BaseAsGlobal -> FuncInterface.BaseAsGlobal
+      in
+      (off', range', entry')
+    ) mem_slots
+    in
+    (ptr_info, mem_slots')
+  ) base_info
+
 let convert_function_interface
     (ctx: Z3.context)
     (fi: TaintTypeInfer.FuncInterface.t)
@@ -267,6 +304,7 @@ let convert_function_interface
     func_name = fi.func_name;
     in_type = in_arch;
     out_type = out_arch;
+    base_info = convert_base_info ctx fi.in_mem fi.base_info;
   }
 
 let convert_taint_type_infer
