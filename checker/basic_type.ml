@@ -17,12 +17,7 @@ module DepType = struct
     | Exp of exp_t
     | Top of int
   [@@deriving sexp]
-
-  let to_string (dep: t) : string =
-    match dep with
-    | Exp expr -> Expr.to_string (Expr.simplify expr None)
-    | Top size -> "Top " ^ (string_of_int size)
-
+  
   type map_t = (int * t) list (* Check the dict type *)
   [@@deriving sexp]
 
@@ -491,14 +486,6 @@ module DepType = struct
   type exe_result = t * ((IsaBasic.flag * t) list)
   type flag_func = (IsaBasic.flag * t) list -> (IsaBasic.flag * t) list
   
-  let string_of_exe_result (result: exe_result) : string =
-    let string_of_flag_pair (pair: IsaBasic.flag * t) : string =
-      let flag, flag_val = pair in
-      (IsaBasic.string_of_flag flag) ^ " = " ^ (to_string flag_val)
-    in
-    let exe_res, flags = result in
-    (to_string exe_res) ^ "; " ^ (String.concat " " (List.map string_of_flag_pair flags))
-
   let downsize_bv (ctx: context) (bv: exp_t) (size: int) : exp_t =
     let bv_size = BitVector.get_size (Expr.get_sort bv) in
     if bv_size <= size then bv
