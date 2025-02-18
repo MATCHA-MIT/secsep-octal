@@ -58,4 +58,13 @@ module RegType = struct
         BasicType.check_subtype smt_ctx false sub_entry sup_entry
     ) true sub_r_type sup_r_type
 
+  let check_taint_eq
+      (smt_ctx: SmtEmitter.t)
+      (sub_r_type: t) (sup_r_type: t) : bool =
+    List.fold_left2 (
+      fun (acc: bool) (_, sub_taint) (_, sup_taint) ->
+        acc &&
+        TaintType.check_subtype smt_ctx true  sub_taint sup_taint
+    ) true sub_r_type sup_r_type
+
 end

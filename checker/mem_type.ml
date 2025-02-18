@@ -685,5 +685,40 @@ module MemType = struct
             else PtrInfo.invalidate_on_write ptr (p, p_info), p_part_mem
         ) mem_type)
 
+  let set_mem_type_with_other
+      (smt_ctx: SmtEmitter.t)
+      (mem_type: t)
+      (update_mem_type: t)
+      (mem_map: MemAnno.slot_t mem_content) : t option =
+    let inner_helper
+        (acc: t option)
+        (update_slot: entry_t mem_slot)
+        (slot_map: MemAnno.slot_t mem_slot) : t option =
+      match acc with
+      | None -> None
+      | Some mem_type ->
+        let _, update_range, update_type = update_slot in
+        let _, _, slot_info = slot_map in
+        match update_range with
+        | [ update_off ] ->
+          set_mem_type smt_ctx (fun _ -> false) mem_type update_off slot_info update_type
+        | _ -> 
+          Printf.printf "Warning: set_mem_type_with_other range format is not single offset slot\n";
+          None
+    in
+    let outer_helper
+        (acc: t option)
+        (update_part_mem: entry_t mem_part)
+        (part_mem_map: MemAnno.slot_t mem_part) : t option =
+      match acc with
+      | None -> None
+      | Some _ ->
+        let update_ptr_info, update_slot_list = update_part_mem in
+        if PtrInfo.can_write update_ptr_info then begin
+          List.fold_left2 inner_helper acc update_slot_list (snd part_mem_map)
+        end else acc
+    in
+    List.fold_left2 outer_helper (Some mem_type) update_mem_type mem_map
+
 end
 
