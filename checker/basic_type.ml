@@ -801,46 +801,6 @@ module DepType = struct
       | _ -> dep_type_error "<TODO> not implemented yet"
       end
   
-  let exe_xchg
-      (ctx: context)
-      (src_list: t list)
-      (dst_list: t list) : t * ((IsaBasic.flag * t) list) =
-    dep_type_error "<TODO> not implemented yet" 
- 
-  let exe_cmp
-      (ctx: context)
-      (src_list: t list) : t * ((IsaBasic.flag * t) list) =
-    match extract_exp_or_top src_list with
-    | Some [ src0; src1 ] ->
-        let _, dest_flag_list = IsaFlagConfig.get_cmp_config in
-        let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
-        let _, flag_vals = exe_sub ctx src1 src0 (get_exp_bit_size src0) in
-        Exp (BitVector.mk_numeral ctx "0" 1), set_flag_list top_flag_list flag_vals (* TODO This is an empty dest; verify that a length-1 0 is the best placeholder value *)
-    | _ -> dep_type_error "exe_cmp must take two source operands"
-    
-  let exe_test
-      (ctx: context)
-      (src_list: t list) : t * ((IsaBasic.flag * t) list) =
-    match extract_exp_or_top src_list with
-    | Some [ src0; src1 ] ->
-        let _, dest_flag_list = IsaFlagConfig.get_test_config in
-        let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
-        let _, flag_vals = exe_bitwise ctx BitVector.mk_and src0 src1 in
-        Exp (BitVector.mk_numeral ctx "0" 1), set_flag_list top_flag_list flag_vals (* TODO This is an empty dest; verify that a length-1 0 is the best placeholder value *)
-    | _ -> dep_type_error "exe_test must take two source operands"
-
-  let exe_push
-      (ctx: context)
-      (src: t)
-      (memslot: MemAnno.t) : t * ((IsaBasic.flag * t) list) =
-    dep_type_error "exe_push not implemented yet" 
-
-  let exe_pop
-      (ctx: context)
-      (src: t list)
-      (memslot: MemAnno.t) : t * ((IsaBasic.flag * t) list) =
-    
-
   let check_subtype
       (smt_ctx: SmtEmitter.t)
       (sub_exp: t) (sup_exp: t) : bool =
@@ -1029,11 +989,6 @@ module BasicType = struct
   let exe_bop  = exe_helper DepType.exe_bop  IsaFlagConfig.get_bop_config
   let exe_uop  = exe_helper DepType.exe_uop  IsaFlagConfig.get_uop_config
   let exe_top  = exe_helper DepType.exe_top  IsaFlagConfig.get_top_config
-  let exe_xchg = exe_helper DepType.exe_xchg IsaFlagConfig.get_xchg_config
-  let exe_cmp  = exe_helper DepType.exe_cmp  IsaFlagConfig.get_cmp_config
-  let exe_test = exe_helper DepType.exe_test IsaFlagConfig.get_test_config
-  let exe_push = exe_helper DepType.exe_push IsaFlagConfig.get_push_config
-  let exe_pop  = exe_helper DepType.exe_pop  IsaFlagConfig.get_pop_config
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
