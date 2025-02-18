@@ -591,11 +591,6 @@ module DepType = struct
     Exp (BitVector.mk_numeral ctx "0" reg_size), [
       CF, Exp flag
     ]
-  
-  let exe_mov (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) : exe_result =
-    let src_size = BitVector.get_size (Expr.get_sort src) in
-    let top = BitVector.mk_extract ctx (dest_size - 1) src_size dst in
-    Exp (BitVector.mk_concat ctx top src), []
 
   let exe_movz (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
     let src_size = BitVector.get_size (Expr.get_sort src) in
@@ -621,6 +616,41 @@ module DepType = struct
       | byte :: rest -> BitVector.mk_concat ctx byte (concat_bytes rest)
     in
     Exp (concat_bytes (get_rev_bytes [])), []
+
+  let exe_neg (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
+    let zero = BitVector.mk_numeral ctx "0" dest_size in
+    let result = BitVector.mk_sub ctx zero src in
+    Exp result, [
+      CF, Exp (Boolean.mk_not ctx (Boolean.mk_eq ctx zero src));
+      PF, Exp (get_parity ctx result);
+      AF, Exp (get_sub_aux ctx zero src);
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_sub_overflow ctx zero src) 
+    ]
+
+  let exe_inc (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
+    let one = BitVector.mk_numeral ctx "1" dest_size in
+    let result = BitVector.mk_add ctx src one in
+    Exp result, [
+      PF, Exp (get_parity ctx result);
+      AF, Exp (get_add_aux ctx src one);
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_add_overflow ctx src one);
+    ]
+  
+  let exe_dec (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
+    let one = BitVector.mk_numeral ctx "1" dest_size in
+    let result = BitVector.mk_sub ctx src one in
+    Exp result, [
+      PF, Exp (get_parity ctx result);
+      AF, Exp (get_sub_aux ctx src one);
+      ZF, Exp (get_zero ctx result);
+      SF, Exp (get_sign ctx result);
+      OF, Exp (get_sub_overflow ctx src one);
+    ]
+    
 
   let exe_shld (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
     let cflg_bv = bool_to_bv ctx cflg 1 in 
@@ -707,18 +737,18 @@ module DepType = struct
       | Or,     [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_or  dst src
       | CmovEq, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
       | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
-      | Punpck, [ ], [ ]               -> Top 128, [ ]
-      | Packxs, [ ], [ ]               -> Top 128, [ ]
-      | Padd,   [ ], [ ]               -> Top 128, [ ]
-      | Psub,   [ ], [ ]               -> Top 128, [ ]
-      | Pxor,   [ ], [ ]               -> Top 128, [ ]
-      | Pandn,  [ ], [ ]               -> Top 128, [ ]
-      | Pand,   [ ], [ ]               -> Top 128, [ ]
-      | Por,    [ ], [ ]               -> Top 128, [ ]
-      | Psll,   [ ], [ ]               -> Top 128, [ ]
-      | Psrl,   [ ], [ ]               -> Top 128, [ ]
-      | Xorp,   [ ], [ ]               -> Top 128, [ ]
-      | Pshuf,  [ ], [ ]               -> Top 128, [ ]
+      | Punpck, [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Packxs, [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Padd,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Psub,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Pxor,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Pandn,  [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Pand,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Por,    [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Psll,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Psrl,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Xorp,   [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Pshuf,  [ _; _ ],     [ ]      -> Top 128, [ ]
       | _ -> dep_type_error "<TODO> not implemented yet"
       end
       in
@@ -736,49 +766,21 @@ module DepType = struct
     | None, _ | _, None ->
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list -> 
-      let set_flags = set_flag_list top_flag_list in
+      let dep_result, flag_vals = begin
       match op, src_exp_list, src_flag_list with
-      | Mov, [ dst; src ], [ ] -> exe_mov ctx dst src dest_size
-      | MovZ, [ src ], [ ] -> exe_movz ctx src dest_size
-      | MovS, [ src ], [ ] -> exe_movs ctx src dest_size
-      | Lea, [ ], [ ] -> dep_type_error "lea should not be inputted into a type check (convert to mov instead)"
-      | Not, [ src ], [ ] -> Exp (BitVector.mk_not ctx src), []
-      | Bswap, [ src ], [ ] -> exe_bswap ctx src
-      | Neg, [ src ], [ ] ->
-        let zero = BitVector.mk_numeral ctx "0" dest_size in
-        let result = BitVector.mk_sub ctx zero src in
-        Exp result, set_flags [
-          CF, Exp (Boolean.mk_not ctx (Boolean.mk_eq ctx zero src));
-          PF, Exp (get_parity ctx result);
-          AF, Exp (get_sub_aux ctx zero src);
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, Exp (get_sub_overflow ctx zero src) 
-        ]
-      | Inc, [ e ], [ ] ->
-        let one = BitVector.mk_numeral ctx "1" (get_exp_bit_size e) in
-        let result = BitVector.mk_add ctx e one in
-        Exp result,
-        set_flag_list top_flag_list [
-          PF, Exp (get_parity ctx result);
-          AF, Exp (get_add_aux ctx e one);
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, Exp (get_add_overflow ctx e one);
-        ]
-      | Dec, [ e ], [ ] ->
-        let one = BitVector.mk_numeral ctx "1" (get_exp_bit_size e) in
-        let result = BitVector.mk_sub ctx e one in
-        Exp result,
-        set_flag_list top_flag_list [
-          PF, Exp (get_parity ctx result);
-          AF, Exp (get_sub_aux ctx e one);
-          ZF, Exp (get_zero ctx result);
-          SF, Exp (get_sign ctx result);
-          OF, Exp (get_sub_overflow ctx e one);
-        ]
+      | Mov,   [ src ],      [ ] -> exe_movs ctx src dest_size
+      | MovZ,  [ src ],      [ ] -> exe_movz ctx src dest_size
+      | MovS,  [ src ],      [ ] -> exe_movs ctx src dest_size
+      | Lea,   _, _              -> dep_type_error "lea should not be inputted into a type check (convert to mov instead)"
+      | Not,   [ src ],      [ ] -> Exp (BitVector.mk_not ctx src), []
+      | Bswap, [ src ],      [ ] -> exe_bswap ctx src
+      | Neg,   [ src ],      [ ] -> exe_neg ctx src dest_size
+      | Inc,   [ src ],      [ ] -> exe_inc ctx src dest_size
+      | Dec,   [ src ],      [ ] -> exe_dec ctx src dest_size
       | _ -> dep_type_error "<TODO> not implemented yet"
-    (* For Lea, it will not appear during type check since it is converted to mov xx, xx, feel free to ignore it *)
+      end
+      in
+      dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_top
       (ctx: context) (op: IsaBasic.top) 
@@ -792,10 +794,52 @@ module DepType = struct
     | None, _ | _, None ->
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list -> 
+      begin
       match op, src_exp_list, src_flag_list with
       | Shld, [ dst; src; cnt ], [ cflg ] -> exe_shld ctx dst src cnt cflg dest_size
       | Shrd, [ dst; src; cnt ], [ cflg ] -> exe_shrd ctx dst src cnt cflg dest_size
       | _ -> dep_type_error "<TODO> not implemented yet"
+      end
+  
+  let exe_xchg
+      (ctx: context)
+      (src_list: t list)
+      (dst_list: t list) : t * ((IsaBasic.flag * t) list) =
+    dep_type_error "<TODO> not implemented yet" 
+ 
+  let exe_cmp
+      (ctx: context)
+      (src_list: t list) : t * ((IsaBasic.flag * t) list) =
+    match extract_exp_or_top src_list with
+    | Some [ src0; src1 ] ->
+        let _, dest_flag_list = IsaFlagConfig.get_cmp_config in
+        let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+        let _, flag_vals = exe_sub ctx src1 src0 (get_exp_bit_size src0) in
+        Exp (BitVector.mk_numeral ctx "0" 1), set_flag_list top_flag_list flag_vals (* TODO This is an empty dest; verify that a length-1 0 is the best placeholder value *)
+    | _ -> dep_type_error "exe_cmp must take two source operands"
+    
+  let exe_test
+      (ctx: context)
+      (src_list: t list) : t * ((IsaBasic.flag * t) list) =
+    match extract_exp_or_top src_list with
+    | Some [ src0; src1 ] ->
+        let _, dest_flag_list = IsaFlagConfig.get_test_config in
+        let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+        let _, flag_vals = exe_bitwise ctx BitVector.mk_and src0 src1 in
+        Exp (BitVector.mk_numeral ctx "0" 1), set_flag_list top_flag_list flag_vals (* TODO This is an empty dest; verify that a length-1 0 is the best placeholder value *)
+    | _ -> dep_type_error "exe_test must take two source operands"
+
+  let exe_push
+      (ctx: context)
+      (src: t)
+      (memslot: MemAnno.t) : t * ((IsaBasic.flag * t) list) =
+    dep_type_error "exe_push not implemented yet" 
+
+  let exe_pop
+      (ctx: context)
+      (src: t list)
+      (memslot: MemAnno.t) : t * ((IsaBasic.flag * t) list) =
+    
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
@@ -961,7 +1005,7 @@ module BasicType = struct
 
   let exe_helper 
       (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
-      (get_flag_conig: 'a -> IsaFlagConfig.t)
+      (get_flag_config: 'a -> IsaFlagConfig.t)
       (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) : 
       t * ((IsaBasic.flag * t) list) =
     (* <TODO> Please check whether this makes sense to you. *)
@@ -970,7 +1014,7 @@ module BasicType = struct
     let dep_list, taint_list = List.split e_list in
     let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
     let taint = TaintType.exe ctx taint_list in
-    let _, update_flag_map = get_flag_conig op in
+    let _, update_flag_map = get_flag_config op in
     (dep, taint),
     List.map2 (
       fun (flag, flag_dep) (flag2, self_is_src) -> 
@@ -982,9 +1026,14 @@ module BasicType = struct
         flag, (flag_dep, flag_taint)
       ) dep_flag_list update_flag_map
 
-  let exe_bop = exe_helper DepType.exe_bop IsaFlagConfig.get_bop_config
-  let exe_uop = exe_helper DepType.exe_uop IsaFlagConfig.get_uop_config
-  let exe_top = exe_helper DepType.exe_top IsaFlagConfig.get_top_config
+  let exe_bop  = exe_helper DepType.exe_bop  IsaFlagConfig.get_bop_config
+  let exe_uop  = exe_helper DepType.exe_uop  IsaFlagConfig.get_uop_config
+  let exe_top  = exe_helper DepType.exe_top  IsaFlagConfig.get_top_config
+  let exe_xchg = exe_helper DepType.exe_xchg IsaFlagConfig.get_xchg_config
+  let exe_cmp  = exe_helper DepType.exe_cmp  IsaFlagConfig.get_cmp_config
+  let exe_test = exe_helper DepType.exe_test IsaFlagConfig.get_test_config
+  let exe_push = exe_helper DepType.exe_push IsaFlagConfig.get_push_config
+  let exe_pop  = exe_helper DepType.exe_pop  IsaFlagConfig.get_pop_config
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)

@@ -60,7 +60,7 @@ module IsaFlagConfig = struct
     | Xor | And | Or -> 
       [],
       [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
-    | CmovEq -> [], []
+    | CmovEq -> [ ZF ], []
     | Bt -> [], [ CF, false ]
     | Punpck | Packxs -> [], []
     | Pshuf -> [], []
@@ -74,10 +74,28 @@ module IsaFlagConfig = struct
     | Inc -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
     | Dec -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
     | _ -> [], []
-
+  
   let get_top_config (top: IsaBasic.top) : t =
     match top with
     | Shld
     | Shrd -> [], [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
+  
+  let get_xchg_config : t = [], []
+  
+  let get_cmp_config : t = [], [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
+  
+  let get_test_config : t = [], [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
+  
+  let get_push_config : t = [], []
+  
+  let get_pop_config : t = [], []
 
+  let get_repmovs_config : t = [], []
+  
+  let get_replods_config : t = [], []
+  
+  let get_repstos_config : t = [], []
+
+  let get_call_config : t = [], []
+  
 end
