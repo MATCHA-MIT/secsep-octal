@@ -180,7 +180,7 @@ include ArchTypeBasic
      (2) type check at call also needs to check other fields in call_anno
      (3) we need to check validity of func interface against its function body, and also check its non-overlap info is constrained correctly *)
 
-  type nary_op = | BOp of bop | UfOp of uop | TOp of top
+  type nary_op = | BOp of bop | UOp of uop | TOp of top
 
   let exe_nary
       ?(ignore_flags: bool = false) (* If true, flags will not be updated. This is to allow for n-ary operations to be applied as part of larger instructions, e.g. incrementing/decrementing %rsp in push/pop *)
@@ -222,6 +222,7 @@ include ArchTypeBasic
     (* Store memory taint in dest *)
     let rsp_type = exe_nary ~ignore_flags:true ctx 2 Add RSP [RegOp RSP; ImmOp (ImmNum 8L, 64L)] in
 
+
   let exe_repmovs
       (ctx: context)
       (curr_type: t)
@@ -262,7 +263,6 @@ include ArchTypeBasic
     | RepMovs (size, mem1, mem2)          -> exe_repmovs ctx size mem1 mem2 
     | RepLods (size, mem)                 -> exe_replods ctx size mem
     | RepStos (size, mem)                 -> exe_repstos ctx size mem
-    | Call (label, call_anno)             -> arch_type_error "<TODO> type_prop_non_branch not yet implemented for Call"
     | Nop                                 -> true, curr_type
     | Hlt                                 -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
