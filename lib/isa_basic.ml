@@ -350,16 +350,25 @@ module IsaBasic = struct
     | OF -> "OF"
 
   type immediate =
-    | ImmNum of int64
-    | ImmLabel of imm_var_id
-    | ImmBExp of immediate * immediate (* sum of two immediates *)
+    | ImmNum of int64 * data_size option
+    | ImmLabel of imm_var_id * data_size option
+    | ImmBExp of (immediate * immediate) (* sum of two immediates *) * data_size option
   [@@deriving sexp]
 
-  let rec string_of_immediate (i: immediate) : string =
+  let get_imm_size (i: immediate) : data_size option =
     match i with
-    | ImmNum x -> Int64.to_string x
-    | ImmLabel x -> "var " ^ (string_of_int x)
-    | ImmBExp (i1, i2) -> "(" ^ (string_of_immediate i1) ^ ") + (" ^ (string_of_immediate i2) ^ ")"
+    | ImmNum (_, size) -> size
+    | ImmLabel (_, size) -> size
+    | ImmBExp (_, size) -> size
+
+  let set_imm_size (i: immediate) (size: data_size option) : immediate =
+    match i with
+    | ImmNum (imm, _) -> ImmNum (imm, size)
+    | ImmLabel (imm, _) -> ImmLabel (imm, size)
+    | ImmBExp (imm, _) -> ImmBExp (imm, size)
+
+  let string_of_immediate (i: immediate) : string =
+    Sexplib.Sexp.to_string_hum (sexp_of_immediate i)
 
   let ocaml_string_of_int (x: int) : string =
     Printf.sprintf (if x >= 0 then "%d" else "(%d)") x
@@ -367,11 +376,8 @@ module IsaBasic = struct
   let ocaml_string_of_int64 (x: int64) : string =
     Printf.sprintf (if x >= 0L then "%LdL" else "(%LdL)") x
 
-  let rec ocaml_string_of_immediate (i: immediate) : string =
-    match i with
-    | ImmNum x -> Printf.sprintf "ImmNum %s" (ocaml_string_of_int64 x)
-    | ImmLabel x -> Printf.sprintf "ImmLabel %s" (ocaml_string_of_int x)
-    | ImmBExp (i1, i2) -> Printf.sprintf "ImmBExp (%s, %s)" (ocaml_string_of_immediate i1) (ocaml_string_of_immediate i2)
+  let ocaml_string_of_immediate (_: immediate) : string =
+    isa_error "unimplemented"
 
   let ocaml_string_of_immediate_op (i: immediate) : string =
     Printf.sprintf "ImmOp (%s)" (ocaml_string_of_immediate i)

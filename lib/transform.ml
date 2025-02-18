@@ -303,20 +303,20 @@ module Transform = struct
 
   let add_delta_on_imm (imm: Isa.immediate) (delta: int64) : Isa.immediate =
     match imm with
-    | ImmNum x -> ImmNum (Int64.add x delta)
-    | ImmLabel label -> ImmBExp (ImmLabel label, ImmNum delta)
-    | ImmBExp (e1, e2) -> begin
+    | ImmNum (x, sz) -> ImmNum (Int64.add x delta, sz)
+    | ImmLabel (label, sz) -> ImmBExp ((ImmLabel (label, sz), ImmNum (delta, sz)), sz)
+    | ImmBExp ((e1, e2), sz) -> begin
         match e1, e2 with
-        | ImmNum x, _ -> ImmBExp (ImmNum (Int64.add x delta), e2)
-        | _, ImmNum y -> ImmBExp (e1, ImmNum (Int64.add y delta))
+        | ImmNum (x, sz1), _ -> ImmBExp ((ImmNum (Int64.add x delta, sz1), e2), sz)
+        | _, ImmNum (y, sz2) -> ImmBExp ((e1, ImmNum (Int64.add y delta, sz2)), sz)
         | _ -> transform_error "Unexpected expression in immediate where displacement is an ImmBExp"
       end
 
   let add_delta_on_disp (mem_op: Isa.mem_op) : Isa.mem_op =
-    let d, b, i, s = mem_op in
+    let d, b, i, s, sz = mem_op in
     match d with
-    | None -> (Some (ImmNum delta), b, i, s)
-    | Some x -> (Some (add_delta_on_imm x delta), b, i, s)
+    | None -> (Some (ImmNum (delta, sz)), b, i, s, sz)
+    | Some x -> (Some (add_delta_on_imm x delta), b, i, s, sz)
 
   let transform_instruction
       (func_state: func_state)
@@ -348,7 +348,7 @@ module Transform = struct
               | TaintConst true -> begin
                   (* accessing ununified memory, taint is true -> do the transformation *)
                   (* Printf.printf "transforming operand %s\n" (Isa.string_of_operand operand); *)
-                  let (d', b', i', s') = add_delta_on_disp (d, b, i, s) in
+                  let (d', b', i', s', _) = add_delta_on_disp (d, b, i, s, Some 8L) in
                   match operand with
                     | LdOp _ -> LdOp (d', b', i', s', w, mem_anno), []
                     | StOp _ -> StOp (d', b', i', s', w, mem_anno), []
@@ -439,7 +439,7 @@ module Transform = struct
         let taint_anno = Option.get taint_anno in
         let taint_anno = tv_ittt taint_anno in (* mocking *)
         let offset_as_disp, sf1 = match taint_anno with
-        | TaintConst true -> Some (Isa.ImmNum delta), []
+        | TaintConst true -> Some (Isa.ImmNum (delta, Some 8L)), []
         | TaintConst false -> None, []
         | TaintVar v -> None, [(v, "push/pop with variable taint")] (* soft fault *)
         | TaintExp v_set -> None, TaintExp.TaintVarSet.to_list v_set |> List.map (fun x -> (x, "ld/st with variable taint")) (* soft fault *)
@@ -532,8 +532,8 @@ module Transform = struct
     let res = match tf.orig with
     | BInst (Add, dst, src1, src2) -> begin
         let replaced = match src1, src2 with
-        | ImmOp (imm, sz), _ -> Some (Isa.ImmOp (add_delta_on_imm imm delta, sz), src2)
-        | _, ImmOp (imm, sz) -> Some (src1, Isa.ImmOp (add_delta_on_imm imm delta, sz))
+        | ImmOp imm, _ -> Some (Isa.ImmOp (add_delta_on_imm imm delta), src2)
+        | _, ImmOp imm -> Some (src1, Isa.ImmOp (add_delta_on_imm imm delta))
         | _ -> None (* TODO: not supported yet, can we do better? *)
         in
         match replaced with
@@ -548,9 +548,9 @@ module Transform = struct
       end
     | UInst (Lea, dst, src) -> begin
         match src with
-        | MemOp ((d, b, i, s), size) -> Some (
+        | MemOp (d, b, i, s, size) -> Some (
             InstTransform.assign tf
-              (UInst (Lea, dst, add_delta_on_disp (d, b, i, s) |> Isa.memop_to_mem_operand size))
+              (UInst (Lea, dst, MemOp (add_delta_on_disp (d, b, i, s, size))))
               []
               []
               true
@@ -654,31 +654,33 @@ module Transform = struct
                   if not (MemOffset.is_8byte_slot pa_base_off) then
                     transform_error "sanity check failed: BaseAsSlot does not access slot of 8 bytes";
                   let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
-                  let mem_op = match base_info with
-                  | BaseAsReg r -> (Some (Isa.ImmNum off_of_base), Some r, None, None)
-                  | BaseAsSlot (b, o) ->
-                    transform_error (Printf.sprintf
-                      "Unexpected recursive base: some base is passed in memory of base %d, which is still in memory of %d (%s)"
-                      ch_base
-                      b
-                      (MemOffset.to_string o)
-                    )
-                  | BaseAsGlobal ->
-                    if pa_base >= Isa.imm_var_unset then
-                      transform_error "Invalid var id for global label";
-                    (Some (Isa.ImmBExp (Isa.ImmLabel pa_base, Isa.ImmNum off_of_base)), None, None, None)
+                  let mem_op = 
+                    match base_info with
+                    | BaseAsReg r -> (Some (Isa.ImmNum (off_of_base, Some 8L)), Some r, None, None, None)
+                    | BaseAsSlot (b, o) ->
+                      transform_error (Printf.sprintf
+                        "Unexpected recursive base: some base is passed in memory of base %d, which is still in memory of %d (%s)"
+                        ch_base
+                        b
+                        (MemOffset.to_string o)
+                      )
+                    | BaseAsGlobal ->
+                      if pa_base >= Isa.imm_var_unset then
+                        transform_error "Invalid var id for global label";
+                      (Some (Isa.ImmBExp ((Isa.ImmLabel (pa_base, Some 8L), Isa.ImmNum (off_of_base, Some 8L)), Some 8L)), None, None, None, None)
                   in
                   (* get the memory operand of the slot to be changed *)
-                  let mem_op, sf = match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
-                  | TaintConst true -> begin
-                      transform_error "we assert the base is untainted";
-                      (* let d, b, i, s = mem_op in     *)
-                      (* add_delta_on_disp (d, b, i, s) *)
-                    end
-                  | TaintConst false -> mem_op, []
-                  | TaintVar v -> mem_op, [(func_state.func_name, bb.label, v, "call finds child's slot has variable taint")] (* soft fault *)
-                  | TaintExp v_set -> mem_op, v_set |> TaintExp.TaintVarSet.to_list |> List.map (fun v -> func_state.func_name, bb.label, v, "call finds child's slot has variable taint") (* soft fault *)
-                  | TaintUnknown -> transform_error "Unexpected unknown taint annotation for BaseAsSlot"
+                  let mem_op, sf = 
+                    match get_child_slot_taint child_fi.in_mem ch_base ch_base_off None with
+                    | TaintConst true -> begin
+                        transform_error "we assert the base is untainted";
+                        (* let d, b, i, s = mem_op in     *)
+                        (* add_delta_on_disp (d, b, i, s) *)
+                      end
+                    | TaintConst false -> mem_op, []
+                    | TaintVar v -> mem_op, [(func_state.func_name, bb.label, v, "call finds child's slot has variable taint")] (* soft fault *)
+                    | TaintExp v_set -> mem_op, v_set |> TaintExp.TaintVarSet.to_list |> List.map (fun v -> func_state.func_name, bb.label, v, "call finds child's slot has variable taint") (* soft fault *)
+                    | TaintUnknown -> transform_error "Unexpected unknown taint annotation for BaseAsSlot"
                   in
                   (
                     (Isa.make_inst_add_i_m64 delta mem_op) :: acc_inst_pre,
@@ -696,8 +698,8 @@ module Transform = struct
               List.filter_map (fun (slot: callee_slot) ->
                 let reg, offset = slot in
                 let disp = get_stack_slot_dyn_offset func_state.init_rsp_var_id offset curr_rsp in
-                let disp = if disp != 0L then Some (Isa.ImmNum disp) else None in
-                let mem_op = (disp, Some Isa.RSP, None, None) in
+                let disp = if disp != 0L then Some (Isa.ImmNum (disp, Some 8L)) else None in
+                let mem_op = (disp, Some Isa.RSP, None, None, None) in
                 let inst_save = Isa.make_inst_st_r64_m64 reg mem_op in
                 let inst_restore = Isa.make_inst_ld_r64_m64 reg mem_op in
                 Some (inst_save, inst_restore)
@@ -791,7 +793,7 @@ module Transform = struct
     : basic_block =
     let extract_offset_helper (inst: Isa.instruction) =
       match inst with
-      | BInst (Add, RegOp reg1, RegOp reg2, ImmOp (ImmNum imm, _)) when reg1 = reg2 ->
+      | BInst (Add, RegOp reg1, RegOp reg2, ImmOp (ImmNum (imm, _))) when reg1 = reg2 ->
         Some imm
       | _ -> None
     in
@@ -810,10 +812,10 @@ module Transform = struct
         | UInst(Mov, StOp(offset_as_disp, Some RSP, None, None, o_size, mem_anno), o') ->
           let disp = match offset_as_disp with
           | None -> acc_offset
-          | Some (ImmNum v) -> Int64.add v acc_offset
+          | Some (ImmNum (v, _)) -> Int64.add v acc_offset
           | _ -> transform_error "unexpected transformed disp"
           in
-          Isa.UInst (Mov, StOp(Some (ImmNum disp), Some RSP, None, None, o_size, mem_anno), o')
+          Isa.UInst (Mov, StOp(Some (ImmNum (disp, Some 8L)), Some RSP, None, None, o_size, mem_anno), o')
         | _ -> transform_error "unexpected transformed push";
         in
 

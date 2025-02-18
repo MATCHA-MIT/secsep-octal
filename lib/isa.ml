@@ -12,17 +12,17 @@ module Isa (MemAnno: MemAnnoType) = struct
   include IsaBasic
 
   (* disp, base, index, scale *)
-  type mem_op = immediate option * register option * register option * scale option
+  type mem_op = immediate option * register option * register option * scale option * data_size option
   [@@deriving sexp]
 
   type ldst_op = immediate option * register option * register option * scale option * data_size * MemAnno.t
   [@@deriving sexp]
 
   type operand =
-    | ImmOp of immediate * data_size option
+    | ImmOp of immediate
     | RegOp of register
     | RegMultOp of register list
-    | MemOp of mem_op * data_size option
+    | MemOp of mem_op
     | LdOp of ldst_op
     | StOp of ldst_op
     | LabelOp of label
@@ -30,28 +30,36 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   (* operand utilities *)
 
+  let get_mem_op_size (mem_op: mem_op) : data_size option =
+    let _, _, _, _, size = mem_op in size
+
+  let set_mem_op_size (mem_op: mem_op) (size: data_size option) : mem_op =
+    let d, b, i, s, _ = mem_op in d, b, i, s, size
+
   let get_op_size (op: operand) : data_size =
     match op with
-    | ImmOp (_, size) -> size |> Option.get
+    | ImmOp imm -> IsaBasic.get_imm_size imm |> Option.get
     | RegOp r -> get_reg_size r
     | LdOp (_, _, _, _, size, _)
     | StOp (_, _, _, _, size, _) -> size
     | _ -> isa_error "cannot get size for the given op"
 
-  let memop_to_mem_operand (sz_opt: data_size option) (op: mem_op) = MemOp (op, sz_opt)
+  let memop_to_mem_operand (sz_opt: data_size option) (op: mem_op) = 
+    let d, b, i, s, _ = op in
+    MemOp (d, b, i, s, sz_opt)
 
   let extract_memop_of_ldst (op: operand) =
     match op with
-    | LdOp (d, b, i, s, sz, _) -> MemOp ((d, b, i, s), Some sz)
-    | StOp (d, b, i, s, sz, _) -> MemOp ((d, b, i, s), Some sz)
+    | LdOp (d, b, i, s, sz, _) -> MemOp (d, b, i, s, Some sz)
+    | StOp (d, b, i, s, sz, _) -> MemOp (d, b, i, s, Some sz)
     | _ -> op
 
   (* TODO: Remove this function *)
   let cmp_operand (op1: operand) (op2: operand) : bool = (* true for equal *)
     match op1, op2 with
-    | ImmOp (i1, s1), ImmOp (i2, s2) -> i1 = i2 && (Option.get s1) = (Option.get s2)
+    | ImmOp i1, ImmOp i2 -> i1 = i2
     | RegOp r1, RegOp r2 -> r1 = r2
-    | MemOp ((d1, b1, i1, s1), sz1), MemOp ((d2, b2, i2, s2), sz2) ->
+    | MemOp (d1, b1, i1, s1, sz1), MemOp (d2, b2, i2, s2, sz2) ->
       d1 = d2 && b1 = b2 && i1 = i2 && s1 = s2 && sz1 = sz2
     | LdOp (d1, b1, i1, s1, size1, _), LdOp (d2, b2, i2, s2, size2, _)
     | StOp (d1, b1, i1, s1, size1, _), StOp (d2, b2, i2, s2, size2, _) ->
@@ -85,10 +93,10 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   let rec string_of_operand (op: operand): string =
     match op with
-    | ImmOp (imm, size) -> (string_of_immediate imm) ^ (string_of_data_size size)
+    | ImmOp imm -> string_of_immediate imm
     | RegOp r -> string_of_reg r
     | RegMultOp r_list -> Printf.sprintf "(%s)" (String.concat " " (List.map string_of_reg r_list))
-    | MemOp ((disp, base, index, scale), size) ->
+    | MemOp (disp, base, index, scale, size) ->
       let disp_str = string_of_option string_of_immediate disp in
       let base_str = string_of_option string_of_reg base in
       let index_str = string_of_option string_of_reg index in
@@ -96,19 +104,19 @@ module Isa (MemAnno: MemAnnoType) = struct
       let size_str = string_of_data_size size in
       Printf.sprintf "%s(%s,%s,%s)%s" disp_str base_str index_str scale_str size_str
     | LdOp (disp, base, index, scale, size, mem_anno) ->
-      let addr_str = string_of_operand (MemOp ((disp, base, index, scale), Some size)) in
+      let addr_str = string_of_operand (MemOp (disp, base, index, scale, Some size)) in
       Printf.sprintf "Ld(%s,anno={%s})" addr_str (MemAnno.to_string mem_anno)
     | StOp (disp, base, index, scale, size, mem_anno) ->
-      let addr_str = string_of_operand (MemOp ((disp, base, index, scale), Some size)) in
+      let addr_str = string_of_operand (MemOp (disp, base, index, scale, Some size)) in
       Printf.sprintf "St(%s,anno={%s})" addr_str (MemAnno.to_string mem_anno)
     | LabelOp label -> label
 
   let ocaml_string_of_operand (op: operand): string =
     match op with
-    | ImmOp (imm, _) -> ocaml_string_of_immediate_op imm
+    | ImmOp imm -> ocaml_string_of_immediate_op imm
     | RegOp r -> ocaml_string_of_reg_op r
     | RegMultOp r_list -> Printf.sprintf "RegMultOp (%s)" (String.concat " " (List.map ocaml_string_of_reg_op r_list))
-    | MemOp ((disp, base, index, scale), size) ->
+    | MemOp (disp, base, index, scale, size) ->
       let disp_str = ocaml_string_of_option ocaml_string_of_immediate disp in
       let base_str = ocaml_string_of_option ocaml_string_of_reg base in
       let index_str = ocaml_string_of_option ocaml_string_of_reg index in
@@ -181,19 +189,19 @@ module Isa (MemAnno: MemAnnoType) = struct
   (* simple instruction builders *)
 
   let make_inst_add_i_r (imm: int64) (reg: register) : instruction =
-    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum imm, Some (get_reg_size reg)))
+    BInst (Add, RegOp reg, RegOp reg, ImmOp (ImmNum (imm, Some (get_reg_size reg))))
 
   let make_inst_add_i_m64 (imm: int64) (mem_op: mem_op) : instruction =
     let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
+    let d, b, i, s, _ = mem_op in
     let mem_anno = MemAnno.make_empty () in
-    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum imm, Some size))
+    BInst (Add, StOp (d, b, i, s, size, mem_anno), LdOp (d, b, i, s, size, mem_anno), ImmOp (ImmNum (imm, Some size)))
 
   let make_inst_st_r64_m64 (reg: register) (mem_op: mem_op) : instruction =
     if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
+    let d, b, i, s, _ = mem_op in
     let mem_anno = MemAnno.make_empty () in
     UInst (Mov, StOp (d, b, i, s, size, mem_anno), RegOp reg)
 
@@ -201,7 +209,7 @@ module Isa (MemAnno: MemAnnoType) = struct
     if get_reg_offset_size reg <> (0L, 8L) then
       isa_error "make_inst_st_r64_m64: reg size does not match";
     let size = get_gpr_full_size () in
-    let d, b, i, s = mem_op in
+    let d, b, i, s, _ = mem_op in
     let mem_anno = MemAnno.make_empty () in
     UInst (Mov, RegOp reg, LdOp (d, b, i, s, size, mem_anno))
 

@@ -72,7 +72,7 @@ include SingleExp
   let get_const_type = get_imm_type
 
   let set_flag_helper (dest_type: t) =
-    dest_type, (dest_type, get_const_type (IsaBasic.ImmNum 0L))
+    dest_type, (dest_type, get_const_type (IsaBasic.ImmNum (0L, None)))
 
   let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     match isa_bop with
@@ -93,7 +93,7 @@ include SingleExp
     | CmovEq -> SingleTop |> set_flag_helper
     | Bt -> (* bit test, set CF to the bit *)
       let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
-      e1, (result, get_const_type (IsaBasic.ImmNum 0L))
+      e1, (result, get_const_type (IsaBasic.ImmNum (0L, None)))
     | Pxor | Xorp -> if same_op then SingleConst 0L, flags else SingleTop, flags
     | Punpck | Packxs
     | Pshuf

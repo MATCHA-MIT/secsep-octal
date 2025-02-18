@@ -19,7 +19,8 @@ include ArchTypeBasic
       (smt_ctx: SmtEmitter.t)
       (curr_type: t) (mem_op: Isa.mem_op) : entry_t =
     let ctx, _ = smt_ctx in
-    let disp, base, index, scale = mem_op in
+    (* I ignore mem_op size since it should always be 8! *)
+    let disp, base, index, scale, _ = mem_op in
     let disp =
       match disp with
       | Some disp_imm -> DepType.get_imm_exp ctx disp_imm
@@ -48,7 +49,7 @@ include ArchTypeBasic
     (* <TODO> Check this against infer and ld rule, make sure it checks everything *)
     let disp, base, index, scale, size, (slot_anno, taint_anno) = ld_op in
     let addr_dep_type, addr_taint_type =
-      get_mem_op_type smt_ctx curr_type (disp, base, index, scale)
+      get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
     in
     if not (TaintType.check_untaint smt_ctx addr_taint_type) then begin
       Printf.printf "get_ld_op_type op %s taint addr %s\n"
@@ -86,10 +87,10 @@ include ArchTypeBasic
     let ctx, _ = smt_ctx in
     (* TODO: Should we use data size here? *)
     match src with
-    | ImmOp (imm, _ (* size *)) -> Some (BasicType.get_imm_type ctx imm) 
+    | ImmOp imm -> Some (BasicType.get_imm_type ctx imm) 
     | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type r)
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
-    | MemOp (mem_op, _ (* size *)) -> Some (get_mem_op_type smt_ctx curr_type mem_op)
+    | MemOp mem_op -> Some (get_mem_op_type smt_ctx curr_type mem_op)
     | LdOp ld_op -> get_ld_op_type smt_ctx curr_type ld_op
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
@@ -109,7 +110,7 @@ include ArchTypeBasic
     (* <TODO> Check this against infer and st rule, make sure it checks everything *)
     let disp, base, index, scale, size, (slot_anno, taint_anno) = st_op in
     let addr_dep_type, addr_taint_type =
-      get_mem_op_type smt_ctx curr_type (disp, base, index, scale)
+      get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
     in
     if not (TaintType.check_untaint smt_ctx addr_taint_type) then begin
       Printf.printf "set_st_op_type op %s taint addr %s\n"

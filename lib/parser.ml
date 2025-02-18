@@ -25,9 +25,9 @@ module Parser = struct
 
   let rec string_of_imm_token (i: IsaBasic.immediate) (name_list: (string option) list) : string =
     match i, name_list with
-    | ImmNum n, None :: [] -> Int64.to_string n
-    | ImmLabel v, Some name :: [] -> "(var " ^ (string_of_int v) ^ ": " ^  name ^ ")"
-    | ImmBExp (i1, i2), hd :: tl ->
+    | ImmNum (n, _), None :: [] -> Int64.to_string n
+    | ImmLabel (v, _), Some name :: [] -> "(var " ^ (string_of_int v) ^ ": " ^  name ^ ")"
+    | ImmBExp ((i1, i2), _), hd :: tl ->
       (string_of_imm_token i1 [hd]) ^ " + " ^ (string_of_imm_token i2 tl)
     | _ -> parse_error "string_of_imm_token" 
 
@@ -101,11 +101,11 @@ module Parser = struct
       lexical_error "consume_immediate: unexpected end of input"
     else if is_char_of_name_start (List.hd cs) then (
       let (name, cs) = consume_name cs in
-      (Isa.ImmLabel IsaBasic.imm_var_unset, [ Some name ], cs)
+      (Isa.ImmLabel (IsaBasic.imm_var_unset, None), [ Some name ], cs)
     )
     else (
       let (num, cs) = consume_int cs in
-      (Isa.ImmNum num, [ None ], cs)
+      (Isa.ImmNum (num, None), [ None ], cs)
     ) end 
     in
 
@@ -115,7 +115,7 @@ module Parser = struct
       let other_exp, other_name_list, other_remained_cs =
         consume_immediate (consume_whitespace remained_cs_tl)
       in
-      (Isa.ImmBExp (exp, other_exp), name_list @ other_name_list, other_remained_cs)
+      (Isa.ImmBExp ((exp, other_exp), None), name_list @ other_name_list, other_remained_cs)
     | '-' :: _ ->
       lexical_error "consume_immediate: constant subtraction expression not supported"
     | _ -> (exp, name_list, remained_cs)
@@ -149,14 +149,14 @@ module Parser = struct
   let parse_memory_operand (ts: token list) : Isa.operand * token list =
     let imm_to_scale (imm: IsaBasic.immediate) : Isa.scale =
       match imm with
-      | ImmNum 1L -> Scale1
-      | ImmNum 2L -> Scale2
-      | ImmNum 4L -> Scale4
-      | ImmNum 8L -> Scale8
+      | ImmNum (1L, _) -> Scale1
+      | ImmNum (2L, _) -> Scale2
+      | ImmNum (4L, _) -> Scale4
+      | ImmNum (8L, _) -> Scale8
       | _ -> parse_error "imm_to_scale"
     in
 
-    let memop, ts = match ts with
+    let (d, b, i, s), ts = match ts with
     | LParen :: RegTok base :: RParen :: ts -> (* (base) *)
       ((None, Some base, None, None), ts)
     | LParen :: RegTok base :: Comma :: RegTok index :: RParen :: ts -> (* (base, index) *)
@@ -179,14 +179,14 @@ module Parser = struct
       ((Some disp, None, None, None), ts)
     | _ -> parse_error ("parse_memory_operand: " ^ (String.concat ", " (List.map string_of_token ts)))
     in
-    MemOp (memop, None), ts
+    MemOp (d, b, i, s, None), ts
 
   let parse_operand (ts: token list) : Isa.operand * token list =
     (* ImmOp and XMM RegOp do not have offset/size info yet *)
     match ts with
     | RegTok reg :: ts -> (RegOp reg, ts)
     | ImmTok _ :: LParen :: _ -> parse_memory_operand ts
-    | ImmTok (imm, _) :: ts -> (ImmOp (imm, None), ts)
+    | ImmTok (imm, _) :: ts -> (ImmOp imm, ts)
     | LParen :: _ -> parse_memory_operand ts
     | _ -> parse_error "parse_operand"
   
@@ -267,14 +267,14 @@ module Parser = struct
 
     match opr with
     | LabelOp _ -> opr
-    | ImmOp (imm, sz_opt) ->
-      if sz_opt |> sz_none_or_compatible suggested then
-        ImmOp (imm, Isa.data_off_size_to_size (Some suggested))
+    | ImmOp imm ->
+      if IsaBasic.get_imm_size imm |> sz_none_or_compatible suggested then
+        ImmOp (IsaBasic.set_imm_size imm (Isa.data_off_size_to_size (Some suggested)))
       else
         complain ()
-    | MemOp (memop, sz_opt) ->
-      if sz_opt |> sz_none_or_compatible suggested then
-        MemOp (memop, Isa.data_off_size_to_size (Some suggested))
+    | MemOp mem_op ->
+      if Isa.get_mem_op_size mem_op |> sz_none_or_compatible suggested then
+        MemOp (Isa.set_mem_op_size mem_op (Isa.data_off_size_to_size (Some suggested)))
       else
         complain ()
     | RegOp r ->
@@ -295,8 +295,8 @@ module Parser = struct
   let get_operand_size (opr: Isa.operand) : Isa.data_size =
     match opr with
     | LabelOp _ -> parse_error "unexpected"
-    | ImmOp (_, sz_opt)
-    | MemOp (_, sz_opt) -> sz_opt |> Option.get 
+    | ImmOp imm -> IsaBasic.get_imm_size imm |> Option.get
+    | MemOp mem_op -> Isa.get_mem_op_size mem_op |> Option.get 
     | RegOp r -> r |> Isa.get_reg_size
     | RegMultOp _ -> parse_error "cannot get size of multiple operands"
     | LdOp (_, _, _, _, size, _)
@@ -382,16 +382,16 @@ module Parser = struct
   
   let src (opr: Isa.operand) : Isa.operand =
     match opr with
-    | MemOp ((disp, base, index, scale), Some size) -> LdOp (disp, base, index, scale, size, MemAnno.make_empty ())
-    | MemOp (_, None) -> parse_error "no size for mem op"
+    | MemOp (disp, base, index, scale, Some size) -> LdOp (disp, base, index, scale, size, MemAnno.make_empty ())
+    | MemOp (_, _, _, _, None) -> parse_error "no size for mem op"
     | StOp _ -> parse_error "src"
     | LdOp _ -> parse_error "LdOp not expected"
     | opr -> opr
 
   let dst (opr: Isa.operand) : Isa.operand =
     match opr with
-    | MemOp ((disp, base, index, scale), Some size) -> StOp (disp, base, index, scale, size, MemAnno.make_empty ())
-    | MemOp (_, None) -> parse_error "no size for mem op"
+    | MemOp (disp, base, index, scale, Some size) -> StOp (disp, base, index, scale, size, MemAnno.make_empty ())
+    | MemOp (_, _, _, _, None) -> parse_error "no size for mem op"
     | LdOp _ -> parse_error "dst"
     | StOp _ -> parse_error "StOp not expected"
     | opr -> opr
@@ -399,7 +399,7 @@ module Parser = struct
   let get_binst_with_one_operand (op: Isa.bop) (opr: Isa.operand) : Isa.instruction =
     let size = opr |> get_operand_size in
     match op with
-    | Sal | Sar | Shr | Shl | Rol | Ror -> BInst (op, dst opr, src opr, src (ImmOp ((ImmNum 1L), Some size)))
+    | Sal | Sar | Shr | Shl | Rol | Ror -> BInst (op, dst opr, src opr, src (ImmOp (ImmNum (1L, Some size))))
     | Mul | Imul -> begin
         let (mul_src: Isa.operand), (mul_dst: Isa.operand) = match size with
         | 1L -> RegOp AL, RegOp AX
@@ -468,25 +468,25 @@ module Parser = struct
             : (IsaBasic.imm_var_map * (IsaBasic.imm_var_id list)) * IsaBasic.immediate =
           let imm_var_map, referred_imm_vars = info in
           match imm_name with
-          | ImmNum n, None :: [] -> ((imm_var_map, referred_imm_vars), ImmNum n)
-          | ImmLabel v, (Some name) :: [] ->
-            if v <> IsaBasic.imm_var_unset then ((imm_var_map, v :: referred_imm_vars), ImmLabel v)
+          | ImmNum (n, sz), None :: [] -> ((imm_var_map, referred_imm_vars), ImmNum (n, sz))
+          | ImmLabel (v, sz), (Some name) :: [] ->
+            if v <> IsaBasic.imm_var_unset then ((imm_var_map, v :: referred_imm_vars), ImmLabel (v, sz))
             else begin
               if Isa.StrM.mem name imm_var_map
               then begin
                 let id = Isa.StrM.find name imm_var_map in
-                ((imm_var_map, id :: referred_imm_vars), ImmLabel id)
+                ((imm_var_map, id :: referred_imm_vars), ImmLabel (id, None))
               end else begin
                 (* let id = CodeType.stack_base_id + 1 + (Isa.StrM.cardinal imm_var_map) in *)(* id starts from stack_base_id + 1 *)
                 let id = IsaBasic.imm_var_unset - 1 - (Isa.StrM.cardinal imm_var_map) in (* id starts from imm_var_unset, going negative!!! *)
                 Printf.printf "new imm_var: %s %d\n" name id;
-                ((Isa.StrM.add name id imm_var_map, id :: referred_imm_vars), ImmLabel id)
+                ((Isa.StrM.add name id imm_var_map, id :: referred_imm_vars), ImmLabel (id, None))
               end
             end
-          | ImmBExp (i1, i2), hd :: tl ->
+          | ImmBExp( (i1, i2), sz), hd :: tl ->
             let (imm_var_map1, referred_imm_vars), new_i1 = fill_id_helper (imm_var_map, referred_imm_vars) (i1, [ hd ]) in
             let (imm_var_map2, referred_imm_vars), new_i2 = fill_id_helper (imm_var_map1, referred_imm_vars) (i2, tl) in
-            ((imm_var_map2, referred_imm_vars), Isa.ImmBExp (new_i1, new_i2))
+            ((imm_var_map2, referred_imm_vars), Isa.ImmBExp ((new_i1, new_i2), sz))
           | _ -> parse_error "parse_tokens fail to generate imm_var_id"
         in
         let (imm_var_map, referred_imm_vars), ts = List.fold_left_map (fun info token ->

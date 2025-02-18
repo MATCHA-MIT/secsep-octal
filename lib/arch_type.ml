@@ -557,14 +557,14 @@ module ArchType (Entry: EntryType) = struct
       entry_t * t * (Constraint.t list) * Isa.operand =
     (* TODO: Should we use data size here? *)
     match src with
-    | ImmOp (imm, _ (* size *)) -> Entry.get_const_type imm, curr_type, [], src
+    | ImmOp imm -> Entry.get_const_type imm, curr_type, [], src
     | RegOp r -> get_reg_type curr_type r, curr_type, [], src
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
-    | MemOp ((disp, base, index, scale), _ (* size *)) ->
+    | MemOp (disp, base, index, scale, _ (* size *)) ->
       get_mem_op_type curr_type disp base index scale, curr_type, [], src
     | LdOp (disp, base, index, scale, size, (slot_anno, taint_anno) (* TODO: check offset and generate constraints *)) ->
       let addr_type = get_mem_op_type curr_type  disp base index scale in
-      let size_type = Entry.get_const_type (ImmNum size) in
+      let size_type = Entry.get_const_type (ImmNum (size, Some 8L)) in
       let src_type, src_constraint, src_useful, slot_anno =
         get_ld_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type addr_type size_type slot_anno
       in
@@ -594,7 +594,7 @@ module ArchType (Entry: EntryType) = struct
     | RegMultOp _ -> arch_type_error "<TODO> not implemented"
     | StOp (disp, base, index, scale, size, (slot_anno, taint_anno)) ->
       let addr_type = get_mem_op_type curr_type disp base index scale in
-      let size_type = Entry.get_const_type (ImmNum size) in
+      let size_type = Entry.get_const_type (ImmNum (size, Some 8L)) in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint new_type taint_anno in
       let next_type, dest_constraint, dest_useful, slot_anno =
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type addr_type size_type slot_anno new_type
@@ -660,7 +660,7 @@ module ArchType (Entry: EntryType) = struct
     let prop_mode = curr_type.prop_mode in
     let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type (Isa.RegOp Isa.RSP) in
 
-    let new_rsp_type, _ = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum offset)) curr_type.flag false in
+    let new_rsp_type, _ = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum (offset, Some 8L))) curr_type.flag false in
     let new_rsp_type = Entry.repl_local_var curr_type.local_var_map new_rsp_type in
 
     let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in

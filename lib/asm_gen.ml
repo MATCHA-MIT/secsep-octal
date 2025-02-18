@@ -21,8 +21,8 @@ module AsmGen = struct
     (if prefix then "$" else "")
     ^
     match imm with
-    | ImmNum x -> (Int64.to_string x)
-    | ImmLabel label -> Isa.IntM.find label ctx.global_var_map
+    | ImmNum (x, _) -> (Int64.to_string x)
+    | ImmLabel (label, _) -> Isa.IntM.find label ctx.global_var_map
     | _ -> asm_gen_error "str_of_immediate: not implemented"
 
   let str_of_memop (ctx: context) (d: Isa.immediate option) (b: Isa.register option) (i: Isa.register option) (s: Isa.scale option) : string =
@@ -49,11 +49,11 @@ module AsmGen = struct
     | Some _, Some base, Some index, None -> Printf.sprintf "%s(%%%s, %%%s, )" (str_of_disp d) (Isa.string_of_reg base) (Isa.string_of_reg index)
     | Some _, _, _, _ -> Printf.sprintf "%s(%s, %s, %s)" (str_of_disp d) (str_of_reg_option b) (str_of_reg_option i) (str_of_scale_option s)
     (* TODO: support more cases *)
-    | _ -> asm_gen_error (Printf.sprintf "str_of_memop: not implemented: %s\n" (Isa.string_of_operand(Isa.MemOp ((d, b, i, s), None))))
+    | _ -> asm_gen_error (Printf.sprintf "str_of_memop: not implemented: %s\n" (Isa.string_of_operand(Isa.MemOp (d, b, i, s, None))))
 
   let str_of_operand (ctx: context) (op: Isa.operand) : string =
     match op with
-    | ImmOp (imm, _) -> str_of_immediate ctx true imm
+    | ImmOp imm -> str_of_immediate ctx true imm
     | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
     | RegMultOp _ -> asm_gen_error "<TODO> not implemented yet"
     | LdOp (d, b, i, s, _, _)

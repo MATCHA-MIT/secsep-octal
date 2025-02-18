@@ -665,8 +665,7 @@ module MemType = struct
       (addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_type: BasicType.t) : t option =
-    (* <TODO> 
-       1. Check write permission; 
+    (* 1. Check write permission; 
        2. update entry and all read/write permission; 
        3. check slot_info, taint constraint *)
     let _ = smt_ctx, is_spill_func, mem_type, addr_off, slot_info, new_type in

@@ -613,9 +613,9 @@ include SingleExpBasic
 
   let rec get_imm_type (i: IsaBasic.immediate) : t =
     match i with
-    | ImmNum v -> SingleConst v
-    | ImmLabel v -> SingleVar v
-    | ImmBExp (i1, i2) -> SingleBExp (SingleAdd, get_imm_type i1, get_imm_type i2)
+    | ImmNum (v, _) -> SingleConst v
+    | ImmLabel (v, _) -> SingleVar v
+    | ImmBExp ((i1, i2), _) -> SingleBExp (SingleAdd, get_imm_type i1, get_imm_type i2)
 
   let get_mem_op_type
       (disp: IsaBasic.immediate option) (base: t option)
@@ -623,17 +623,17 @@ include SingleExpBasic
     let disp_type = 
       match disp with
       | Some d -> get_imm_type d
-      | None -> get_imm_type (ImmNum 0L)
+      | None -> get_imm_type (ImmNum (0L, None))
     in
     let base_type =
       match base with
       | Some b -> b
-      | None -> get_imm_type (ImmNum 0L)
+      | None -> get_imm_type (ImmNum (0L, None))
     in
     let index_type =
       match index with
       | Some i -> i
-      | None -> get_imm_type (ImmNum 0L)
+      | None -> get_imm_type (ImmNum (0L, None))
     in
     eval (
       SingleBExp (SingleAdd,
