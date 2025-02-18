@@ -104,6 +104,33 @@ module MemOffset = struct
     addr_exp,
     BitVector.mk_add ctx addr_exp (DepType.get_const_exp ctx size 64)
 
+  let offset_get_start_len
+      (smt_ctx: SmtEmitter.t)
+      (base: DepType.exp_t)
+      (off: t) : (int64 * int64) option =
+    let ctx, _ = smt_ctx in
+    let l, r = off in
+    let start = BitVector.mk_sub ctx l base in
+    let len = BitVector.mk_sub ctx r l in
+    match DepType.to_common_const smt_ctx start with
+    | Some start_int ->
+      begin match DepType.to_common_const smt_ctx len with
+      | Some len_int -> Some (start_int, len_int)
+      | None -> None
+      end
+    | _ -> None
+
+  let get_offset_top
+      (smt_ctx: SmtEmitter.t)
+      (off: t) : DepType.t =
+    (* Get dep type top with proper size. If size is not const, return Top 0 *)
+    let ctx, _ = smt_ctx in
+    let l, r = off in
+    let size_exp = BitVector.mk_sub ctx r l in
+    match DepType.to_common_const smt_ctx size_exp with
+    | Some size_byte -> Top ((Int64.to_int size_byte) * 8)
+    | None -> Top 0
+
 end
 
 module MemRange = struct
@@ -127,6 +154,7 @@ module MemRange = struct
   let check_subset
       (smt_ctx: SmtEmitter.t)
       (r1: t) (r2: t) : bool =
+    (* Check whether r1 is a subset of r2*)
     let off_check_subset = MemOffset.offset_cmp smt_ctx CmpSubset in
     let remain_off_list =
       List.fold_left (
@@ -362,17 +390,273 @@ module MemType = struct
     | None -> check_subtype_no_map smt_ctx is_spill_func sub_m_type sup_m_type
     | Some mem_map -> check_subtype_map smt_ctx is_spill_func sub_m_type sup_m_type mem_map
 
+  let find_part_mem_helper
+      (mem_type: t) (slot_info: MemAnno.slot_t) : entry_t mem_part =
+    let slot_ptr, _, _, _ = slot_info in
+    let part_mem_opt =
+      List.find_opt (fun ((ptr, _), _) -> ptr = slot_ptr) mem_type
+    in
+    match part_mem_opt with
+    | None -> mem_type_error (Printf.sprintf "Cannot find ptr %d" slot_ptr)
+    | Some part_mem -> part_mem
+
+  let get_one_slot_type
+      (smt_ctx: SmtEmitter.t)
+      (slot: entry_t mem_slot)
+      (addr_off: MemOffset.t) : entry_t option =
+    let ctx, _ = smt_ctx in
+    let _, slot_range, (slot_dep, slot_taint) = slot in
+    match slot_range with
+    | [] ->
+      Printf.printf "Warning: read from an invalid entry\n";
+      None
+    | [ valid_l, valid_r ] ->
+      let cmp_off = 
+        MemOffset.offset_cmp smt_ctx CmpEqSubset addr_off (valid_l, valid_r)
+      in
+      begin match cmp_off with
+      | Eq -> Some (slot_dep, slot_taint)
+      | Subset ->
+        begin match MemOffset.offset_get_start_len smt_ctx valid_l addr_off with
+        | None -> Some (MemOffset.get_offset_top smt_ctx addr_off, slot_taint)
+        | Some (start, len) ->
+          Some (DepType.get_start_len ctx start len slot_dep, slot_taint)
+        end
+      | _ ->
+        Printf.printf "Warning: get_one_slot_type off check failed";
+        None
+      end
+    | _ ->
+      if MemRange.check_subset smt_ctx [addr_off] slot_range then
+        Some (MemOffset.get_offset_top smt_ctx addr_off, slot_taint)
+      else begin
+        Printf.printf "Warning: get_one_slot_type addr_off %s does not belongs to entry range %s\n"
+          (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off))
+          (Sexplib.Sexp.to_string_hum (MemRange.sexp_of_t slot_range));
+        None
+      end
+
+  let get_mult_slot_type
+      (smt_ctx: SmtEmitter.t)
+      (slot_list: entry_t mem_slot list)
+      (addr_off: MemOffset.t) : entry_t option =
+    let get_one_entry
+        (acc: (DepType.exp_t * entry_t) option) 
+        (* right boundary of last off,
+           merged type *)
+        (slot: entry_t mem_slot) :
+        (DepType.exp_t * entry_t) option =
+      match acc with
+      | None -> None
+      | Some (acc_r, acc_merged_type) ->
+        let _, slot_range, slot_type = slot in
+        begin match slot_range with
+        | [ slot_l, slot_r ] ->
+          let slot_continuous = DepType.check_eq smt_ctx acc_r slot_l in
+          if slot_continuous then
+            match BasicType.concat_same_taint smt_ctx slot_type acc_merged_type with
+            | Some merged_type -> Some (slot_r, merged_type)
+            | None -> 
+              Printf.printf "Warning: get_mult_slot_type has different taint types\n";
+              None
+          else begin
+            Printf.printf "Warning: get_mult_slot_type slot not continuous\n";
+            None
+          end
+        | _ ->
+          Printf.printf "Warning: get_mult_slot_type valid range format unrecognized\n";
+          None
+        end
+    in
+    let addr_l, addr_r = addr_off in
+    match slot_list with
+    | [] -> mem_type_error "get_mult_slot_type: should not have empty slot_list"
+    | (_, [ hd_l, hd_r ], hd_type) :: tl ->
+      let slot_left_aligned = DepType.check_eq smt_ctx addr_l hd_l in
+      if slot_left_aligned then begin
+        let result = List.fold_left get_one_entry (Some (hd_r, hd_type)) tl in
+        match result with
+        | None -> None
+        | Some (acc_r, merged_type) ->
+          let slot_right_aligned = DepType.check_eq smt_ctx addr_r acc_r in
+          if slot_right_aligned then Some merged_type
+          else begin
+            Printf.printf "Warning: get_mult_slot_type last entry not right aligned with addr_off\n";
+            None
+          end      
+      end else begin
+        Printf.printf "Warning: get_mult_slot_type first entry not left aligned with addr_off\n";
+        None
+      end
+    | _ -> None
+
+  let get_part_mem
+      (smt_ctx: SmtEmitter.t)
+      (part_mem: entry_t mem_slot list)
+      (slot_info: MemAnno.slot_t)
+      (addr_off: MemOffset.t) : entry_t option =
+    let _, slot_idx, _, num_slots = slot_info in
+    if List.length part_mem < slot_idx + num_slots then begin
+      Printf.printf "Warning: get_part_mem cannot find %d slot(s) starting from idx %d\n" 
+        num_slots slot_idx;
+      None
+    end else
+    if num_slots = 1 then get_one_slot_type smt_ctx (List.nth part_mem slot_idx) addr_off
+    else
+      let matching_slots =
+        List.filteri (fun i _ -> i >= slot_idx && i < slot_idx + num_slots) part_mem
+      in
+      get_mult_slot_type smt_ctx matching_slots addr_off
+
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
       (mem_type: t)
       (addr_off: MemOffset.t) 
       (slot_info: MemAnno.slot_t) : entry_t option =
-    (* <TODO> 
-       1. Check read permission; 
+    (* 1. Check read permission; 
        2. get entry with slot; 
-       3. check slot_info *)
-    let _ = smt_ctx, mem_type, addr_off, slot_info in
-    None
+       3. check add_off *)
+    let ptr_info, part_mem = find_part_mem_helper mem_type slot_info in
+    if not (PtrInfo.can_read ptr_info) then begin
+      Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
+        (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
+      None
+    end else
+      (* Check addr_off and get entry *)
+      get_part_mem smt_ctx part_mem slot_info addr_off
+
+  let set_one_slot_type
+      (smt_ctx: SmtEmitter.t)
+      (is_spill: bool)
+      (slot: entry_t mem_slot)
+      (addr_off: MemOffset.t)
+      (new_type: BasicType.t) : entry_t mem_slot option =
+    (* 1. Update entry (valid region and type)
+       2. Check slot_off, taint constraint *)
+    let slot_off, slot_range, (_, slot_taint) = slot in
+    if is_spill then begin
+      (* Check slot_off *)
+      if MemOffset.offset_cmp smt_ctx CmpSubset addr_off slot_off = Subset then begin
+        (* For spill, we overwrite the valid region with write range. *)
+        Some (slot_off, [ addr_off ], new_type)
+      end else begin
+        Printf.printf "Warning: %s is not subset of %s\n" 
+          (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
+          (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t slot_off));
+        None
+      end
+    end else begin
+      (* Check slot_off *)
+      let cmp_off = MemOffset.offset_cmp smt_ctx CmpEqSubset addr_off slot_off in
+      (* Check taint *)
+      let _, new_taint = new_type in
+      let check_taint = TaintType.check_subtype smt_ctx true new_taint slot_taint in
+      if not check_taint then begin
+        Printf.printf "Warning: new taint not equal to old taint %s <> %s\n"
+        (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t new_taint))
+        (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t slot_taint));
+        None
+      end else begin
+        if cmp_off = Eq then begin
+          Some (slot_off, [ slot_off ], new_type)
+        end else if cmp_off = Subset then begin
+          Some (slot_off, MemRange.merge smt_ctx slot_range [addr_off], (Top 0, new_taint))
+        end else begin
+          Printf.printf "Warning: %s is not subset of %s\n" 
+            (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
+            (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t slot_off));
+          None
+        end
+      end
+    end
+
+  let set_mult_slot_type
+      (smt_ctx: SmtEmitter.t)
+      (set_range: int * int)
+      (slot_list: entry_t mem_slot list)
+      (addr_off: MemOffset.t)
+      (new_type: BasicType.t) : (entry_t mem_slot list) option =
+    let addr_l, addr_r = addr_off in
+    let new_dep, new_taint = new_type in
+    let is_set (idx: int) : bool =
+      idx >= fst set_range && idx < snd set_range
+    in
+    let set_one_slot
+        (acc: (int * DepType.exp_t) option)
+        (slot: entry_t mem_slot) : ((int * DepType.exp_t) option) * (entry_t mem_slot) =
+      match acc with
+      | None -> None, slot
+      | Some (idx, acc_r) ->
+        if is_set idx then begin
+          let (slot_l, slot_r), _, (_, slot_taint) = slot in
+          let slot_continuous = DepType.check_eq smt_ctx acc_r slot_l in
+          if slot_continuous then begin
+            let check_taint = TaintType.check_subtype smt_ctx true new_taint slot_taint in
+            if not check_taint then begin
+              Printf.printf "Warning: new taint not equal to old taint %s <> %s\n"
+                (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t new_taint))
+                (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t slot_taint));
+                None, slot
+            end else begin
+              match MemOffset.offset_get_start_len smt_ctx addr_l (slot_l, slot_r) with
+              | Some (start_byte, len_byte) ->
+                Some (idx + 1, slot_r),
+                ((slot_l, slot_r), [slot_l, slot_r], 
+                (DepType.get_start_len (fst smt_ctx) start_byte len_byte new_dep, new_taint))
+              | None ->
+                Some (idx + 1, slot_r),
+                ((slot_l, slot_r), [slot_l, slot_r], (Top 0, new_taint))
+            end
+          end else begin
+            Printf.printf "Warning: set_mult_slot_type slot not continuous\n";
+            None, slot
+          end
+        end else Some (idx + 1, acc_r), slot
+    in
+    let acc, new_slot_list =
+      List.fold_left_map set_one_slot (Some (0, addr_l)) slot_list
+    in
+    match acc with
+    | None -> None
+    | Some (_, acc_r) ->
+      if DepType.check_eq smt_ctx addr_r acc_r then
+        Some new_slot_list
+      else None
+
+  let set_part_mem
+      (smt_ctx: SmtEmitter.t)
+      (is_spill_func: MemAnno.slot_t -> bool)
+      (part_mem: entry_t mem_slot list)
+      (addr_off: MemOffset.t)
+      (slot_info: MemAnno.slot_t)
+      (new_type: BasicType.t) : (entry_t mem_slot list) option =
+    (* 1. Update entry
+       2. Check slot_info, taint constraint *)
+    let _, slot_idx, _, num_slots = slot_info in
+    if List.length part_mem < slot_idx + num_slots then begin
+      Printf.printf "Warning: set_part_mem cannot find %d slot(s) starting from idx %d\n" 
+        num_slots slot_idx;
+      None
+    end else
+    if num_slots = 1 then
+      let acc, new_part_mem =
+        List.fold_left_map (
+          fun (acc: int option) (slot: entry_t mem_slot) ->
+            match acc with
+            | None -> None, slot
+            | Some acc_idx ->
+              if acc_idx <> slot_idx then Some (acc_idx + 1), slot
+              else begin
+                match set_one_slot_type smt_ctx (is_spill_func slot_info) slot addr_off new_type with
+                | None -> None, slot
+                | Some new_slot -> Some (acc_idx + 1), new_slot
+              end
+        ) (Some 0) part_mem
+      in
+      if acc <> None then Some new_part_mem
+      else None
+    else
+      set_mult_slot_type smt_ctx (slot_idx, slot_idx + num_slots) part_mem addr_off new_type
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -386,7 +670,21 @@ module MemType = struct
        2. update entry and all read/write permission; 
        3. check slot_info, taint constraint *)
     let _ = smt_ctx, is_spill_func, mem_type, addr_off, slot_info, new_type in
-    None
+    let (ptr, ptr_info), part_mem = find_part_mem_helper mem_type slot_info in
+    if not (PtrInfo.can_write_info ptr_info) then begin
+      Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
+        (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
+      None
+    end else
+      let new_part_mem_opt = set_part_mem smt_ctx is_spill_func part_mem addr_off slot_info new_type in
+      match new_part_mem_opt with
+      | None -> None
+      | Some new_part_mem ->
+        Some (List.map (
+          fun ((p, p_info), p_part_mem) ->
+            if p = ptr then (p, p_info), new_part_mem
+            else PtrInfo.invalidate_on_write ptr (p, p_info), p_part_mem
+        ) mem_type)
 
 end
 

@@ -104,6 +104,20 @@ module DepType = struct
     | Top _ -> e
     | Exp e -> exp_substitute e
 
+  let check_eq
+      (smt_ctx: SmtEmitter.t)
+      (exp1: exp_t) (exp2: exp_t) : bool =
+    SmtEmitter.check_compliance smt_ctx
+      [ Boolean.mk_eq (fst smt_ctx) exp1 exp2 ]
+    = SatYes
+
+  let to_common_const (smt_ctx: SmtEmitter.t) (exp: exp_t) : int64 option =
+    let ctx, _ = smt_ctx in
+    let eq_int (exp: exp_t) (i: int64) : bool =
+      check_eq smt_ctx exp (BitVector.mk_numeral ctx (Int64.to_string i) (get_exp_bit_size exp))
+    in
+    List.find_opt (eq_int exp) [1L; 2L; 4L; 8L; 16L]
+
   let get_const_exp (ctx: context) (c: int64) (size: int) : exp_t =
     BitVector.mk_numeral ctx (Int64.to_string c) size
 
@@ -258,6 +272,15 @@ module DepType = struct
       (ctx: context) (set_default_zero: bool)
       (start_byte: int64) (len_byte: int64) (orig_e: t) (new_e: t) : t * bool =
     set_start_end ctx set_default_zero start_byte (Int64.add start_byte len_byte) orig_e new_e
+
+  let concat (ctx: context) (high: t) (low: t) : t =
+    (* Used for concat type of multiple mem slots. If Top, return Top 0. *)
+    match low, high with
+    | Exp low_exp, Exp high_exp ->
+      if BitVector.is_bv_numeral low_exp && BitVector.is_bv_numeral high_exp then
+        Exp (BitVector.mk_concat ctx high_exp low_exp)
+      else Top 0
+    | _ -> Top 0
 
   let get_flag (e: t) : t =
     if is_bool e then e
@@ -953,6 +976,13 @@ module BasicType = struct
       (start_byte: int64) (len_byte: int64) 
       (orig_e: t) (new_e: t) : t =
     set_start_end ctx set_default_zero start_byte (Int64.add start_byte len_byte) orig_e new_e
+
+  let concat_same_taint (smt_ctx: SmtEmitter.t) (high: t) (low: t) : t option =
+    let high_dep, high_taint = high in
+    let low_dep, low_taint = low in
+    if TaintType.check_subtype smt_ctx true high_taint low_taint then
+      Some (DepType.concat (fst smt_ctx) high_dep low_dep, low_taint)
+    else None
 
   let get_flag (e: t) : t =
     let dep, taint = e in
