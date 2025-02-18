@@ -95,12 +95,12 @@ include ArchTypeBasic
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
 
-  let rec get_dest_op_size (dest: Isa.operand) : int =
+  let get_dest_op_size (dest: Isa.operand) : int =
     match dest with
-    | RegOp r -> Isa.get_reg_offset_size r |> snd |> Int64.to_int
-    | RegMultOp rlst -> Isa.get_reg_mult_op_size rlst |> Int64.to_int 
+    | RegOp r -> Isa.get_reg_size r |> Int64.to_int
+    | RegMultOp r_list -> Isa.get_reg_mult_op_size r_list |> Int64.to_int
     | StOp (_, _, _, _, size, _) -> size |> Int64.to_int
-    | ImmOp _ | MemOp _ | LdOp _ | LabelOp _ -> arch_type_error "get_dest_op_size: dest is not reg or st op"
+    | ImmOp _ | MemOp _ | LdOp _ | LabelOp _ -> arch_type_error "set_dest_op_type: dest is not reg or st op"
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -155,7 +155,10 @@ include ArchTypeBasic
       Some { curr_type with
         reg_type = RegType.set_reg_type (fst smt_ctx) curr_type.reg_type r new_type;
         flag_type = new_flags }
-    | RegMultOp _ -> arch_type_error "<TODO> not implemented yet"
+    | RegMultOp r_list -> 
+      Some { curr_type with
+        reg_type = RegType.set_reg_mult_type (fst smt_ctx) curr_type.reg_type r_list new_type;
+        flag_type = new_flags }
     | StOp st_op ->
       begin match set_st_op_type smt_ctx curr_type st_op new_type with
       | None -> None
@@ -173,159 +176,22 @@ include ArchTypeBasic
      (2) type check at call also needs to check other fields in call_anno
      (3) we need to check validity of func interface against its function body, and also check its non-overlap info is constrained correctly *)
 
-  type nary_op = | BOp of bop | UOp of uop | TOp of top
-
-  let shift_rsp
-      (smt_ctx: SmitEmitter.t)
-      (curr_type: t)
-      (push: bool) =
-    match get_src_op_type smt_ctx curr_type (RegOp RSP) with
-    | None -> arch_type_error "shift_rsp: Cannot get type of %rsp"
-    | Some (Top _, _) -> arch_type_error "shift_rsp: %rsp is top"
-    | Some (Exp rsp_dep, rsp_tnt) ->
-        let ctx, _ = smt_ctx in
-        let offset = if push then "-8" else "8" in
-        let new_dep = BitVector.mk_sub ctx rsp_dep (BitVector.mk_numeral ctx offset 64) in
-        let new_rsp = Exp new_dep, rsp_tnt in
-        { curr_type with reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP new_rsp }
-  
-  let exe_nary
-      ?(ignore_flags: bool = false) (* If true, flags will not be updated. This is to allow for n-ary operations to be applied as part of larger instructions, e.g. incrementing/decrementing %rsp in push/pop *)
-      (smt_ctx: context)
-      (curr_type: t)
-      (n: int) (nop: nary_op)
-      (dest: Isa.operand) (src_ops: Isa.operand list) : bool * t =
-    let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
-    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) src_ops in
-    if List.length src_type_list <> n then false, curr_type else
-    let ctx, _ = smt_ctx in
-    let dest_type, flag_update_list =
-      begin match n, nop with
-      | 1, UOp uop -> BasicType.exe_uop ctx uop src_type_list get_src_flag_func (get_dest_op_size dest)
-      | 2, BOp bop -> BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest)
-      | 3, TOp top -> BasicType.exe_top ctx top src_type_list get_src_flag_func (get_dest_op_size dest)
-      | _ -> arch_type_error "exe_nary: n and nop size do not match"
-      end
-    in
-    let flag_update_list = if ignore_flags then [] else flag_update_list in
-    begin match set_dest_op_type smt_ctx curr_type dest dest_type flag_update_list with
-    | None -> false, curr_type
-    | Some next_type -> true, next_type
-    end
-
-  let exe_xchg
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t)
-      (dest0: Isa.operand) (dest1: Isa.operand)
-      (src0: Isa.operand) (src1: Isa.operand) =
-    let src_type_0 = Option.get (get_src_op_type smt_ctx curr_type src0) in
-    let src_type_1 = Option.get (get_src_op_type smt_ctx curr_type src1) in
-    match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] with
-    | None _ -> false, curr_type
-    | Some result_type_1 ->
-      begin
-      match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] with
-      | None _ -> false, curr_type
-      | Some result_type_2 -> true, result_type_2
-      end
-
-  let exe_cmp
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t)
-      (src0: Isa.operand)
-      (src1: Isa.operand) =
-    (* Note that src0 is not the true dest; in cmp, the result is discarded *)
-    let _, new_flags = exe_nary smt_ctx curr_type 2 (BOp Sub) src0 [ src0; src1 ] in 
-    { curr_type with flag_type = new_flags }
-  
-  let exe_test
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t)
-      (src0: Isa.operand)
-      (src1: Isa.operand) =
-    (* Note that src0 is not the true dest; in test, the result is discarded *)
-    let _, new_flags = exe_nary smt_ctx curr_type 2 (BOp And) src0 [ src0; src1 ] in
-    { curr_type with flag_type = new_flags }
-
-  let exe_push
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t)
-      (src: Isa.operand)
-      (memslot: MemAnno.t) =
-    let rsp_type = shift_rsp curr_type true in
-    let src_type = Option.get (get_src_op_type smt_ctx rsp_type src) in
-    let src_size = Isa.get_op_size src in
-    match set_dest_op_type smt_ctx rsp_type (StOp (None, RSP, None, None, src_size, memslot)) src_type [] with
-    | None _ -> false, curr_type
-    | Some result_type -> true, result_type
-
-  let exe_pop
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t)
-      (dest: Isa.operand)
-      (memslot: MemAnno.t) =
-    (* Store memory taint in dest *)
-    let dest_size = Isa.get_op_size dest in
-    let ld_op = LdOp (None, RSP, None, None, dest_size, memslot) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type dest ld_type [] with
-    | None _ -> false, curr_type
-    | Some result_type -> true, shift_rsp result_type false
-
-  let exe_repmovs
-      (ctx: context)
-      (curr_type: t)
-      (size: int64)
-      (mem1: MemAnno.t)
-      (mem2: MemAnno.t) =
-    let ld_op = LdOp (None, RSI, None, None, size, mem1) in
-    let st_op = StOp (None, RDI, None, None, size, mem2) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type st_op ld_type [] with
-    | None _ -> false, curr_type
-    | Some result_type -> true, result_type
- 
-  let exe_replods
-      (ctx: context)
-      (curr_type: t)
-      (size: int64)
-      (mem: MemAnno.t) =
-    let ld_op = LdOp (None, RSI, None, None, size, mem1) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] with
-    | None _ -> false, curr_type
-    | Some result_type -> true, result_type
-  
-  let exe_repstos
-      (ctx: context)
-      (curr_type: t)
-      (size: int64)
-      (mem: MemAnno.t) =
-    let rax_type = Option.get (get_src_op_type smt_ctx curr_type (RegOp RAX)) in
-    let st_op = StOp (None, RDI, None, None, size, mem2) in
-    match set_dest_op_type smt_ctx curr_type st_op ld_type [] with
-    | None _ -> false, curr_type
-    | Some result_type -> true, result_type
-  
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     match inst with
-    | BInst (bop, dest, src0, src1)       -> exe_nary smt_ctx curr_type 2 (BOp bop) dest [ src0; src1 ]
-    | UInst (uop, dest, src)              -> exe_nary smt_ctx curr_type 1 (UOp uop) dest [ src ]
-    | TInst (top, dest, src0, src1, src2) -> exe_nary smt_ctx curr_type 3 (TOp top) dest [ src0; src1; src2 ]
-    | Xchg (dest0, dest1, src0, src1)     -> exe_xchg smt_ctx curr_type dest0 dest1 src0 src1
-    | Cmp (src0, src1)                    -> exe_cmp  smt_ctx curr_type src0 src1
-    | Test (src0, src1)                   -> exe_test smt_ctx curr_type src0 src1
-    | Push (src, memslot)                 -> exe_push smt_ctx curr_type src memslot
-    | Pop (dest, memslot)                 -> exe_pop  smt_ctx curr_type dest memslot
-    | RepMovs (size, mem1, mem2)          -> exe_repmovs smt_ctx size mem1 mem2 
-    | RepLods (size, mem)                 -> exe_replods smt_ctx size mem
-    | RepStos (size, mem)                 -> exe_repstos smt_ctx size mem
-    | Nop                                 -> true, curr_type
-    | Hlt                                 -> true, curr_type
+    | BInst (bop, dest, src0, src1) ->
+      let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
+      if List.length src_type_list <> 2 then false, curr_type else
+      let dest_type, flag_update_list = 
+        BasicType.exe_bop (fst smt_ctx) bop src_type_list get_src_flag_func (get_dest_op_size dest)
+      in
+      begin match set_dest_op_type smt_ctx curr_type dest dest_type flag_update_list with
+      | None -> false, curr_type
+      | Some next_type -> true, next_type
+      end
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
 
   let type_prop_check_one_inst

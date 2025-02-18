@@ -32,6 +32,23 @@ module RegType = struct
       fun i entry_type -> if i = reg_idx then new_type else entry_type
     ) reg_type
 
+  let set_reg_mult_type 
+      (ctx: context) (reg_type: t) 
+      (r_list: IsaBasic.register list) (new_type: entry_t) : t =
+    let helper
+        (acc: int64 * t) (r: IsaBasic.register) : int64 * t =
+      let acc_off, acc_reg_type = acc in
+      let reg_size = IsaBasic.get_reg_size r in
+      let acc_end = Int64.add acc_off reg_size in
+      let write_type = BasicType.get_start_end ctx acc_off acc_end new_type in
+      acc_end,
+      set_reg_type ctx acc_reg_type r write_type
+    in
+    let acc_off, reg_type = List.fold_left helper (0L, reg_type) r_list in
+    if DepType.get_bit_size (fst new_type) = (Int64.to_int acc_off) * 8 then
+      reg_type
+    else reg_type_error "set_reg_mult_type: new_type size and dest size unmatched"
+
   let check_subtype
       (smt_ctx: SmtEmitter.t)
       (sub_r_type: t) (sup_r_type: t) : bool =

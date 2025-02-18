@@ -30,6 +30,12 @@ module Isa (MemAnno: MemAnnoType) = struct
 
   (* operand utilities *)
 
+  let get_reg_mult_op_size (reg_mult_op: register list) : int64 =
+    List.fold_left (
+      fun (acc: int64) (r: register) ->
+        Int64.add acc (get_reg_size r)
+    ) 0L reg_mult_op
+
   let get_mem_op_size (mem_op: mem_op) : data_size option =
     let _, _, _, _, size = mem_op in size
 
