@@ -191,6 +191,7 @@ include ArchTypeBasic
      (3) we need to check validity of func interface against its function body, and also check its non-overlap info is constrained correctly *)
 
   type nary_op = | BOp of Isa.bop | UOp of Isa.uop | TOp of Isa.top
+  [@@deriving sexp]
 
   let shift_rsp
       (smt_ctx: SmtEmitter.t)

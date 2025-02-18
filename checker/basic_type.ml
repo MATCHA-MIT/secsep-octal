@@ -483,8 +483,13 @@ module DepType = struct
    **********************)    
 
   type z3_binop = context -> exp_t -> exp_t -> exp_t
+  [@@deriving sexp]
+  
   type exe_result = t * ((IsaBasic.flag * t) list)
+  [@@deriving sexp]
+  
   type flag_func = (IsaBasic.flag * t) list -> (IsaBasic.flag * t) list
+  [@@deriving sexp]
   
   let downsize_bv (ctx: context) (bv: exp_t) (size: int) : exp_t =
     let bv_size = BitVector.get_size (Expr.get_sort bv) in
