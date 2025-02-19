@@ -170,19 +170,6 @@ include ArchTypeBasic
       end
     | ImmOp _ | MemOp _ | LdOp _ | LabelOp _ -> arch_type_error "set_dest_op_type: dest is not reg or st op"
 
-  let add_offset_rsp
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t) (offset: int64) : t =
-    match get_src_op_type smt_ctx curr_type (RegOp RSP) with
-    | None -> arch_type_error "add_offset_rsp: cannot get rsp type"
-    | Some (Top _, _) -> arch_type_error "add_offset_rsp: rsp is top"
-    | Some (Exp rsp_exp, rsp_taint) ->
-      let ctx, _ = smt_ctx in
-      let off_exp = DepType.get_const_exp ctx offset 64 in
-      let new_rsp_exp = Z3.BitVector.mk_add ctx rsp_exp off_exp in
-      let new_reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP (Exp new_rsp_exp, rsp_taint) in
-      { curr_type with reg_type = new_reg_type }
-
   (* TODO:
      (1) type check at branch (or call) needs to check whether ctx_map contain all local (or local and input) variables
          (we should use the sup_a_type's global/input var as reference!!!)
@@ -192,19 +179,6 @@ include ArchTypeBasic
 
   type nary_op = | BOp of Isa.bop | UOp of Isa.uop | TOp of Isa.top
   [@@deriving sexp]
-
-  let add_offset_rsp
-      (smt_ctx: SmtEmitter.t)
-      (curr_type: t) (offset: int64) : t =
-    match get_src_op_type smt_ctx curr_type (RegOp RSP) with
-    | None -> arch_type_error "add_offset_rsp: cannot get rsp type"
-    | Some (Top _, _) -> arch_type_error "add_offset_rsp: rsp is top"
-    | Some (Exp rsp_exp, rsp_taint) ->
-      let ctx, _ = smt_ctx in
-      let off_exp = DepType.get_const_exp ctx offset 64 in
-      let new_rsp_exp = Z3.BitVector.mk_add ctx rsp_exp off_exp in
-      let new_reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP (Exp new_rsp_exp, rsp_taint) in
-      { curr_type with reg_type = new_reg_type }
 
   let shift_rsp
       (smt_ctx: SmtEmitter.t)
