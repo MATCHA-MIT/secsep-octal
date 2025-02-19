@@ -11,7 +11,6 @@ module CallAnno = struct
     ctx_map: BasicType.map_t;
     mem_map: MemAnno.slot_t MemType.mem_content;
   }
-
-
+  [@@deriving sexp]
 
 end
