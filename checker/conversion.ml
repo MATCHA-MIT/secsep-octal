@@ -18,14 +18,15 @@ let rec convert_dep_type
     (ctx: Z3.context)
     (se: SingleEntryType.t)
     (size: int) (* assume that variables involved have consistent size *)
+    (top_size: int)
     : DepType.t =
   match se with
-  | SingleTop -> DepType.Top size
+  | SingleTop -> DepType.Top top_size
   | SingleConst c -> DepType.Exp (Z3Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx (size * 8)))
   | SingleVar v -> DepType.Exp (Z3Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (size * 8)))
   | SingleBExp (bop, e1, e2) ->
-    let e1 = convert_dep_type ctx e1 size in
-    let e2 = convert_dep_type ctx e2 size in
+    let e1 = convert_dep_type ctx e1 size top_size in
+    let e2 = convert_dep_type ctx e2 size top_size in
     (
       match bop, e1, e2 with
       | _, DepType.Top sz, _
@@ -72,11 +73,12 @@ let convert_taint_type
 let convert_basic_type
     (ctx: Z3.context)
     (taint_entry_type: TaintEntryType.t)
-    (default_size: int) (* size in bytes for variables involved in DepType *)
+    (size: int) (* size in bytes for variables involved in DepType *)
+    (top_size: int) (* size for top *)
     : BasicType.t =
   let se, te = taint_entry_type in
   (
-    convert_dep_type ctx se default_size,
+    convert_dep_type ctx se size top_size,
     convert_taint_type ctx te
   )
 
@@ -88,12 +90,12 @@ let convert_reg_type
     failwith "source reg_type's length is unexpected"
   else
     List.mapi (fun idx entry ->
-      convert_basic_type ctx entry (
-        idx
+      let size = idx
         |> TaintTypeInfer.ArchType.Isa.get_full_reg_by_idx
         |> TaintTypeInfer.ArchType.Isa.get_reg_size
         |> Int64.to_int
-      )
+      in
+      convert_basic_type ctx entry size size
     ) reg_type
 
 let convert_flag_type
@@ -109,8 +111,9 @@ let convert_mem_offset
     (off: Type.Mem_offset_new.MemOffset.t)
     : MemOffset.t =
   let off_l, off_r = off in
-  let off_l' = convert_dep_type ctx off_l (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int) in
-  let off_r' = convert_dep_type ctx off_r (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int) in
+  let size = TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int in
+  let off_l' = convert_dep_type ctx off_l size size in
+  let off_r' = convert_dep_type ctx off_r size size in
   match off_l', off_r' with
   | Exp e_l, Exp e_r -> (e_l, e_r)
   | _ -> failwith "unexpected Top found in input's MemOffset"
@@ -118,11 +121,19 @@ let convert_mem_offset
 let convert_mem_range
     (ctx: Z3.context)
     (range: Type.Mem_offset_new.MemRange.t)
-    : MemRange.t =
+    : MemRange.t * (int64 list) = (* empty list is a hint that the slot's DepType can be treated as Top *)
   match range with
   | Type.Mem_offset_new.MemRange.RangeConst off_list ->
-    List.map (fun off -> convert_mem_offset ctx off) off_list
-  | _ -> failwith "unexpected variable MemRange" (* TODO: is variable expected after inference? *)
+    off_list
+    |> List.map (fun off ->
+      let off' = convert_mem_offset ctx off in
+      let size = Type.Mem_offset_new.MemOffset.get_size off |> Option.get in
+      (off', size)
+    )
+    |> List.split
+  | _ ->
+    Printf.printf "warn: %s converted to empty list\n" (Type.Mem_offset_new.MemRange.to_string range);
+    ([], [])
 
 let convert_mem_type
     (ctx: Z3.context)
@@ -132,9 +143,23 @@ let convert_mem_type
     let ptr_info, mem_slots = mem_part in
     let mem_slots' = List.map (fun (mem_slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off, range, entry = mem_slot in
+
       let off' = convert_mem_offset ctx off in
-      let range' = convert_mem_range ctx range in
-      let entry' = convert_basic_type ctx entry DepType.top_unknown_size in
+
+      let range', inited_range_sizes = convert_mem_range ctx range in
+
+      let default_top_type = (* DepType is top, TaintType is init accordingly *)
+        convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) DepType.top_unknown_size DepType.top_unknown_size
+      in
+      let entry' = match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
+      | [], _ -> default_top_type
+      | [_], None -> default_top_type (* non-const size slot *)
+      | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
+      | [inited_size], Some _ ->
+        convert_basic_type ctx entry (Int64.to_int inited_size) DepType.top_unknown_size
+      | _ -> default_top_type (* more than one inited range *)
+      in
+
       (off', range', entry')
     ) mem_slots
     in
@@ -252,7 +277,7 @@ let convert_base_info
     let mem_slots' = List.map (fun (mem_slot: Type.Call_anno_type.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off, range, entry = mem_slot in
       let off' = convert_mem_offset ctx off in
-      let range' = convert_mem_range ctx range in
+      let range', _ = convert_mem_range ctx range in
       let entry' = match entry with
       | Type.Call_anno_type.CallAnno.BaseAsReg r -> FuncInterface.BaseAsReg r
       | Type.Call_anno_type.CallAnno.BaseAsSlot (ptr, off) -> FuncInterface.BaseAsSlot (convert_slot ref_mem ptr off)
