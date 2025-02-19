@@ -273,11 +273,6 @@ module MemTypeBasic = struct
         ) acc off_list
     ) [] mem_layout
   
-  let get_mem_part (mem: 'a mem_content) (ptr: IsaBasic.imm_var_id) : 'a mem_part option =
-    List.find_opt (
-      fun ((x, _), _) -> x = ptr
-    ) mem
-
 end
 
 module MemType (Entry: EntryType) = struct

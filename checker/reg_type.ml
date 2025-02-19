@@ -64,7 +64,7 @@ module RegType = struct
     List.fold_left2 (
       fun (acc: bool) (_, sub_taint) (_, sup_taint) ->
         acc &&
-        TaintType.check_subtype smt_ctx true  sub_taint sup_taint
+        TaintType.check_subtype smt_ctx true sub_taint sup_taint
     ) true sub_r_type sup_r_type
 
 end

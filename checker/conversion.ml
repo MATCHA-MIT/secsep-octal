@@ -258,7 +258,7 @@ let convert_slot
     (ptr: Type.Isa_basic.IsaBasic.imm_var_id)
     (off: Type.Mem_offset_new.MemOffset.t)
     : MemAnno.slot_t =
-  let part = TaintTypeInfer.ArchType.MemType.get_mem_part ref_mem ptr |> Option.get in
+  let part = TaintTypeInfer.ArchType.MemType.get_part_mem ref_mem ptr in
   let idx = List.find_index (
     fun (slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off', _, _ = slot in
