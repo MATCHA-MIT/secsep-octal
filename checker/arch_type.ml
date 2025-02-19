@@ -193,19 +193,34 @@ include ArchTypeBasic
   type nary_op = | BOp of Isa.bop | UOp of Isa.uop | TOp of Isa.top
   [@@deriving sexp]
 
+  let add_offset_rsp
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t) (offset: int64) : t =
+    match get_src_op_type smt_ctx curr_type (RegOp RSP) with
+    | None -> arch_type_error "add_offset_rsp: cannot get rsp type"
+    | Some (Top _, _) -> arch_type_error "add_offset_rsp: rsp is top"
+    | Some (Exp rsp_exp, rsp_taint) ->
+      let ctx, _ = smt_ctx in
+      let off_exp = DepType.get_const_exp ctx offset 64 in
+      let new_rsp_exp = Z3.BitVector.mk_add ctx rsp_exp off_exp in
+      let new_reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP (Exp new_rsp_exp, rsp_taint) in
+      { curr_type with reg_type = new_reg_type }
+
   let shift_rsp
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
-      (push: bool) =
+      (offset: int64) =
     match get_src_op_type smt_ctx curr_type (RegOp RSP) with
     | None -> arch_type_error "shift_rsp: Cannot get type of %rsp"
     | Some (Top _, _) -> arch_type_error "shift_rsp: %rsp is top"
     | Some (Exp rsp_dep, rsp_tnt) ->
         let ctx, _ = smt_ctx in
-        let offset = if push then "-8" else "8" in
+        let off_exp = DepType.get_const_exp ctx offset 64 in
+        let new_rsp_dep = DepType.Exp (Z3.BitVector.mk_add ctx rsp_dep off_exp) in
+        (* let offset = if push then "-8" else "8" in
         let new_dep = Z3.BitVector.mk_sub ctx rsp_dep (Z3.BitVector.mk_numeral ctx offset 64) in
-        let new_rsp = DepType.Exp new_dep, rsp_tnt in
-        { curr_type with reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP new_rsp }
+        let new_rsp = DepType.Exp new_dep, rsp_tnt in *)
+        { curr_type with reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP (new_rsp_dep, rsp_tnt) }
   
   let exe_nary
       ?(ignore_flags: bool = false) (* If true, flags will not be updated. This is to allow for n-ary operations to be applied as part of larger instructions, e.g. incrementing/decrementing %rsp in push/pop *)
@@ -236,16 +251,20 @@ include ArchTypeBasic
       (curr_type: t)
       (dest0: Isa.operand) (dest1: Isa.operand)
       (src0: Isa.operand) (src1: Isa.operand) =
-    let src_type_0 = Option.get (get_src_op_type smt_ctx curr_type src0) in
-    let src_type_1 = Option.get (get_src_op_type smt_ctx curr_type src1) in
-    match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] with
-    | None -> false, curr_type
-    | Some result_type_1 ->
-      begin
-      match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] with
+    let src_type_opt_0 = get_src_op_type smt_ctx curr_type src0 in
+    let src_type_opt_1 = get_src_op_type smt_ctx curr_type src1 in
+    match src_type_opt_0, src_type_opt_1 with
+    | Some src_type_0, Some src_type_1 ->
+      begin match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] with
       | None -> false, curr_type
-      | Some result_type_2 -> true, result_type_2
+      | Some result_type_1 ->
+        begin
+        match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] with
+        | None -> false, curr_type
+        | Some result_type_2 -> true, result_type_2
+        end
       end
+    | _ -> false, curr_type
 
   let exe_cmp
       (smt_ctx: SmtEmitter.t)
@@ -280,9 +299,10 @@ include ArchTypeBasic
       (curr_type: t)
       (src: Isa.operand)
       (memslot: MemAnno.t) =
-    let rsp_type = shift_rsp smt_ctx curr_type true in
-    let src_type = Option.get (get_src_op_type smt_ctx rsp_type src) in
     let src_size = Isa.get_op_size src in
+    let rsp_type = shift_rsp smt_ctx curr_type (Int64.neg src_size) in
+    (* src should be reg, so always return Some *)
+    let src_type = Option.get (get_src_op_type smt_ctx rsp_type src) in
     match set_dest_op_type smt_ctx rsp_type (StOp (None, Some RSP, None, None, src_size, memslot)) src_type [] with
     | None -> false, curr_type
     | Some result_type -> true, result_type
@@ -295,10 +315,12 @@ include ArchTypeBasic
     (* Store memory taint in dest *)
     let dest_size = Isa.get_op_size dest in
     let ld_op = Isa.LdOp (None, Some RSP, None, None, dest_size, memslot) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type dest ld_type [] with
+    match get_src_op_type smt_ctx curr_type ld_op with
     | None -> false, curr_type
-    | Some result_type -> true, shift_rsp smt_ctx result_type false
+    | Some ld_type ->
+      (* dest should be reg, so always return Some *)
+      let result_type = Option.get (set_dest_op_type smt_ctx curr_type dest ld_type []) in
+      true, shift_rsp smt_ctx result_type dest_size
 
   let exe_repmovs
       (smt_ctx: SmtEmitter.t)
@@ -306,6 +328,7 @@ include ArchTypeBasic
       (size: int64)
       (mem1: MemAnno.t)
       (mem2: MemAnno.t) =
+    (* <TODO> Fix this! *)
     let ld_op = Isa.LdOp (None, Some RSI, None, None, size, mem1) in
     let st_op = Isa.StOp (None, Some RDI, None, None, size, mem2) in
     let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
@@ -318,6 +341,7 @@ include ArchTypeBasic
       (curr_type: t)
       (size: int64)
       (mem: MemAnno.t) =
+    (* <TODO> Fix this! *)
     let ld_op = Isa.LdOp (None, Some RSI, None, None, size, mem) in
     let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
     match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] with
@@ -329,6 +353,7 @@ include ArchTypeBasic
       (curr_type: t)
       (size: int64)
       (mem: MemAnno.t) =
+    (* <TODO> Fix this! *)
     let rax_type = Option.get (get_src_op_type smt_ctx curr_type (RegOp RAX)) in
     let st_op = Isa.StOp (None, Some RDI, None, None, size, mem) in
     match set_dest_op_type smt_ctx curr_type st_op rax_type [] with
