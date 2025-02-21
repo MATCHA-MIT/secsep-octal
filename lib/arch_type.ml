@@ -264,6 +264,16 @@ module ArchType (Entry: EntryType) = struct
   let set_reg_type_helper (allow_set_xmm: bool) (curr_type: t) (r: Isa.register) (new_type: entry_t) : t =
     { curr_type with reg_type = (RegType.set_reg_type_helper allow_set_xmm curr_type.reg_type r new_type) }
 
+  let set_mult_reg_type_helper (allow_set_xmm: bool) (curr_type: t) (r_list: Isa.register list) (new_type: entry_t) : t =
+    let top_new_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) new_type in
+    let reg_type =
+      List.fold_left (
+        fun (acc: RegType.t) (r: Isa.register) ->
+          RegType.set_reg_type_helper allow_set_xmm acc r top_new_type
+      ) curr_type.reg_type r_list
+    in
+    { curr_type with reg_type = reg_type }
+
   let set_reg_type = set_reg_type_helper false
 
   let get_mem_op_type
@@ -591,7 +601,7 @@ module ArchType (Entry: EntryType) = struct
       t * (Constraint.t list) * Isa.operand =
     match dest with
     | RegOp r -> set_reg_type_helper allow_set_xmm curr_type r new_type, [], dest
-    | RegMultOp _ -> arch_type_error "<TODO> not implemented"
+    | RegMultOp r_list -> set_mult_reg_type_helper allow_set_xmm curr_type r_list new_type, [], dest
     | StOp (disp, base, index, scale, size, (slot_anno, taint_anno)) ->
       let addr_type = get_mem_op_type curr_type disp base index scale in
       let size_type = Entry.get_const_type (ImmNum (size, Some 8L)) in
