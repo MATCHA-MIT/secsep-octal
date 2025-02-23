@@ -995,8 +995,9 @@ module BasicType = struct
     let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
     let dep_list, taint_list = List.split e_list in
     let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
-    let taint = TaintType.exe ctx taint_list in
-    let _, update_flag_map = get_flag_config op in
+    let src_flag_list, update_flag_map = get_flag_config op in
+    let src_flag_taint_list = List.map get_src_flag_taint src_flag_list in
+    let taint = TaintType.exe ctx (taint_list @ src_flag_taint_list) in
     (dep, taint),
     List.map2 (
       fun (flag, flag_dep) (flag2, self_is_src) -> 
