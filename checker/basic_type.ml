@@ -26,6 +26,11 @@ module DepType = struct
   let top_bool_size = -1 (* Intend to distinguish Top bv and Top bool*)
   let top_unknown_size = 0 (* Intend to represent mem data type where size is not gained from basic types *)
 
+  let get_exp (e: t) : exp_t =
+    match e with
+    | Exp e -> e
+    | Top _ -> dep_type_error "get_exp of top"
+
   let is_bv (e: t) : bool =
     match e with
     | Exp e -> BitVector.is_bv e
@@ -35,7 +40,7 @@ module DepType = struct
     match e with
     | Exp e -> Boolean.is_bool e
     | Top size -> size = top_bool_size
-
+  
   let get_exp_bit_size (e: exp_t) : int =
     Z3.BitVector.get_size (Z3.Expr.get_sort e)
 
@@ -926,6 +931,10 @@ module BasicType = struct
 
   type ctx_t = DepType.ctx_t * TaintType.ctx_t
   [@@deriving sexp]
+
+  let append_ctx (ctx_list: ctx_t) (new_constraint: DepType.exp_t) : ctx_t =
+    let dep_ctx, taint_ctx = ctx_list in
+    (new_constraint :: dep_ctx, taint_ctx)
 
   let substitute
       (dep_substitute: DepType.t -> DepType.t)

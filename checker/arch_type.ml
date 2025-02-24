@@ -354,14 +354,93 @@ include ArchTypeBasic
     | Nop                                     -> true, curr_type
     | Hlt                                     -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
-
+  
   let type_prop_uncond_branch
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
-      (target_type: t)
-      (branch_anno: BranchAnno.t) : bool * t =
-    check_subtype smt_ctx curr_type target_type branch_anno None,
-    curr_type
+      (targ_type: t)
+      (br_anno: BranchAnno.t)
+      : bool * t =
+    if curr_type.pc + 1 < curr_type.dead_pc then begin
+      Printf.printf "Warning: instr after uncond branch is not dead";
+      false, curr_type
+    end else
+
+    check_subtype smt_ctx curr_type targ_type br_anno None,
+    curr_type (* already at the end of block, no further update *)
+  
+  let type_prop_cond_branch
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t)
+      (targ_type: t)
+      (br_cond: Isa.branch_cond)
+      (br_anno: BranchAnno.t)
+      : bool * t =
+    let z3_ctx, _ = smt_ctx in
+    let get_flag (f: Isa.flag) : DepType.exp_t = FlagType.get_flag_type curr_type.flag_type f |> fst |> DepType.get_exp in
+    let is_zero (x: Z3.Expr.expr) = Z3.Boolean.mk_eq z3_ctx x (Z3.Boolean.mk_false z3_ctx) in
+    let is_one (x: Z3.Expr.expr) = Z3.Boolean.mk_eq z3_ctx x (Z3.Boolean.mk_true z3_ctx) in
+    let equal (x: Z3.Expr.expr) (y: Z3.Expr.expr) = Z3.Boolean.mk_eq z3_ctx x y in 
+    let not_equal (x: Z3.Expr.expr) (y: Z3.Expr.expr) = Z3.Boolean.mk_not z3_ctx (Z3.Boolean.mk_eq z3_ctx x y) in
+    let logic_and (x_list: Z3.Expr.expr list) = Z3.Boolean.mk_and z3_ctx x_list in
+    let logic_or (x_list: Z3.Expr.expr list) = Z3.Boolean.mk_or z3_ctx x_list in
+
+    let taken = match br_cond with
+    | JNe -> get_flag ZF |> is_zero
+    | JE  -> get_flag ZF |> is_one
+    | JL -> not_equal (get_flag SF) (get_flag OF)
+    | JLe -> logic_or [ is_one (get_flag ZF); not_equal (get_flag SF) (get_flag OF) ]
+    | JG -> logic_and [ is_zero (get_flag ZF); equal (get_flag SF) (get_flag OF) ]
+    | JGe -> equal (get_flag SF) (get_flag OF)
+    | JB -> is_one (get_flag CF)
+    | JBe -> logic_or [ is_one (get_flag ZF); is_one (get_flag CF) ]
+    | JA -> logic_and [ is_zero (get_flag ZF); is_zero (get_flag CF) ]
+    | JAe -> is_zero (get_flag CF)
+    | JOther -> Z3.Boolean.mk_const_s z3_ctx "s-top-bool"
+    in
+
+    let check_taken () : bool =
+      if targ_type.pc >= targ_type.dead_pc then begin
+        Printf.printf "Warning: branch target is dead";
+        false
+      end else begin
+        SmtEmitter.push smt_ctx;
+        SmtEmitter.add_assertions smt_ctx [taken];
+        let next_type = { curr_type with
+          context = BasicType.append_ctx curr_type.context taken
+        } in
+        let valid = check_subtype smt_ctx next_type targ_type br_anno None in
+        SmtEmitter.pop smt_ctx 1;
+        valid
+      end
+    in
+
+    let check_not_taken () : bool * t =
+      let not_taken = Z3.Boolean.mk_not z3_ctx taken in
+      SmtEmitter.add_assertions smt_ctx [not_taken];
+      let next_type = { curr_type with
+        pc = curr_type.pc + 1;
+        context = BasicType.append_ctx curr_type.context not_taken
+      } in
+      if next_type.pc >= next_type.dead_pc then begin
+        Printf.printf "Warning: instr after not taken branch is dead";
+        false, next_type
+      end else
+        true, next_type
+    in
+
+    match SmtEmitter.check_compliance smt_ctx [taken] with
+    | SmtEmitter.SatNo -> (* always not taken *)
+      check_not_taken ()
+    | SmtEmitter.SatYes -> (* always taken *)
+      if curr_type.pc + 1 < curr_type.dead_pc then begin
+        Printf.printf "Warning: instr after always-taken cond branch is not dead";
+        false, curr_type
+      end else
+        check_taken (), curr_type (* already at the last alive instruction, no further update *)
+    | SmtEmitter.SatUnknown ->
+      let not_taken_valid, next_type = check_not_taken () in
+      not_taken_valid && check_taken (), next_type
 
   let type_prop_check_one_inst
       (smt_ctx: SmtEmitter.t)
@@ -371,13 +450,16 @@ include ArchTypeBasic
       (inst: Isa.instruction) : bool * t =
     (* 1. Prop inst
        2. Ensure if can proceed to next inst, pc + 1 < dead_pc *)
-    let _ = func_interface_list, block_type_list in (* TODO: remove this later *)
+    let find_block_helper (label: Isa.label) : t =
+      List.find (fun block_type -> block_type.label = label) block_type_list
+    in
     match inst with
-    | Jmp _ | Jcond _ ->
-      arch_type_error "<TODO> not implemented yet"
-      (* <TODO> For cond branch, 
-         Taken: check dest is not dead block;
-         Not taken: check if not taken is possible, next_pc < dead_pc, else next_pc = dead_pc! *)
+    | Jmp (br_target, br_anno) ->
+      let targ_type = find_block_helper br_target in
+      type_prop_uncond_branch smt_ctx curr_type targ_type br_anno
+    | Jcond (br_cond, br_target, br_anno) ->
+      let targ_type = find_block_helper br_target in
+      type_prop_cond_branch smt_ctx curr_type targ_type br_cond br_anno
     | Call (callee_name, call_anno) ->
       let callee_interface = FuncInterface.get_func_interface func_interface_list callee_name in
       let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
