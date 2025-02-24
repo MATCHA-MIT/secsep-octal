@@ -405,8 +405,7 @@ include ArchTypeBasic
        1. Check block well-formness
           1. s-val belongs to s-alloc for each mem slot
        2. Prop if dead_pc > pc and check dead_pc *)
-    (* <TODO> Check block well-formness *)
-    false &&
+    (MemType.check_valid_region smt_ctx block_type.mem_type) &&
     begin
       SmtEmitter.push smt_ctx;
       SmtEmitter.add_assertions smt_ctx (fst block_type.context);
@@ -441,8 +440,7 @@ include ArchTypeBasic
        2. Check func type matches its interface
        3. Check func type correctness (prop/symbolic execution) *)
     let _ = func_name in (* <TODO> Remove this later *)
-    (* <TODO> Check non-overlap *)
-    false &&
+    (MemType.check_non_overlap smt_ctx (List.hd func_type).mem_type) &&
     (* <TODO> Check func type matches its interface *)
     false &&
     (* Check func type correctness (prop/symbolic execution) *)

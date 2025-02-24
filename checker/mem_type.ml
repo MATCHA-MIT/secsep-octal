@@ -1,5 +1,6 @@
 open Type.Ptr_info
 open Type.Smt_emitter
+open Type.Set_sexp
 open Basic_type
 open Mem_anno
 open Z3
@@ -251,6 +252,59 @@ module MemType = struct
       PtrInfo.t * (MemAnno.slot_t * 'a) mem_slot =
     let ptr_info, (off, range, entry) = get_single_slot mem slot_info in
     ptr_info, (off, range, (slot_info, entry))
+
+  let get_mem_boundary_list 
+      (mem_type: t) : (PtrInfo.t * MemOffset.t) list =
+    let helper 
+        (part_mem: 'a mem_part) :
+        (PtrInfo.t * MemOffset.t) option =
+      let ptr_info, offset_list = part_mem in
+      match offset_list with
+      | [] -> None
+      | ((l, r), _, _) :: [] ->
+        Some (ptr_info, (l, r))
+      | ((l, _), _, _) :: tl ->
+        let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
+        Some (ptr_info, (l, r))
+    in
+    List.filter_map helper mem_type
+
+  let check_non_overlap
+      (smt_ctx: SmtEmitter.t)
+      (mem: 'a mem_content) : bool =
+    let ctx, _ = smt_ctx in
+    let rec get_mem_non_overlap_constraint_helper
+        (acc: DepType.exp_t list)
+        (boundary_list: (PtrInfo.t * MemOffset.t) list) :
+        DepType.exp_t list =
+      match boundary_list with
+      | [] -> acc
+      | ((_, (hd_overlap_set, _, _)), (hd_l, hd_r)) :: tl ->
+        let acc = get_mem_non_overlap_constraint_helper acc tl in
+        List.fold_left (
+            fun (acc: DepType.exp_t list) ((ptr, _), (l, r)) ->
+              if IntSet.mem ptr hd_overlap_set then acc
+              else 
+                (Boolean.mk_or ctx [
+                  (BitVector.mk_sle ctx hd_r l);
+                  (BitVector.mk_sle ctx r hd_l);
+                ]) :: acc
+          ) acc tl
+    in
+    let boundary_list = get_mem_boundary_list mem in
+    let constraint_list = get_mem_non_overlap_constraint_helper [] boundary_list in
+    SmtEmitter.check_compliance smt_ctx constraint_list = SatYes
+
+  let check_valid_region
+      (smt_ctx: SmtEmitter.t)
+      (mem: 'a mem_content) : bool =
+    List.find_opt (
+      fun (_, part_mem) ->
+        List.find_opt (
+          fun (off, range, _) ->
+            not (MemRange.check_subset smt_ctx range [off])
+        ) part_mem <> None
+    ) mem = None
 
   let check_slot_subtype
       (smt_ctx: SmtEmitter.t)
