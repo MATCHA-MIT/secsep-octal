@@ -10,7 +10,7 @@ open Single_entry_type
 open Taint_entry_type
 open Reg_type_new
 open Mem_type_new
-open Call_anno_type
+open Call_anno
 open Smt_emitter
 open Pretty_print
 open Sexplib.Std

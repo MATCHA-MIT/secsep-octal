@@ -270,18 +270,18 @@ let convert_slot
 let convert_base_info
     (ctx: Z3.context)
     (ref_mem: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_content)
-    (base_info: Type.Call_anno_type.CallAnno.base_info Type.Mem_type_new.MemTypeBasic.mem_content)
+    (base_info: Type.Call_anno.CallAnno.base_info Type.Mem_type_new.MemTypeBasic.mem_content)
     : FuncInterface.base_info MemType.mem_content =
-  List.map (fun (mem_part: Type.Call_anno_type.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_part) ->
+  List.map (fun (mem_part: Type.Call_anno.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_part) ->
     let ptr_info, mem_slots = mem_part in
-    let mem_slots' = List.map (fun (mem_slot: Type.Call_anno_type.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_slot) ->
+    let mem_slots' = List.map (fun (mem_slot: Type.Call_anno.CallAnno.base_info TaintTypeInfer.ArchType.MemType.mem_slot) ->
       let off, range, entry = mem_slot in
       let off' = convert_mem_offset ctx off in
       let range', _ = convert_mem_range ctx range in
       let entry' = match entry with
-      | Type.Call_anno_type.CallAnno.BaseAsReg r -> FuncInterface.BaseAsReg r
-      | Type.Call_anno_type.CallAnno.BaseAsSlot (ptr, off) -> FuncInterface.BaseAsSlot (convert_slot ref_mem ptr off)
-      | Type.Call_anno_type.CallAnno.BaseAsGlobal -> FuncInterface.BaseAsGlobal
+      | Type.Call_anno.CallAnno.BaseAsReg r -> FuncInterface.BaseAsReg r
+      | Type.Call_anno.CallAnno.BaseAsSlot (ptr, off) -> FuncInterface.BaseAsSlot (convert_slot ref_mem ptr off)
+      | Type.Call_anno.CallAnno.BaseAsGlobal -> FuncInterface.BaseAsGlobal
       in
       (off', range', entry')
     ) mem_slots

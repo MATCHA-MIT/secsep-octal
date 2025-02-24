@@ -2,8 +2,8 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
-open Branch_anno_type
-open Call_anno_type
+open Branch_anno
+open Call_anno
 open Constraint
 open Sexplib.Std
 

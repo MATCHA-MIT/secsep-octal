@@ -1,5 +1,5 @@
 open Single_entry_type
-open Branch_anno_type
+open Branch_anno
 open Arch_type
 open Single_inverse_map
 open Set_sexp

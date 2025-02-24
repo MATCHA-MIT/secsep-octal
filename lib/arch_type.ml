@@ -12,7 +12,7 @@ open Range_exp
 open Constraint
 open Func_interface
 open Full_mem_anno
-open Call_anno_type
+open Call_anno
 open Sexplib.Std
 
 module ArchType (Entry: EntryType) = struct
@@ -993,6 +993,7 @@ module ArchType (Entry: EntryType) = struct
       (target_func_name: Isa.label)
       (orig_call_anno: CallAnno.t) : t * CallAnno.t =
     Printf.printf "type_prop_call %s pc %d%!\n" target_func_name curr_type.pc;
+    SmtEmitter.pp_smt_ctx 1 smt_ctx;
     (* Entry.pp_local_var 0 curr_type.local_var_map; *)
     pp_arch_type 0 curr_type;
     match FuncInterface.find_fi func_interface_list target_func_name with

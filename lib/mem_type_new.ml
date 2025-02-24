@@ -476,14 +476,14 @@ module MemType (Entry: EntryType) = struct
             (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
             Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
           | _ -> 
-            SmtEmitter.pp_smt_ctx 0 smt_ctx;
+            SmtEmitter.pp_smt_ctx 1 smt_ctx;
             Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
             Printf.printf "simp_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t simp_addr_off));
             Printf.printf "quick cmp success while full cmp failed\n";
-            (* begin match SmtEmitter.check_context smt_ctx with
+            begin match SmtEmitter.check_context smt_ctx with
             | SatYes -> Printf.printf "ctx success\n"
             | _ -> Printf.printf "ctx fail\n"
-            end; *)
+            end;
             (* let l1, r1 = orig_addr_off in
             let l2, r2 = off in
             Printf.printf "No overflow %s\n" (Z3.Expr.to_string (SmtEmitter.expr_of_single_exp smt_ctx (SingleBExp (SingleMul, SingleVar 2, SingleConst 128L)) true));

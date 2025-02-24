@@ -5,7 +5,7 @@ open Taint_type_infer
 open Mem_type_new
 open Mem_offset_new
 open Full_mem_anno
-open Call_anno_type
+open Call_anno
 open Single_exp
 open Pretty_print
 

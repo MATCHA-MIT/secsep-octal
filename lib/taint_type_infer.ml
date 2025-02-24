@@ -13,7 +13,7 @@ open Taint_unknown_infer
 open Range_type_infer
 open Smt_emitter
 open Full_mem_anno
-open Call_anno_type
+open Call_anno
 open Taint_api
 open Sexplib.Std
 

@@ -547,7 +547,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [], 
-        Call_anno_type.CallAnno.BaseAsReg RDI
+        Call_anno.CallAnno.BaseAsReg RDI
       ];
       get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
     ];
@@ -615,12 +615,12 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
       get_default_info (r RDI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [], 
-        Call_anno_type.CallAnno.BaseAsReg RDI
+        Call_anno.CallAnno.BaseAsReg RDI
       ];
       get_const_default_info (r RSI), [ 
         (Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX)), 
         RangeConst [(Single_exp.SingleExp.SingleConst 0L, Single_exp.SingleExp.SingleVar (r RDX))], 
-        Call_anno_type.CallAnno.BaseAsReg RSI 
+        Call_anno.CallAnno.BaseAsReg RSI 
       ];
       get_default_info (r RSP), [ (SingleConst 0L, SingleConst 8L), RangeConst [], BaseAsReg RSP ];
     ];

@@ -18,7 +18,7 @@ open Mem_alive
 open Smt_emitter
 open Pretty_print
 open Full_mem_anno
-open Branch_anno_type
+open Branch_anno
 open Block_alive
 open Sexplib.Std
 

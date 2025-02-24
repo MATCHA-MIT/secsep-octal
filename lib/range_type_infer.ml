@@ -115,6 +115,8 @@ module RangeTypeInfer = struct
       SmtEmitter.push infer_state.smt_ctx;
       SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
       ArchType.add_assertions infer_state.smt_ctx block_type;
+      Printf.printf "Infer %s %s init smt_ctx\n" infer_state.func_name block_type.label;
+      SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
       let (_, block_subtype), _ =
         ArchType.type_prop_block infer_state.smt_ctx 
           (* (SingleSubtype.sub_sol_single_to_range_opt infer_state.single_sol infer_state.input_single_var_set)  *)

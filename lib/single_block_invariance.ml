@@ -1,7 +1,7 @@
 open Isa_basic
 open Single_exp
 open Single_entry_type
-open Branch_anno_type
+open Branch_anno
 open Cond_type_new
 open Single_context
 open Arch_type
