@@ -4,6 +4,8 @@ open Type.Smt_emitter
 (* open Z3_sexp *)
 open Basic_type
 open Mem_anno
+open Branch_anno
+open Call_anno
 open Stack_spill_info
 open Reg_type
 open Flag_type
@@ -16,7 +18,7 @@ module ArchTypeBasic = struct
 
   let arch_type_error msg = raise (ArchTypeError ("[Arch Type Error] " ^ msg))
 
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   type entry_t = BasicType.t
   [@@deriving sexp]

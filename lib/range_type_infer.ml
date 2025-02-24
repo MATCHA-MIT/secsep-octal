@@ -11,6 +11,8 @@ open Func_interface
 open Single_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Branch_anno
+open Call_anno
 open Set_sexp
 open Sexplib.Std
 (* open Sexplib *)
@@ -19,7 +21,7 @@ module RangeTypeInfer = struct
   exception RangeTypeInferError of string
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   let range_type_infer_error msg = raise (RangeTypeInferError ("[Range Type Infer Error] " ^ msg))
 

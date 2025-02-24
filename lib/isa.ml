@@ -2,12 +2,12 @@
 open Isa_basic
 open Pretty_print
 open Mem_anno_type
-open Branch_anno
-open Call_anno
+open Branch_anno_type
+open Call_anno_type
 open Constraint
 open Sexplib.Std
 
-module Isa (MemAnno: MemAnnoType) = struct
+module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAnnoType) = struct
 
   include IsaBasic
 

@@ -1,5 +1,7 @@
 open Isa
 open Full_mem_anno
+open Branch_anno
+open Call_anno
 open Transform
 
 module AsmGen = struct
@@ -8,7 +10,7 @@ module AsmGen = struct
   let asm_gen_error msg = raise (AsmGenError ("[AsmGen Error] " ^ msg))
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   type context = {
     global_var_map: Isa.imm_var_rev_map;

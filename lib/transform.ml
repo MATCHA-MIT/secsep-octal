@@ -5,6 +5,7 @@ open Taint_type_infer
 open Mem_type_new
 open Mem_offset_new
 open Full_mem_anno
+open Branch_anno
 open Call_anno
 open Single_exp
 open Pretty_print
@@ -15,7 +16,7 @@ let transform_error msg = raise (TransformError ("[Transform Error] " ^ msg))
 module InstTransform = struct
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   type t = {
     (* was *)
@@ -114,7 +115,7 @@ end
 module Transform = struct
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   module ArchType = TaintTypeInfer.ArchType
   module RegType = ArchType.RegType

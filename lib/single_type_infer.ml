@@ -19,13 +19,14 @@ open Smt_emitter
 open Pretty_print
 open Full_mem_anno
 open Branch_anno
+open Call_anno
 open Block_alive
 open Sexplib.Std
 
 module SingleTypeInfer = struct
   exception SingleTypeInferError of string
 
-  module Isa = Isa (FullMemAnno)
+  module Isa = Isa (FullMemAnno) (BranchAnno) (CallAnno)
 
   let single_type_infer_error msg = raise (SingleTypeInferError ("[Single Type Infer Error] " ^ msg))
 

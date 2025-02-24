@@ -12,6 +12,7 @@ open Range_exp
 open Constraint
 open Func_interface
 open Full_mem_anno
+open Branch_anno
 open Call_anno
 open Sexplib.Std
 
@@ -24,7 +25,7 @@ module ArchType (Entry: EntryType) = struct
 
   module MemAnno = FullMemAnno
 
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
   module RegType = RegType (Entry)
   module MemType = MemType (Entry)
   module CondType = CondType (Entry)

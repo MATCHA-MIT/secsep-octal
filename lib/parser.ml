@@ -1,6 +1,8 @@
 open Isa_basic
 open Isa
 open Full_mem_anno
+open Branch_anno
+open Call_anno
 
 module Parser = struct
 
@@ -8,7 +10,7 @@ module Parser = struct
   exception ParseError of string
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   let lexical_error msg = raise (LexicalError ("[Lexical Error] " ^ msg))
   let parse_error msg = raise (ParseError ("[Parse Error] " ^ msg))

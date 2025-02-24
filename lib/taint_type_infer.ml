@@ -13,6 +13,7 @@ open Taint_unknown_infer
 open Range_type_infer
 open Smt_emitter
 open Full_mem_anno
+open Branch_anno
 open Call_anno
 open Taint_api
 open Sexplib.Std
@@ -21,7 +22,7 @@ module TaintTypeInfer = struct
   exception TaintTypeInferError of string
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
 
   let taint_type_infer_error msg = raise (TaintTypeInferError ("[Taint Type Infer Error] " ^ msg))
 

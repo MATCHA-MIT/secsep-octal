@@ -7,6 +7,8 @@ open Mem_offset_new
 open Reg_type_new
 open Mem_type_new
 open Full_mem_anno
+open Branch_anno
+open Call_anno
 open External_layouts
 open Arch_type
 open Sexplib.Std
@@ -16,7 +18,7 @@ module TaintApi = struct
   let taint_api_error msg = raise (TaintApiError ("[Taint Api Error] " ^ msg))
 
   module MemAnno = FullMemAnno
-  module Isa = Isa (MemAnno)
+  module Isa = Isa (MemAnno) (BranchAnno) (CallAnno)
   module SingleArchType = ArchType (SingleEntryType)
   module TaintRegType = RegType (TaintEntryType)
   module TaintMemType = MemType (TaintEntryType)
