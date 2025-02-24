@@ -26,6 +26,17 @@ module FuncInterface = struct
   }
   [@@deriving sexp]
 
+  let get_func_interface
+      (fi_list: t list) (func_name: string) : t =
+    let f_opt =
+      List.find_opt (
+        fun (x: t) -> x.func_name = func_name
+      ) fi_list
+    in
+    match f_opt with
+    | Some f -> f
+    | None -> func_interface_error (Printf.sprintf "get_func_interface cannot find func %s" func_name)
+
   let interface_list_to_file (filename: string) (fi_list: t list) : unit =
     let open Sexplib in
     let channel = open_out filename in

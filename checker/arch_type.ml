@@ -9,6 +9,7 @@ open Reg_type
 open Flag_type
 open Mem_type
 open Mem_anno
+open Branch_anno
 open Arch_type_basic
 open Func_interface
 (* open Z3 *)
@@ -354,6 +355,14 @@ include ArchTypeBasic
     | Hlt                                     -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
 
+  let type_prop_uncond_branch
+      (smt_ctx: SmtEmitter.t)
+      (curr_type: t)
+      (target_type: t)
+      (branch_anno: BranchAnno.t) : bool * t =
+    check_subtype smt_ctx curr_type target_type branch_anno None,
+    curr_type
+
   let type_prop_check_one_inst
       (smt_ctx: SmtEmitter.t)
       (func_interface_list: FuncInterface.t list)
@@ -369,8 +378,13 @@ include ArchTypeBasic
       (* <TODO> For cond branch, 
          Taken: check dest is not dead block;
          Not taken: check if not taken is possible, next_pc < dead_pc, else next_pc = dead_pc! *)
-    | Call _ ->
-      arch_type_error "<TODO> not implemented yet"
+    | Call (callee_name, call_anno) ->
+      let callee_interface = FuncInterface.get_func_interface func_interface_list callee_name in
+      let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
+      begin match result with
+      | Some next_type -> true, next_type
+      | None -> false, curr_type
+      end
     | _ ->
       (* Get state before executing next inst *)
       let checked, next_type = type_prop_non_branch smt_ctx curr_type inst in
