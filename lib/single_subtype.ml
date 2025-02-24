@@ -1590,9 +1590,11 @@ module SingleSubtype = struct
           SmtEmitter.push smt_ctx;
           update_block_smt_ctx sub_pc;
           let general_sol_candidate = List.fold_left (
-            fun (acc: SingleExpSet.t) (other_sub, other_pc) ->
-              if other_pc = sub_pc then acc
-              else if SingleExpSet.mem other_sub acc then
+            fun (acc: SingleExpSet.t) (other_sub, _) ->
+              (* if other_pc = sub_pc then acc *)
+              (* NOTE: We have to remove this optimization, since var generated after fun call with several subtype
+                 having the same PC will have its solution merged by mistake. *)
+              if SingleExpSet.mem other_sub acc then
                 if SingleCondType.check true smt_ctx [ Eq, sub, other_sub ] = SatYes then acc
                 else SingleExpSet.remove other_sub acc
               else acc
@@ -1611,6 +1613,7 @@ module SingleSubtype = struct
         | [] -> None
         | hd :: _ -> 
           Printf.printf "Merge sol for SymImm %d\n" (fst tv_rel.var_idx);
+          Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleEntryType.sexp_of_t general_sol_candidate));
           Some hd (* TODO: Consider to pick the best one later *)
       end
     | _ -> None
