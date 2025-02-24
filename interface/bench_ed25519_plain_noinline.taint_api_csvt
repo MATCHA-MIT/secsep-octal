@@ -1,5 +1,6 @@
 ((SHA512_Init
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
       (RangeConst ()) ())))
@@ -22,7 +23,8 @@
        (SingleBExp SingleAdd (SingleVar 7) (SingleConst 216)))
       (RangeConst ()) (false))))))
  (sha512_block_data_order
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -376))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -42,7 +44,8 @@
           (SingleBExp SingleMul (SingleVar 2) (SingleConst 128))))))
       (true))))))
  (SHA512_Final
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -424))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -86,7 +89,8 @@
          (SingleBExp SingleAdd (SingleVar 6) (SingleConst 216)))))
       (false))))))
  (fe_mul_impl
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -368))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -105,7 +109,8 @@
        (((SingleVar 2) (SingleBExp SingleAdd (SingleVar 2) (SingleConst 40)))))
       (true))))))
  (ge_madd
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -576))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -163,7 +168,8 @@
          (SingleBExp SingleAdd (SingleVar 2) (SingleConst 120)))))
       (true))))))
  (ge_p2_dbl
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -344))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -198,7 +204,8 @@
          (SingleBExp SingleAdd (SingleVar 6) (SingleConst 120)))))
       (true))))))
  (fe_tobytes
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -120))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -212,7 +219,8 @@
        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleConst 40)))))
       (true))))))
  (x25519_ge_p1p1_to_p2
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -400))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -250,7 +258,8 @@
          (SingleBExp SingleAdd (SingleVar 6) (SingleConst 160)))))
       (true))))))
  (x25519_ge_p1p1_to_p3
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -416))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -291,7 +300,8 @@
          (SingleBExp SingleAdd (SingleVar 6) (SingleConst 160)))))
       (true))))))
  (CRYPTO_memcmp
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
       (RangeConst ()) ())))
@@ -306,7 +316,8 @@
        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))))
       (true))))))
  (SHA512_Update
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -424))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -352,7 +363,8 @@
        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2)))))
       (true))))))
  (SHA512
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -680))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -367,7 +379,7 @@
       (RangeConst ()) (true))))))
  (x25519_sc_reduce
   (() () (true) () () () () () () () () () () () () () () () () () () () ()
-   ())
+   () () () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -152))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -378,7 +390,8 @@
        (((SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleConst 64)))))
       (true))))))
  (table_select
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -216))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -393,7 +406,8 @@
        (SingleBExp SingleAdd (SingleVar 7) (SingleConst 120)))
       (RangeConst ()) (true))))))
  (x25519_ge_scalarmult_base
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -1120))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -416,7 +430,8 @@
        (((SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleConst 32)))))
       (true))))))
  (sc_muladd
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -408))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -440,7 +455,8 @@
        (((SingleVar 1) (SingleBExp SingleAdd (SingleVar 1) (SingleConst 64)))))
       (true))))))
  (ge_p3_tobytes
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -864))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -463,7 +479,8 @@
        (SingleBExp SingleAdd (SingleVar 6) (SingleConst 160)))
       (RangeConst ()) (true))))))
  (ED25519_sign
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -1760))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
@@ -482,7 +499,8 @@
        (((SingleVar 1) (SingleBExp SingleAdd (SingleVar 1) (SingleConst 64)))))
       (true))))))
  (main
-  (() () () () () () () () () () () () () () () () () () () () () () () ())
+  (() () () () () () () () () () () () () () () () () () () () () () () () ()
+   () () () () () () ())
   (((4 (() true true))
     ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -1840))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
