@@ -203,6 +203,24 @@ module TaintTypeInfer = struct
       ) (CallAnno.update_taint update_taint) state.func 
     in
     let func_type = List.map (ArchType.update_reg_mem_type update_entry) state.func_type in
+    let has_invalid_unknown_taint =
+      List.find_opt (
+        fun (a_type: ArchType.t) ->
+          ArchType.MemType.fold_left_full (
+            fun (acc: bool) (slot: ArchType.entry_t ArchType.MemType.mem_slot) ->
+              if acc then acc else
+              let _, range, (_, taint) = slot in
+              match taint with
+              | TaintUnknown ->
+                begin match range with
+                | RangeConst [] -> acc
+                | _ -> true
+                end
+              | _ -> acc
+          ) false a_type.mem_type
+      ) func_type
+    in
+    if has_invalid_unknown_taint <> None then taint_type_infer_error "has invalid unknown taint" else
     { state with func = func; func_type = func_type }
   
 

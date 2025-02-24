@@ -437,6 +437,12 @@ module MemRange = struct
     | RangeVar v -> RangeVar (v + 1)
     | _ -> mem_range_error "next_var should only be called on mem range var"
 
+  let get_range_var (r: t) : range_var_id option =
+    match r with
+    | RangeConst _ -> None
+    | RangeVar v -> Some v
+    | RangeExp (v, _) -> Some v
+
   let get_vars (r: t) : SingleExp.SingleVarSet.t =
     let helper (x: MemOffset.t list) : SingleExp.SingleVarSet.t =
       let var_list = List.map MemOffset.get_vars x in

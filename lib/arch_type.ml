@@ -392,7 +392,11 @@ module ArchType (Entry: EntryType) = struct
       in
       let (off, range, entry), mult_slot_cons, pass_check = MemType.get_slot_mem_type smt_ctx is_spill_func check_addr curr_type.mem_type orig_addr_offset slot_info in
       if pass_check then
-        entry, (Constraint.gen_off_subset smt_ctx orig_addr_offset range off) @ mult_slot_cons @ addr_untaint_cons, useful_vars
+        entry, 
+        (Constraint.RangeMustKnown range) :: 
+        (Constraint.gen_off_subset smt_ctx orig_addr_offset range off) @ 
+        mult_slot_cons @ addr_untaint_cons, 
+        useful_vars
       else
         arch_type_error (Printf.sprintf "get_ld_op_type_slot: Annotation %s does not match memory slot %s"
           (MemAnno.slot_to_string (Some slot_info)) (MemOffset.to_string orig_addr_offset))

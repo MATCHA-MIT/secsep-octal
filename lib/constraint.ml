@@ -16,6 +16,7 @@ module Constraint = struct
     | RangeUnsat of MemOffset.t * (MemOffset.t list)
     | RangeEq of MemOffset.t * MemRange.t
     | RangeOverwritten of MemRange.t
+    | RangeMustKnown of MemRange.t
     | TaintSub of TaintExp.t * TaintExp.t (* (x, y) where x => y *)
     | TaintOverwritten of TaintExp.t
     | TaintMustKnown of TaintExp.t
@@ -58,6 +59,24 @@ module Constraint = struct
           invalid_pc_list
         | _ -> acc
     ) (TaintExp.TaintVarSet.empty, []) constraint_list
+
+  let get_range_can_be_empty (constraint_list: (t * int) list) : IntSet.t =
+    let add_range_var_helper (r: MemRange.t) (s: IntSet.t) : IntSet.t =
+      match MemRange.get_range_var r with
+      | Some v -> IntSet.add v s
+      | None -> s
+    in
+    let overwritten_var_set, must_known_var_set =
+      List.fold_left (
+        fun (acc: IntSet.t * IntSet.t) (x, _) ->
+          let overwritten_var_set, must_known_var_set = acc in
+          match x with
+          | RangeOverwritten r -> add_range_var_helper r overwritten_var_set, must_known_var_set
+          | RangeMustKnown r -> overwritten_var_set, add_range_var_helper r must_known_var_set
+          | _ -> acc
+      ) (IntSet.empty, IntSet.empty) constraint_list
+    in
+    IntSet.diff overwritten_var_set must_known_var_set
 
   let gen_off_subset (smt_ctx: SmtEmitter.t) (sub_off: MemOffset.t) (range: MemRange.t) (off: MemOffset.t) : t list =
     match range with

@@ -189,6 +189,11 @@ module RangeTypeInfer = struct
       ) subtype_list
     in
     let constraint_list = List.concat_map (fun (a_type: ArchType.t) -> a_type.constraint_list) state.func_type in
+
+    (* If a range var is overwritten and not used, then we can just mark it as empty. *)
+    let empty_var_set = Constraint.get_range_can_be_empty constraint_list in
+    let subtype_list = RangeSubtype.apply_empty_list subtype_list empty_var_set in
+
     let subtype_list = Constraint.get_range_subset constraint_list |> RangeSubtype.get_read_constraint subtype_list in
     let subtype_list = RangeSubset.update_subtype_list_equal_set subtype_list in
     (* let single_sol_repl_helper = SingleSubtype.subsititue_one_exp_subtype_list state.single_sol in *)

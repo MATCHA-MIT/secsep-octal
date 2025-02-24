@@ -876,7 +876,8 @@ module MemType (Entry: EntryType) = struct
           let range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
           let idx_new_val = List.nth split_val_list idx in
           if not (is_spill_func s_ptr off) then
-            (* All slots taint are equal to the same new taint (required by st), so they are the same*)
+            (* I do not add range must known here, since it is not spill, and is overwritten *)
+            (* All slots taint are equal to the same new taint (required by st), so they are the same *)
             (off, range, Entry.set_taint_with_other idx_new_val entry_val), 
             (Entry.get_must_known_taint_constraint entry_val) @
             (Entry.get_eq_taint_constraint entry_val idx_new_val)
@@ -1061,6 +1062,7 @@ module MemType (Entry: EntryType) = struct
             let new_range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if not (is_spill_func s_ptr s_off) then
               Some (
+                (* I do not add range must known here, since it is not spill (will not be overwritten in current version) *)
                 (Entry.get_must_known_taint_constraint entry_val) @ 
                 (Entry.get_eq_taint_constraint entry_val new_val)), 
               (off, new_range, Entry.set_taint_with_other new_val entry_val)
@@ -1075,6 +1077,7 @@ module MemType (Entry: EntryType) = struct
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
             let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
             Some (
+              (* I do not add range must known here, since it is not spill (will not be overwritten in current version) *)
               (Entry.get_must_known_taint_constraint entry_val) @ 
               (Entry.get_eq_taint_constraint entry_val new_val)), 
             (off, new_range, Entry.set_taint_with_other (Entry.mem_partial_write_val entry_val new_val) entry_val)

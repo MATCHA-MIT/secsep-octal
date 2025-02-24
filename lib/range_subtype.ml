@@ -192,6 +192,15 @@ module RangeSubtype = struct
       equal_subtype_list = equal_subtype_list;
     }
 
+  let apply_empty_list (tv_rel_list: t) (empty_var_set: IntSet.t) : t =
+    List.map (
+      fun (tv_rel: type_rel) ->
+        let var_idx, _ = tv_rel.var_idx in
+        if IntSet.mem var_idx empty_var_set then
+          { tv_rel with sol = Some (RangeConst []) }
+        else tv_rel
+    ) tv_rel_list
+
   let try_solve_full (tv_rel: type_rel) : MemRange.t option =
     let find_not_full =
       List.find_opt (

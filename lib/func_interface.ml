@@ -254,7 +254,7 @@ module FuncInterface (Entry: EntryType) = struct
     let taint_val_constraint = Entry.get_eq_taint_constraint p_entry m_in_entry in
     if not write_mem_can_write then (* We do not upate mem slot type for read-only entries *)
       parent_entry,
-      read_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+      read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
       SingleExp.SingleVarSet.empty
     else begin
       let _, c_out_range, c_out_entry = write_mem in
@@ -270,11 +270,11 @@ module FuncInterface (Entry: EntryType) = struct
       in
       if is_full then 
       (p_off, p_range, m_out_entry), 
-      read_range_constraint @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+      read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
       out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
-        read_range_constraint @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+        read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
         out_range_useful_var
     end
 
