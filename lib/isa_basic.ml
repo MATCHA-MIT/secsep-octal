@@ -94,36 +94,18 @@ module IsaBasic = struct
     |     EAX |     ECX |     EDX |     EBX | ESP  | EBP  | ESI  | EDI  | R8D | R9D | R10D | R11D | R12D | R13D | R14D | R15D
     |      AX |      CX |      DX |      BX |  SP  |  BP  |  SI  |  DI  | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W
     | AH | AL | CH | CL | DH | DL | BH | BL |  SPL |  BPL |  SIL |  DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B
-    | XMM0 of data_off_size option
-    | XMM1 of data_off_size option
-    | XMM2 of data_off_size option
-    | XMM3 of data_off_size option
-    | XMM4 of data_off_size option
-    | XMM5 of data_off_size option
-    | XMM6 of data_off_size option
-    | XMM7 of data_off_size option
-    | XMM8 of data_off_size option
-    | XMM9 of data_off_size option
+    | XMM of (int * data_off_size option)
     (* | R0 *)
   [@@deriving sexp]
 
   let is_xmm (r: register) : bool =
     match r with
-    | XMM0 _ | XMM1 _ | XMM2 _ | XMM3 _ | XMM4 _ | XMM5 _ | XMM6 _ | XMM7 _ | XMM8 _ | XMM9 _ -> true
+    | XMM _ -> true
     | _ -> false
 
   let get_xmm_off_size (r: register) : data_off_size option =
     match r with
-    | XMM0 os -> os
-    | XMM1 os -> os
-    | XMM2 os -> os
-    | XMM3 os -> os
-    | XMM4 os -> os
-    | XMM5 os -> os
-    | XMM6 os -> os
-    | XMM7 os -> os
-    | XMM8 os -> os
-    | XMM9 os -> os
+    | XMM (_, os) -> os
     | _ -> isa_error "get_xmm_off_size: not xmm register"
 
   let reg_map = [
@@ -143,9 +125,10 @@ module IsaBasic = struct
     ("r13", R13); ("r13d", R13D); ("r13w", R13W); ("r13b", R13B);
     ("r14", R14); ("r14d", R14D); ("r14w", R14W); ("r14b", R14B);
     ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
-    ("xmm0", XMM0 None); ("xmm1", XMM1 None); ("xmm2", XMM2 None); ("xmm3", XMM3 None); 
-    ("xmm4", XMM4 None); ("xmm5", XMM5 None); ("xmm6", XMM6 None); ("xmm7", XMM7 None);
-    ("xmm8", XMM8 None); ("xmm9", XMM9 None);
+    ("xmm0", XMM (0, None)); ("xmm1", XMM (1, None)); ("xmm2", XMM (2, None)); ("xmm3", XMM (3, None)); 
+    ("xmm4", XMM (4, None)); ("xmm5", XMM (5, None)); ("xmm6", XMM (6, None)); ("xmm7", XMM (7, None)); 
+    ("xmm8", XMM (80, None)); ("xmm9", XMM (9, None)); ("xmm10", XMM (10, None)); ("xmm11", XMM (11, None)); 
+    ("xmm12", XMM (12, None)); ("xmm13", XMM (13, None)); ("xmm14", XMM (14, None)); ("xmm15", XMM (15, None)); 
   ]
 
   let string_of_reg (r: register) : string =
@@ -153,16 +136,7 @@ module IsaBasic = struct
       r |> string_of_sth reg_map |> Option.get
     else begin
       match r with
-      | XMM0 os -> "xmm0" ^ (string_of_data_off_size os)
-      | XMM1 os -> "xmm1" ^ (string_of_data_off_size os)
-      | XMM2 os -> "xmm2" ^ (string_of_data_off_size os)
-      | XMM3 os -> "xmm3" ^ (string_of_data_off_size os)
-      | XMM4 os -> "xmm4" ^ (string_of_data_off_size os)
-      | XMM5 os -> "xmm5" ^ (string_of_data_off_size os)
-      | XMM6 os -> "xmm6" ^ (string_of_data_off_size os)
-      | XMM7 os -> "xmm7" ^ (string_of_data_off_size os)
-      | XMM8 os -> "xmm8" ^ (string_of_data_off_size os)
-      | XMM9 os -> "xmm9" ^ (string_of_data_off_size os)
+      | XMM (idx, os) -> "xmm" ^ (string_of_int idx) ^ (string_of_data_off_size os)
       | _ -> isa_error "expecting xmm register"
     end
 
@@ -198,19 +172,10 @@ module IsaBasic = struct
     | R13 | R13D | R13W | R13B -> 13
     | R14 | R14D | R14W | R14B -> 14
     | R15 | R15D | R15W | R15B -> 15
-    | XMM0 _ -> 16
-    | XMM1 _ -> 17
-    | XMM2 _ -> 18
-    | XMM3 _ -> 19
-    | XMM4 _ -> 20
-    | XMM5 _ -> 21
-    | XMM6 _ -> 22
-    | XMM7 _ -> 23
-    | XMM8 _ -> 24
-    | XMM9 _ -> 25
+    | XMM (idx, _) -> 16 + idx
     (* | R0 -> 16 *)
 
-  let total_reg_num : int = 26
+  let total_reg_num : int = 32
 
   let rsp_idx = get_reg_idx RSP
 
@@ -232,17 +197,9 @@ module IsaBasic = struct
     | 13 -> R13
     | 14 -> R14
     | 15 -> R15
-    | 16 -> XMM0 (Some xmm_full_off_size)
-    | 17 -> XMM1 (Some xmm_full_off_size)
-    | 18 -> XMM2 (Some xmm_full_off_size)
-    | 19 -> XMM3 (Some xmm_full_off_size)
-    | 20 -> XMM4 (Some xmm_full_off_size)
-    | 21 -> XMM5 (Some xmm_full_off_size)
-    | 22 -> XMM6 (Some xmm_full_off_size)
-    | 23 -> XMM7 (Some xmm_full_off_size)
-    | 24 -> XMM8 (Some xmm_full_off_size)
-    | 25 -> XMM9 (Some xmm_full_off_size)
-    | _ -> isa_error "get_full_reg_by_idx: invalid idx"
+    | _ ->
+      if idx < 32 then XMM (idx - 16, Some xmm_full_off_size)
+      else isa_error "get_full_reg_by_idx: invalid idx"
 
   let get_reg_offset_size_opt (r: register) : data_off_size option =
     match r with
@@ -251,29 +208,11 @@ module IsaBasic = struct
     | AX | CX | DX | BX | SP | BP | SI | DI | R8W | R9W | R10W | R11W | R12W | R13W | R14W | R15W -> Some (0L, 2L)
     | AH | CH | DH | BH -> Some (1L, 1L)
     | AL | CL | DL | BL | SPL | BPL | SIL | DIL | R8B | R9B | R10B | R11B | R12B | R13B | R14B | R15B -> Some (0L, 1L)
-    | XMM0 os -> os
-    | XMM1 os -> os
-    | XMM2 os -> os
-    | XMM3 os -> os
-    | XMM4 os -> os
-    | XMM5 os -> os
-    | XMM6 os -> os
-    | XMM7 os -> os
-    | XMM8 os -> os
-    | XMM9 os -> os
+    | XMM (_, os) -> os
   
   let fill_os_for_reg (r: register) (os: data_off_size) : register =
     match r with
-    | XMM0 _ -> XMM0 (Some os)
-    | XMM1 _ -> XMM1 (Some os)
-    | XMM2 _ -> XMM2 (Some os)
-    | XMM3 _ -> XMM3 (Some os)
-    | XMM4 _ -> XMM4 (Some os)
-    | XMM5 _ -> XMM5 (Some os)
-    | XMM6 _ -> XMM6 (Some os)
-    | XMM7 _ -> XMM7 (Some os)
-    | XMM8 _ -> XMM8 (Some os)
-    | XMM9 _ -> XMM9 (Some os)
+    | XMM (idx, _) -> XMM (idx, Some os)
     | _ -> r
 
   let get_reg_offset_size (r: register) : data_off_size = get_reg_offset_size_opt r |> Option.get
@@ -283,7 +222,7 @@ module IsaBasic = struct
   (* full size of the physical register that r belongs to *)
   let get_reg_full_size (r: register) : data_size =
     let os = match r with
-    | XMM0 _ | XMM1 _ | XMM2 _ | XMM3 _ | XMM4 _ | XMM5 _ | XMM6 _ | XMM7 _ | XMM8 _ | XMM9 _ -> xmm_full_off_size
+    | XMM _ -> xmm_full_off_size
     | _ -> gpr_full_off_size
     in
     os |> snd
@@ -298,7 +237,8 @@ module IsaBasic = struct
     "r12"; "r13"; "r14"; "r15";
     "xmm0"; "xmm1"; "xmm2"; "xmm3";
     "xmm4"; "xmm5"; "xmm6"; "xmm7";
-    "xmm8"; "xmm9";
+    "xmm8"; "xmm9"; "xmm10"; "xmm11";
+    "xmm12"; "xmm13"; "xmm14"; "xmm15";
   ]
 
   (* physical registers *)
