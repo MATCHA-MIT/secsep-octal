@@ -42,7 +42,7 @@ module IsaFlagConfig = struct
     | Add | Sub -> 
       [], (* flags used to calculate dest value *) 
       [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
-      (* flags being updated and whether the new flag value depends on the old value *)
+      (* flags being updated and whether the new flag value may depend on the old value because the update is optional *)
     | Adc | Sbb ->
       [ CF ],
       [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]

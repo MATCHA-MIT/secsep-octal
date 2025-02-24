@@ -54,7 +54,6 @@ module DepType = struct
     (* Dirty implementation to judge whether a variable mapped to top appears in the exp *)
     let bv_top_var_str = "s-top-bv" in
     let bool_top_var_str = "s-top-bool" in
-    let top_str = "s-top-" in
     let var_list, exp_list =
       List.map (
         fun (var_idx, exp) ->
@@ -77,7 +76,7 @@ module DepType = struct
     in
     let e_sub = Expr.substitute e var_list exp_list in
     let e_sub_string = Expr.to_string e_sub in
-    if Str.string_match (Str.regexp top_str) e_sub_string 0 then
+    if Str.string_match (Str.regexp {|.*s-top-.*|}) e_sub_string 0 then
       Top (get_exp_bit_size e)
     else
       Exp e_sub
@@ -119,8 +118,24 @@ module DepType = struct
   let get_const_type (ctx: context) (c: int64) (size: int) : t =
     Exp (get_const_exp ctx c size)
 
-  let get_imm_exp (_: context) (_: IsaBasic.immediate) : exp_t =
-    dep_type_error "<TODO> implement this after adding size to IsaBasic.immediate, which should match other operand's size in the same inst"
+
+  let get_imm_exp_size_expected (ctx: context) (imm: IsaBasic.immediate) (expected_size: int64 option): exp_t =
+    let imm = IsaBasic.simplify_imm imm in
+    match imm with
+    | ImmNum (x, Some size) ->
+      if Option.is_none expected_size || (size = Option.get expected_size) then
+        get_const_exp ctx x (Int64.to_int size)
+      else
+        dep_type_error "get_imm_exp_size_expected: size is unexpected"
+    | ImmLabel (label_var_id, Some size) ->
+      if Option.is_none expected_size || (size = Option.get expected_size) then
+        BitVector.mk_const_s ctx (get_dep_var_string label_var_id) (Int64.to_int size)
+      else
+        dep_type_error "get_imm_exp_size_expected: size is unexpected"
+    | _ -> dep_type_error "unexpected ImmLabel / ImmBExp in get_imm_exp"
+
+  let get_imm_exp (ctx: context) (imm: IsaBasic.immediate) : exp_t =
+    get_imm_exp_size_expected ctx imm None
 
   let get_imm_type (ctx: context) (imm: IsaBasic.immediate) : t =
     Exp (get_imm_exp ctx imm)
@@ -304,6 +319,7 @@ module DepType = struct
 
   (* NOTE: Actually, functions regarding bop, uop, and top should be merged.
      The current ugly code is due to the imperfect definition in inference tool *)
+  (* TODO: deprecated? *)
   let bop_update_flag_list (op: IsaBasic.bop) : IsaBasic.flag list =
     match op with
     | Add | Adc | Sub | Sbb -> [ CF; PF; AF; ZF; SF; OF ]
@@ -319,12 +335,14 @@ module DepType = struct
     | Psll | Psrl -> []
     | Xorp -> []
 
+  (* TODO: deprecated? *)
   let uop_update_flag_list (op: IsaBasic.uop) : IsaBasic.flag list =
     match op with
     | Neg -> [ CF; PF; AF; ZF; SF; OF ]
     | Inc | Dec -> [ PF; AF; ZF; SF; OF ]
     | _ -> []
 
+  (* TODO: deprecated? *)
   let top_update_flag_list (op: IsaBasic.top) : IsaBasic.flag list =
     match op with
     | Shld
@@ -990,7 +1008,6 @@ module BasicType = struct
       (get_flag_config: 'a -> IsaFlagConfig.t)
       (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) : 
       t * ((IsaBasic.flag * t) list) =
-    (* <TODO> Please check whether this makes sense to you. *)
     let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
     let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
     let dep_list, taint_list = List.split e_list in

@@ -25,17 +25,17 @@ include ArchTypeBasic
     let disp, base, index, scale, _ = mem_op in
     let disp =
       match disp with
-      | Some disp_imm -> DepType.get_imm_exp ctx disp_imm
+      | Some disp_imm -> DepType.get_imm_exp_size_expected ctx disp_imm (Some 64L)
       | None -> DepType.get_const_exp ctx 0L 64
     in
     let base =
       match base with
-      | Some base_r -> RegType.get_reg_type ctx curr_type.reg_type base_r
+      | Some base_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type base_r (Some 64L)
       | None -> BasicType.get_const_type ctx 0L 64
     in
     let index =
       match index with
-      | Some index_r -> RegType.get_reg_type ctx curr_type.reg_type index_r
+      | Some index_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type index_r (Some 64L)
       | None -> BasicType.get_const_type ctx 0L 64
     in
     let scale =

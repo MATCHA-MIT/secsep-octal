@@ -306,6 +306,17 @@ module IsaBasic = struct
     | ImmNum (imm, _) -> ImmNum (imm, size)
     | ImmLabel (imm, _) -> ImmLabel (imm, size)
     | ImmBExp (imm, _) -> ImmBExp (imm, size)
+  
+  let rec simplify_imm (i: immediate) : immediate =
+    match i with
+    | ImmBExp ((l, r), size_opt) -> begin
+        let l = simplify_imm l in
+        let r = simplify_imm r in
+        match l, r with
+        | ImmNum (l_val, _), ImmNum (r_val, _) -> ImmNum (Int64.add l_val r_val, size_opt)
+        | _ -> i
+      end
+    | _ -> i
 
   let string_of_immediate (i: immediate) : string =
     Sexplib.Sexp.to_string_hum (sexp_of_immediate i)

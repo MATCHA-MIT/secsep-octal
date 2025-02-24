@@ -130,7 +130,7 @@ module MemOffset = struct
     let size_exp = BitVector.mk_sub ctx r l in
     match DepType.to_common_const smt_ctx size_exp with
     | Some size_byte -> Top ((Int64.to_int size_byte) * 8)
-    | None -> Top 0
+    | None -> Top DepType.top_unknown_size
 
 end
 
@@ -318,7 +318,7 @@ module MemType = struct
     let check_taint () : bool = TaintType.check_subtype smt_ctx true sub_taint sup_taint in
     let offset_cmp_option, offset_cmp_goal =
       if off_must_eq then MemOffset.CmpEq, MemOffset.Eq
-      else CmpSubset, Subset
+      else MemOffset.CmpSubset, MemOffset.Subset
     in
     if offset_cmp offset_cmp_option sub_off sup_off = offset_cmp_goal then
       if MemRange.is_empty sup_range then
@@ -614,7 +614,7 @@ module MemType = struct
         if cmp_off = Eq then begin
           Some (slot_off, [ slot_off ], new_type)
         end else if cmp_off = Subset then begin
-          Some (slot_off, MemRange.merge smt_ctx slot_range [addr_off], (Top 0, new_taint))
+          Some (slot_off, MemRange.merge smt_ctx slot_range [addr_off], (Top DepType.top_unknown_size, new_taint))
         end else begin
           Printf.printf "Warning: %s is not subset of %s\n" 
             (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
@@ -659,7 +659,7 @@ module MemType = struct
                 (DepType.get_start_len (fst smt_ctx) start_byte len_byte new_dep, new_taint))
               | None ->
                 Some (idx + 1, slot_r),
-                ((slot_l, slot_r), [slot_l, slot_r], (Top 0, new_taint))
+                ((slot_l, slot_r), [slot_l, slot_r], (Top DepType.top_unknown_size, new_taint))
             end
           end else begin
             Printf.printf "Warning: set_mult_slot_type slot not continuous\n";
@@ -722,7 +722,6 @@ module MemType = struct
     (* 1. Check write permission; 
        2. update entry and all read/write permission; 
        3. check slot_info, taint constraint *)
-    let _ = smt_ctx, is_spill_func, mem_type, addr_off, slot_info, new_type in
     let (ptr, ptr_info), part_mem = find_part_mem_helper mem_type slot_info in
     if not (PtrInfo.can_write_info ptr_info) then begin
       Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"

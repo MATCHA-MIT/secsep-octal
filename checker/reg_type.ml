@@ -15,11 +15,22 @@ module RegType = struct
   type t = entry_t list
   [@@deriving sexp]
 
-  let get_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) : entry_t =
+  let get_reg_type_size_expected
+      (ctx: context)
+      (reg_type: t)
+      (r: IsaBasic.register)
+      (expected_size: int64 option)
+      : entry_t =
     let reg_idx = IsaBasic.get_reg_idx r in
     let entry_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
-    BasicType.get_start_len ctx off size entry_type
+    if Option.is_none expected_size || (size = Option.get expected_size) then
+      BasicType.get_start_len ctx off size entry_type
+    else
+      reg_type_error "get_reg_type_size_expected: reg size is unexpected"
+
+  let get_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) : entry_t =
+    get_reg_type_size_expected ctx reg_type r None
 
   let set_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in

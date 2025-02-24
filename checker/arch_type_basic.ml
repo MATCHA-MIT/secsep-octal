@@ -65,7 +65,7 @@ module ArchTypeBasic = struct
     let flag_type = List.map basic_sub_func a_type.flag_type in
     (* Note: We do not substitute ptr since
         1. ptr is checked if slot offset checked
-        2. ptr overlap/non-overlap is checked byu checking context *)
+        2. ptr overlap/non-overlap is checked by checking context *)
     let mem_type =
       MemType.map_full (
         fun (off, range, entry) ->
