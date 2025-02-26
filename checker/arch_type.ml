@@ -297,31 +297,81 @@ include ArchTypeBasic
       let result_type = Option.get (set_dest_op_type smt_ctx curr_type dest ld_type []) in
       true, shift_rsp smt_ctx result_type dest_size
 
+  let get_rep_acc (size: int64) : Isa.register =
+    match size with
+    | 8L -> AL
+    | 16L -> AX
+    | 32L -> EAX
+    | 64L -> RAX
+    | _ -> arch_type_error "Invalid size for rep instruction, must be 8L, 16L, 32L, or 64L"
+
+  let get_rep_count_reg (size: int64) : Isa.register =
+    match size with
+    | 16L      -> CX
+    | 64L      -> RCX
+    | 8L | 32L -> ECX
+    | _ -> arch_type_error "Invalid size for rep instruction, must be 8L, 16L, 32L, or 64L"
+
   let exe_repmovs
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (size: int64)
-      (mem1: MemAnno.t)
-      (mem2: MemAnno.t) =
-    (* <TODO> Fix this! *)
-    let ld_op = Isa.LdOp (None, Some RSI, None, None, size, mem1) in
-    let st_op = Isa.StOp (None, Some RDI, None, None, size, mem2) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type st_op ld_type [] with
-    | None -> false, curr_type
-    | Some result_type -> true, result_type
- 
+      (mem_dst: MemAnno.t)
+      (mem_src: MemAnno.t) =
+    let ctx, _ = smt_ctx in
+    let src_slot, _ = mem_src in
+    let dst_slot, _ = mem_dst in
+    let count_reg = get_rep_count_reg size in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    match rcx_dep with
+    | Top _ -> false, curr_type 
+    | Exp rcx_exp -> begin
+      let rcx_size = Z3.BitVector.get_size (Z3.Expr.get_sort rcx_exp) in
+      let entry_size = string_of_int (Int64.to_int size) in
+      let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
+      let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
+      let addr_off = (addr_lower, addr_upper) in
+      match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off src_slot with
+      | None -> false, curr_type
+      | Some src_type -> begin
+        let is_spill_func = StackSpillInfo.is_spill curr_type.stack_spill_info in
+        match MemType.set_mem_type smt_ctx is_spill_func curr_type.mem_type addr_off dst_slot src_type with
+        | None -> false, curr_type
+        | Some result_mem_type ->
+          let result_type = { curr_type with mem_type = result_mem_type } in
+          let rcx_zero = RegType.set_reg_type ctx result_type.reg_type count_reg (Exp (Z3.BitVector.mk_numeral ctx "0" rcx_size), rcx_taint) in
+          true, { result_type with reg_type = rcx_zero }
+        end
+      end
+
   let exe_replods
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (size: int64)
       (mem: MemAnno.t) =
     (* <TODO> Fix this! *)
-    let ld_op = Isa.LdOp (None, Some RSI, None, None, size, mem) in
-    let ld_type = Option.get (get_src_op_type smt_ctx curr_type ld_op) in
-    match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] with
-    | None -> false, curr_type
-    | Some result_type -> true, result_type
+    let ctx, _ = smt_ctx in
+    let ld_slot, _ = mem in
+    let count_reg = get_rep_count_reg size in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    match rcx_dep with
+    | Top _ -> false, curr_type 
+    | Exp rcx_exp -> begin
+      let rcx_size = Z3.BitVector.get_size (Z3.Expr.get_sort rcx_exp) in
+      let entry_size = string_of_int (Int64.to_int size) in
+      let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
+      let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
+      let addr_off = (addr_lower, addr_upper) in
+      match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off ld_slot with
+      | None -> false, curr_type
+      | Some ld_type -> begin
+        match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] with
+        | None -> false, curr_type
+        | Some result_type ->
+          let rcx_zero = RegType.set_reg_type ctx result_type.reg_type count_reg (Exp (Z3.BitVector.mk_numeral ctx "0" rcx_size), rcx_taint) in
+          true, { result_type with reg_type = rcx_zero }
+        end
+      end
   
   let exe_repstos
       (smt_ctx: SmtEmitter.t)
@@ -329,12 +379,29 @@ include ArchTypeBasic
       (size: int64)
       (mem: MemAnno.t) =
     (* <TODO> Fix this! *)
-    let rax_type = Option.get (get_src_op_type smt_ctx curr_type (RegOp RAX)) in
-    let st_op = Isa.StOp (None, Some RDI, None, None, size, mem) in
-    match set_dest_op_type smt_ctx curr_type st_op rax_type [] with
-    | None -> false, curr_type
-    | Some result_type -> true, result_type
-  
+    let ctx, _ = smt_ctx in
+    let st_slot, _ = mem in
+    let count_reg = get_rep_count_reg size in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    match rcx_dep with
+    | Top _ -> false, curr_type 
+    | Exp rcx_exp -> begin
+      let acc_reg = get_rep_acc size in
+      let acc_type = Option.get (get_src_op_type smt_ctx curr_type (RegOp acc_reg)) in
+      let rcx_size = Z3.BitVector.get_size (Z3.Expr.get_sort rcx_exp) in
+      let entry_size = string_of_int (Int64.to_int size) in
+      let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
+      let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
+      let addr_off = (addr_lower, addr_upper) in
+      let is_spill_func = StackSpillInfo.is_spill curr_type.stack_spill_info in
+      match MemType.set_mem_type smt_ctx is_spill_func curr_type.mem_type addr_off st_slot acc_type with
+      | None -> false, curr_type
+      | Some result_mem_type ->
+          let result_type = { curr_type with mem_type = result_mem_type } in
+          let rcx_zero = RegType.set_reg_type ctx result_type.reg_type count_reg (Exp (Z3.BitVector.mk_numeral ctx "0" rcx_size), rcx_taint) in
+          true, { result_type with reg_type = rcx_zero }
+      end
+     
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
@@ -348,7 +415,7 @@ include ArchTypeBasic
     | Test (src0, src1)                       -> exe_test    smt_ctx curr_type src0 src1
     | Push (src, memslot)                     -> exe_push    smt_ctx curr_type src memslot
     | Pop (dest, memslot)                     -> exe_pop     smt_ctx curr_type dest memslot
-    | RepMovs (size, mem1, mem2)              -> exe_repmovs smt_ctx curr_type size mem1 mem2 
+    | RepMovs (size, mem_dst, mem_src)        -> exe_repmovs smt_ctx curr_type size mem_dst mem_src 
     | RepLods (size, mem)                     -> exe_replods smt_ctx curr_type size mem
     | RepStos (size, mem)                     -> exe_repstos smt_ctx curr_type size mem
     | Nop                                     -> true, curr_type
