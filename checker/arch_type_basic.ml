@@ -40,16 +40,6 @@ module ArchTypeBasic = struct
   }
   [@@deriving sexp]
 
-  let arch_list_to_file (filename: string) (arch_list: t list) : unit =
-    let open Sexplib in
-    let channel = open_out filename in
-    Sexp.output_hum channel (Std.sexp_of_list sexp_of_t arch_list)
-
-  let arch_list_list_to_file (filename: string) (arch_list_list: t list list) : unit =
-    let open Sexplib in
-    let channel = open_out filename in
-    Sexp.output_hum channel (Std.sexp_of_list (Std.sexp_of_list sexp_of_t) arch_list_list)
-
   let sub_ctx_map_helper
       (ctx: Z3.context)
       (a_type: t) (ctx_map: BasicType.map_t) : 

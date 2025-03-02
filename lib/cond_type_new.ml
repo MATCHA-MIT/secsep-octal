@@ -82,6 +82,14 @@ include CondTypeBase
     let cond, l, r = cond in
     let exp_l = Entry.to_smt_expr smt_ctx l in
     let exp_r = Entry.to_smt_expr smt_ctx r in
+
+    (* unify bitvector width using sign-extension *)
+    let w_l = Z3.Expr.get_sort exp_l |> Z3.BitVector.get_size in
+    let w_r = Z3.Expr.get_sort exp_r |> Z3.BitVector.get_size in
+    let w = max w_l w_r in
+    let exp_l = if w = w_l then exp_l else Z3.BitVector.mk_sign_ext ctx (w - w_l) exp_l in
+    let exp_r = if w = w_r then exp_r else Z3.BitVector.mk_sign_ext ctx (w - w_r) exp_r in
+
     match cond with
     | Ne -> Z3.Boolean.mk_not ctx (Z3.Boolean.mk_eq ctx exp_l exp_r)
     | Eq -> Z3.Boolean.mk_eq ctx exp_l exp_r
