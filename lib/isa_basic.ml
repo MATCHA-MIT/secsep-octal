@@ -327,8 +327,8 @@ module IsaBasic = struct
   let ocaml_string_of_int64 (x: int64) : string =
     Printf.sprintf (if x >= 0L then "%LdL" else "(%LdL)") x
 
-  let ocaml_string_of_immediate (_: immediate) : string =
-    isa_error "unimplemented"
+  let ocaml_string_of_immediate (i: immediate) : string =
+    string_of_immediate i (* no longer ocaml format *)
 
   let ocaml_string_of_immediate_op (i: immediate) : string =
     Printf.sprintf "ImmOp (%s)" (ocaml_string_of_immediate i)

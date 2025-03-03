@@ -186,6 +186,9 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
 
   let get_func_of_prog (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
+  
+  let block_list_contains_block (block_list: basic_block list) (block_label: label) : bool =
+    List.exists (fun (bb: basic_block) -> bb.label = block_label) block_list
 
   let inst_is_uncond_jump (inst: instruction) : bool =
     match inst with

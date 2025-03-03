@@ -17,49 +17,90 @@ open Branch_anno
 open Call_anno
 open Sexplib.Std
 
-(* map variables at start of each BB to their size *)
-type bb_var_size_map = (string * ((int * int) list)) list
+(* map variables in each function to their size *)
+type func_var_size_map = (string * ((int * int) list)) list
 [@@deriving sexp]
 
 type checker_func = (* for each function ('s taint type infer) *)
     ArchType.Isa.label *              (* function name *)
     (ArchType.Isa.basic_block list) * (* basic blocks *)
     (ArchType.t list) *               (* basic blocks' arch type *)
-    bb_var_size_map                   (* variable size in each basic block *)
+    func_var_size_map                 (* variable size in each function *)
 [@@deriving sexp]
 
 let get_size_of_var
     (sz_map: (int * int) list)
     (var_id: int)
-    : int =
-  List.find_map (
+    : int option =
+  let matched = List.filter_map (
     fun (var_id', size) ->
       if var_id = var_id' then Some size else None
-  ) sz_map |> Option.get
+  ) sz_map
+  in
+  match matched with
+  | [] -> None
+  | [sz] -> Some sz
+  | sz_hd :: sz_tl ->
+    if List.for_all ((=) sz_hd) sz_tl then
+      Some sz_hd
+    else
+      failwith (Printf.sprintf "var %d has multiple sizes in size map" var_id)
 
-let get_size_finder_of_bb
-    (bb_vsm: bb_var_size_map)
-    (block: string) : (int -> int) =
+let get_size_finder_of_func
+    (func_vsm: func_var_size_map)
+    (func_name: string) : (int -> int option) =
   let sz_map = List.find_map (
-    fun (block', sz_map) ->
-      if block = block' then Some sz_map else None
-  ) bb_vsm |> Option.get
+    fun (func_name', sz_map) ->
+      if func_name = func_name' then Some sz_map else None
+  ) func_vsm |> Option.get
   in
   get_size_of_var sz_map
+
+let append_func_var_size_map
+    (func_vsm: func_var_size_map)
+    (func_name: string)
+    (sz_map: (int * int) list)
+    : func_var_size_map =
+  let pr_cmp = fun (v1, s1) (v2, s2) -> if v1 != v2 then Int.compare v1 v2 else Int.compare s1 s2 in
+  let sz_map = List.sort_uniq pr_cmp sz_map in
+  let found, result = List.fold_left_map (
+    fun found (func_name', sz_map') ->
+      if func_name = func_name' then
+        let new_sz_map = List.fold_left (
+          fun curr_map (v, s) ->
+            match List.find_opt (fun (v', _) -> v = v') curr_map with
+            | None -> (v, s) :: curr_map
+            | Some (_, s') ->
+              if s = s' then
+                curr_map
+              else
+                failwith (Printf.sprintf "var %d has multiple sizes in size map" v)
+        ) sz_map' sz_map in
+        let new_sz_map = List.sort pr_cmp new_sz_map in
+        (true, (func_name', new_sz_map))
+      else
+        (found, (func_name', sz_map'))
+  ) false func_vsm in
+  match found with
+  | true -> result
+  | false -> (func_name, sz_map) :: func_vsm
 
 let intermediate_sz = 64
 
 let rec convert_dep_type_inner
     (ctx: Z3.context)
     (se: SingleEntryType.t)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     : DepType.t =
   let raw_res = match se with
   | SingleTop -> DepType.Top intermediate_sz
   | SingleConst c -> DepType.Exp (Z3Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx intermediate_sz))
   | SingleVar v ->
-    let var_size = get_var_size v in
-    DepType.Exp (Z3Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
+    let var_size = get_var_size v |> Option.get in
+    if var_size = -1 then
+      DepType.Top DepType.top_unknown_size
+    else
+      DepType.Exp (Z3Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
   | SingleBExp (bop, e1, e2) ->
     let e1 = convert_dep_type_inner ctx e1 get_var_size in
     let e2 = convert_dep_type_inner ctx e2 get_var_size in
@@ -102,22 +143,20 @@ let rec convert_dep_type_inner
   in
   match raw_res with
   | DepType.Top sz ->
-    if sz > intermediate_sz then failwith "Top size exceeds intermediate size" else
-    DepType.Top intermediate_sz
+    DepType.Top (max sz intermediate_sz)
   | DepType.Exp e ->
     let e_size = Z3.BitVector.get_size (Z3.Expr.get_sort e) in
     if e_size = intermediate_sz then
       DepType.Exp e
     else if e_size < intermediate_sz then
       DepType.Exp (Z3.BitVector.mk_sign_ext ctx (intermediate_sz - e_size) e)
-    else 
-      failwith "Exp size exceeds intermediate size"
-
+    else
+      DepType.Top e_size
 
 let convert_dep_type
     (ctx: Z3.context)
     (se: SingleEntryType.t)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (out_size: int)
     : DepType.t =
   match convert_dep_type_inner ctx se get_var_size with
@@ -149,13 +188,12 @@ let convert_taint_type
       Z3.Boolean.mk_or ctx t_list
     end
   | TaintUnknown ->
-    Printf.printf "warn: TaintUnknown detected, converted to t_unknown\n";
-    Z3.Boolean.mk_const_s ctx "t_unknown"
+    Z3.Expr.mk_fresh_const ctx "t_unknown" (Z3.Boolean.mk_sort ctx)
 
 let convert_basic_type
     (ctx: Z3.context)
     (taint_entry_type: TaintEntryType.t)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (size: int)
     : BasicType.t =
   let se, te = taint_entry_type in
@@ -166,7 +204,7 @@ let convert_basic_type
 
 let convert_reg_type
     (ctx: Z3.context)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (reg_type: TaintTypeInfer.ArchType.RegType.t)
     : RegType.t =
   if TaintTypeInfer.ArchType.Isa.total_reg_num != List.length reg_type then
@@ -186,12 +224,12 @@ let convert_flag_type
     : FlagType.t =
   List.init TaintTypeInfer.ArchType.Isa.total_flag_num (fun _ ->
     DepType.get_top_flag (),
-    Z3.Boolean.mk_const_s ctx "t_unknown"
+    Z3.Expr.mk_fresh_const ctx "t_unknown" (Z3.Boolean.mk_sort ctx)
   )
 
 let convert_mem_offset
     (ctx: Z3.context)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (off: Type.Mem_offset_new.MemOffset.t)
     : MemOffset.t =
   let off_l, off_r = off in
@@ -204,25 +242,27 @@ let convert_mem_offset
 
 let convert_mem_range
     (ctx: Z3.context)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (range: Type.Mem_offset_new.MemRange.t)
     : MemRange.t * (int64 list) = (* empty list is a hint that the slot's DepType can be treated as Top *)
   match range with
   | Type.Mem_offset_new.MemRange.RangeConst off_list ->
     off_list
-    |> List.map (fun off ->
+    |> List.filter_map (fun off ->
       let off' = convert_mem_offset ctx get_var_size off in
-      let size = Type.Mem_offset_new.MemOffset.get_size off |> Option.get in
-      (off', size)
+      let size_opt = Type.Mem_offset_new.MemOffset.get_size off in
+      if Option.is_some size_opt then
+        Some (off', Option.get size_opt)
+      else
+        None
     )
     |> List.split
   | _ ->
-    Printf.printf "warn: %s converted to empty list\n" (Type.Mem_offset_new.MemRange.to_string range);
     ([], [])
 
 let convert_mem_generic
     (ctx: Z3.context)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (mem_type: 'a Type.Mem_type_new.MemTypeBasic.mem_content)
     (convert_entry: Z3.context -> Type.Mem_offset_new.MemOffset.t -> Type.Mem_offset_new.MemRange.t -> 'a -> int64 list -> 'b)
     : 'b MemType.mem_content =
@@ -241,20 +281,20 @@ let convert_mem_generic
 
 let convert_mem_type
     (ctx: Z3.context)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     (mem_type: TaintTypeInfer.ArchType.MemType.t)
     : MemType.t =
   let convert_entry ctx off _ entry inited_range_sizes =
-      let default_top_type = (* DepType is top, TaintType is init accordingly *)
-        convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) (fun _ -> failwith "placeholder") DepType.top_unknown_size
-      in
-      match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
-      | [], _ -> default_top_type
-      | [_], None -> default_top_type (* non-const size slot *)
-      | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
-      | [inited_size], Some _ ->
-        convert_basic_type ctx entry get_var_size (Int64.to_int inited_size)
-      | _ -> default_top_type (* more than one inited range *)
+    let default_top_type = (* DepType is top, TaintType is init accordingly *)
+      convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) (fun _ -> failwith "placeholder") DepType.top_unknown_size
+    in
+    match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
+    | [], _ -> default_top_type
+    | [_], None -> default_top_type (* non-const size slot *)
+    | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
+    | [inited_size], Some _ ->
+      convert_basic_type ctx entry get_var_size (Int64.to_int inited_size)
+    | _ -> default_top_type (* more than one inited range *)
   in
   convert_mem_generic ctx get_var_size mem_type convert_entry
 
@@ -284,6 +324,7 @@ let infer_var_size_map
     (reg_type: TaintTypeInfer.ArchType.RegType.t)
     (mem_type: TaintTypeInfer.ArchType.MemType.t)
     : (int * int) list =
+  (* vars in register *)
   let res, _ = List.fold_left (
     fun (acc, id) (entry: TaintEntryType.t) ->
       let se, _ = entry in
@@ -292,11 +333,10 @@ let infer_var_size_map
       | SingleEntryType.SingleVar v ->
         let size = TaintTypeInfer.Isa.get_reg_size reg |> Int64.to_int in
         (v, size) :: acc, id + 1
-      | SingleEntryType.SingleBExp _ | SingleEntryType.SingleUExp _ ->
-        failwith "expecting var/const/top for reg at the start of BB"
       | _ -> acc, id + 1
   ) ([], 0) reg_type
   in
+  (* vars in memory slots *)
   let res = TaintTypeInfer.ArchType.MemType.fold_left_full (
     fun acc (_, range, entry) ->
       let se, _ = entry in
@@ -304,17 +344,24 @@ let infer_var_size_map
       | SingleEntryType.SingleVar v -> begin
           let _, inited_range_sizes = convert_mem_range
             ctx
-            (fun _ -> TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int) (* placeholder *)
+            (fun _ -> Some (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int)) (* placeholder *)
             range 
           in
           match inited_range_sizes with
-          | [] -> failwith "uninited mem slot should be SingleTop rather than SingleVar"
+          | [] -> (v, -1) :: acc (* uninited mem slot, but is a SingleVar *)
           | [sz] -> (v, Int64.to_int sz) :: acc
           | _ -> failwith "more than one inited range for SingleVar"
         end
       | SingleEntryType.SingleBExp _ | SingleEntryType.SingleUExp _ ->
         failwith "expecting var/const/top for mem slot at the start of BB"
       | _ -> acc
+  ) res mem_type
+  in
+  (* vars as pointer *)
+  let res = List.fold_left (
+    fun acc mem_part ->
+      let (ptr, _), _ = mem_part in
+      (ptr, ArchType.Isa.get_gpr_full_size () |> Int64.to_int) :: acc
   ) res mem_type
   in
   res
@@ -325,9 +372,11 @@ let convert_arch_type
     (arch_type: TaintTypeInfer.ArchType.t)
     (stack_spill_info: StackSpillInfo.t)
     (input_var: TaintExp.TaintVarSet.t)
-    : ArchType.t * (string * ((int * int) list)) =
-  let var_size_map = infer_var_size_map ctx arch_type.reg_type arch_type.mem_type in
-  let get_var_size = get_size_of_var var_size_map in
+    (func_vsm: func_var_size_map)
+    : ArchType.t * func_var_size_map =
+  let bb_var_size_map = infer_var_size_map ctx arch_type.reg_type arch_type.mem_type in
+  let func_vsm = append_func_var_size_map func_vsm tti.func_name bb_var_size_map in
+  let get_var_size = get_size_finder_of_func func_vsm tti.func_name in
   {
     label = arch_type.label;
     pc = arch_type.pc;
@@ -341,7 +390,7 @@ let convert_arch_type
     global_var = arch_type.global_var;
     input_var = input_var;
     local_var = TaintTypeInfer.ArchType.get_local_var_set arch_type;
-  }, (arch_type.label, var_size_map)
+  }, func_vsm
 
 let convert_stack_spill_info
     (tti: TaintTypeInfer.t)
@@ -415,7 +464,7 @@ let convert_base_info
     (ctx: Z3.context)
     (ref_mem: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_content)
     (base_info: Type.Call_anno.CallAnno.base_info Type.Mem_type_new.MemTypeBasic.mem_content)
-    (get_var_size: int -> int)
+    (get_var_size: int -> int option)
     : FuncInterface.base_info MemType.mem_content =
   let convert_entry _ _ _ entry _ =
     match entry with
@@ -428,9 +477,13 @@ let convert_base_info
 let convert_function_interface
     (ctx: Z3.context)
     (fi: TaintTypeInfer.FuncInterface.t)
-    : FuncInterface.t =
-  let var_size_map = infer_var_size_map ctx fi.in_reg fi.in_mem in
-  let get_var_size_func = get_size_of_var var_size_map in
+    (func_vsm: func_var_size_map)
+    : func_var_size_map * FuncInterface.t =
+  (* Printf.printf "converting function interface of %s\n" fi.func_name; *)
+  let var_size_map1 = infer_var_size_map ctx fi.in_reg fi.in_mem in
+  let var_size_map2 = infer_var_size_map ctx fi.out_reg fi.out_mem in
+  let func_vsm = append_func_var_size_map func_vsm fi.func_name (var_size_map1 @ var_size_map2) in
+  let get_var_size_func = get_size_finder_of_func func_vsm fi.func_name in
   let in_arch: ArchType.t = {
     label = fi.func_name;
     reg_type = convert_reg_type ctx get_var_size_func fi.in_reg;
@@ -463,24 +516,33 @@ let convert_function_interface
     local_var = TaintExp.TaintVarSet.empty;
   }
   in
-  {
+  func_vsm, {
     func_name = fi.func_name;
     in_type = in_arch;
     out_type = out_arch;
-    base_info = convert_base_info ctx fi.in_mem fi.base_info get_var_size_func;
+    (* base_info = convert_base_info ctx fi.in_mem fi.base_info get_var_size_func; *)
   }
 
 let convert_single_var_map
     (ctx: Z3.context)
     (single_var_map: SingleEntryType.local_var_map_t)
-    (from_get_var_size: int -> int)
-    (targ_get_var_size: int -> int)
+    (from_get_var_size: int -> int option)
+    (targ_get_var_size: int -> int option)
     : DepType.map_t =
   List.map (
     fun (targ_var, from_exp) ->
-      let targ_var_size = targ_get_var_size targ_var in
-      let from_exp' = convert_dep_type ctx from_exp from_get_var_size targ_var_size in
-      (targ_var, from_exp')
+      (* TODO: Two fallbacks are added for sha512 bench. Confirm if we need these after verifying sha512 is valid. *)
+      let targ_var_size = targ_get_var_size targ_var |> Option.get in
+      if targ_var_size = -1 then
+        (targ_var, DepType.Top DepType.top_unknown_size)
+      else
+        let from_get_var_size' (var: int) =
+          match from_get_var_size var with
+          | None -> Some targ_var_size
+          | Some sz -> Some sz
+        in
+        let from_exp' = convert_dep_type ctx from_exp from_get_var_size' targ_var_size in
+        (targ_var, from_exp')
   ) single_var_map
 
 let convert_taint_var_map
@@ -496,8 +558,8 @@ let convert_taint_var_map
 let convert_branch_anno
     (ctx: Z3.context)
     (anno: Type.Branch_anno.BranchAnno.t)
-    (from_get_var_size: int -> int)
-    (targ_get_var_size: int -> int)
+    (from_get_var_size: int -> int option)
+    (targ_get_var_size: int -> int option)
     : BranchAnno.t =
   let anno = Option.get anno in
   let dep_map = convert_single_var_map ctx anno from_get_var_size targ_get_var_size in
@@ -505,11 +567,21 @@ let convert_branch_anno
 
 let convert_call_anno
     (ctx: Z3.context)
+    (arch_type: TaintTypeInfer.ArchType.t)
     (anno: Type.Call_anno.CallAnno.t)
     (from_mem: TaintTypeInfer.ArchType.MemType.t)
-    (from_get_var_size: int -> int)
-    (targ_get_var_size: int -> int)
+    (from_get_var_size: int -> int option)
+    (targ_get_var_size: int -> int option)
     : CallAnno.t =
+  let single_local_var_map = TaintEntryType.get_single_var_map arch_type.local_var_map in
+  let get_var_size (fallback: int -> int option) (var: int) : int option =
+    (* this is to return the size of global vars that is not contained in the func_vsm *)
+    if var < 0 && SingleEntryType.SingleVarSet.exists (fun x -> x = var) arch_type.global_var then
+      Some (ArchType.Isa.get_gpr_full_size () |> Int64.to_int)
+    else
+      fallback var
+  in
+
   let anno = Option.get anno in
 
   let pr_reg = List.mapi (
@@ -519,7 +591,8 @@ let convert_call_anno
         |> TaintTypeInfer.Isa.get_reg_size
         |> Int64.to_int
       in
-      let se' = convert_dep_type ctx se from_get_var_size reg_size in
+      let se = SingleEntryType.repl_local_var single_local_var_map se in
+      let se' = convert_dep_type ctx se (get_var_size from_get_var_size) reg_size in
       let te' = convert_taint_type ctx te in
       (se', te')
   ) anno.pr_reg in
@@ -530,13 +603,13 @@ let convert_call_anno
     convert_slot from_mem slot_base slot_off (Some slot_full) (Some 1)
   in
   let ch_mem_slot_info =
-    convert_mem_generic ctx targ_get_var_size anno.ch_mem convert_ch_mem_slot_info
+    convert_mem_generic ctx (get_var_size targ_get_var_size) anno.ch_mem convert_ch_mem_slot_info
   in
 
   {
     pr_reg = pr_reg;
     ctx_map = (
-      convert_single_var_map ctx anno.single_var_map from_get_var_size targ_get_var_size,
+      convert_single_var_map ctx anno.single_var_map (get_var_size from_get_var_size) (get_var_size targ_get_var_size),
       convert_taint_var_map ctx anno.taint_var_map
     );
     mem_map = ch_mem_slot_info;
@@ -574,61 +647,74 @@ let convert_isa_operand
     ArchType.Isa.StOp (disp, base, index, scale, data_size, convert_mem_anno ctx ref_mem mem_anno)
   | LabelOp l -> ArchType.Isa.LabelOp l
 
-let convert_taint_type_infer
+let convert_taint_type_infers
     (ctx: Z3.context)
-    (tti: TaintTypeInfer.t)
-    : checker_func =
-  let stack_spill_info = convert_stack_spill_info tti in
-  let input_var = convert_input_var tti in
-  let bb_vsm, archs = List.fold_left_map (
-    fun acc arch_type ->
-      let converted, bb_vsm_entry = convert_arch_type ctx tti arch_type stack_spill_info input_var in
-      bb_vsm_entry :: acc, converted
-  ) [] tti.func_type
+    (tti_list: TaintTypeInfer.t list)
+    (func_vsm: func_var_size_map)
+    : checker_func list =
+  let func_vsm, archs_of_func = List.fold_left_map (
+    fun func_vsm tti ->
+      let stack_spill_info = convert_stack_spill_info tti in
+      let input_var = convert_input_var tti in
+      List.fold_left_map (
+        fun func_vsm arch_type ->
+          let converted, func_vsm = convert_arch_type ctx tti arch_type stack_spill_info input_var func_vsm in
+          func_vsm, converted
+      ) func_vsm tti.func_type
+  ) func_vsm tti_list
   in
-  let bbs = List.map2 (
-    fun (bb: TaintTypeInfer.Isa.basic_block) (bb_type: TaintTypeInfer.ArchType.t) : ArchType.Isa.basic_block ->
-      let f = convert_isa_operand ctx bb_type.mem_type in
-      let g = convert_mem_anno ctx bb_type.mem_type in
-      let inst' = List.map (fun (inst : TaintTypeInfer.Isa.instruction) ->
-        match inst with
-        | BInst (bop, od, o1, o2) -> ArchType.Isa.BInst (bop, f od, f o1, f o2)
-        | UInst (uop, od, o1) -> ArchType.Isa.UInst (uop, f od, f o1)
-        | TInst (top, od, o_list) -> ArchType.Isa.TInst (top, f od, List.map f o_list)
-        | Xchg (o1, o2, o3, o4) -> ArchType.Isa.Xchg (f o1, f o2, f o3, f o4)
-        | Cmp (o1, o2) -> ArchType.Isa.Cmp (f o1, f o2)
-        | Test (o1, o2) -> ArchType.Isa.Test (f o1, f o2)
-        | Push (o, mem_anno) -> ArchType.Isa.Push (f o, g mem_anno)
-        | Pop (o, mem_anno) -> ArchType.Isa.Pop (f o, g mem_anno)
-        | RepMovs (sz, mem_anno1, mem_anno2) -> ArchType.Isa.RepMovs (sz, g mem_anno1, g mem_anno2)
-        | RepLods (sz, mem_anno) -> ArchType.Isa.RepLods (sz, g mem_anno)
-        | RepStos (sz, mem_anno) -> ArchType.Isa.RepStos (sz, g mem_anno)
-        | Jmp (targ, branch_anno) ->
-          let from_get_var_size = get_size_finder_of_bb bb_vsm bb.label in
-          let targ_get_var_size = get_size_finder_of_bb bb_vsm targ in
-          ArchType.Isa.Jmp (targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
-        | Jcond (cond, targ, branch_anno) ->
-          let from_get_var_size = get_size_finder_of_bb bb_vsm bb.label in
-          let targ_get_var_size = get_size_finder_of_bb bb_vsm targ in
-          ArchType.Isa.Jcond (cond, targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
-        | Call (targ, call_anno) ->
-          let from_get_var_size = get_size_finder_of_bb bb_vsm bb.label in
-          let targ_get_var_size = get_size_finder_of_bb bb_vsm targ in
-          ArchType.Isa.Call (targ, convert_call_anno ctx call_anno bb_type.mem_type from_get_var_size targ_get_var_size)
-        | Nop -> ArchType.Isa.Nop
-        | Syscall -> ArchType.Isa.Syscall
-        | Hlt -> ArchType.Isa.Hlt
-        | Directive s -> ArchType.Isa.Directive s
-      ) bb.insts in
-      {
-        label = bb.label;
-        insts = inst';
-        mnemonics = bb.mnemonics;
-        orig_asm = bb.orig_asm;
-      }
-  ) tti.func tti.func_type
-  in
-  (tti.func_name, bbs, archs, bb_vsm)
+  Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));
+  List.map2 (fun (tti: TaintTypeInfer.t) (archs: ArchType.t list) ->
+    let bbs = List.map2 (
+      fun (bb: TaintTypeInfer.Isa.basic_block) (bb_type: TaintTypeInfer.ArchType.t) : ArchType.Isa.basic_block ->
+        let f = convert_isa_operand ctx bb_type.mem_type in
+        let g = convert_mem_anno ctx bb_type.mem_type in
+        let inst' = List.map (fun (inst : TaintTypeInfer.Isa.instruction) ->
+          match inst with
+          | BInst (bop, od, o1, o2) -> ArchType.Isa.BInst (bop, f od, f o1, f o2)
+          | UInst (uop, od, o1) -> ArchType.Isa.UInst (uop, f od, f o1)
+          | TInst (top, od, o_list) -> ArchType.Isa.TInst (top, f od, List.map f o_list)
+          | Xchg (o1, o2, o3, o4) -> ArchType.Isa.Xchg (f o1, f o2, f o3, f o4)
+          | Cmp (o1, o2) -> ArchType.Isa.Cmp (f o1, f o2)
+          | Test (o1, o2) -> ArchType.Isa.Test (f o1, f o2)
+          | Push (o, mem_anno) -> ArchType.Isa.Push (f o, g mem_anno)
+          | Pop (o, mem_anno) -> ArchType.Isa.Pop (f o, g mem_anno)
+          | RepMovs (sz, mem_anno1, mem_anno2) -> ArchType.Isa.RepMovs (sz, g mem_anno1, g mem_anno2)
+          | RepLods (sz, mem_anno) -> ArchType.Isa.RepLods (sz, g mem_anno)
+          | RepStos (sz, mem_anno) -> ArchType.Isa.RepStos (sz, g mem_anno)
+          | Jmp (targ, branch_anno) ->
+            if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
+              failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
+            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+            let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+            ArchType.Isa.Jmp (targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+          | Jcond (cond, targ, branch_anno) ->
+            (* Printf.printf "converting Jcond %s\n" (TaintTypeInfer.ArchType.Isa.string_of_instruction inst); *)
+            if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
+              failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
+            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+            let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+            ArchType.Isa.Jcond (cond, targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+          | Call (targ, call_anno) ->
+            (* Printf.printf "converting call anno of %s from %s\n" targ tti.func_name; *)
+            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+            let targ_get_var_size = get_size_finder_of_func func_vsm targ in
+            ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size)
+          | Nop -> ArchType.Isa.Nop
+          | Syscall -> ArchType.Isa.Syscall
+          | Hlt -> ArchType.Isa.Hlt
+          | Directive s -> ArchType.Isa.Directive s
+        ) bb.insts in
+        {
+          label = bb.label;
+          insts = inst';
+          mnemonics = bb.mnemonics;
+          orig_asm = bb.orig_asm;
+        }
+    ) tti.func tti.func_type
+    in
+    (tti.func_name, bbs, archs, func_vsm)
+  ) tti_list archs_of_func
 
 let converted_to_file (filename: string) (cf_list: checker_func list) : unit =
   let open Sexplib in

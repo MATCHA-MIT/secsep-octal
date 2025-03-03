@@ -21,7 +21,8 @@ module FuncInterface = struct
     func_name: IsaBasic.label;
     in_type: ArchTypeBasic.t;
     out_type: ArchTypeBasic.t;
-    base_info: base_info MemType.mem_content;
+
+    (* base_info: base_info MemType.mem_content; *)
     (* <TODO>: check func interface validity also needs to check base_info *)
   }
   [@@deriving sexp]

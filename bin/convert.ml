@@ -20,8 +20,8 @@ let () =
   in
 
   let ctx = Z3.mk_context [] in
-  let fi'_list = List.map (Checker.Conversion.convert_function_interface ctx) fi_list in
-  let converted_funcs = List.map (fun tti -> Checker.Conversion.convert_taint_type_infer ctx tti) tti_list in
+  let func_vsm, fi'_list = List.fold_left_map (fun func_vsm fi -> Checker.Conversion.convert_function_interface ctx fi func_vsm) [] fi_list in
+  let converted_funcs = Checker.Conversion.convert_taint_type_infers ctx tti_list func_vsm in
 
   Checker.Func_interface.FuncInterface.interface_list_to_file
     (get_related_filename !program_name "out" "checker_interface") fi'_list;
