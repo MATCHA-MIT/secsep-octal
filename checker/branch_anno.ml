@@ -13,4 +13,6 @@ module BranchAnno = struct
 
   let to_ocaml_string (_) : string = branch_anno_error "Not implemented"
 
+  let get_empty () : t = ([], [])
+
 end

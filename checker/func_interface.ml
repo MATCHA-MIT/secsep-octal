@@ -43,6 +43,11 @@ module FuncInterface = struct
     let channel = open_out filename in
     Sexp.output_hum channel (Std.sexp_of_list sexp_of_t fi_list)
   
+  let interface_list_from_file (filename: string) : t list =
+    let open Sexplib in
+    let channel = open_in filename in
+    Std.list_of_sexp t_of_sexp (Sexp.input_sexp channel)
+  
   let prop_check_call
       (smt_ctx: SmtEmitter.t)
       (pr_type: ArchTypeBasic.t)

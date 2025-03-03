@@ -12,7 +12,6 @@ open Type.Taint_entry_type
 open Type.Taint_exp
 open Type.Single_context
 open Type.Set_sexp
-open Z3_sexp
 open Branch_anno
 open Call_anno
 open Sexplib.Std
@@ -94,13 +93,13 @@ let rec convert_dep_type_inner
     : DepType.t =
   let raw_res = match se with
   | SingleTop -> DepType.Top intermediate_sz
-  | SingleConst c -> DepType.Exp (Z3Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx intermediate_sz))
+  | SingleConst c -> DepType.Exp (Z3.Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx intermediate_sz))
   | SingleVar v ->
     let var_size = get_var_size v |> Option.get in
     if var_size = -1 then
       DepType.Top DepType.top_unknown_size
     else
-      DepType.Exp (Z3Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
+      DepType.Exp (Z3.Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
   | SingleBExp (bop, e1, e2) ->
     let e1 = convert_dep_type_inner ctx e1 get_var_size in
     let e2 = convert_dep_type_inner ctx e2 get_var_size in
@@ -669,8 +668,8 @@ let convert_taint_type_infers
       fun (bb: TaintTypeInfer.Isa.basic_block) (bb_type: TaintTypeInfer.ArchType.t) : ArchType.Isa.basic_block ->
         let f = convert_isa_operand ctx bb_type.mem_type in
         let g = convert_mem_anno ctx bb_type.mem_type in
-        let inst' = List.map (fun (inst : TaintTypeInfer.Isa.instruction) ->
-          match inst with
+        let _, inst' = List.fold_left_map (fun pc (inst : TaintTypeInfer.Isa.instruction) ->
+          let inst' = match inst with
           | BInst (bop, od, o1, o2) -> ArchType.Isa.BInst (bop, f od, f o1, f o2)
           | UInst (uop, od, o1) -> ArchType.Isa.UInst (uop, f od, f o1)
           | TInst (top, od, o_list) -> ArchType.Isa.TInst (top, f od, List.map f o_list)
@@ -683,28 +682,50 @@ let convert_taint_type_infers
           | RepLods (sz, mem_anno) -> ArchType.Isa.RepLods (sz, g mem_anno)
           | RepStos (sz, mem_anno) -> ArchType.Isa.RepStos (sz, g mem_anno)
           | Jmp (targ, branch_anno) ->
-            if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
-              failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
-            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-            let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-            ArchType.Isa.Jmp (targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+            if Option.is_none branch_anno then begin
+              if pc < bb_type.dead_pc then
+                failwith (Printf.sprintf "Alive Jmp does not have branch annotation")
+              else
+                ArchType.Isa.Jmp (targ, BranchAnno.get_empty ())
+            end else begin
+              if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
+                failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
+              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              ArchType.Isa.Jmp (targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+            end
           | Jcond (cond, targ, branch_anno) ->
-            (* Printf.printf "converting Jcond %s\n" (TaintTypeInfer.ArchType.Isa.string_of_instruction inst); *)
-            if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
-              failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
-            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-            let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-            ArchType.Isa.Jcond (cond, targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+            if Option.is_none branch_anno then begin
+              if pc < bb_type.dead_pc then
+                let _ = Printf.printf "converting %s\n" (TaintTypeInfer.Isa.string_of_instruction inst) in
+                failwith (Printf.sprintf "Alive Jcond does not have branch annotation")
+              else
+                ArchType.Isa.Jcond (cond, targ, BranchAnno.get_empty ())
+            end else begin
+              if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
+                failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
+              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              ArchType.Isa.Jcond (cond, targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
+            end
           | Call (targ, call_anno) ->
-            (* Printf.printf "converting call anno of %s from %s\n" targ tti.func_name; *)
-            let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-            let targ_get_var_size = get_size_finder_of_func func_vsm targ in
-            ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size)
+            if Option.is_none call_anno then begin
+              if pc < bb_type.dead_pc then
+                failwith (Printf.sprintf "Alive Call does not have branch annotation")
+              else
+                ArchType.Isa.Call (targ, CallAnno.get_empty ())
+            end else begin
+              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              let targ_get_var_size = get_size_finder_of_func func_vsm targ in
+              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size)
+            end
           | Nop -> ArchType.Isa.Nop
           | Syscall -> ArchType.Isa.Syscall
           | Hlt -> ArchType.Isa.Hlt
           | Directive s -> ArchType.Isa.Directive s
-        ) bb.insts in
+          in
+          (pc + 1, inst')
+        ) bb_type.pc bb.insts in
         {
           label = bb.label;
           insts = inst';
@@ -720,3 +741,8 @@ let converted_to_file (filename: string) (cf_list: checker_func list) : unit =
   let open Sexplib in
   let channel = open_out filename in
   Sexp.output_hum channel (Std.sexp_of_list sexp_of_checker_func cf_list)
+
+let converted_from_file (filename: string) : checker_func list =
+  let open Sexplib in
+  let channel = open_in filename in
+  Std.list_of_sexp checker_func_of_sexp (Sexp.input_sexp channel)

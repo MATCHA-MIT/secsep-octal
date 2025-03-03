@@ -13,6 +13,7 @@
   prog_transform
   gen_csvt_taint_api
   convert
+  check
   )
  (names 
   main 
@@ -28,5 +29,6 @@
   prog_transform
   gen_csvt_taint_api
   convert
+  check
   )
  (libraries core type checker))

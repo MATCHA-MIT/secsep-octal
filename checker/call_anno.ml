@@ -20,4 +20,10 @@ module CallAnno = struct
 
   let to_ocaml_string (_) : string = call_anno_error "Not implemented"
 
+  let get_empty () : t = {
+    pr_reg = [];
+    ctx_map = ([], []);
+    mem_map = [];
+  }
+
 end
