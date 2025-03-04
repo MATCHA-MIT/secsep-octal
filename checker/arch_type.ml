@@ -50,6 +50,7 @@ include ArchTypeBasic
       (curr_type: t) (ld_op: Isa.ldst_op) : entry_t option =
     (* <TODO> Check this against infer and ld rule, make sure it checks everything *)
     let disp, base, index, scale, size, (slot_anno, taint_anno) = ld_op in
+    let slot_anno, taint_anno = (Option.get slot_anno), (Option.get taint_anno) in
     let addr_dep_type, addr_taint_type =
       get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
     in
@@ -111,6 +112,7 @@ include ArchTypeBasic
       (new_type: entry_t) : MemType.t option =
     (* <TODO> Check this against infer and st rule, make sure it checks everything *)
     let disp, base, index, scale, size, (slot_anno, taint_anno) = st_op in
+    let slot_anno, taint_anno = (Option.get slot_anno), (Option.get taint_anno) in
     let addr_dep_type, addr_taint_type =
       get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
     in
@@ -320,7 +322,9 @@ include ArchTypeBasic
       (mem_src: MemAnno.t) =
     let ctx, _ = smt_ctx in
     let src_slot, _ = mem_src in
+    let src_slot = Option.get src_slot in
     let dst_slot, _ = mem_dst in
+    let dst_slot = Option.get dst_slot in
     let count_reg = get_rep_count_reg size in
     let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
     match rcx_dep with
@@ -352,6 +356,7 @@ include ArchTypeBasic
     (* <TODO> Fix this! *)
     let ctx, _ = smt_ctx in
     let ld_slot, _ = mem in
+    let ld_slot = Option.get ld_slot in
     let count_reg = get_rep_count_reg size in
     let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
     match rcx_dep with
@@ -381,6 +386,7 @@ include ArchTypeBasic
     (* <TODO> Fix this! *)
     let ctx, _ = smt_ctx in
     let st_slot, _ = mem in
+    let st_slot = Option.get st_slot in
     let count_reg = get_rep_count_reg size in
     let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
     match rcx_dep with

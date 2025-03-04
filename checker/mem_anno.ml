@@ -16,7 +16,7 @@ module MemAnno = struct
   type taint_t = TaintType.t
   [@@deriving sexp]
 
-  type t = slot_t * taint_t
+  type t = (slot_t option) * (taint_t option)
   [@@deriving sexp]
 
   (* Dirty code to be compatible with interface in infer *)

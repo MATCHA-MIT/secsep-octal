@@ -442,22 +442,47 @@ let convert_slot
     (opt_full: bool option)
     (opt_num: int option)
     : MemAnno.slot_t =
+  (* Printf.printf "converting slot %s\n" (Type.Mem_offset_new.MemOffset.to_string off);
+  Printf.printf "ref mem:\n";
+  TaintTypeInfer.ArchType.MemType.pp_mem_type 1 ref_mem; *)
   let part = TaintTypeInfer.ArchType.MemType.get_part_mem ref_mem ptr in
-  let idx = List.find_index (
-    fun (slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
-      let off', _, _ = slot in
-      Type.Mem_offset_new.MemOffset.cmp off off' = 0
-  ) (snd part) |> Option.get
+  let off_l, off_r = off in
+  let _, idx_l, idx_r = List.fold_left (
+    fun acc (slot: TaintEntryType.t TaintTypeInfer.ArchType.MemType.mem_slot) ->
+      let idx, idx_l, idx_r = acc in
+      let (slot_off_l, slot_off_r), _, _ = slot in
+      match idx_l, idx_r with
+      | None, None ->
+        if Type.Mem_offset_new.MemOffset.cmp (slot_off_l, slot_off_r) off = 0 then
+          (idx + 1, Some idx, Some idx)
+        else if SingleEntryType.cmp slot_off_l off_l = 0 then
+          (idx + 1, Some idx, None)
+        else
+          (idx + 1, None, None)
+      | Some l, None ->
+        if SingleEntryType.cmp slot_off_r off_r = 0 then
+          (idx + 1, Some l, Some idx)
+        else
+          (idx + 1, Some l, None)
+      | Some l, Some r -> (idx + 1, Some l, Some r)
+      | _ -> failwith "unexpected"
+  ) (0, None, None) (snd part)
   in
+  let idx_l = Option.get idx_l in
+  let idx_r = Option.get idx_r in
   let full = match opt_full with
   | Some b -> b
   | None -> true
   in
+  if idx_l < idx_r && full = false then
+    failwith "slot is not full when off spans multiple slot";
   let num = match opt_num with
   | Some x -> x
-  | None -> 1
+  | None -> idx_r - idx_l + 1 
   in
-  (ptr, idx, full, num) (* based is passed by a single full slot *)
+  if idx_r - idx_l + 1 != num then
+    failwith "given slot num mismatched with the actual slot num";
+  (ptr, idx_l, full, num) (* based is passed by a single full slot *)
 
 let convert_base_info
     (ctx: Z3.context)
@@ -620,13 +645,18 @@ let convert_mem_anno
     (mem_anno: Type.Full_mem_anno.FullMemAnno.t)
     : MemAnno.t =
   let slot_info, taint_info = mem_anno in
-  let slot_info = Option.get slot_info in
-  let taint_info = Option.get taint_info in
 
-  let slot_base, slot_off, slot_full, slot_num = slot_info in
-  let slot = convert_slot ref_mem slot_base slot_off (Some slot_full) (Some slot_num) in
+  let slot = match slot_info with
+  | Some slot_info ->
+    let slot_base, slot_off, slot_full, slot_num = slot_info in
+    Some (convert_slot ref_mem slot_base slot_off (Some slot_full) (Some slot_num))
+  | None -> None
+  in
 
-  let taint = convert_taint_type ctx taint_info in
+  let taint = match taint_info with
+  | Some taint_info -> Some (convert_taint_type ctx taint_info)
+  | None -> None
+  in
 
   (slot, taint)
 
@@ -683,9 +713,6 @@ let convert_taint_type_infers
           | RepStos (sz, mem_anno) -> ArchType.Isa.RepStos (sz, g mem_anno)
           | Jmp (targ, branch_anno) ->
             if Option.is_none branch_anno then begin
-              if pc < bb_type.dead_pc then
-                failwith (Printf.sprintf "Alive Jmp does not have branch annotation")
-              else
                 ArchType.Isa.Jmp (targ, BranchAnno.get_empty ())
             end else begin
               if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
@@ -696,10 +723,6 @@ let convert_taint_type_infers
             end
           | Jcond (cond, targ, branch_anno) ->
             if Option.is_none branch_anno then begin
-              if pc < bb_type.dead_pc then
-                let _ = Printf.printf "converting %s\n" (TaintTypeInfer.Isa.string_of_instruction inst) in
-                failwith (Printf.sprintf "Alive Jcond does not have branch annotation")
-              else
                 ArchType.Isa.Jcond (cond, targ, BranchAnno.get_empty ())
             end else begin
               if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
@@ -710,9 +733,6 @@ let convert_taint_type_infers
             end
           | Call (targ, call_anno) ->
             if Option.is_none call_anno then begin
-              if pc < bb_type.dead_pc then
-                failwith (Printf.sprintf "Alive Call does not have branch annotation")
-              else
                 ArchType.Isa.Call (targ, CallAnno.get_empty ())
             end else begin
               let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
