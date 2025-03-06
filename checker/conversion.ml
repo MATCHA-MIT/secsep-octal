@@ -155,9 +155,10 @@ let rec convert_dep_type_inner
 let convert_dep_type
     (ctx: Z3.context)
     (se: SingleEntryType.t)
-    (get_var_size: int -> int option)
-    (out_size: int)
+    (get_var_size: int -> int option) (* in bytes *)
+    (out_size: int) (* in bytes *)
     : DepType.t =
+  let out_size = out_size * 8 in (* in bits *)
   match convert_dep_type_inner ctx se get_var_size with
   | DepType.Top _ -> DepType.Top out_size
   | DepType.Exp e ->
@@ -347,7 +348,8 @@ let infer_var_size_map
             range 
           in
           match inited_range_sizes with
-          | [] -> (v, -1) :: acc (* uninited mem slot, but is a SingleVar *)
+          | [] -> (v, -1) :: acc (* -1 means the variable appears in reg/mem type, but the strict size cannot be deteremined *)
+            (* TODO: SingleVar should be replaced by SingleTop if init range cannot be determined (i.e. variable length / not inited) *)
           | [sz] -> (v, Int64.to_int sz) :: acc
           | _ -> failwith "more than one inited range for SingleVar"
         end
@@ -692,7 +694,9 @@ let convert_taint_type_infers
       ) func_vsm tti.func_type
   ) func_vsm tti_list
   in
+
   Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));
+
   List.map2 (fun (tti: TaintTypeInfer.t) (archs: ArchType.t list) ->
     let bbs = List.map2 (
       fun (bb: TaintTypeInfer.Isa.basic_block) (bb_type: TaintTypeInfer.ArchType.t) : ArchType.Isa.basic_block ->
@@ -754,6 +758,20 @@ let convert_taint_type_infers
         }
     ) tti.func tti.func_type
     in
+
+    (* calculate precise dead_pc for basic blocks whose every instruction is alive *)
+    let bbs, archs = List.map2 (
+      fun (bb: ArchType.Isa.basic_block) (arch_type: ArchType.t) ->
+        let last_executable_pc, _ = List.fold_left (
+          fun (acc, pc) inst ->
+            match inst with
+            | ArchType.Isa.Directive _ -> (acc, pc + 1)
+            | _ -> (pc, pc + 1)
+        ) (arch_type.pc, arch_type.pc) bb.insts
+        in
+        bb, {arch_type with dead_pc = min arch_type.dead_pc (last_executable_pc + 1) }
+    ) bbs archs |> List.split in
+
     (tti.func_name, bbs, archs, func_vsm)
   ) tti_list archs_of_func
 

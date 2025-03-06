@@ -293,6 +293,10 @@ module MemType = struct
     in
     let boundary_list = get_mem_boundary_list mem in
     let constraint_list = get_mem_non_overlap_constraint_helper [] boundary_list in
+
+    (* Printf.printf "check_non_overlap: constraint list:\n";
+    List.iter (fun x -> Printf.printf "\t%s\n" (Expr.to_string x)) constraint_list;
+    Printf.printf "solver:\n%s\n" (SmtEmitter.to_string smt_ctx); *)
     SmtEmitter.check_compliance smt_ctx constraint_list = SatYes
 
   let check_valid_region
@@ -477,7 +481,7 @@ module MemType = struct
           Some (DepType.get_start_len ctx start len slot_dep, slot_taint)
         end
       | _ ->
-        Printf.printf "Warning: get_one_slot_type off check failed";
+        Printf.printf "Warning: get_one_slot_type off check failed\n";
         None
       end
     | _ ->

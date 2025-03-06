@@ -19,7 +19,7 @@ module RegType = struct
       (ctx: context)
       (reg_type: t)
       (r: IsaBasic.register)
-      (expected_size: int64 option)
+      (expected_size: int64 option) (* in bytes *)
       : entry_t =
     let reg_idx = IsaBasic.get_reg_idx r in
     let entry_type = List.nth reg_type reg_idx in

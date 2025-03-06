@@ -25,17 +25,17 @@ include ArchTypeBasic
     let disp, base, index, scale, _ = mem_op in
     let disp =
       match disp with
-      | Some disp_imm -> DepType.get_imm_exp_size_expected ctx disp_imm (Some 64L)
+      | Some disp_imm -> DepType.get_imm_exp_size_expected ctx disp_imm (Some (Isa.get_gpr_full_size ()))
       | None -> DepType.get_const_exp ctx 0L 64
     in
     let base =
       match base with
-      | Some base_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type base_r (Some 64L)
+      | Some base_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type base_r (Some (Isa.get_gpr_full_size ()))
       | None -> BasicType.get_const_type ctx 0L 64
     in
     let index =
       match index with
-      | Some index_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type index_r (Some 64L)
+      | Some index_r -> RegType.get_reg_type_size_expected ctx curr_type.reg_type index_r (Some (Isa.get_gpr_full_size ()))
       | None -> BasicType.get_const_type ctx 0L 64
     in
     let scale =
@@ -98,12 +98,14 @@ include ArchTypeBasic
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
 
-  let get_dest_op_size (dest: Isa.operand) : int =
-    match dest with
+  let get_dest_op_size (dest: Isa.operand) : int = (* return: # bits *)
+    let size_bytes = match dest with
     | RegOp r -> Isa.get_reg_size r |> Int64.to_int
     | RegMultOp r_list -> Isa.get_reg_mult_op_size r_list |> Int64.to_int
     | StOp (_, _, _, _, size, _) -> size |> Int64.to_int
     | ImmOp _ | MemOp _ | LdOp _ | LabelOp _ -> arch_type_error "get_dest_op_size: dest is not reg or st op"
+    in
+    size_bytes * 8
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
@@ -426,6 +428,7 @@ include ArchTypeBasic
     | RepStos (size, mem)                     -> exe_repstos smt_ctx curr_type size mem
     | Nop                                     -> true, curr_type
     | Hlt                                     -> true, curr_type
+    | Directive _                             -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
   
   let type_prop_uncond_branch
@@ -435,12 +438,18 @@ include ArchTypeBasic
       (br_anno: BranchAnno.t)
       : bool * t =
     if curr_type.pc + 1 < curr_type.dead_pc then begin
-      Printf.printf "Warning: instr after uncond branch is not dead";
+      Printf.printf "Warning: instr after uncond branch is not dead (%d, %d)\n" (curr_type.pc + 1) curr_type.dead_pc;
       false, curr_type
     end else
 
-    check_subtype smt_ctx curr_type targ_type br_anno None,
-    curr_type (* already at the end of block, no further update *)
+    let result =
+      check_subtype smt_ctx curr_type targ_type br_anno None,
+      curr_type (* already at the end of block, no further update *)
+    in
+
+    if (fst result) = false then
+      Printf.printf "Warning: uncond branch target subtype check failed\n";
+    result
   
   let type_prop_cond_branch
       (smt_ctx: SmtEmitter.t)
@@ -502,7 +511,7 @@ include ArchTypeBasic
         true, next_type
     in
 
-    match SmtEmitter.check_compliance smt_ctx [taken] with
+    let result = match SmtEmitter.check_compliance smt_ctx [taken] with
     | SmtEmitter.SatNo -> (* always not taken *)
       check_not_taken ()
     | SmtEmitter.SatYes -> (* always taken *)
@@ -514,6 +523,11 @@ include ArchTypeBasic
     | SmtEmitter.SatUnknown ->
       let not_taken_valid, next_type = check_not_taken () in
       not_taken_valid && check_taken (), next_type
+    in
+
+    if (fst result) = false then
+      Printf.printf "Warning: cond branch target subtype check failed\n";
+    result
 
   let type_prop_check_one_inst
       (smt_ctx: SmtEmitter.t)
@@ -550,6 +564,13 @@ include ArchTypeBasic
         true, next_type
       else false, next_type
 
+  let add_block_context_to_solver
+      (smt_ctx: SmtEmitter.t)
+      (block_type: t) : unit =
+    SmtEmitter.add_assertions smt_ctx (fst block_type.context);
+    SmtEmitter.add_assertions smt_ctx (snd block_type.context);
+    ()
+
   let type_prop_check_one_block
       (smt_ctx: SmtEmitter.t)
       (func_interface_list: FuncInterface.t list)
@@ -563,8 +584,7 @@ include ArchTypeBasic
     (MemType.check_valid_region smt_ctx block_type.mem_type) &&
     begin
       SmtEmitter.push smt_ctx;
-      SmtEmitter.add_assertions smt_ctx (fst block_type.context);
-      SmtEmitter.add_assertions smt_ctx (snd block_type.context);
+      add_block_context_to_solver smt_ctx block_type;
       let check_prop =
         if block_type.pc >= block_type.dead_pc then true else
         List.fold_left (

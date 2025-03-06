@@ -47,7 +47,13 @@ module DepType = struct
   let get_bit_size (e: t) : int =
     match e with
     | Exp e -> get_exp_bit_size e
-    | Top size -> size
+    | Top size ->
+      if size = top_unknown_size then begin
+        (* TODO: check this, should not appear after replacing those size-undetermined SingleVar with SingleTop *)
+        Printf.printf "get_bit_size: using 64-bit bv for Top top_unknown_size\n";
+        64
+      end else
+        size
 
   let get_dep_var_string = SmtEmitter.expr_var_str_of_single_var
 
@@ -71,12 +77,19 @@ module DepType = struct
               dep_type_error (Printf.sprintf "invalid dep exp %s" (Sexplib.Sexp.to_string_hum (sexp_of_t exp)))
           in
           match exp with
-          | Exp exp -> var_exp, exp
+          | Exp exp -> (var_exp, exp)
           | Top size ->
-            if size = top_bool_size then 
-              var_exp, Boolean.mk_const_s ctx bool_top_var_str
-            else
-              var_exp, BitVector.mk_const_s ctx bv_top_var_str size
+            let top_exp = if size = top_bool_size then 
+              Z3.Expr.mk_fresh_const ctx bool_top_var_str (Boolean.mk_sort ctx)
+            else if size != top_unknown_size then
+              Z3.Expr.mk_fresh_const ctx bv_top_var_str (BitVector.mk_sort ctx size)
+            else begin
+              (* TODO: check this, should not appear after replacing those size-undetermined SingleVar with SingleTop *)
+              Printf.printf "substitute_exp_t: using 64-bit bv for Top top_unknown_size\n";
+              Z3.Expr.mk_fresh_const ctx bv_top_var_str (BitVector.mk_sort ctx 64)
+            end
+            in
+            (var_exp, top_exp)
       ) context_var_map |> List.split
     in
     let e_sub = Expr.substitute e var_list exp_list in
@@ -126,17 +139,22 @@ module DepType = struct
 
   let get_imm_exp_size_expected (ctx: context) (imm: IsaBasic.immediate) (expected_size: int64 option): exp_t =
     let imm = IsaBasic.simplify_imm imm in
+    (* these sizes are in bytes *)
     match imm with
     | ImmNum (x, Some size) ->
       if Option.is_none expected_size || (size = Option.get expected_size) then
-        get_const_exp ctx x (Int64.to_int size)
+        get_const_exp ctx x ((Int64.to_int size) * 8)
       else
         dep_type_error "get_imm_exp_size_expected: size is unexpected"
+    | ImmNum (x, None) ->
+      get_const_exp ctx x ((Option.get expected_size |> Int64.to_int) * 8)
     | ImmLabel (label_var_id, Some size) ->
       if Option.is_none expected_size || (size = Option.get expected_size) then
-        BitVector.mk_const_s ctx (get_dep_var_string label_var_id) (Int64.to_int size)
+        BitVector.mk_const_s ctx (get_dep_var_string label_var_id) ((Int64.to_int size) * 8)
       else
         dep_type_error "get_imm_exp_size_expected: size is unexpected"
+    | ImmLabel (label_var_id, None) ->
+      BitVector.mk_const_s ctx (get_dep_var_string label_var_id) ((Option.get expected_size |> Int64.to_int) * 8)
     | _ -> dep_type_error "unexpected ImmLabel / ImmBExp in get_imm_exp"
 
   let get_imm_exp (ctx: context) (imm: IsaBasic.immediate) : exp_t =
@@ -487,7 +505,7 @@ module DepType = struct
     let cflg_bv = BitVector.mk_extract ctx 0 0 result in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
-      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Boolean.mk_xor ctx top_bv cflg_bv)))
+      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Z3.BitVector.mk_xor ctx top_bv cflg_bv)))
       oflg
 
   let get_ror_overflow (ctx: context) (result: exp_t) (cnt: exp_t) (oflg: exp_t) : exp_t =
@@ -497,7 +515,7 @@ module DepType = struct
     let next_bv = BitVector.mk_extract ctx next_bit next_bit result in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
-      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Boolean.mk_xor ctx top_bv next_bv)))
+      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Z3.BitVector.mk_xor ctx top_bv next_bv)))
       oflg
       
 
@@ -586,6 +604,8 @@ module DepType = struct
     ]
 
   let exe_shr (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    (* cnt should also have the same size as the other operand *)
+    let cnt = BitVector.mk_sign_ext ctx ((get_exp_bit_size dst) - (get_exp_bit_size cnt)) cnt in
     let result = BitVector.mk_lshr ctx dst cnt in
     Exp result, [
       CF, Exp (get_shr_carry ctx dst cnt);
@@ -743,7 +763,8 @@ module DepType = struct
       (ctx: context) (op: IsaBasic.bop) 
       (src_list: t list) 
       (get_src_flag_func: IsaBasic.flag -> t) 
-      (dest_size: int) : exe_result =
+      (dest_size: int) (* in bits *)
+      : exe_result =
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_bop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
@@ -796,7 +817,8 @@ module DepType = struct
       (ctx: context) (op: IsaBasic.uop) 
       (src_list: t list) 
       (get_src_flag_func: IsaBasic.flag -> t) 
-      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+      (dest_size: int) (* in bits *)
+      : t * ((IsaBasic.flag * t) list) =
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_uop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
@@ -809,7 +831,7 @@ module DepType = struct
       | Mov,   [ src ],      [ ] -> exe_movs ctx src dest_size
       | MovZ,  [ src ],      [ ] -> exe_movz ctx src dest_size
       | MovS,  [ src ],      [ ] -> exe_movs ctx src dest_size
-      | Lea,   _, _              -> dep_type_error "lea should not be inputted into a type check (convert to mov instead)"
+      | Lea,   [ src ],      [ ] -> exe_movs ctx src dest_size
       | Not,   [ src ],      [ ] -> Exp (BitVector.mk_not ctx src), []
       | Bswap, [ src ],      [ ] -> exe_bswap ctx src
       | Neg,   [ src ],      [ ] -> exe_neg ctx src dest_size
@@ -824,7 +846,8 @@ module DepType = struct
       (ctx: context) (op: IsaBasic.top) 
       (src_list: t list) 
       (get_src_flag_func: IsaBasic.flag -> t) 
-      (dest_size: int) : t * ((IsaBasic.flag * t) list) =
+      (dest_size: int) (* in bits *)
+      : t * ((IsaBasic.flag * t) list) =
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_top_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
@@ -1015,8 +1038,8 @@ module BasicType = struct
   let exe_helper 
       (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
       (get_flag_config: 'a -> IsaFlagConfig.t)
-      (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) : 
-      t * ((IsaBasic.flag * t) list) =
+      (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) (* in bits *)
+      : t * ((IsaBasic.flag * t) list) =
     let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
     let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
     let dep_list, taint_list = List.split e_list in
