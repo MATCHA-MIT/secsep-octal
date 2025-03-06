@@ -52,7 +52,7 @@ module FuncInputEntry = struct
   let to_string (e: t) : string =
     sexp_of_t e |> Sexplib.Sexp.to_string_hum
   let to_ocaml_string (_ : t) : string = panic ()
-  let empty_var_map_to_ocaml_string = panic ()
+  let empty_var_map_to_ocaml_string = ""
   let cmp (_: t) (_: t) : int = panic ()
   let read_val (_: int64) (_: int64) (_: t) : t = panic ()
   let mem_partial_read_val (_: t) : t = panic ()
