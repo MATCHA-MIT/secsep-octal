@@ -3,7 +3,7 @@ open Single_entry_type
 open Mem_offset_new
 open Stack_spill_info
 open Constraint
-open Single_context
+(* open Single_context *)
 open Single_subtype
 open Range_subtype
 open Range_subset
@@ -35,7 +35,7 @@ module RangeTypeInfer = struct
     stack_spill_info: StackSpillInfo.t;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    state_context: SingleContext.t list;
+    (* state_context: SingleContext.t list; *)
     (* range_sol: MemRange.local_var_map_t; *)
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
@@ -97,7 +97,7 @@ module RangeTypeInfer = struct
       stack_spill_info = single_infer_state.stack_spill_info;
       single_sol = single_infer_state.single_subtype;
       input_single_var_set = single_infer_state.input_var_set;
-      state_context = single_infer_state.state_context;
+      (* state_context = single_infer_state.state_context; *)
       (* range_sol = []; *)
       ret_subtype_list = single_infer_state.ret_subtype_list;
       smt_ctx = SmtEmitter.init_smt_ctx ();

@@ -46,7 +46,7 @@ module SingleTypeInfer = struct
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
     var_type_map: SingleEntryType.var_type_map_t;
-    state_context: SingleContext.t list;
+    (* state_context: SingleContext.t list; *)
     ret_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list;
     smt_ctx: SmtEmitter.t;
   }
@@ -255,7 +255,7 @@ module SingleTypeInfer = struct
       next_var = next_var;
       input_var_set = input_var_set;
       var_type_map = var_type_map;
-      state_context = [];
+      (* state_context = []; *)
       ret_subtype_list = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
@@ -597,9 +597,9 @@ module SingleTypeInfer = struct
                     @ ArchType.MemType.get_all_mem_constraint x.mem_type
                 }
             ) state.func_type;
-          state_context = state.state_context 
+          (* state_context = state.state_context 
             @ (List.hd state.func_type).context 
-            @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) 
+            @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type)  *)
         }
       else begin
         let curr_iter = iter - iter_left + 1 in
@@ -842,9 +842,9 @@ module SingleTypeInfer = struct
             func = update_branch_anno block_subtype state.func;
             func_type = func_type;
             single_subtype = single_subtype;
-            state_context = state.state_context 
+            (* state_context = state.state_context 
               @ (List.hd func_type).context 
-              @ (ArchType.MemType.get_all_mem_constraint (List.hd func_type).mem_type);
+              @ (ArchType.MemType.get_all_mem_constraint (List.hd func_type).mem_type); *)
           }
         end else begin
           let state = (
