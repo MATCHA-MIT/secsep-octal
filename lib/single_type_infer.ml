@@ -46,7 +46,7 @@ module SingleTypeInfer = struct
     next_var: SingleEntryType.t;
     input_var_set: SingleEntryType.SingleVarSet.t;
     var_type_map: SingleEntryType.var_type_map_t;
-    context: SingleContext.t list;
+    state_context: SingleContext.t list;
     ret_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list;
     smt_ctx: SmtEmitter.t;
   }
@@ -255,7 +255,7 @@ module SingleTypeInfer = struct
       next_var = next_var;
       input_var_set = input_var_set;
       var_type_map = var_type_map;
-      context = [];
+      state_context = [];
       ret_subtype_list = [];
       smt_ctx = SmtEmitter.init_smt_ctx ();
     }
@@ -593,10 +593,11 @@ module SingleTypeInfer = struct
                 { x with 
                   context = x.context 
                     @ x.blk_br_context 
-                    @ SingleSubtype.get_block_context state.single_subtype x.useful_var
+                    @ SingleSubtype.get_block_context state.single_subtype x
+                    @ ArchType.MemType.get_all_mem_constraint x.mem_type
                 }
             ) state.func_type;
-          context = state.context 
+          state_context = state.state_context 
             @ (List.hd state.func_type).context 
             @ (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type) 
         }
@@ -607,7 +608,7 @@ module SingleTypeInfer = struct
         (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
         (* SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_mem_boundary_constraint (List.hd state.func_type).mem_type); *)
         SingleContext.add_assertions state.smt_ctx (ArchType.MemType.get_all_mem_constraint (List.hd state.func_type).mem_type);
-        SingleContext.add_assertions state.smt_ctx state.context;
+        (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
         (* if func_name = "SHA512_Update" then
           SingleContext.add_assertions state.smt_ctx [ Cond (Le, SingleConst 0L, SingleVar 27) ]; *)
         (* gen_implicit_mem_constraints state; *)
@@ -793,36 +794,56 @@ module SingleTypeInfer = struct
           Printf.printf "\n\nSuccessfully resolved all memory accesses for %s at iter %d%!\n\n" func_name curr_iter;
           (* Printf.printf "After infer, single subtype%!\n";
           SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
-          let func_type = 
+
+          (* Begin of merge subtype set sol *)
+          (* We need to first add solution to context, to support merge, 
+             but we do not want to keep unmerged solution in ctx,
+             so we use tmp_func_type as a helper state and regenerate func_type later. *)
+          let tmp_func_type = 
             List.map (
               fun (x: SingleSubtype.ArchType.t) ->
                 { x with 
                   context = x.context 
                     @ x.blk_br_context 
-                    @ (SingleSubtype.get_block_context single_subtype x.useful_var)
+                    @ SingleSubtype.get_block_context single_subtype x
+                    @ ArchType.MemType.get_all_mem_constraint x.mem_type
                 }
             ) state.func_type
           in
           let single_subtype = 
             SingleSubtype.merge_all_set_sol 
               state.smt_ctx state.input_var_set 
-              func_type block_subtype single_subtype 
+              tmp_func_type block_subtype single_subtype 
           in
           Printf.printf "\n\nAfter merge single set sol\n";
           SingleSubtype.pp_single_subtype 0 single_subtype;
+          (* End of merge subtype set sol *)
+
+          let func_type = 
+            List.map (
+              fun (x: SingleSubtype.ArchType.t) ->
+                { x with 
+                  context = x.context 
+                    @ x.blk_br_context 
+                    @ SingleSubtype.get_block_context single_subtype x
+                    @ ArchType.MemType.get_all_mem_constraint x.mem_type
+                }
+            ) state.func_type
+          in
+          let func_type =
+            List.map (
+              fun (x: SingleSubtype.ArchType.t) ->
+                if x.label = func_name then x else
+                { x with
+                  context = x.context @ (List.hd func_type).context }
+            ) func_type
+          in
           { state with 
             func = update_branch_anno block_subtype state.func;
             func_type = func_type;
             single_subtype = single_subtype;
-            context = state.context 
-              @ (List.hd state.func_type).context 
-              (* Dirty Fix: Here we have to use List.hd state.func_type instead of List.hd func_type.
-                 This is because List.hd func_type may include the solution format of new block vars
-                 introduced by function calls inside the first block.
-                 They are not input vars, but are vars of the first block.
-                 We do not need to check constraints on them because they are solely determined by real input vars.
-                 We should filter it, but use state.func_type (whose context does not include single sol) 
-                 is just a quick but a dirty fix that works.*)
+            state_context = state.state_context 
+              @ (List.hd func_type).context 
               @ (ArchType.MemType.get_all_mem_constraint (List.hd func_type).mem_type);
           }
         end else begin
@@ -855,7 +876,7 @@ module SingleTypeInfer = struct
       infer_state.smt_ctx
       infer_state.func_name
       infer_state.func_type
-      infer_state.context
+      (* infer_state.state_context *)
       infer_state.ret_subtype_list
       sub_sol
 

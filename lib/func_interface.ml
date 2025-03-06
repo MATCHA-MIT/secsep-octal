@@ -603,10 +603,16 @@ module FuncInterface (Entry: EntryType) = struct
       List.filter_map (
         fun (x: SingleContext.t) ->
           if SingleContext.is_val (SingleExp.is_val single_var_set) x then
-            Some (SingleContext.repl (SingleExp.repl_context_var single_var_map) x)
+            let repl_x = SingleContext.repl (SingleExp.repl_context_var single_var_map) x in
+            if SingleContext.has_top repl_x then None
+            else Some repl_x
           else None
       ) child_out_context 
     in
+    Printf.printf "Extra single var map\n";
+    SingleEntryType.pp_local_var 0 extra_single_var_map;
+    Printf.printf "child_out_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t child_out_context));
+    Printf.printf "extra_context_list\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t extra_context_list));
     SingleContext.add_assertions smt_ctx extra_context_list;
 
     reg_type, mem_type, 

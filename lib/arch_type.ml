@@ -1182,12 +1182,15 @@ module ArchType (Entry: EntryType) = struct
     let branch_hist = get_branch_hist block_subtype_list branch_pc in
     get_pc_cond_from_branch_hist branch_hist branch_pc
 
-  let get_local_var_set (a_type: t) : SingleExp.SingleVarSet.t =
+  let get_reg_mem_var_set (a_type: t) : SingleExp.SingleVarSet.t =
     let helper (acc: SingleExp.SingleVarSet.t) (x: entry_t) =
       SingleExp.SingleVarSet.union (SingleExp.get_vars (Entry.get_single_exp x)) acc
     in
     let reg_var_set = List.fold_left helper SingleExp.SingleVarSet.empty a_type.reg_type in
     let mem_var_set = MemType.fold_left helper SingleExp.SingleVarSet.empty a_type.mem_type in
+    SingleExp.SingleVarSet.union reg_var_set mem_var_set
+
+  let get_local_var_set (a_type: t) : SingleExp.SingleVarSet.t =
     let extra_call_exp_list = List.concat_map (fun (_, var_map) -> List.map snd var_map) a_type.extra_call_context_map_list in
     let extra_call_var_set =
       List.fold_left (
@@ -1195,7 +1198,7 @@ module ArchType (Entry: EntryType) = struct
           SingleExp.SingleVarSet.union (SingleExp.get_vars e) acc
       ) SingleExp.SingleVarSet.empty extra_call_exp_list
     in
-    SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.union reg_var_set mem_var_set) extra_call_var_set
+    SingleExp.SingleVarSet.union (get_reg_mem_var_set a_type) extra_call_var_set
 
   let update_reg_mem_type (update_func: entry_t -> entry_t) (a_type: t) : t =
     { a_type with
@@ -1246,7 +1249,7 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (func_name: Isa.label)
       (func_type: t list)
-      (context: SingleContext.t list)
+      (* (context: SingleContext.t list) *)
       (out_single_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
@@ -1254,7 +1257,7 @@ module ArchType (Entry: EntryType) = struct
 
     SmtEmitter.push smt_ctx;
     (* MemType.gen_implicit_mem_constraints smt_ctx in_state.mem_type; *)
-    SingleContext.add_assertions smt_ctx context;
+    SingleContext.add_assertions smt_ctx in_state.context;
 
     (* let helper (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
       let r = 
@@ -1270,7 +1273,7 @@ module ArchType (Entry: EntryType) = struct
       func_name = func_name;
       in_reg = in_state.reg_type;
       in_mem = in_mem;
-      in_context = context;
+      in_context = in_state.context;
       in_taint_context = [];
       out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
       out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type);

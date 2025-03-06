@@ -24,6 +24,13 @@ module SingleContext = struct
     in
     helper cond *)
 
+  let rec has_top (c: t) : bool =
+    match c with
+    | Cond cond -> SingleCondType.has_top cond
+    | NoOverflow e -> e = SingleTop
+    | Or e_list | And e_list ->
+      List.find_opt (fun x -> has_top x) e_list <> None
+
   let ctx_or (l: t) (r: t) : t =
     match l, r with
     | Or or_list, other

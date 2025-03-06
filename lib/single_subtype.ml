@@ -575,7 +575,10 @@ module SingleSubtype = struct
     SingleSol.to_context var_idx sol.sol
 
   let get_block_context
-      (sol: t) (useful_single_var: SingleExp.SingleVarSet.t) : SingleContext.t list =
+      (sol: t) (a_type: ArchType.t) : SingleContext.t list =
+      (* (useful_single_var: SingleExp.SingleVarSet.t) : SingleContext.t list = *)
+    let block_var_set = ArchType.get_reg_mem_var_set a_type in
+    let useful_single_var = SingleExp.SingleVarSet.inter block_var_set a_type.useful_var in
     List.concat_map (
       fun (x: type_rel) ->
         let var_idx, _ = x.var_idx in

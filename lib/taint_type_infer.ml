@@ -36,7 +36,7 @@ module TaintTypeInfer = struct
     stack_spill_info: StackSpillInfo.t;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    context: SingleContext.t list;
+    state_context: SingleContext.t list;
     taint_sol: TaintExp.local_var_map_t;
     taint_context: TaintExp.sub_t list;
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
@@ -114,7 +114,7 @@ module TaintTypeInfer = struct
       stack_spill_info = range_infer_state.stack_spill_info;
       single_sol = range_infer_state.single_sol;
       input_single_var_set = range_infer_state.input_single_var_set;
-      context = range_infer_state.context;
+      state_context = range_infer_state.state_context;
       taint_sol = [];
       taint_context = [];
       ret_subtype_list = range_infer_state.ret_subtype_list;
@@ -133,7 +133,7 @@ module TaintTypeInfer = struct
       if block_type.pc >= block_type.dead_pc then block_subtype, block else begin
       (* Prepare SMT context for the current block *)
       SmtEmitter.push infer_state.smt_ctx;
-      SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
+      (* SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var; *)
       ArchType.add_assertions infer_state.smt_ctx block_type;
       let (_, block_subtype), new_block =
         ArchType.type_prop_block infer_state.smt_ctx 
@@ -176,7 +176,7 @@ module TaintTypeInfer = struct
         infer_state.smt_ctx
         infer_state.func_name
         infer_state.func_type
-        infer_state.context
+        (* infer_state.state_context *)
         infer_state.ret_subtype_list
         sub_sol_for_taint
     in
@@ -242,7 +242,7 @@ module TaintTypeInfer = struct
     (* Prepare SMT context *)
     SmtEmitter.push state.smt_ctx;
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-    SingleContext.add_assertions state.smt_ctx state.context;
+    (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
     SmtEmitter.pop state.smt_ctx 1;
 
@@ -269,7 +269,8 @@ module TaintTypeInfer = struct
     ) in
     let input_var = List.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type in
     SmtEmitter.push state.smt_ctx;
-    SingleContext.add_assertions state.smt_ctx state.context;
+    (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
+    SingleContext.add_assertions state.smt_ctx (List.hd state.func_type).context;
     let input_var = 
       ArchType.MemType.fold_left merge_helper input_var 
         (ArchType.MemType.merge_local_mem_quick_cmp state.smt_ctx input_arch.mem_type) 

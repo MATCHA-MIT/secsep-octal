@@ -1364,7 +1364,7 @@ module MemType (Entry: EntryType) = struct
     let align_constraint = get_mem_align_constraint mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
     let result = get_mem_non_overlap_constraint_helper (align_constraint @ boundary_constraint) boundary_list in
-    Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result));
+    (* Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result)); *)
     result
 
 end

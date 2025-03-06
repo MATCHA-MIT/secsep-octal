@@ -35,7 +35,7 @@ module RangeTypeInfer = struct
     stack_spill_info: StackSpillInfo.t;
     single_sol: SingleSubtype.t;
     input_single_var_set: SingleEntryType.SingleVarSet.t;
-    context: SingleContext.t list;
+    state_context: SingleContext.t list;
     (* range_sol: MemRange.local_var_map_t; *)
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     smt_ctx: SmtEmitter.t;
@@ -97,10 +97,10 @@ module RangeTypeInfer = struct
       stack_spill_info = single_infer_state.stack_spill_info;
       single_sol = single_infer_state.single_subtype;
       input_single_var_set = single_infer_state.input_var_set;
-      context = single_infer_state.context;
+      state_context = single_infer_state.state_context;
       (* range_sol = []; *)
       ret_subtype_list = single_infer_state.ret_subtype_list;
-      smt_ctx = single_infer_state.smt_ctx;
+      smt_ctx = SmtEmitter.init_smt_ctx ();
     }
 
   let type_prop_all_blocks
@@ -115,7 +115,7 @@ module RangeTypeInfer = struct
       if block_type.pc >= block_type.dead_pc then block_subtype else begin
       (* Prepare SMT context for the current block *)
       SmtEmitter.push infer_state.smt_ctx;
-      SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var;
+      (* SingleSubtype.update_block_smt_ctx infer_state.smt_ctx infer_state.single_sol block_type.useful_var; *)
       ArchType.add_assertions infer_state.smt_ctx block_type;
       Printf.printf "Infer %s %s init smt_ctx\n" infer_state.func_name block_type.label;
       SmtEmitter.pp_smt_ctx 0 infer_state.smt_ctx;
@@ -153,7 +153,7 @@ module RangeTypeInfer = struct
       infer_state.smt_ctx
       infer_state.func_name
       infer_state.func_type
-      infer_state.context
+      (* infer_state.state_context *)
       infer_state.ret_subtype_list
       sub_sol
 
@@ -175,14 +175,16 @@ module RangeTypeInfer = struct
 
     (* 1. Type prop *)
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
-    SingleContext.add_assertions state.smt_ctx state.context;
+    (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
 
     Printf.printf "After infer, unknown list:\n";
     List.iter (
       fun (x: ArchType.t) -> 
-        Printf.printf "%s\n" x.label;
-        MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+        if x.pc >= x.dead_pc then () else begin
+          Printf.printf "%s\n" x.label;
+          MemOffset.pp_unknown_list 0 (Constraint.get_unknown x.constraint_list)
+        end
     ) state.func_type;
 
     (* 2. Range type infer *)
