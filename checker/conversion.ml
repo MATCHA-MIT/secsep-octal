@@ -97,6 +97,7 @@ let rec convert_dep_type_inner
   | SingleVar v ->
     let var_size = get_var_size v |> Option.get in
     if var_size = -1 then
+      (* this var is designated to be replaced by Top after conversion *)
       DepType.Top DepType.top_unknown_size
     else
       DepType.Exp (Z3.Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
@@ -244,17 +245,14 @@ let convert_mem_range
     (ctx: Z3.context)
     (get_var_size: int -> int option)
     (range: Type.Mem_offset_new.MemRange.t)
-    : MemRange.t * (int64 list) = (* empty list is a hint that the slot's DepType can be treated as Top *)
+    : MemRange.t * (int64 option list) =
+    (* range list and size list; size is None means the inited slot's DepType should be treated as Top *)
   match range with
   | Type.Mem_offset_new.MemRange.RangeConst off_list ->
     off_list
-    |> List.filter_map (fun off ->
-      let off' = convert_mem_offset ctx get_var_size off in
-      let size_opt = Type.Mem_offset_new.MemOffset.get_size off in
-      if Option.is_some size_opt then
-        Some (off', Option.get size_opt)
-      else
-        None
+    |> List.map (fun off ->
+      convert_mem_offset ctx get_var_size off,
+      Type.Mem_offset_new.MemOffset.get_size off
     )
     |> List.split
   | _ ->
@@ -264,7 +262,7 @@ let convert_mem_generic
     (ctx: Z3.context)
     (get_var_size: int -> int option)
     (mem_type: 'a Type.Mem_type_new.MemTypeBasic.mem_content)
-    (convert_entry: Z3.context -> Type.Mem_offset_new.MemOffset.t -> Type.Mem_offset_new.MemRange.t -> 'a -> int64 list -> 'b)
+    (convert_entry: Z3.context -> Type.Mem_offset_new.MemOffset.t -> Type.Mem_offset_new.MemRange.t -> 'a -> int64 option list -> 'b)
     : 'b MemType.mem_content =
   List.map (fun (mem_part: 'a Type.Mem_type_new.MemTypeBasic.mem_part) ->
     let ptr_info, mem_slots = mem_part in
@@ -285,16 +283,12 @@ let convert_mem_type
     (mem_type: TaintTypeInfer.ArchType.MemType.t)
     : MemType.t =
   let convert_entry ctx off _ entry inited_range_sizes =
-    let default_top_type = (* DepType is top, TaintType is init accordingly *)
-      convert_basic_type ctx (SingleEntryType.SingleTop, snd entry) (fun _ -> failwith "placeholder") DepType.top_unknown_size
-    in
+    let _, slot_taint = entry in
     match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
-    | [], _ -> default_top_type
-    | [_], None -> default_top_type (* non-const size slot *)
-    | [_], Some slot_size when slot_size > 8L -> default_top_type (* slot bigger than 8 bytes *)
-    | [inited_size], Some _ ->
-      convert_basic_type ctx entry get_var_size (Int64.to_int inited_size)
-    | _ -> default_top_type (* more than one inited range *)
+    | [Some inited_sz], Some slot_size when inited_sz <= 8L && slot_size <= 8L ->
+      convert_basic_type ctx entry get_var_size (Int64.to_int inited_sz)
+    | _ ->
+      convert_basic_type ctx (SingleEntryType.SingleTop, slot_taint) (fun _ -> failwith "placeholder, should not be called") DepType.top_unknown_size
   in
   convert_mem_generic ctx get_var_size mem_type convert_entry
 
@@ -338,7 +332,7 @@ let infer_var_size_map
   in
   (* vars in memory slots *)
   let res = TaintTypeInfer.ArchType.MemType.fold_left_full (
-    fun acc (_, range, entry) ->
+    fun acc (off, range, entry) ->
       let se, _ = entry in
       match se with
       | SingleEntryType.SingleVar v -> begin
@@ -347,11 +341,23 @@ let infer_var_size_map
             (fun _ -> Some (TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int)) (* placeholder *)
             range 
           in
-          match inited_range_sizes with
-          | [] -> (v, -1) :: acc (* -1 means the variable appears in reg/mem type, but the strict size cannot be deteremined *)
-            (* TODO: SingleVar should be replaced by SingleTop if init range cannot be determined (i.e. variable length / not inited) *)
-          | [sz] -> (v, Int64.to_int sz) :: acc
-          | _ -> failwith "more than one inited range for SingleVar"
+          match inited_range_sizes, Type.Mem_offset_new.MemOffset.get_size off with
+          | [], _ | _, None ->
+            (* slot whose inited range is not a single const range *)
+            (* we should replace the SingleVar with Top and ignore these vars when converting single_var_map *)
+            (v, -1) :: acc (* -1 means the variable is to be replaced by Top *)
+          | [Some inited_sz], Some slot_size ->
+            (* constant-size slot with single continous constant-size inited range *)
+            if inited_sz > slot_size then
+              failwith "mem slot's inited range is bigger than the slot";
+            (* use Top instead if slot / inited range is bigger than 8 bytes *)
+            if inited_sz > 8L || slot_size > 8L then
+              (v, -1) :: acc
+            else
+              (v, Int64.to_int inited_sz) :: acc
+          | _, Some _ ->
+            (* inited range is not a single const range, use Top *)
+            (v, -1) :: acc
         end
       | SingleEntryType.SingleBExp _ | SingleEntryType.SingleUExp _ ->
         failwith "expecting var/const/top for mem slot at the start of BB"
@@ -555,20 +561,26 @@ let convert_single_var_map
     (from_get_var_size: int -> int option)
     (targ_get_var_size: int -> int option)
     : DepType.map_t =
-  List.map (
+  List.filter_map (
     fun (targ_var, from_exp) ->
-      (* TODO: Two fallbacks are added for sha512 bench. Confirm if we need these after verifying sha512 is valid. *)
+      (* targ_var --> from_exp *)
       let targ_var_size = targ_get_var_size targ_var |> Option.get in
       if targ_var_size = -1 then
-        (targ_var, DepType.Top DepType.top_unknown_size)
+        (* this var at target context has been replaced by Top; this map entry is skipped *)
+        None
       else
         let from_get_var_size' (var: int) =
+          (* size of var in from context could be unknown, since we only infer size for vars at block start *)
+          (* if so, we assume the size be the same as LHS, i.e. targ_var *)
           match from_get_var_size var with
-          | None -> Some targ_var_size
+          | None ->
+            Printf.printf "convert_single_var_map: Warning: size of var %d in from context is assumed to be the same as targ var (%d)\n"
+              var targ_var_size;
+            Some targ_var_size
           | Some sz -> Some sz
         in
         let from_exp' = convert_dep_type ctx from_exp from_get_var_size' targ_var_size in
-        (targ_var, from_exp')
+        Some (targ_var, from_exp')
   ) single_var_map
 
 let convert_taint_var_map

@@ -47,13 +47,7 @@ module DepType = struct
   let get_bit_size (e: t) : int =
     match e with
     | Exp e -> get_exp_bit_size e
-    | Top size ->
-      if size = top_unknown_size then begin
-        (* TODO: check this, should not appear after replacing those size-undetermined SingleVar with SingleTop *)
-        Printf.printf "get_bit_size: using 64-bit bv for Top top_unknown_size\n";
-        64
-      end else
-        size
+    | Top size -> size
 
   let get_dep_var_string = SmtEmitter.expr_var_str_of_single_var
 
@@ -182,7 +176,7 @@ module DepType = struct
     if start_byte >= 0 && start_byte < end_byte then
       let start_bit = start_byte * 8 in
       let end_bit = end_byte * 8 in
-      if end_bit > total_bit then None
+      if total_bit != top_unknown_size && end_bit > total_bit then None
       else if write_bit = None || Option.get write_bit = end_bit - start_bit then
         Some (start_bit, end_bit, total_bit)
       else None
@@ -282,22 +276,30 @@ module DepType = struct
       begin match check_start_end start_byte end_byte (get_bit_size orig_e) (Some new_size) with
       | Some (start_bit, end_bit, total_bit) -> 
         Top total_bit,
-        start_bit = 0 && end_bit = total_bit
+        set_default_zero || (total_bit != top_unknown_size && start_bit = 0 && end_bit >= total_bit)
       | None ->
         dep_type_error 
-          (Printf.sprintf "set_exp_start_end invalid argument: start_byte %d, end_byte %d orig_e %s\n" 
+          (Printf.sprintf "set_start_end invalid argument: start_byte %d, end_byte %d orig_e %s\n" 
             start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_t orig_e)))
       end
     | Top total_bit, Exp new_e ->
       begin match check_start_end start_byte end_byte total_bit (Some (get_exp_bit_size new_e)) with
       | Some (start_bit, end_bit, total_bit) ->
-        if start_bit = 0 && end_bit = total_bit then
+        if set_default_zero || (total_bit != top_unknown_size && start_bit = 0 && end_bit >= total_bit) then
+          let new_e = if set_default_zero then begin
+            (* e.g., writing EAX zero-extends into RAX *)
+            if start_bit != 0 then
+              failwith "set_start_end: set_default_zero but start_bit != 0";
+            BitVector.mk_zero_ext ctx (total_bit - end_bit) new_e
+          end else
+            new_e
+          in
           Exp new_e, true (* Full overwrite *)
         else 
           Top total_bit, false
       | None ->
         dep_type_error 
-          (Printf.sprintf "set_exp_start_end invalid argument: start_byte %d, end_byte %d orig_e %s\n" 
+          (Printf.sprintf "set_start_end invalid argument: start_byte %d, end_byte %d orig_e %s\n" 
             start_byte end_byte (Sexplib.Sexp.to_string (sexp_of_t orig_e)))
       end
 
@@ -657,6 +659,16 @@ module DepType = struct
   let exe_movs (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
     let src_size = BitVector.get_size (Expr.get_sort src) in
     Exp (BitVector.mk_sign_ext ctx (dest_size - src_size) src), []
+  
+  (* use sign-extend or extract to match the size *)
+  let exe_mov (ctx: context) (src: exp_t) (dest_size: int) : exe_result =
+    let src_size = BitVector.get_size (Expr.get_sort src) in
+    if dest_size = src_size then
+      Exp src, []
+    else if dest_size < src_size then
+      Exp (BitVector.mk_extract ctx (dest_size - 1) 0 src), []
+    else
+      Exp (BitVector.mk_sign_ext ctx (dest_size - src_size) src), []
 
   let exe_bswap (ctx: context) (src: exp_t) : exe_result =
     let byte_size = (BitVector.get_size (Expr.get_sort src)) / 8 in
@@ -831,7 +843,7 @@ module DepType = struct
       | Mov,   [ src ],      [ ] -> exe_movs ctx src dest_size
       | MovZ,  [ src ],      [ ] -> exe_movz ctx src dest_size
       | MovS,  [ src ],      [ ] -> exe_movs ctx src dest_size
-      | Lea,   [ src ],      [ ] -> exe_movs ctx src dest_size
+      | Lea,   [ src ],      [ ] -> exe_mov ctx src dest_size
       | Not,   [ src ],      [ ] -> Exp (BitVector.mk_not ctx src), []
       | Bswap, [ src ],      [ ] -> exe_bswap ctx src
       | Neg,   [ src ],      [ ] -> exe_neg ctx src dest_size

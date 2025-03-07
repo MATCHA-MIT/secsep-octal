@@ -428,7 +428,6 @@ include ArchTypeBasic
     | RepStos (size, mem)                     -> exe_repstos smt_ctx curr_type size mem
     | Nop                                     -> true, curr_type
     | Hlt                                     -> true, curr_type
-    | Directive _                             -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
   
   let type_prop_uncond_branch
@@ -541,6 +540,7 @@ include ArchTypeBasic
       List.find (fun block_type -> block_type.label = label) block_type_list
     in
     match inst with
+    | Directive _ -> true, { curr_type with pc = curr_type.pc + 1 }
     | Jmp (br_target, br_anno) ->
       let targ_type = find_block_helper br_target in
       type_prop_uncond_branch smt_ctx curr_type targ_type br_anno
@@ -615,7 +615,15 @@ include ArchTypeBasic
        2. Check func type matches its interface
        3. Check func type correctness (prop/symbolic execution) *)
     let _ = func_name in (* <TODO> Remove this later *)
-    (MemType.check_non_overlap smt_ctx (List.hd func_type).mem_type) &&
+
+    (* temporarily add context of entry BB to do non-overlap check *)
+    SmtEmitter.push smt_ctx;
+    let entry_bb_type = List.hd func_type in
+    add_block_context_to_solver smt_ctx entry_bb_type;
+    let result_non_overlap = MemType.check_non_overlap smt_ctx entry_bb_type.mem_type in
+    SmtEmitter.pop smt_ctx 1;
+
+    result_non_overlap &&
     (* <TODO> Check func type matches its interface *)
     false &&
     (* Check func type correctness (prop/symbolic execution) *)
