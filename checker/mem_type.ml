@@ -191,7 +191,7 @@ module MemType = struct
 
   let mem_type_error msg = raise (MemTypeError ("[Mem Type Error] " ^ msg))
 
-  type 'a mem_slot = MemOffset.t * MemRange.t * 'a
+  type 'a mem_slot = MemOffset.t * bool * MemRange.t * 'a
   [@@deriving sexp]
 
   type 'a mem_part = PtrInfo.t * (('a mem_slot) list)
@@ -207,7 +207,7 @@ module MemType = struct
   [@@deriving sexp]
 
   let map_full
-      (func: MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b)
+      (func: 'a mem_slot -> 'b mem_slot)
       (mem: 'a mem_content) : 'b mem_content =
     let helper_outer
         (entry: 'a mem_part) :
@@ -218,7 +218,7 @@ module MemType = struct
     List.map helper_outer mem
 
   let fold_left2_full
-      (func: 'acc -> MemOffset.t * MemRange.t * 'a -> MemOffset.t * MemRange.t * 'b -> 'acc)
+      (func: 'acc -> 'a mem_slot -> 'b mem_slot -> 'acc)
       (acc: 'acc)
       (mem1: 'a mem_content)
       (mem2: 'b mem_content) : 'acc =
@@ -249,9 +249,9 @@ module MemType = struct
   let get_single_slot_with_info
       (mem: 'a mem_content)
       (slot_info: MemAnno.slot_t) :
-      PtrInfo.t * (MemAnno.slot_t * 'a) mem_slot =
-    let ptr_info, (off, range, entry) = get_single_slot mem slot_info in
-    ptr_info, (off, range, (slot_info, entry))
+      PtrInfo.t * 'a mem_slot =
+    let ptr_info, (off, forget_type, range, entry) = get_single_slot mem slot_info in
+    ptr_info, (off, forget_type, range, entry)
 
   let get_mem_boundary_list 
       (mem_type: t) : (PtrInfo.t * MemOffset.t) list =
@@ -261,10 +261,10 @@ module MemType = struct
       let ptr_info, offset_list = part_mem in
       match offset_list with
       | [] -> None
-      | ((l, r), _, _) :: [] ->
+      | ((l, r), _, _, _) :: [] ->
         Some (ptr_info, (l, r))
-      | ((l, _), _, _) :: tl ->
-        let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
+      | ((l, _), _, _, _) :: tl ->
+        let (_, r), _, _, _ = List.nth tl ((List.length tl) - 1) in
         Some (ptr_info, (l, r))
     in
     List.filter_map helper mem_type
@@ -305,7 +305,7 @@ module MemType = struct
     List.find_opt (
       fun (_, part_mem) ->
         List.find_opt (
-          fun (off, range, _) ->
+          fun (off, _, range, _) ->
             not (MemRange.check_subset smt_ctx range [off])
         ) part_mem <> None
     ) mem = None
@@ -313,12 +313,13 @@ module MemType = struct
   let check_slot_subtype
       (smt_ctx: SmtEmitter.t)
       (off_must_eq: bool)
-      (is_spill: bool)
       (sub_slot: entry_t mem_slot)
       (sup_slot: entry_t mem_slot) : bool =
     let offset_cmp = MemOffset.offset_cmp smt_ctx in
-    let sub_off, sub_range, (sub_dep, sub_taint) = sub_slot in
-    let sup_off, sup_range, (sup_dep, sup_taint) = sup_slot in
+    let sub_off, sub_forget_type, sub_range, (sub_dep, sub_taint) = sub_slot in
+    let sup_off, sup_forget_type, sup_range, (sup_dep, sup_taint) = sup_slot in
+    (* We add strongest constraint for whether corressponding slots should allow forget type - they should agree on this property. *)
+    if not sub_forget_type = sup_forget_type then false else
     let check_taint () : bool = TaintType.check_subtype smt_ctx true sub_taint sup_taint in
     let offset_cmp_option, offset_cmp_goal =
       if off_must_eq then MemOffset.CmpEq, MemOffset.Eq
@@ -327,7 +328,8 @@ module MemType = struct
     if offset_cmp offset_cmp_option sub_off sup_off = offset_cmp_goal then
       if MemRange.is_empty sup_range then
         (* In this case we do not check dep *)
-        if is_spill then true (* taint for spill can be anything if s-val is empty *)
+        (* Empty range => overwrite in sup block or future => taint can be anything if allow forget valid range/taint (e.g., for spill) *)
+        if sub_forget_type then true
         else check_taint ()
       else if MemRange.check_single_slot_eq smt_ctx sub_range sup_range then
         DepType.check_subtype smt_ctx sub_dep sup_dep &&
@@ -348,7 +350,6 @@ module MemType = struct
 
   let check_subtype_no_map
       (smt_ctx: SmtEmitter.t)
-      (is_spill_func: MemAnno.slot_t -> bool)
       (sub_m_type: t) (sup_m_type: t) : bool =
     (* Items to check:
        1. Ptr info
@@ -368,8 +369,7 @@ module MemType = struct
             let acc_check, slot_idx = acc in
             if not acc_check then acc_check, slot_idx + 1
             else 
-              let is_spill = is_spill_func (sub_ptr, slot_idx, false, 1) in
-              check_slot_subtype smt_ctx true is_spill sub_slot sup_slot, 
+              check_slot_subtype smt_ctx true sub_slot sup_slot, 
               slot_idx + 1
         ) (true, 0) sub_part_mem sup_part_mem |> fst
     ) true sub_m_type sup_m_type
@@ -377,12 +377,12 @@ module MemType = struct
   let apply_mem_map
       (mem_type: 'a mem_content)
       (mem_map: MemAnno.slot_t mem_content) :
-      (MemAnno.slot_t * 'a) mem_content =
+      'a mem_content =
     List.map (
       fun (_, part_mem_map) ->
         let ptr_info_opt, new_part_mem =
           List.fold_left_map (
-            fun (acc: PtrInfo.t option) (_, _, slot_info) ->
+            fun (acc: PtrInfo.t option) (_, _, _, slot_info) ->
               let curr_ptr_info, new_slot = get_single_slot_with_info mem_type slot_info in
               match acc with
               | None -> Some curr_ptr_info, new_slot
@@ -396,7 +396,6 @@ module MemType = struct
 
   let check_subtype_map
       (smt_ctx: SmtEmitter.t)
-      (is_spill_func: MemAnno.slot_t -> bool)
       (sub_m_type: t) (sup_m_type: t)
       (mem_map: MemAnno.slot_t mem_content) : bool =
     (* This is used for function call.
@@ -419,7 +418,7 @@ module MemType = struct
        But the good thing is that we do not need to check overlap issue here. It is included in the target context *)
     let sub_map_m_type = apply_mem_map sub_m_type mem_map in
     List.fold_left2 (
-      fun (acc: bool) (sub: (MemAnno.slot_t * entry_t) mem_part) (sup: entry_t mem_part) ->
+      fun (acc: bool) (sub: entry_t mem_part) (sup: entry_t mem_part) ->
         if not acc then acc else
         let (_, (_, sub_read, sub_write)), sub_part_mem = sub in
         let (_, (_, sup_read, sup_write)), sup_part_mem = sup in
@@ -427,26 +426,22 @@ module MemType = struct
         imply_helper sub_write sup_write &&
         List.fold_left2 (
           fun (acc_check: bool) 
-              (sub_info_slot: (MemAnno.slot_t * entry_t) mem_slot)
+              (sub_info_slot: entry_t mem_slot)
               (sup_slot: entry_t mem_slot) ->
             if not acc_check then acc_check
             else
-              let (sub_off, sub_range, (sub_slot_info, sub_entry)) = sub_info_slot in
-              if is_spill_func sub_slot_info then
-                mem_type_error "check_subtype_map should not map spill slots (at func call)"
-              else
-                check_slot_subtype smt_ctx false false (sub_off, sub_range, sub_entry) sup_slot
+              let (sub_off, sub_forget_type, sub_range, sub_entry) = sub_info_slot in
+              check_slot_subtype smt_ctx false (sub_off, sub_forget_type, sub_range, sub_entry) sup_slot
         ) true sub_part_mem sup_part_mem
     ) true sub_map_m_type sup_m_type
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
-      (is_spill_func: MemAnno.slot_t -> bool)
       (sub_m_type: t) (sup_m_type: t)
       (mem_map_opt: MemAnno.slot_t mem_content option) : bool =
     match mem_map_opt with
-    | None -> check_subtype_no_map smt_ctx is_spill_func sub_m_type sup_m_type
-    | Some mem_map -> check_subtype_map smt_ctx is_spill_func sub_m_type sup_m_type mem_map
+    | None -> check_subtype_no_map smt_ctx sub_m_type sup_m_type
+    | Some mem_map -> check_subtype_map smt_ctx sub_m_type sup_m_type mem_map
 
   let find_part_mem_helper
       (mem_type: t) (slot_info: MemAnno.slot_t) : entry_t mem_part =
@@ -463,7 +458,7 @@ module MemType = struct
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t) : entry_t option =
     let ctx, _ = smt_ctx in
-    let _, slot_range, (slot_dep, slot_taint) = slot in
+    let _, _, slot_range, (slot_dep, slot_taint) = slot in
     match slot_range with
     | [] ->
       Printf.printf "Warning: read from an invalid entry\n";
@@ -507,7 +502,7 @@ module MemType = struct
       match acc with
       | None -> None
       | Some (acc_r, acc_merged_type) ->
-        let _, slot_range, slot_type = slot in
+        let _, _, slot_range, slot_type = slot in
         begin match slot_range with
         | [ slot_l, slot_r ] ->
           let slot_continuous = DepType.check_eq smt_ctx acc_r slot_l in
@@ -529,7 +524,7 @@ module MemType = struct
     let addr_l, addr_r = addr_off in
     match slot_list with
     | [] -> mem_type_error "get_mult_slot_type: should not have empty slot_list"
-    | (_, [ hd_l, hd_r ], hd_type) :: tl ->
+    | (_, _, [ hd_l, hd_r ], hd_type) :: tl ->
       let slot_left_aligned = DepType.check_eq smt_ctx addr_l hd_l in
       if slot_left_aligned then begin
         let result = List.fold_left get_one_entry (Some (hd_r, hd_type)) tl in
@@ -585,18 +580,17 @@ module MemType = struct
 
   let set_one_slot_type
       (smt_ctx: SmtEmitter.t)
-      (is_spill: bool)
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t)
       (new_type: BasicType.t) : entry_t mem_slot option =
     (* 1. Update entry (valid region and type)
        2. Check slot_off, taint constraint *)
-    let slot_off, slot_range, (_, slot_taint) = slot in
-    if is_spill then begin
+    let slot_off, slot_forget_type, slot_range, (_, slot_taint) = slot in
+    if slot_forget_type then begin
       (* Check slot_off *)
       if MemOffset.offset_cmp smt_ctx CmpSubset addr_off slot_off = Subset then begin
-        (* For spill, we overwrite the valid region with write range. *)
-        Some (slot_off, [ addr_off ], new_type)
+        (* For slot that allow forget valid range/taint (e.g., spill), we overwrite the valid region with write range. *)
+        Some (slot_off, slot_forget_type, [ addr_off ], new_type)
       end else begin
         Printf.printf "Warning: %s is not subset of %s\n" 
           (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
@@ -616,9 +610,9 @@ module MemType = struct
         None
       end else begin
         if cmp_off = Eq then begin
-          Some (slot_off, [ slot_off ], new_type)
+          Some (slot_off, slot_forget_type, [ slot_off ], new_type)
         end else if cmp_off = Subset then begin
-          Some (slot_off, MemRange.merge smt_ctx slot_range [addr_off], (Top DepType.top_unknown_size, new_taint))
+          Some (slot_off, slot_forget_type, MemRange.merge smt_ctx slot_range [addr_off], (Top DepType.top_unknown_size, new_taint))
         end else begin
           Printf.printf "Warning: %s is not subset of %s\n" 
             (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
@@ -646,7 +640,10 @@ module MemType = struct
       | None -> None, slot
       | Some (idx, acc_r) ->
         if is_set idx then begin
-          let (slot_l, slot_r), _, (_, slot_taint) = slot in
+          (* Here we ignore slot_forget_type for simplicity since it always overwrites the full slot,
+            and we do not allow change of taint for simplicity. 
+            If needed, we can skip check taint and directly overwrite taint if slot_forget_type is true. *)
+          let (slot_l, slot_r), slot_forget_type, _, (_, slot_taint) = slot in
           let slot_continuous = DepType.check_eq smt_ctx acc_r slot_l in
           if slot_continuous then begin
             let check_taint = TaintType.check_subtype smt_ctx true new_taint slot_taint in
@@ -659,11 +656,11 @@ module MemType = struct
               match MemOffset.offset_get_start_len smt_ctx addr_l (slot_l, slot_r) with
               | Some (start_byte, len_byte) ->
                 Some (idx + 1, slot_r),
-                ((slot_l, slot_r), [slot_l, slot_r], 
+                ((slot_l, slot_r), slot_forget_type, [slot_l, slot_r], 
                 (DepType.get_start_len (fst smt_ctx) start_byte len_byte new_dep, new_taint))
               | None ->
                 Some (idx + 1, slot_r),
-                ((slot_l, slot_r), [slot_l, slot_r], (Top DepType.top_unknown_size, new_taint))
+                ((slot_l, slot_r), slot_forget_type, [slot_l, slot_r], (Top DepType.top_unknown_size, new_taint))
             end
           end else begin
             Printf.printf "Warning: set_mult_slot_type slot not continuous\n";
@@ -683,7 +680,6 @@ module MemType = struct
 
   let set_part_mem
       (smt_ctx: SmtEmitter.t)
-      (is_spill_func: MemAnno.slot_t -> bool)
       (part_mem: entry_t mem_slot list)
       (addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
@@ -705,7 +701,7 @@ module MemType = struct
             | Some acc_idx ->
               if acc_idx <> slot_idx then Some (acc_idx + 1), slot
               else begin
-                match set_one_slot_type smt_ctx (is_spill_func slot_info) slot addr_off new_type with
+                match set_one_slot_type smt_ctx slot addr_off new_type with
                 | None -> None, slot
                 | Some new_slot -> Some (acc_idx + 1), new_slot
               end
@@ -718,7 +714,6 @@ module MemType = struct
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
-      (is_spill_func: MemAnno.slot_t -> bool)
       (mem_type: t)
       (addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
@@ -732,7 +727,7 @@ module MemType = struct
         (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
       None
     end else
-      let new_part_mem_opt = set_part_mem smt_ctx is_spill_func part_mem addr_off slot_info new_type in
+      let new_part_mem_opt = set_part_mem smt_ctx part_mem addr_off slot_info new_type in
       match new_part_mem_opt with
       | None -> None
       | Some new_part_mem ->
@@ -754,11 +749,34 @@ module MemType = struct
       match acc with
       | None -> None
       | Some mem_type ->
-        let _, update_range, update_type = update_slot in
-        let _, _, slot_info = slot_map in
+        let _, update_slot_forget_type, update_range, update_type = update_slot in
+        let _, slot_forget_type, slot_range, slot_info = slot_map in
+        (* Check whether the two slots agree on whether to forget valid range/taint. *)
+        if slot_forget_type <> update_slot_forget_type then begin
+          Printf.printf "Warning: set_mem_type_with_other forget type field mismatch";
+          None
+        end else
         match update_range with
+        | [] ->
+          if update_slot_forget_type then (* There must also be slot_forget_type = true according to the previous check *)
+            (* In this case we need to update the slot valid range to 
+               (slot_range - udpate_off) to clear valid range that might be changed by update_off. *)
+            if List.is_empty slot_range then acc
+            else begin
+              (* This case usually should not happen, so I skipped its implementation. *)
+              Printf.printf "Warning: Not implemented\n";
+              None
+            end
+          else 
+            (* If update_slot_forget_type = false and update valid range = [], then the child function does not write to the slot at all. *)
+            acc
         | [ update_off ] ->
-          set_mem_type smt_ctx (fun _ -> false) mem_type update_off slot_info update_type
+          (* We only implement for the case where slot_forget_type = update_slot_forget_type = false *)
+          if slot_forget_type then begin
+            Printf.printf "Warning: Not implemented\n"; (* It is a bit complex to handle update slot is a subsetneq of parent/orig slot. *)
+            None
+          end else
+          set_mem_type smt_ctx mem_type update_off slot_info update_type
         | _ -> 
           Printf.printf "Warning: set_mem_type_with_other range format is not single offset slot\n";
           None

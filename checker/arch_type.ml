@@ -4,7 +4,6 @@ open Type.Smt_emitter
 (* open Z3_sexp *)
 open Basic_type
 (* open Mem_anno *)
-open Stack_spill_info
 open Reg_type
 open Flag_type
 open Mem_type
@@ -137,7 +136,6 @@ include ArchTypeBasic
           (* Note: we check taint_anno against original taint in set_mem_type *)
           let new_mem_opt =
             MemType.set_mem_type smt_ctx 
-              (StackSpillInfo.is_spill curr_type.stack_spill_info) 
               curr_type.mem_type addr_off slot_anno (st_dep_type, taint_anno)
           in
           begin match new_mem_opt with
@@ -340,8 +338,7 @@ include ArchTypeBasic
       match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off src_slot with
       | None -> false, curr_type
       | Some src_type -> begin
-        let is_spill_func = StackSpillInfo.is_spill curr_type.stack_spill_info in
-        match MemType.set_mem_type smt_ctx is_spill_func curr_type.mem_type addr_off dst_slot src_type with
+        match MemType.set_mem_type smt_ctx curr_type.mem_type addr_off dst_slot src_type with
         | None -> false, curr_type
         | Some result_mem_type ->
           let result_type = { curr_type with mem_type = result_mem_type } in
@@ -401,8 +398,7 @@ include ArchTypeBasic
       let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
       let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
       let addr_off = (addr_lower, addr_upper) in
-      let is_spill_func = StackSpillInfo.is_spill curr_type.stack_spill_info in
-      match MemType.set_mem_type smt_ctx is_spill_func curr_type.mem_type addr_off st_slot acc_type with
+      match MemType.set_mem_type smt_ctx curr_type.mem_type addr_off st_slot acc_type with
       | None -> false, curr_type
       | Some result_mem_type ->
           let result_type = { curr_type with mem_type = result_mem_type } in

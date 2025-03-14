@@ -4,7 +4,7 @@ open Basic_type
 open Flag_type
 open Mem_anno
 open Mem_type
-open Stack_spill_info
+(* open Stack_spill_info *)
 open Func_interface
 open Type.Taint_type_infer
 open Type.Single_entry_type
@@ -261,17 +261,18 @@ let convert_mem_range
 let convert_mem_generic
     (ctx: Z3.context)
     (get_var_size: int -> int option)
+    (is_forget_slot: (int * int) -> bool)
     (mem_type: 'a Type.Mem_type_new.MemTypeBasic.mem_content)
     (convert_entry: Z3.context -> Type.Mem_offset_new.MemOffset.t -> Type.Mem_offset_new.MemRange.t -> 'a -> int64 option list -> 'b)
     : 'b MemType.mem_content =
   List.map (fun (mem_part: 'a Type.Mem_type_new.MemTypeBasic.mem_part) ->
     let ptr_info, mem_slots = mem_part in
-    let mem_slots' = List.map (fun (mem_slot: 'a Type.Mem_type_new.MemTypeBasic.mem_slot) ->
+    let mem_slots' = List.mapi (fun (idx: int) (mem_slot: 'a Type.Mem_type_new.MemTypeBasic.mem_slot) ->
       let off, range, entry = mem_slot in
       let off' = convert_mem_offset ctx get_var_size off in
       let range', inited_range_sizes = convert_mem_range ctx get_var_size range in
       let entry' = convert_entry ctx off range entry inited_range_sizes in
-      (off', range', entry')
+      (off', is_forget_slot (fst ptr_info, idx), range', entry')
     ) mem_slots
     in
     (ptr_info, mem_slots')
@@ -280,6 +281,7 @@ let convert_mem_generic
 let convert_mem_type
     (ctx: Z3.context)
     (get_var_size: int -> int option)
+    (is_forget_slot: (int * int) -> bool)
     (mem_type: TaintTypeInfer.ArchType.MemType.t)
     : MemType.t =
   let convert_entry ctx off _ entry inited_range_sizes =
@@ -290,7 +292,7 @@ let convert_mem_type
     | _ ->
       convert_basic_type ctx (SingleEntryType.SingleTop, slot_taint) (fun _ -> failwith "placeholder, should not be called") DepType.top_unknown_size
   in
-  convert_mem_generic ctx get_var_size mem_type convert_entry
+  convert_mem_generic ctx get_var_size is_forget_slot mem_type convert_entry
 
 let convert_context
     (ctx: Z3.context)
@@ -377,9 +379,10 @@ let convert_arch_type
     (ctx: Z3.context)
     (tti: TaintTypeInfer.t)
     (arch_type: TaintTypeInfer.ArchType.t)
-    (stack_spill_info: StackSpillInfo.t)
+    (* (stack_spill_info: StackSpillInfo.t) *)
     (input_var: TaintExp.TaintVarSet.t)
     (func_vsm: func_var_size_map)
+    (is_forget_slot: (int * int) -> bool)
     : ArchType.t * func_var_size_map =
   let bb_var_size_map = infer_var_size_map ctx arch_type.reg_type arch_type.mem_type in
   let func_vsm = append_func_var_size_map func_vsm tti.func_name bb_var_size_map in
@@ -390,18 +393,23 @@ let convert_arch_type
     dead_pc = arch_type.dead_pc;
     reg_type = convert_reg_type ctx get_var_size arch_type.reg_type;
     flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx get_var_size arch_type.mem_type;
+    mem_type = convert_mem_type ctx get_var_size is_forget_slot arch_type.mem_type;
     context = convert_context ctx arch_type.context tti.taint_context tti.taint_sol;
-    stack_spill_info = stack_spill_info;
+    (* stack_spill_info = stack_spill_info; *)
 
     global_var = arch_type.global_var;
     input_var = input_var;
     local_var = TaintTypeInfer.ArchType.get_local_var_set arch_type;
   }, func_vsm
 
-let convert_stack_spill_info
+let convert_is_forget_slot
     (tti: TaintTypeInfer.t)
-    : StackSpillInfo.t =
+    : IntSet.t =
+  (* This function generate set of stack slot indices that allow "forget valid/init range and taint" during its lifetime.
+     Usually, spills and the big slot for callee's stack (that may contain callee's spill) allow this.
+     If this property is true, the slot allows
+     (1) shrink of valid region size
+     (2) change of taint (placement) *)
   (* imm_var_id of RSP upon function entry *)
   let rsp_ptr_idx = TaintTypeInfer.ArchType.Isa.rsp_idx in
   (* sanity check *)
@@ -416,15 +424,22 @@ let convert_stack_spill_info
   let idx_list = List.map (
     fun (spill_slot_pr: int64 * int64) ->
       let l, r = spill_slot_pr in
-      List.find_mapi (
-        fun idx (off, _, _) ->
+      List.find_index (
+        fun (off, _, _) ->
           let off_l, off_r = Type.Stack_spill_info.StackSpillInfo.to_off_pair
             rsp_ptr_idx off
           in
-          if off_l = l && off_r = r then Some idx else None
+          off_l = l && off_r = r
       ) (snd rsp_mem)
       |> Option.get
   ) (Int64PairSet.to_list tti.stack_spill_info)
+  in
+  (* If the function has callee, the first slot on its stack will be used as its callee's stack, 
+     and may contain callee's "forget valid region slot" during its lifetime.
+     If not adding this slot here, the type check will fail. *)
+  let idx_list =
+    if tti.has_callee then 0 :: idx_list
+    else idx_list
   in
   IntSet.of_list idx_list
 
@@ -504,7 +519,9 @@ let convert_base_info
     | Type.Call_anno.CallAnno.BaseAsSlot (ptr, off) -> FuncInterface.BaseAsSlot (convert_slot ref_mem ptr off (Some true) (Some 1))
     | Type.Call_anno.CallAnno.BaseAsGlobal -> FuncInterface.BaseAsGlobal
   in
-  convert_mem_generic ctx get_var_size base_info convert_entry
+  (* <NOTE> In base info, the is_forget field is not important, so I just mark it as false.
+     We may want to remove base info from checker or change it to another format. *)
+  convert_mem_generic ctx get_var_size (fun _ -> false) base_info convert_entry
 
 let convert_function_interface
     (ctx: Z3.context)
@@ -512,6 +529,12 @@ let convert_function_interface
     (func_vsm: func_var_size_map)
     : func_var_size_map * FuncInterface.t =
   (* Printf.printf "converting function interface of %s\n" fi.func_name; *)
+  (* <TODO> This is a dirty fix to generate is_forget field for interface in/out memory.
+     Later we should either check its correctness or generate it from checker's in/out block type. *)
+  let is_forget_slot (slot_ptr_idx: int * int) : bool =
+    let ptr, idx = slot_ptr_idx in
+    ptr = Type.Isa_basic.IsaBasic.rsp_idx && idx = 0
+  in
   let var_size_map1 = infer_var_size_map ctx fi.in_reg fi.in_mem in
   let var_size_map2 = infer_var_size_map ctx fi.out_reg fi.out_mem in
   let func_vsm = append_func_var_size_map func_vsm fi.func_name (var_size_map1 @ var_size_map2) in
@@ -520,13 +543,13 @@ let convert_function_interface
     label = fi.func_name;
     reg_type = convert_reg_type ctx get_var_size_func fi.in_reg;
     flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx get_var_size_func fi.in_mem;
+    mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.in_mem;
     context = convert_context ctx fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;
-    stack_spill_info = IntSet.empty;
+    (* stack_spill_info = IntSet.empty; *)
     global_var = IntSet.empty;
     input_var = TaintExp.TaintVarSet.empty;
     local_var = TaintExp.TaintVarSet.empty;
@@ -536,13 +559,13 @@ let convert_function_interface
     label = fi.func_name;
     reg_type = convert_reg_type ctx get_var_size_func fi.out_reg;
     flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx get_var_size_func fi.out_mem;
+    mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.out_mem;
     context = convert_context ctx fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
 
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;
-    stack_spill_info = IntSet.empty;
+    (* stack_spill_info = IntSet.empty; *)
     global_var = IntSet.empty;
     input_var = TaintExp.TaintVarSet.empty;
     local_var = TaintExp.TaintVarSet.empty;
@@ -640,8 +663,9 @@ let convert_call_anno
     (* reference memory is caller's memory *)
     convert_slot from_mem slot_base slot_off (Some slot_full) (Some 1)
   in
+  (* <NOTE> I think is_forget does not matter here, so just return false. *)
   let ch_mem_slot_info =
-    convert_mem_generic ctx (get_var_size targ_get_var_size) anno.ch_mem convert_ch_mem_slot_info
+    convert_mem_generic ctx (get_var_size targ_get_var_size) (fun _ -> false) anno.ch_mem convert_ch_mem_slot_info
   in
 
   {
@@ -697,11 +721,17 @@ let convert_taint_type_infers
     : checker_func list =
   let func_vsm, archs_of_func = List.fold_left_map (
     fun func_vsm tti ->
-      let stack_spill_info = convert_stack_spill_info tti in
+      (* <TODO> I want to rename stack_spill_info to forget (stack) slot list here. *)
+      let stack_forget_slot_info = convert_is_forget_slot tti in
+      let is_forget_slot (slot_ptr_idx: int * int) : bool =
+        let ptr, idx = slot_ptr_idx in
+        ptr = Type.Isa_basic.IsaBasic.rsp_idx &&
+        IntSet.mem idx stack_forget_slot_info
+      in
       let input_var = convert_input_var tti in
       List.fold_left_map (
         fun func_vsm arch_type ->
-          let converted, func_vsm = convert_arch_type ctx tti arch_type stack_spill_info input_var func_vsm in
+          let converted, func_vsm = convert_arch_type ctx tti arch_type input_var func_vsm is_forget_slot in
           func_vsm, converted
       ) func_vsm tti.func_type
   ) func_vsm tti_list

@@ -6,7 +6,7 @@ open Basic_type
 open Mem_anno
 open Branch_anno
 open Call_anno
-open Stack_spill_info
+(* open Stack_spill_info *)
 open Reg_type
 open Flag_type
 open Mem_type
@@ -32,7 +32,7 @@ module ArchTypeBasic = struct
     mem_type: MemType.t;
     context: BasicType.ctx_t;
 
-    stack_spill_info: StackSpillInfo.t;
+    (* stack_spill_info: StackSpillInfo.t; *)
 
     global_var: IntSet.t;
     input_var: IntSet.t;
@@ -58,8 +58,9 @@ module ArchTypeBasic = struct
         2. ptr overlap/non-overlap is checked by checking context *)
     let mem_type =
       MemType.map_full (
-        fun (off, range, entry) ->
+        fun (off, slot_forget, range, entry) ->
           MemOffset.substitute dep_exp_sub_func off,
+          slot_forget,
           MemRange.substitute dep_exp_sub_func range,
           basic_sub_func entry
       ) a_type.mem_type
@@ -83,7 +84,6 @@ module ArchTypeBasic = struct
     FlagType.check_subtype smt_ctx sub_a_type.flag_type sup_flag_type &&
     MemType.check_subtype 
       smt_ctx 
-      (StackSpillInfo.is_spill sub_a_type.stack_spill_info) 
       sub_a_type.mem_type sup_mem_type mem_map_opt &&
     SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes &&
     SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes

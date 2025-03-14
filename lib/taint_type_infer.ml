@@ -40,6 +40,7 @@ module TaintTypeInfer = struct
     taint_sol: TaintExp.local_var_map_t;
     taint_context: TaintExp.sub_t list;
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
+    has_callee: bool;
     smt_ctx: SmtEmitter.t;
     alive: bool option;
   }
@@ -118,6 +119,7 @@ module TaintTypeInfer = struct
       taint_sol = [];
       taint_context = [];
       ret_subtype_list = range_infer_state.ret_subtype_list;
+      has_callee = false;
       smt_ctx = SmtEmitter.init_smt_ctx ();
       alive = None;
     }
@@ -223,7 +225,25 @@ module TaintTypeInfer = struct
     in
     if has_invalid_unknown_taint <> None then taint_type_infer_error "has invalid unknown taint" else
     { state with func = func; func_type = func_type }
-  
+
+  let identify_callee_stack_slot
+      (state: t) : t =
+    (* Search for call inst in currecnt function.
+       If found, the first slot of the current function's stack is used for callee's local stack,
+       which will be marked as "allow forgetting range/taint" during check (treated similarly to stack spill).
+       Actually, it might be filled by callee's stack spill during its lifetime. *)
+    let has_callee =
+      List.find_opt (
+        fun (block: Isa.basic_block) ->
+          List.find_opt (
+            fun (inst: Isa.instruction) ->
+              match inst with
+              | Call _ -> true
+              | _ -> false
+          ) block.insts <> None
+      ) state.func <> None
+    in
+    { state with has_callee = has_callee }
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
@@ -280,7 +300,9 @@ module TaintTypeInfer = struct
 
     let taint_sol, taint_context = TaintSubtype.solve input_var subtype_list in
     let taint_sol = taint_sol @ unknown_sol in
-    update_with_taint_sol taint_sol { state with taint_sol = taint_sol; taint_context = taint_context }
+    let state = update_with_taint_sol taint_sol { state with taint_sol = taint_sol; taint_context = taint_context } in
+    (* Identify whether the function calls other functions. *)
+    identify_callee_stack_slot state
     (* let update_taint = TaintExp.repl_context_var_no_error taint_sol in
     let update_entry = fun (entry: TaintEntryType.t) -> let single, taint = entry in single, update_taint taint in
     let func = 
