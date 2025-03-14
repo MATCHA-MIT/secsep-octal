@@ -93,18 +93,18 @@ module SingleContext = struct
             end
       ) (Left true) c_list
 
-  let rec to_smt_expr (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
+  let rec to_smt_expr ?(get_var_size: (int -> int option) option = None) (smt_ctx: SmtEmitter.t) (cond: t) : SmtEmitter.exp_t =
     match cond with
-    | Cond c -> SingleCondType.to_smt_expr smt_ctx c
+    | Cond c -> SingleCondType.to_smt_expr ~get_var_size:get_var_size smt_ctx c
     | NoOverflow e -> 
       let z3_ctx, _ = smt_ctx in
-      Z3.Boolean.mk_and z3_ctx (SmtEmitter.get_exp_no_overflow_constraint smt_ctx e)
+      Z3.Boolean.mk_and z3_ctx (SmtEmitter.get_exp_no_overflow_constraint ~get_var_size:get_var_size smt_ctx e)
     | Or c_list -> 
       let z3_ctx, _ = smt_ctx in
-      Z3.Boolean.mk_or z3_ctx (List.map (to_smt_expr smt_ctx) c_list)
+      Z3.Boolean.mk_or z3_ctx (List.map (to_smt_expr ~get_var_size:get_var_size smt_ctx) c_list)
     | And c_list -> 
       let z3_ctx, _ = smt_ctx in
-      Z3.Boolean.mk_and z3_ctx (List.map (to_smt_expr smt_ctx) c_list)
+      Z3.Boolean.mk_and z3_ctx (List.map (to_smt_expr ~get_var_size:get_var_size smt_ctx) c_list)
 
   let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
     SmtEmitter.add_assertions smt_ctx (List.map (to_smt_expr smt_ctx) cond_list)

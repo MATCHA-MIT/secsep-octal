@@ -675,7 +675,7 @@ module ArchType (Entry: EntryType) = struct
     let prop_mode = curr_type.prop_mode in
     let rsp_type, curr_type, _, _ = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type (Isa.RegOp Isa.RSP) in
 
-    let new_rsp_type, _ = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum (offset, Some 8L))) curr_type.flag false in
+    let new_rsp_type, _ = Entry.exe_bop_inst Isa.Add rsp_type (Entry.get_const_type (Isa.ImmNum (offset, Some 8L))) curr_type.flag false in
     let new_rsp_type = Entry.repl_local_var curr_type.local_var_map new_rsp_type in
 
     let curr_type, _, _ = set_dest_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type (Isa.RegOp Isa.RSP) new_rsp_type in
@@ -702,7 +702,7 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src1 in
-      let dest_type, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) bop src0_type src1_type curr_type.flag (Isa.cmp_operand src0 src1) in
+      let dest_type, new_flag = Entry.exe_bop_inst bop src0_type src1_type curr_type.flag (Isa.cmp_operand src0 src1) in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest =
         (* Dirty fix to allow clean up xmm reg with xor *)
@@ -814,7 +814,7 @@ module ArchType (Entry: EntryType) = struct
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src1 in
-      let _, new_flag = Entry.exe_bop_inst (prop_mode = TypeCheck) Isa.And src0_type src1_type curr_type.flag false in
+      let _, new_flag = Entry.exe_bop_inst Isa.And src0_type src1_type curr_type.flag false in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
       { curr_type with flag = new_flag; },
       Test (src0, src1)

@@ -74,7 +74,7 @@ include SingleExp
   let set_flag_helper (dest_type: t) =
     dest_type, (dest_type, get_const_type (IsaBasic.ImmNum (0L, None)))
 
-  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     match isa_bop with
     | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
     | Adc -> SingleTop |> set_flag_helper
@@ -84,8 +84,7 @@ include SingleExp
     | Imul -> eval (SingleBExp (SingleMul, e1, e2)) |> set_flag_helper
     | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2)) |> set_flag_helper
     | Sar -> eval (SingleBExp (SingleSar, e1, e2)) |> set_flag_helper
-    | Shr -> (* Check has a dirty, possibly incorrect calculation *)
-      (if is_check then SingleTop else eval (SingleBExp (SingleSar, e1, e2))) |> set_flag_helper
+    | Shr -> eval (SingleBExp (SingleShr, e1, e2)) |> set_flag_helper
     | Rol | Ror -> SingleTop |> set_flag_helper
     | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
     | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper

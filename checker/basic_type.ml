@@ -151,6 +151,12 @@ module DepType = struct
       BitVector.mk_const_s ctx (get_dep_var_string label_var_id) ((Option.get expected_size |> Int64.to_int) * 8)
     | _ -> dep_type_error "unexpected ImmLabel / ImmBExp in get_imm_exp"
 
+  let mk_extract_wrapper (ctx: context) (l: int) (r: int) (e: exp_t) : exp_t =
+    if l = (get_exp_bit_size e) - 1 && r = 0 then
+      e
+    else
+      BitVector.mk_extract ctx l r e
+
   let get_imm_exp (ctx: context) (imm: IsaBasic.immediate) : exp_t =
     get_imm_exp_size_expected ctx imm None
 
@@ -188,7 +194,7 @@ module DepType = struct
       (e: exp_t) : exp_t =
     match check_start_end start_byte end_byte (get_exp_bit_size e) None with
     | Some (start_bit, end_bit, _) ->
-      BitVector.mk_extract ctx (end_bit - 1) start_bit e
+      mk_extract_wrapper ctx (end_bit - 1) start_bit e
     | None ->
       dep_type_error 
         (Printf.sprintf "get_exp_start_end invalid argument: start_byte %d, end_byte %d e %s\n" 
@@ -250,14 +256,14 @@ module DepType = struct
         match start_bit, ext_bit with
         | (0, 0) -> new_e, true
         | (0, _) ->
-          let orig_high = BitVector.mk_extract ctx (total_bit - 1) end_bit orig_e in
+          let orig_high = mk_extract_wrapper ctx (total_bit - 1) end_bit orig_e in
           BitVector.mk_concat ctx orig_high new_e, false
         | (_, 0) ->
-          let orig_low = BitVector.mk_extract ctx (start_bit - 1) 0 orig_e in
+          let orig_low = mk_extract_wrapper ctx (start_bit - 1) 0 orig_e in
           BitVector.mk_concat ctx new_e orig_low, false
         | (_, _) ->
-          let orig_high = BitVector.mk_extract ctx (total_bit - 1) end_bit orig_e in
-          let orig_low = BitVector.mk_extract ctx (start_bit - 1) 0 orig_e in
+          let orig_high = mk_extract_wrapper ctx (total_bit - 1) end_bit orig_e in
+          let orig_low = mk_extract_wrapper ctx (start_bit - 1) 0 orig_e in
           BitVector.mk_concat ctx new_e orig_low |> BitVector.mk_concat ctx orig_high, false
 
   let set_start_end 
@@ -421,25 +427,25 @@ module DepType = struct
     let top_bit = bv_size - 1 in
     let subcnt = BitVector.mk_sub ctx cnt (BitVector.mk_numeral ctx "1" bv_size) in
     let sub_shift = BitVector.mk_shl ctx e subcnt in
-    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx top_bit top_bit sub_shift)) 
+    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx top_bit top_bit sub_shift)) 
 
   let get_shr_carry (ctx: context) (e: exp_t) (cnt: exp_t) : exp_t =
     let bv_size = BitVector.get_size (Expr.get_sort e) in
     let subcnt = BitVector.mk_sub ctx cnt (BitVector.mk_numeral ctx "1" bv_size) in
     let sub_shift = BitVector.mk_lshr ctx e subcnt in
-    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx 0 0 sub_shift)) 
+    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx 0 0 sub_shift)) 
  
   let get_rol_carry (ctx: context) (result: exp_t) : exp_t =
-    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx 0 0 result))
+    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx 0 0 result))
 
   let get_ror_carry (ctx: context) (result: exp_t) : exp_t = 
     let top_bit = BitVector.get_size (Expr.get_sort result) in
-    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx top_bit top_bit result)) 
+    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx top_bit top_bit result)) 
   
   let get_parity (ctx: context) (e: exp_t) : exp_t =
     (* Extend the bits to 3-bit vectors so we can do addition *)
     let get_bit (idx: int) : exp_t =
-      BitVector.mk_zero_ext ctx 2 (BitVector.mk_extract ctx idx idx e)
+      BitVector.mk_zero_ext ctx 2 (mk_extract_wrapper ctx idx idx e)
     in
     let rec sum_bits (acc: exp_t) (next: exp_t list) : exp_t =
       match next with
@@ -448,16 +454,16 @@ module DepType = struct
     in 
     let bits = List.init 8 get_bit in
     let sum = sum_bits (List.hd bits) (List.tl bits) in
-    ml_to_z3_bool ctx (BitVector.is_bv_bit0 (BitVector.mk_extract ctx 0 0 sum))
+    ml_to_z3_bool ctx (BitVector.is_bv_bit0 (mk_extract_wrapper ctx 0 0 sum))
   
   let get_add_aux (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
-    let low_nib0 = BitVector.mk_extract ctx 3 0 e0 in
-    let low_nib1 = BitVector.mk_extract ctx 3 0 e1 in
+    let low_nib0 = mk_extract_wrapper ctx 3 0 e0 in
+    let low_nib1 = mk_extract_wrapper ctx 3 0 e1 in
     get_add_carry ctx low_nib0 low_nib1
 
   let get_sub_aux (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
-    let high_nib0 = BitVector.mk_extract ctx 7 4 e0 in
-    let high_nib1 = BitVector.mk_extract ctx 7 4 e1 in
+    let high_nib0 = mk_extract_wrapper ctx 7 4 e0 in
+    let high_nib1 = mk_extract_wrapper ctx 7 4 e1 in
     get_sub_carry ctx high_nib0 high_nib1 
 
   let get_zero (ctx: context) (e: exp_t) : exp_t =
@@ -466,7 +472,7 @@ module DepType = struct
 
   let get_sign (ctx: context) (e: exp_t) : exp_t =
     let top_bit = (BitVector.get_size (Expr.get_sort e)) - 1 in
-    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx top_bit top_bit e))
+    ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx top_bit top_bit e))
 
   let get_add_overflow (ctx: context) (e0: exp_t) (e1: exp_t) : exp_t =
     [ BitVector.mk_add_no_overflow ctx e0 e1 true; 
@@ -481,8 +487,8 @@ module DepType = struct
   let get_shl_overflow (ctx: context) (dst: exp_t) (cnt: exp_t) (oflg: exp_t) : exp_t =
     let top_bit = (BitVector.get_size (Expr.get_sort dst)) - 1 in
     let next_bit = top_bit - 1 in
-    let top_bv = BitVector.mk_extract ctx top_bit top_bit dst in
-    let next_bv = BitVector.mk_extract ctx next_bit next_bit dst in
+    let top_bv = mk_extract_wrapper ctx top_bit top_bit dst in
+    let next_bv = mk_extract_wrapper ctx next_bit next_bit dst in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
       (Boolean.mk_not ctx (Boolean.mk_eq ctx top_bv next_bv))
@@ -498,13 +504,13 @@ module DepType = struct
     let top_bit = (BitVector.get_size (Expr.get_sort dst)) - 1 in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
-      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (BitVector.mk_extract ctx top_bit top_bit dst)))
+      (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (mk_extract_wrapper ctx top_bit top_bit dst)))
       oflg
 
   let get_rol_overflow (ctx: context) (result: exp_t) (cnt: exp_t) (oflg: exp_t) : exp_t =
     let top_bit = (BitVector.get_size (Expr.get_sort result)) - 1 in
-    let top_bv = BitVector.mk_extract ctx top_bit top_bit result in
-    let cflg_bv = BitVector.mk_extract ctx 0 0 result in
+    let top_bv = mk_extract_wrapper ctx top_bit top_bit result in
+    let cflg_bv = mk_extract_wrapper ctx 0 0 result in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
       (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Z3.BitVector.mk_xor ctx top_bv cflg_bv)))
@@ -513,8 +519,8 @@ module DepType = struct
   let get_ror_overflow (ctx: context) (result: exp_t) (cnt: exp_t) (oflg: exp_t) : exp_t =
     let top_bit = (BitVector.get_size (Expr.get_sort result)) - 1 in
     let next_bit = top_bit - 1 in
-    let top_bv = BitVector.mk_extract ctx top_bit top_bit result in 
-    let next_bv = BitVector.mk_extract ctx next_bit next_bit result in
+    let top_bv = mk_extract_wrapper ctx top_bit top_bit result in 
+    let next_bv = mk_extract_wrapper ctx next_bit next_bit result in
     let one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
     Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt one)
       (ml_to_z3_bool ctx (BitVector.is_bv_bit1 (Z3.BitVector.mk_xor ctx top_bv next_bv)))
@@ -537,7 +543,7 @@ module DepType = struct
   let downsize_bv (ctx: context) (bv: exp_t) (size: int) : exp_t =
     let bv_size = BitVector.get_size (Expr.get_sort bv) in
     if bv_size <= size then bv
-    else BitVector.mk_extract ctx (size - 1) 0 bv
+    else mk_extract_wrapper ctx (size - 1) 0 bv
   
   let exe_add (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) : exe_result =
     let result = downsize_bv ctx (BitVector.mk_add ctx dst src) dest_size in
@@ -577,7 +583,7 @@ module DepType = struct
     let src_ext = ext_func ctx src_size src in
     let dst_ext = ext_func ctx src_size dst in
     let result = BitVector.mk_mul ctx dst_ext src_ext in
-    let top_half = BitVector.mk_extract ctx (dest_size - 1) src_size result in
+    let top_half = mk_extract_wrapper ctx (dest_size - 1) src_size result in
     let zero = BitVector.mk_numeral ctx "0" src_size in
     let flags = Boolean.mk_not ctx (Boolean.mk_eq ctx top_half zero) in 
     Exp result, [
@@ -666,7 +672,7 @@ module DepType = struct
     if dest_size = src_size then
       Exp src, []
     else if dest_size < src_size then
-      Exp (BitVector.mk_extract ctx (dest_size - 1) 0 src), []
+      Exp (mk_extract_wrapper ctx (dest_size - 1) 0 src), []
     else
       Exp (BitVector.mk_sign_ext ctx (dest_size - src_size) src), []
 
@@ -676,7 +682,7 @@ module DepType = struct
       if idx == byte_size then
         acc
       else
-        let new_acc = (BitVector.mk_extract ctx (idx * 8 + 7) (idx * 8) src) :: acc in
+        let new_acc = (mk_extract_wrapper ctx (idx * 8 + 7) (idx * 8) src) :: acc in
         get_rev_bytes ~idx:(idx+1) new_acc
     in
     let rec concat_bytes (byte_list: exp_t list) : exp_t =
@@ -725,12 +731,12 @@ module DepType = struct
   let exe_shld (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
     let cflg_bv = bool_to_bv ctx cflg 1 in 
     let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx cflg_bv dst) src in
-    let cnt = BitVector.mk_extract ctx 4 0 cnt in
+    let cnt = mk_extract_wrapper ctx 4 0 cnt in
     let shifted = BitVector.mk_shl ctx merged cnt in
-    let result = BitVector.mk_extract ctx (dest_size - 1) 0 shifted in
-    let dst_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) dst in
-    let result_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) result in
-    let cflg_bit = BitVector.mk_extract ctx dest_size dest_size shifted in
+    let result = mk_extract_wrapper ctx (dest_size - 1) 0 shifted in
+    let dst_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) dst in
+    let result_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) result in
+    let cflg_bit = mk_extract_wrapper ctx dest_size dest_size shifted in
     let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
     let oflg =
       let cnt_one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
@@ -749,12 +755,12 @@ module DepType = struct
   let exe_shrd (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
     let cflg_bv = bool_to_bv ctx cflg 1 in 
     let merged = BitVector.mk_concat ctx src (BitVector.mk_concat ctx dst cflg_bv) in
-    let cnt = BitVector.mk_extract ctx 4 0 cnt in
+    let cnt = mk_extract_wrapper ctx 4 0 cnt in
     let shifted = BitVector.mk_lshr ctx merged cnt in
-    let result = BitVector.mk_extract ctx dest_size 1 shifted in
-    let dst_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) dst in
-    let result_sign = BitVector.mk_extract ctx (dest_size - 1) (dest_size - 1) result in
-    let cflg_bit = BitVector.mk_extract ctx 0 0 shifted in
+    let result = mk_extract_wrapper ctx dest_size 1 shifted in
+    let dst_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) dst in
+    let result_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) result in
+    let cflg_bit = mk_extract_wrapper ctx 0 0 shifted in
     let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
     let oflg =
       let cnt_one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
@@ -943,6 +949,10 @@ module TaintType = struct
     else
       Boolean.mk_implies ctx sub_exp sup_exp
   in
+
+  (* Printf.printf "TaintType.check_subtype\nsolver:\n%s\nassertions:\n%s\n"
+    (SmtEmitter.to_string smt_ctx)
+    (Z3.Expr.to_string check_target); *)
   SmtEmitter.check_compliance smt_ctx [ check_target ] = SatYes
 
   let check_untaint
@@ -1051,6 +1061,7 @@ module BasicType = struct
       (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
       (get_flag_config: 'a -> IsaFlagConfig.t)
       (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) (* in bits *)
+      (taint_reset: bool) (* the outcome's taint should be false *)
       : t * ((IsaBasic.flag * t) list) =
     let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
     let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
@@ -1058,7 +1069,11 @@ module BasicType = struct
     let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
     let src_flag_list, update_flag_map = get_flag_config op in
     let src_flag_taint_list = List.map get_src_flag_taint src_flag_list in
-    let taint = TaintType.exe ctx (taint_list @ src_flag_taint_list) in
+    let taint = if taint_reset then 
+      TaintType.get_untaint_exp ctx
+    else
+      TaintType.exe ctx (taint_list @ src_flag_taint_list)
+    in
     (dep, taint),
     List.map2 (
       fun (flag, flag_dep) (flag2, self_is_src) -> 

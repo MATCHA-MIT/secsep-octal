@@ -14,6 +14,7 @@ module SingleExpBasic = struct
     | SingleMul
     | SingleSal
     | SingleSar
+    | SingleShr
     | SingleXor
     | SingleAnd
     | SingleOr

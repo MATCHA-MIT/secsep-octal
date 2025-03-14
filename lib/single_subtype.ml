@@ -692,7 +692,7 @@ module SingleSubtype = struct
       (e_pc: int)
       (e: SingleExp.t) : RangeExp.t =
     let rec helper (e: SingleEntryType.t) : RangeExp.t =
-      match e with
+      let result: RangeExp.t = match e with
       | SingleTop -> Top
       | SingleConst c -> Single (SingleConst c)
       | SingleVar v ->
@@ -718,8 +718,6 @@ module SingleSubtype = struct
         | SingleAdd, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleAdd, e, e1)), SingleEntryType.eval (SingleBExp (SingleAdd, e, e2)), s)
         | SingleAdd, Range (e11, e12, s1), Range (e21, e22, s2) -> begin
-            let e11, e12, s1 = RangeExp.canonicalize_range e11 e12 s1 in
-            let e21, e22, s2 = RangeExp.canonicalize_range e21 e22 s2 in
             if (Int64.to_int s1) < 0 || (Int64.to_int s2) < 0 then
               single_subtype_error "expecting left aligned now";
 
@@ -795,6 +793,8 @@ module SingleSubtype = struct
           Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
+      in
+      RangeExp.canonicalize result
     in
     helper e
 
@@ -1088,9 +1088,9 @@ module SingleSubtype = struct
             end *)
           | s :: [], (l, r, step) :: [] ->
             if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleAdd, r, SingleConst (Int64.abs step)))) = 0 then
-              { tv_rel with sol = SolSimple (Range (l, s, step)) }
+              { tv_rel with sol = SolSimple (Range (l, s, step) |> RangeExp.canonicalize) }
             else if SingleEntryType.cmp s (SingleEntryType.eval (SingleBExp (SingleSub, l, SingleConst (Int64.abs step)))) = 0 then
-              { tv_rel with sol = SolSimple (Range (s, r, step))}
+              { tv_rel with sol = SolSimple (Range (s, r, step) |> RangeExp.canonicalize) }
             else tv_rel
           | _ -> tv_rel (* TODO: Maybe need to improve this!!! *)
         end
@@ -1129,9 +1129,9 @@ module SingleSubtype = struct
     in
     let get_range_helper (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t) (step: int64) : RangeExp.t =
       if step > 0L then
-        Range (begin_val, end_val, step)
+        Range (begin_val, end_val, step) |> RangeExp.canonicalize
       else if step < 0L then
-        Range (end_val, begin_val, step)
+        Range (end_val, begin_val, step) |> RangeExp.canonicalize
       else
         single_subtype_error "get_range_helper step = 0L"
     in
@@ -1246,7 +1246,7 @@ module SingleSubtype = struct
           let e = boundary_converter e in
           SingleExp.eval (SingleBExp (SingleAdd, e, SingleConst boundary_adjust))
         in
-        match range with
+        let result: RangeExp.t = match range with
         | Single other_x -> Single (boundary_converter_with_fix other_x 0L)
         | Range (l, r, step) -> 
           let new_l = boundary_converter_with_fix l (if step > 0L then 1L else 0L) in
@@ -1254,6 +1254,8 @@ module SingleSubtype = struct
           if SingleExp.cmp new_l new_r = 0 then Single new_l
           else Range (new_l, new_r, Int64.shift_right (Int64.mul step mult_step) (Int64.to_int shift_right))
         | _ -> single_subtype_error (Printf.sprintf "Invalid loop sol %s" (SingleSol.to_string other_sol))
+        in
+        RangeExp.canonicalize result
       in
       (* Why get_sol_helper is sol complex: 
         Other solution may have the following formula:

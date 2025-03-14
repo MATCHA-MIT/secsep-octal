@@ -45,6 +45,10 @@ module ArchTypeBasic = struct
       (a_type: t) (ctx_map: BasicType.map_t) : 
       RegType.t * FlagType.t * MemType.t * BasicType.ctx_t =
     let dep_ctx_map, taint_ctx_map = ctx_map in
+    (*     
+    Printf.printf "dep_ctx_map:\n%s\n" (DepType.sexp_of_map_t dep_ctx_map |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "taint_ctx_map:\n%s\n" (TaintType.sexp_of_map_t taint_ctx_map |> Sexplib.Sexp.to_string_hum);
+    *)
     let dep_sub_helper = DepType.substitute_exp_t ctx dep_ctx_map in
     let dep_exp_sub_func = DepType.substitute_exp_exp dep_sub_helper in
     let dep_sub_func = DepType.substitute dep_sub_helper in
@@ -79,13 +83,33 @@ module ArchTypeBasic = struct
     let sup_reg_type, sup_flag_type, sup_mem_type, (sup_dep_context, sup_taint_context) =
       sub_ctx_map_helper ctx sup_a_type ctx_map
     in
+    (*
+    Printf.printf "subbed types:\n";
+    Printf.printf "reg sup:\n%s\nreg sub:\n%s\n"
+      (RegType.sexp_of_t sup_reg_type |> Sexplib.Sexp.to_string_hum)
+      (RegType.sexp_of_t sub_a_type.reg_type |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "flag sup:\n%s\nflag sub:\n%s\n"
+      (FlagType.sexp_of_t sup_flag_type |> Sexplib.Sexp.to_string_hum)
+      (FlagType.sexp_of_t sub_a_type.flag_type |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "mem sup:\n%s\nmem sub:\n%s\n"
+      (MemType.sexp_of_t sup_mem_type |> Sexplib.Sexp.to_string_hum)
+      (MemType.sexp_of_t sub_a_type.mem_type |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "ctx sup:\n%s\nctx sub:\n%s\n"
+      (BasicType.sexp_of_ctx_t (sup_dep_context, sup_taint_context) |> Sexplib.Sexp.to_string_hum)
+      (BasicType.sexp_of_ctx_t sub_a_type.context |> Sexplib.Sexp.to_string_hum);
+    *)
+
     (* 2. check subtype relation of each reg/flag/mem slot *)
-    RegType.check_subtype smt_ctx sub_a_type.reg_type sup_reg_type &&
-    FlagType.check_subtype smt_ctx sub_a_type.flag_type sup_flag_type &&
-    MemType.check_subtype 
+    let reg_check = RegType.check_subtype smt_ctx sub_a_type.reg_type sup_reg_type in
+    let flag_check = FlagType.check_subtype smt_ctx sub_a_type.flag_type sup_flag_type in
+    let mem_check = MemType.check_subtype 
       smt_ctx 
-      sub_a_type.mem_type sup_mem_type mem_map_opt &&
-    SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes &&
-    SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes
+      sub_a_type.mem_type sup_mem_type mem_map_opt in
+    let dep_ctx_check = SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes in
+    let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
+
+    (* Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b\n"
+      reg_check flag_check mem_check dep_ctx_check taint_ctx_check; *)
+    reg_check && flag_check && mem_check && dep_ctx_check && taint_ctx_check
 
 end

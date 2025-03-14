@@ -85,6 +85,7 @@ let append_func_var_size_map
   | false -> (func_name, sz_map) :: func_vsm
 
 let intermediate_sz = 64
+let () = assert (intermediate_sz mod 8 = 0)
 
 let rec convert_dep_type_inner
     (ctx: Z3.context)
@@ -93,7 +94,7 @@ let rec convert_dep_type_inner
     : DepType.t =
   let raw_res = match se with
   | SingleTop -> DepType.Top intermediate_sz
-  | SingleConst c -> DepType.Exp (Z3.Expr.mk_numeral_int ctx (Int64.to_int c) (Z3.BitVector.mk_sort ctx intermediate_sz))
+  | SingleConst c -> DepType.Exp (Z3.BitVector.mk_numeral ctx (Int64.to_string c) intermediate_sz)
   | SingleVar v ->
     let var_size = get_var_size v |> Option.get in
     if var_size = -1 then
@@ -120,6 +121,7 @@ let rec convert_dep_type_inner
           | SingleMul -> Z3.BitVector.mk_mul ctx e1' e2'
           | SingleSal -> Z3.BitVector.mk_shl ctx e1' e2'
           | SingleSar -> Z3.BitVector.mk_ashr ctx e1' e2'
+          | SingleShr -> Z3.BitVector.mk_lshr ctx e1' e2'
           | SingleXor -> Z3.BitVector.mk_xor ctx e1' e2'
           | SingleAnd -> Z3.BitVector.mk_and ctx e1' e2'
           | SingleOr ->  Z3.BitVector.mk_or ctx e1' e2'
@@ -189,7 +191,7 @@ let convert_taint_type
       Z3.Boolean.mk_or ctx t_list
     end
   | TaintUnknown ->
-    Z3.Expr.mk_fresh_const ctx "t_unknown" (Z3.Boolean.mk_sort ctx)
+    Z3.Boolean.mk_const_s ctx "t_unknown"
 
 let convert_basic_type
     (ctx: Z3.context)
@@ -225,7 +227,7 @@ let convert_flag_type
     : FlagType.t =
   List.init TaintTypeInfer.ArchType.Isa.total_flag_num (fun _ ->
     DepType.get_top_flag (),
-    Z3.Expr.mk_fresh_const ctx "t_unknown" (Z3.Boolean.mk_sort ctx)
+    TaintType.get_taint_exp ctx
   )
 
 let convert_mem_offset
@@ -296,12 +298,16 @@ let convert_mem_type
 
 let convert_context
     (ctx: Z3.context)
+    (get_var_size: int -> int option)
     (single_context: SingleContext.t list)
     (taint_context: TaintExp.sub_t list)
     (taint_sol: TaintExp.local_var_map_t)
     : BasicType.ctx_t =
-  let dep_ctx = List.map (
-    fun entry -> SingleContext.to_smt_expr (ctx, Z3.Solver.mk_simple_solver ctx (* placeholder *)) entry
+  let dep_ctx = List.map (fun entry ->
+    SingleContext.to_smt_expr
+      ~get_var_size:(Some get_var_size)
+      (ctx, Z3.Solver.mk_solver ctx None (* placeholder solver *))
+      entry
   ) single_context
   in
   let taint_ctx = List.map (
@@ -394,7 +400,7 @@ let convert_arch_type
     reg_type = convert_reg_type ctx get_var_size arch_type.reg_type;
     flag_type = convert_flag_type ctx;
     mem_type = convert_mem_type ctx get_var_size is_forget_slot arch_type.mem_type;
-    context = convert_context ctx arch_type.context tti.taint_context tti.taint_sol;
+    context = convert_context ctx get_var_size arch_type.context tti.taint_context tti.taint_sol;
     (* stack_spill_info = stack_spill_info; *)
 
     global_var = arch_type.global_var;
@@ -544,7 +550,7 @@ let convert_function_interface
     reg_type = convert_reg_type ctx get_var_size_func fi.in_reg;
     flag_type = convert_flag_type ctx;
     mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.in_mem;
-    context = convert_context ctx fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
+    context = convert_context ctx get_var_size_func fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
     (* ignored fields *)
     pc = -1; 
@@ -560,7 +566,7 @@ let convert_function_interface
     reg_type = convert_reg_type ctx get_var_size_func fi.out_reg;
     flag_type = convert_flag_type ctx;
     mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.out_mem;
-    context = convert_context ctx fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
+    context = convert_context ctx get_var_size_func fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
 
     (* ignored fields *)
     pc = -1; 

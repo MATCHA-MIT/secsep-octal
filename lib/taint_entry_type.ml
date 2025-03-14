@@ -140,11 +140,11 @@ module TaintBaseEntryType (Entry: EntryType) = struct
       (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
     | None -> e, []
 
-  let exe_bop_inst (is_check: bool) (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     let s1, t1 = e1 in
     let s2, t2 = e2 in
     let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
-    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst is_check isa_bop s1 s2 (fl_entry, fr_entry) same_op in
+    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst isa_bop s1 s2 (fl_entry, fr_entry) same_op in
     let (dest_taint_type: TaintExp.t) =
       if (isa_bop = Xor || isa_bop = Xorp || isa_bop = Pxor) && same_op then
         TaintConst false
@@ -274,9 +274,9 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let single, taint = e in
     (Entry.is_val2 single_map single) && (TaintExp.is_val2 taint_map taint)
 
-  let to_smt_expr (smg_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t =
+  let to_smt_expr ?(get_var_size: (int -> int option) option = None) (smg_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t =
     let single, _ = e in
-    Entry.to_smt_expr smg_ctx single
+    Entry.to_smt_expr ~get_var_size:get_var_size smg_ctx single
 
   let split_val (e: t) (off_list: (SingleExp.t * SingleExp.t) list) : t list =
     let single, taint = e in

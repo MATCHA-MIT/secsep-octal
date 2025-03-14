@@ -207,13 +207,23 @@ include ArchTypeBasic
       (dest: Isa.operand) (src_ops: Isa.operand list) : bool * t =
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) src_ops in
+    (* Printf.printf "exe_nary src_type_list:\n";
+    List.iter (fun entry -> Printf.printf "%s" (Sexplib.Sexp.to_string_hum (sexp_of_entry_t entry))) src_type_list;
+    Printf.printf "\n"; *)
     if List.length src_type_list <> n then false, curr_type else
     let ctx, _ = smt_ctx in
     let dest_type, flag_update_list =
       begin match n, nop with
-      | 1, UOp uop -> BasicType.exe_uop ctx uop src_type_list get_src_flag_func (get_dest_op_size dest)
-      | 2, BOp bop -> BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest)
-      | 3, TOp top -> BasicType.exe_top ctx top src_type_list get_src_flag_func (get_dest_op_size dest)
+      | 1, UOp uop -> BasicType.exe_uop ctx uop src_type_list get_src_flag_func (get_dest_op_size dest) false
+      | 2, BOp bop ->
+        let taint_reset = match bop, src_ops with
+        | Isa.Xor, [ src1; src2 ]
+        | Isa.Xorp, [ src1; src2 ]
+        | Isa.Pxor, [ src1; src2 ] -> Isa.cmp_operand src1 src2
+        | _ -> false
+        in
+        BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) taint_reset
+      | 3, TOp top -> BasicType.exe_top ctx top src_type_list get_src_flag_func (get_dest_op_size dest) false
       | _ -> arch_type_error "exe_nary: n and nop size do not match"
       end
     in
@@ -253,7 +263,7 @@ include ArchTypeBasic
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
     let ctx, _ = smt_ctx in
-    let _, flag_list = BasicType.exe_bop ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) in 
+    let _, flag_list = BasicType.exe_bop ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list in
     true, { curr_type with flag_type = new_flags }
   
@@ -267,7 +277,7 @@ include ArchTypeBasic
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
     let ctx, _ = smt_ctx in
-    let _, flag_list = BasicType.exe_bop ctx And src_type_list get_src_flag_func (get_dest_op_size src0) in 
+    let _, flag_list = BasicType.exe_bop ctx And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list in
     true, { curr_type with flag_type = new_flags }
 
@@ -516,8 +526,10 @@ include ArchTypeBasic
       end else
         check_taken (), curr_type (* already at the last alive instruction, no further update *)
     | SmtEmitter.SatUnknown ->
+      (* check_not_taken must be called later, as it adds assertions and changes the global ctx *)
+      let taken_valid = check_taken() in
       let not_taken_valid, next_type = check_not_taken () in
-      not_taken_valid && check_taken (), next_type
+      taken_valid && not_taken_valid, next_type
     in
 
     if (fst result) = false then
@@ -530,6 +542,7 @@ include ArchTypeBasic
       (block_type_list: t list)
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
+    Printf.printf "checking inst %s\n" (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum);
     (* 1. Prop inst
        2. Ensure if can proceed to next inst, pc + 1 < dead_pc *)
     let find_block_helper (label: Isa.label) : t =
@@ -545,6 +558,7 @@ include ArchTypeBasic
       type_prop_cond_branch smt_ctx curr_type targ_type br_cond br_anno
     | Call (callee_name, call_anno) ->
       let callee_interface = FuncInterface.get_func_interface func_interface_list callee_name in
+      let curr_type = shift_rsp smt_ctx curr_type (-8L) in
       let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
       begin match result with
       | Some next_type -> true, next_type
@@ -573,6 +587,7 @@ include ArchTypeBasic
       (block_type_list: t list)
       (block_type: t)
       (block: Isa.instruction list) : bool =
+    Printf.printf "checking block %s\n" block_type.label;
     (* Check block type:
        1. Check block well-formness
           1. s-val belongs to s-alloc for each mem slot
@@ -594,6 +609,7 @@ include ArchTypeBasic
         ) (true, block_type) block |> fst
       in
       SmtEmitter.pop smt_ctx 1;
+      Printf.printf "block %s check result: %b\n" block_type.label check_prop;
       check_prop
     end
 

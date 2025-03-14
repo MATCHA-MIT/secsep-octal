@@ -46,7 +46,7 @@ module type EntryType = sig
   val update_ld_taint_constraint: t -> TaintExp.t option -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t option -> t * Constraint.t list
 
-  val exe_bop_inst: bool -> IsaBasic.bop -> t -> t -> flag_t -> bool -> t * flag_t
+  val exe_bop_inst: IsaBasic.bop -> t -> t -> flag_t -> bool -> t * flag_t
   val exe_uop_inst: IsaBasic.uop -> t -> flag_t -> t * flag_t
   val exe_top_inst: IsaBasic.top -> t list -> flag_t -> t * flag_t
 
@@ -77,7 +77,7 @@ module type EntryType = sig
   val repl_context_var: local_var_map_t -> t -> t
   val is_val2 : local_var_map_t -> t -> bool
 
-  val to_smt_expr: SmtEmitter.t -> t -> SmtEmitter.exp_t
+  val to_smt_expr: ?get_var_size:((int -> int option) option) -> SmtEmitter.t -> t -> SmtEmitter.exp_t
 
   val split_val : t -> (SingleExp.t * SingleExp.t) list -> t list
 end

@@ -65,7 +65,7 @@ module FuncInputEntry = struct
   let get_must_known_taint_constraint (_: t) : Constraint.t list = panic ()
   let update_ld_taint_constraint (_: t) (_: TaintExp.t option) : Constraint.t list = panic ()
   let update_st_taint_constraint (_: t) (_: TaintExp.t option) : t * Constraint.t list = panic ()
-  let exe_bop_inst (_: bool) (_: IsaBasic.bop) (_: t) (_: t) (_: flag_t) (_: bool) : t * flag_t = panic ()
+  let exe_bop_inst (_: IsaBasic.bop) (_: t) (_: t) (_: flag_t) (_: bool) : t * flag_t = panic ()
   let exe_uop_inst (_: IsaBasic.uop) (_: t) (_: flag_t) : t * flag_t = panic ()
   let exe_top_inst (_: IsaBasic.top) (_: t list) (_: flag_t) : t * flag_t = panic ()
   let get_single_taint_exp (_: t) : (SingleEntryType.t * TaintExp.t) = panic ()
@@ -85,7 +85,8 @@ module FuncInputEntry = struct
   let repl_local_var (_: local_var_map_t) (_: t) : t = panic ()
   let repl_context_var (_: local_var_map_t) (_: t) : t = panic ()
   let is_val2 (_: local_var_map_t) (_: t) : bool = panic ()
-  let to_smt_expr (_: SmtEmitter.t) (_: t) : SmtEmitter.exp_t = panic ()
+  let to_smt_expr ?(get_var_size: (int -> int option) option = None) (_: SmtEmitter.t) (_: t) : SmtEmitter.exp_t =
+    let _ = get_var_size in panic ()
   let split_val (_: t) (_: (SingleEntryType.t * SingleEntryType.t) list) : t list = panic ()
 
 end

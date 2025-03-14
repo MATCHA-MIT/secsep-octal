@@ -27,6 +27,7 @@ include SingleExpBasic
       | SingleMul -> "Mul"
       | SingleSal -> "Sal"
       | SingleSar -> "Sar"
+      | SingleShr -> "Shr"
       | SingleXor -> "Xor"
       | SingleAnd -> "And"
       | SingleOr -> "Or"
@@ -51,6 +52,7 @@ include SingleExpBasic
       | SingleMul -> "SingleMul"
       | SingleSal -> "SingleSal"
       | SingleSar -> "SingleSar"
+      | SingleShr -> "SingleShr"
       | SingleXor -> "SingleXor"
       | SingleAnd -> "SingleAnd"
       | SingleOr -> "SingleOr"
@@ -101,9 +103,16 @@ include SingleExpBasic
     | SingleSar, SingleMod
     | SingleSar, SingleOr
     | SingleSar, SingleAnd
-    | SingleSar, SingleXor -> -1
+    | SingleSar, SingleXor
+    | SingleSar, SingleShr -> -1
     | SingleSar, SingleSar -> 0
     | SingleSar, _ -> 1
+    | SingleShr, SingleMod
+    | SingleShr, SingleOr
+    | SingleShr, SingleAnd -> -1
+    | SingleShr, SingleXor -> -1
+    | SingleShr, SingleShr -> 0
+    | SingleShr, _ -> 1
     | SingleXor, SingleMod
     | SingleXor, SingleOr
     | SingleXor, SingleAnd -> -1
@@ -344,6 +353,7 @@ include SingleExpBasic
           | SingleMul -> SingleConst (Int64.mul v1 v2) (* These three cases are not needed here *)
           | SingleSal -> SingleConst (Int64.shift_left v1 (Int64.to_int v2))
           | SingleSar -> SingleConst (Int64.shift_right v1 (Int64.to_int v2))
+          | SingleShr -> SingleConst (Int64.shift_right_logical v1 (Int64.to_int v2))
           | SingleXor -> SingleConst (Int64.logxor v1 v2)
           | SingleAnd -> SingleConst (Int64.logand v1 v2)
           | SingleOr -> SingleConst (Int64.logor v1 v2)
@@ -683,8 +693,8 @@ include SingleExpBasic
 
   let get_single_exp (e: t) : t = e
 
-  let to_smt_expr (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
-    SmtEmitter.expr_of_single_exp smt_ctx e false
+  let to_smt_expr ?(get_var_size: (int -> int option) option = None) (smt_ctx: SmtEmitter.t) (e: t) : SmtEmitter.exp_t = 
+    SmtEmitter.expr_of_single_exp ~get_var_size:get_var_size smt_ctx e false
 
   let match_const_offset (o: t) (base_id: IsaBasic.imm_var_id) : int64 option =
     match o with

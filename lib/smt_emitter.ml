@@ -15,6 +15,7 @@ module SmtEmitter = struct
   type t = ctx_t * Solver.solver
 
   let bv_width = 64
+  let () = assert (bv_width mod 8 = 0)
   
   let to_string (smt_ctx: t) : string =
     Printf.sprintf "Current smt_ctx:\n%s\n" (Z3.Solver.to_string (snd smt_ctx))
@@ -124,64 +125,87 @@ let get_model (smt_ctx: t) : Model.model option =
 
   let expr_var_str_of_taint_var (var_idx: int) : string =
     Printf.sprintf "t%d" var_idx
-
-  let rec expr_of_single_exp (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =
+  
+  let get_bv_size (bv: exp_t) : int =
+    bv |> Expr.get_sort |> BitVector.get_size
+  
+  let signed_ext_bv (ctx: Z3.context) (target_sz: int) (bv: exp_t) : exp_t =
+    let bv_sz = get_bv_size bv in
+    (* if bv is wider than target_sz, we stay silent; if size mismatched for bv ops, complains will be generated *)
+    if bv_sz >= target_sz then bv
+    else BitVector.mk_sign_ext ctx (target_sz - bv_sz) bv
+  
+  let expr_of_single_exp ?(get_var_size: (int -> int option) option = None)
+      (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =
     (* let add_constr = true in *)
     let z3_ctx, _ = smt_ctx in
-    match se with
-    | SingleTop -> smt_emitter_error "expr_of_single_exp cannot convert SingleTop!!!"
-    | SingleConst c -> mk_numeral smt_ctx c
-    | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width
-    | SingleBExp (op, se1, se2) ->
-      let e1 = expr_of_single_exp smt_ctx se1 add_constr in
-      let e2 = expr_of_single_exp smt_ctx se2 add_constr in
-      begin
-        match op with
-        | SingleAdd ->  
-            if add_constr then begin
-              add_assertions smt_ctx [
-                BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
-                BitVector.mk_add_no_underflow z3_ctx e1 e2;
-              ];
-            end;
-            BitVector.mk_add z3_ctx e1 e2
-        | SingleSub ->
-            if add_constr then begin
-              add_assertions smt_ctx [
-                BitVector.mk_sub_no_overflow z3_ctx e1 e2;
-                BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
-              ];
-            end;
-            BitVector.mk_sub z3_ctx e1 e2
-        | SingleMul ->
-            if add_constr then begin
-              add_assertions smt_ctx [
-                BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
-                BitVector.mk_mul_no_underflow z3_ctx e1 e2;
-              ];
-            end;
-            BitVector.mk_mul z3_ctx e1 e2
-        | SingleSal -> BitVector.mk_shl z3_ctx e1 e2
-        | SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
-        | SingleXor -> BitVector.mk_xor z3_ctx e1 e2
-        | SingleAnd -> BitVector.mk_and z3_ctx e1 e2
-        | SingleOr -> BitVector.mk_or z3_ctx e1 e2
-        | SingleMod ->BitVector.mk_smod z3_ctx e1 e2
-      end
-    | SingleUExp (op, se) ->
-      let e = expr_of_single_exp smt_ctx se add_constr in
-      begin
-        match op with
-        | SingleNot -> BitVector.mk_not z3_ctx e
-      end
+    let get_var_size = Option.value get_var_size ~default:(fun _ -> Some (bv_width / 8)) in
+    let rec helper (se: SingleExpBasic.t) : exp_t =
+      let e = match se with
+      | SingleTop -> smt_emitter_error "expr_of_single_exp cannot convert SingleTop!!!"
+      | SingleConst c -> mk_numeral smt_ctx c
+      | SingleVar v ->
+        let var_size = (get_var_size v |> Option.value ~default:(bv_width / 8)) in
+        BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) (var_size * 8)
+      | SingleBExp (op, se1, se2) ->
+        let e1 = helper se1 in
+        let e2 = helper se2 in
+        begin
+          match op with
+          | SingleAdd ->  
+              if add_constr then begin
+                add_assertions smt_ctx [
+                  BitVector.mk_add_no_overflow z3_ctx e1 e2 true;
+                  BitVector.mk_add_no_underflow z3_ctx e1 e2;
+                ];
+              end;
+              BitVector.mk_add z3_ctx e1 e2
+          | SingleSub ->
+              if add_constr then begin
+                add_assertions smt_ctx [
+                  BitVector.mk_sub_no_overflow z3_ctx e1 e2;
+                  BitVector.mk_sub_no_underflow z3_ctx e1 e2 true;
+                ];
+              end;
+              BitVector.mk_sub z3_ctx e1 e2
+          | SingleMul ->
+              if add_constr then begin
+                add_assertions smt_ctx [
+                  BitVector.mk_mul_no_overflow z3_ctx e1 e2 true;
+                  BitVector.mk_mul_no_underflow z3_ctx e1 e2;
+                ];
+              end;
+              BitVector.mk_mul z3_ctx e1 e2
+          | SingleSal -> BitVector.mk_shl z3_ctx e1 e2
+          | SingleSar -> BitVector.mk_ashr z3_ctx e1 e2
+          | SingleShr -> BitVector.mk_lshr z3_ctx e1 e2
+          | SingleXor -> BitVector.mk_xor z3_ctx e1 e2
+          | SingleAnd -> BitVector.mk_and z3_ctx e1 e2
+          | SingleOr -> BitVector.mk_or z3_ctx e1 e2
+          | SingleMod ->BitVector.mk_smod z3_ctx e1 e2
+        end
+      | SingleUExp (op, se) ->
+        let e = helper se in
+        begin
+          match op with
+          | SingleNot -> BitVector.mk_not z3_ctx e
+        end
+      in
+      signed_ext_bv z3_ctx bv_width e
+    in
+    helper se
 
-  let get_exp_no_overflow_constraint (smt_ctx: t) (se: SingleExpBasic.t) : exp_t list =
+  let get_exp_no_overflow_constraint ?(get_var_size: (int -> int option) option = None)
+      (smt_ctx: t) (se: SingleExpBasic.t) : exp_t list =
     let z3_ctx, _ = smt_ctx in
+    let get_var_size = Option.value get_var_size ~default:(fun _ -> Some (bv_width / 8)) in
     let rec helper (se: SingleExpBasic.t) (constraint_list: exp_t list) : exp_t * (exp_t list) =
-      match se with
+      let e, cl = match se with
       | SingleTop -> smt_emitter_error "get_exp_no_overflow_constraint cannot convert SingleTop!!!"
       | SingleConst c -> mk_numeral smt_ctx c, constraint_list
-      | SingleVar v -> BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) bv_width, constraint_list
+      | SingleVar v ->
+        let var_size = (get_var_size v |> Option.value ~default:(bv_width / 8)) in
+        BitVector.mk_const_s z3_ctx ("s" ^ (Int.to_string v)) (var_size * 8), constraint_list
       | SingleBExp (op, se1, se2) ->
         let e1, constraint_list = helper se1 constraint_list in
         let e2, constraint_list = helper se2 constraint_list in
@@ -207,6 +231,7 @@ let get_model (smt_ctx: t) : Model.model option =
               ] @ constraint_list
           | SingleSal -> BitVector.mk_shl z3_ctx e1 e2, constraint_list
           | SingleSar -> BitVector.mk_ashr z3_ctx e1 e2, constraint_list
+          | SingleShr -> BitVector.mk_lshr z3_ctx e1 e2, constraint_list
           | SingleXor -> BitVector.mk_xor z3_ctx e1 e2, constraint_list
           | SingleAnd -> BitVector.mk_and z3_ctx e1 e2, constraint_list
           | SingleOr -> BitVector.mk_or z3_ctx e1 e2, constraint_list
@@ -218,6 +243,8 @@ let get_model (smt_ctx: t) : Model.model option =
           match op with
           | SingleNot -> BitVector.mk_not z3_ctx e, constraint_list
         end
+      in
+      e |> signed_ext_bv z3_ctx bv_width, cl
     in
     let _, result = helper se [] in
     result

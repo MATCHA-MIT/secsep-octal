@@ -39,6 +39,13 @@ module RangeExp = struct
         |> SingleExp.eval
       in
       (l', r, step)
+  
+  let canonicalize (r: t) : t =
+    match r with
+    | Range (l, r, step) ->
+      let l, r, step = canonicalize_range l r step in
+      Range (l, r, step)
+    | _ -> r
 
   let to_string (e: t) : string =
     match e with
@@ -95,7 +102,7 @@ module RangeExp = struct
     | Range (a, b, step) ->
       let diff_align : SingleExp.t =
         if step > 0L then SingleBExp (SingleSub, v_exp, a)
-        else SingleBExp (SingleSub, v_exp, b)
+        else range_exp_error (Printf.sprintf "expecting canonicalized range")
       in
       let step = SingleExp.SingleConst step in
       Some (And [
@@ -132,7 +139,7 @@ module RangeExp = struct
   let eval_helper (single_eval_helper: SingleExp.t -> SingleExp.t) (r: t) : t =
     match r with
     | Single e -> Single (single_eval_helper e)
-    | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step)
+    | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step) |> canonicalize
     | SingleSet e_list -> SingleSet (List.map single_eval_helper e_list)
     | Top -> Top
 
