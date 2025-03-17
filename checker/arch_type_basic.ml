@@ -83,6 +83,7 @@ module ArchTypeBasic = struct
     let sup_reg_type, sup_flag_type, sup_mem_type, (sup_dep_context, sup_taint_context) =
       sub_ctx_map_helper ctx sup_a_type ctx_map
     in
+    
     (*
     Printf.printf "subbed types:\n";
     Printf.printf "reg sup:\n%s\nreg sub:\n%s\n"
@@ -108,8 +109,8 @@ module ArchTypeBasic = struct
     let dep_ctx_check = SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes in
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
 
-    (* Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b\n"
-      reg_check flag_check mem_check dep_ctx_check taint_ctx_check; *)
+    Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b\n"
+      reg_check flag_check mem_check dep_ctx_check taint_ctx_check;
     reg_check && flag_check && mem_check && dep_ctx_check && taint_ctx_check
 
 end

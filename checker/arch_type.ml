@@ -165,7 +165,7 @@ include ArchTypeBasic
         flag_type = new_flags }
     | StOp st_op ->
       begin match set_st_op_type smt_ctx curr_type st_op new_type with
-      | None -> None
+      | None -> Printf.printf "set_st_op_type failed\n"; None
       | Some new_mem_type ->
         Some { curr_type with 
           mem_type = new_mem_type;
@@ -216,13 +216,13 @@ include ArchTypeBasic
       begin match n, nop with
       | 1, UOp uop -> BasicType.exe_uop ctx uop src_type_list get_src_flag_func (get_dest_op_size dest) false
       | 2, BOp bop ->
-        let taint_reset = match bop, src_ops with
+        let xor_reset = match bop, src_ops with
         | Isa.Xor, [ src1; src2 ]
         | Isa.Xorp, [ src1; src2 ]
         | Isa.Pxor, [ src1; src2 ] -> Isa.cmp_operand src1 src2
         | _ -> false
         in
-        BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) taint_reset
+        BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) xor_reset
       | 3, TOp top -> BasicType.exe_top ctx top src_type_list get_src_flag_func (get_dest_op_size dest) false
       | _ -> arch_type_error "exe_nary: n and nop size do not match"
       end
@@ -432,8 +432,7 @@ include ArchTypeBasic
     | RepMovs (size, mem_dst, mem_src)        -> exe_repmovs smt_ctx curr_type size mem_dst mem_src 
     | RepLods (size, mem)                     -> exe_replods smt_ctx curr_type size mem
     | RepStos (size, mem)                     -> exe_repstos smt_ctx curr_type size mem
-    | Nop                                     -> true, curr_type
-    | Hlt                                     -> true, curr_type
+    | Nop | Hlt | Syscall                     -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
   
   let type_prop_uncond_branch
@@ -542,7 +541,7 @@ include ArchTypeBasic
       (block_type_list: t list)
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
-    Printf.printf "checking inst %s\n" (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "checking inst[%d] %s\n" curr_type.pc (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum);
     (* 1. Prop inst
        2. Ensure if can proceed to next inst, pc + 1 < dead_pc *)
     let find_block_helper (label: Isa.label) : t =
@@ -561,7 +560,7 @@ include ArchTypeBasic
       let curr_type = shift_rsp smt_ctx curr_type (-8L) in
       let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
       begin match result with
-      | Some next_type -> true, next_type
+      | Some next_type -> true, shift_rsp smt_ctx next_type 8L
       | None -> false, curr_type
       end
     | _ ->
@@ -592,26 +591,28 @@ include ArchTypeBasic
        1. Check block well-formness
           1. s-val belongs to s-alloc for each mem slot
        2. Prop if dead_pc > pc and check dead_pc *)
-    (MemType.check_valid_region smt_ctx block_type.mem_type) &&
-    begin
-      SmtEmitter.push smt_ctx;
-      add_block_context_to_solver smt_ctx block_type;
-      let check_prop =
-        if block_type.pc >= block_type.dead_pc then true else
-        List.fold_left (
-          fun (acc: bool * t) (inst: Isa.instruction) ->
-            let acc_check, curr_type = acc in
-            if not acc_check then acc 
-            else if curr_type.pc < curr_type.dead_pc then
-              (* if not dead_pc, type_prop_check_one_inst prop one inst and also check dead_pc validity for next inst *)
-              type_prop_check_one_inst smt_ctx func_interface_list block_type_list curr_type inst
-            else acc
-        ) (true, block_type) block |> fst
-      in
-      SmtEmitter.pop smt_ctx 1;
-      Printf.printf "block %s check result: %b\n" block_type.label check_prop;
-      check_prop
-    end
+    SmtEmitter.push smt_ctx;
+    add_block_context_to_solver smt_ctx block_type;
+
+    let check_valid_region = MemType.check_valid_region smt_ctx block_type.mem_type in
+
+    let check_prop =
+      if block_type.pc >= block_type.dead_pc then true else
+      List.fold_left (
+        fun (acc: bool * t) (inst: Isa.instruction) ->
+          let acc_check, curr_type = acc in
+          if not acc_check then acc 
+          else if curr_type.pc < curr_type.dead_pc then
+            (* if not dead_pc, type_prop_check_one_inst prop one inst and also check dead_pc validity for next inst *)
+            type_prop_check_one_inst smt_ctx func_interface_list block_type_list curr_type inst
+          else acc
+      ) (true, block_type) block |> fst
+    in
+
+    let result = check_valid_region && check_prop in
+    Printf.printf "block %s check result: %b\n" block_type.label result;
+    SmtEmitter.pop smt_ctx 1;
+    result
 
   let type_prop_check_one_func
       (smt_ctx: SmtEmitter.t)

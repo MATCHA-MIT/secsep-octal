@@ -1061,7 +1061,7 @@ module BasicType = struct
       (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
       (get_flag_config: 'a -> IsaFlagConfig.t)
       (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) (* in bits *)
-      (taint_reset: bool) (* the outcome's taint should be false *)
+      (xor_reset: bool) (* outcome is constant zero due to xor(or similar) %foo, %foo *)
       : t * ((IsaBasic.flag * t) list) =
     let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
     let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
@@ -1069,10 +1069,10 @@ module BasicType = struct
     let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
     let src_flag_list, update_flag_map = get_flag_config op in
     let src_flag_taint_list = List.map get_src_flag_taint src_flag_list in
-    let taint = if taint_reset then 
-      TaintType.get_untaint_exp ctx
+    let dep, taint = if xor_reset then 
+      DepType.get_const_type ctx 0L dest_size, TaintType.get_untaint_exp ctx
     else
-      TaintType.exe ctx (taint_list @ src_flag_taint_list)
+      dep, TaintType.exe ctx (taint_list @ src_flag_taint_list)
     in
     (dep, taint),
     List.map2 (

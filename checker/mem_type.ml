@@ -318,6 +318,21 @@ module MemType = struct
     let offset_cmp = MemOffset.offset_cmp smt_ctx in
     let sub_off, sub_forget_type, sub_range, (sub_dep, sub_taint) = sub_slot in
     let sup_off, sup_forget_type, sup_range, (sup_dep, sup_taint) = sup_slot in
+
+    (*
+    Printf.printf "check_slot_subtype %b:\n" off_must_eq;
+    Printf.printf "sub_slot: %s %s %s %s %s\n" (MemOffset.sexp_of_t sub_off |> Sexplib.Sexp.to_string_hum)
+      (string_of_bool sub_forget_type)
+      (MemRange.sexp_of_t sub_range |> Sexplib.Sexp.to_string_hum)
+      (DepType.sexp_of_t sub_dep |> Sexplib.Sexp.to_string_hum)
+      (TaintType.sexp_of_t sub_taint |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "sup_slot: %s %s %s %s %s\n" (MemOffset.sexp_of_t sup_off |> Sexplib.Sexp.to_string_hum)
+      (string_of_bool sup_forget_type)
+      (MemRange.sexp_of_t sup_range |> Sexplib.Sexp.to_string_hum)
+      (DepType.sexp_of_t sup_dep |> Sexplib.Sexp.to_string_hum)
+      (TaintType.sexp_of_t sup_taint |> Sexplib.Sexp.to_string_hum);
+    *)
+
     (* We add strongest constraint for whether corressponding slots should allow forget type - they should agree on this property. *)
     if not sub_forget_type = sup_forget_type then false else
     let check_taint () : bool = TaintType.check_subtype smt_ctx true sub_taint sup_taint in
@@ -325,7 +340,7 @@ module MemType = struct
       if off_must_eq then MemOffset.CmpEq, MemOffset.Eq
       else MemOffset.CmpSubset, MemOffset.Subset
     in
-    if offset_cmp offset_cmp_option sub_off sup_off = offset_cmp_goal then
+    if offset_cmp offset_cmp_option sup_off sub_off = offset_cmp_goal then
       if MemRange.is_empty sup_range then
         (* In this case we do not check dep *)
         (* Empty range => overwrite in sup block or future => taint can be anything if allow forget valid range/taint (e.g., for spill) *)
@@ -340,6 +355,7 @@ module MemType = struct
           | Top _ -> true
           | _ -> false
         in
+        MemRange.check_subset smt_ctx sup_range sub_range &&
         check_dep &&
         check_taint ()
     else false
@@ -369,8 +385,9 @@ module MemType = struct
             let acc_check, slot_idx = acc in
             if not acc_check then acc_check, slot_idx + 1
             else 
-              check_slot_subtype smt_ctx true sub_slot sup_slot, 
-              slot_idx + 1
+              let slot_result = check_slot_subtype smt_ctx true sub_slot sup_slot in
+              (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
+              slot_result, slot_idx + 1
         ) (true, 0) sub_part_mem sup_part_mem |> fst
     ) true sub_m_type sup_m_type
 
@@ -422,17 +439,22 @@ module MemType = struct
         if not acc then acc else
         let (_, (_, sub_read, sub_write)), sub_part_mem = sub in
         let (_, (_, sup_read, sup_write)), sup_part_mem = sup in
-        imply_helper sub_read sup_read &&
-        imply_helper sub_write sup_write &&
-        List.fold_left2 (
+        let check_imp1 = imply_helper sub_read sup_read in
+        let check_imp2 = imply_helper sub_write sup_write in
+        let check_mem = List.fold_left2 (
           fun (acc_check: bool) 
               (sub_info_slot: entry_t mem_slot)
               (sup_slot: entry_t mem_slot) ->
             if not acc_check then acc_check
             else
               let (sub_off, sub_forget_type, sub_range, sub_entry) = sub_info_slot in
-              check_slot_subtype smt_ctx false (sub_off, sub_forget_type, sub_range, sub_entry) sup_slot
+              let slot_result = check_slot_subtype smt_ctx false (sub_off, sub_forget_type, sub_range, sub_entry) sup_slot in
+              (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
+              slot_result
         ) true sub_part_mem sup_part_mem
+        in
+        (* Printf.printf "check_subtype_map: ptr %d check_imp1 %b, check_imp2 %b, check_mem %b\n" (fst (fst sub)) check_imp1 check_imp2 check_mem; *)
+        check_imp1 && check_imp2 && check_mem
     ) true sub_map_m_type sup_m_type
 
   let check_subtype
@@ -749,11 +771,14 @@ module MemType = struct
       match acc with
       | None -> None
       | Some mem_type ->
-        let _, update_slot_forget_type, update_range, update_type = update_slot in
-        let _, slot_forget_type, slot_range, slot_info = slot_map in
+        let off1, update_slot_forget_type, update_range, update_type = update_slot in
+        let off2, slot_forget_type, slot_range, slot_info = slot_map in
         (* Check whether the two slots agree on whether to forget valid range/taint. *)
         if slot_forget_type <> update_slot_forget_type then begin
-          Printf.printf "Warning: set_mem_type_with_other forget type field mismatch";
+          Printf.printf "Warning: (%s, %s) set_mem_type_with_other forget type field mismatch (%b, %b)\n"
+            (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t off1))
+            (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t off2))
+            update_slot_forget_type slot_forget_type;
           None
         end else
         match update_range with
@@ -793,6 +818,10 @@ module MemType = struct
           List.fold_left2 inner_helper acc update_slot_list (snd part_mem_map)
         end else acc
     in
+    (*
+    Printf.printf "parent_mem_type: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t mem_type));
+    Printf.printf "update_mem_type: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t update_mem_type));
+    *)
     List.fold_left2 outer_helper (Some mem_type) update_mem_type mem_map
 
 end

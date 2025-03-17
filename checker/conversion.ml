@@ -639,6 +639,7 @@ let convert_call_anno
     (from_mem: TaintTypeInfer.ArchType.MemType.t)
     (from_get_var_size: int -> int option)
     (targ_get_var_size: int -> int option)
+    (targ_is_forget: (int * int) -> bool)
     : CallAnno.t =
   let single_local_var_map = TaintEntryType.get_single_var_map arch_type.local_var_map in
   let get_var_size (fallback: int -> int option) (var: int) : int option =
@@ -671,7 +672,7 @@ let convert_call_anno
   in
   (* <NOTE> I think is_forget does not matter here, so just return false. *)
   let ch_mem_slot_info =
-    convert_mem_generic ctx (get_var_size targ_get_var_size) (fun _ -> false) anno.ch_mem convert_ch_mem_slot_info
+    convert_mem_generic ctx (get_var_size targ_get_var_size) targ_is_forget anno.ch_mem convert_ch_mem_slot_info
   in
 
   {
@@ -725,7 +726,7 @@ let convert_taint_type_infers
     (tti_list: TaintTypeInfer.t list)
     (func_vsm: func_var_size_map)
     : checker_func list =
-  let func_vsm, archs_of_func = List.fold_left_map (
+  let func_vsm, packed = List.fold_left_map (
     fun func_vsm tti ->
       (* <TODO> I want to rename stack_spill_info to forget (stack) slot list here. *)
       let stack_forget_slot_info = convert_is_forget_slot tti in
@@ -735,12 +736,18 @@ let convert_taint_type_infers
         IntSet.mem idx stack_forget_slot_info
       in
       let input_var = convert_input_var tti in
-      List.fold_left_map (
+      let vsm, arch = List.fold_left_map (
         fun func_vsm arch_type ->
           let converted, func_vsm = convert_arch_type ctx tti arch_type input_var func_vsm is_forget_slot in
           func_vsm, converted
       ) func_vsm tti.func_type
+      in
+      vsm, (arch, (tti.func_name, is_forget_slot))
   ) func_vsm tti_list
+  in
+  let archs_of_func, func_is_forget = List.split packed in
+  let get_is_forget (func: string) : (int * int) -> bool =
+    List.find (fun (func_name, _) -> func_name = func) func_is_forget |> snd
   in
 
   Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));
@@ -789,7 +796,7 @@ let convert_taint_type_infers
             end else begin
               let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
               let targ_get_var_size = get_size_finder_of_func func_vsm targ in
-              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size)
+              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size (get_is_forget targ))
             end
           | Nop -> ArchType.Isa.Nop
           | Syscall -> ArchType.Isa.Syscall

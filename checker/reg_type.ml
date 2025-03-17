@@ -65,8 +65,15 @@ module RegType = struct
       (sub_r_type: t) (sup_r_type: t) : bool =
     List.fold_left2 (
       fun (acc: bool) (sub_entry: entry_t) (sup_entry: entry_t) ->
-        acc &&
-        BasicType.check_subtype smt_ctx false sub_entry sup_entry
+        let curr = BasicType.check_subtype smt_ctx false sub_entry sup_entry in
+        (* Printf.printf "reg subtype check: %s(%d) -> %s(%d) : %b\n"
+          (BasicType.sexp_of_t sub_entry |> Sexplib.Sexp.to_string_hum)
+          (DepType.get_bit_size (fst sub_entry))
+          (BasicType.sexp_of_t sup_entry |> Sexplib.Sexp.to_string_hum)
+          (DepType.get_bit_size (fst sup_entry))
+          curr; *)
+        acc && curr
+        
     ) true sub_r_type sup_r_type
 
   let check_taint_eq

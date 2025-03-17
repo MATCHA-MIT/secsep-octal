@@ -439,737 +439,740 @@ sha512_block_data_order:                # @sha512_block_data_order
 	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	subq	$200, %rsp
-	movq	%rdi, 56(%rsp)                  # 8-byte Spill
+	subq	$192, %rsp
+	movq	%rdi, 64(%rsp)                  # 8-byte Spill
 	testq	%rdx, %rdx
 	je	.LBB7_5
 # %bb.1:
-	movq	56(%rsp), %rax                  # 8-byte Reload
-	movq	(%rax), %r13
-	movq	8(%rax), %r14
+	movq	64(%rsp), %rax                  # 8-byte Reload
+	movq	(%rax), %r15
+	movq	8(%rax), %rbx
 	movq	16(%rax), %r10
 	movq	24(%rax), %rdi
-	movq	32(%rax), %rbp
-	movq	40(%rax), %r12
-	movq	48(%rax), %r11
-	movq	56(%rax), %r8
+	movq	32(%rax), %r13
+	movq	40(%rax), %r14
+	movq	48(%rax), %r8
+	movq	56(%rax), %r9
 	.p2align	4, 0x90
 .LBB7_2:                                # =>This Loop Header: Depth=1
                                         #     Child Loop BB7_3 Depth 2
-	movq	%rdx, 160(%rsp)                 # 8-byte Spill
-	movq	(%rsi), %r9
-	bswapq	%r9
-	movq	%rbp, %rax
+	movq	%rdx, 168(%rsp)                 # 8-byte Spill
+	movq	(%rsi), %rdx
+	bswapq	%rdx
+	movq	%r13, %rax
 	rolq	$50, %rax
-	movq	8(%rsi), %rbx
-	movq	%rsi, %r15
-	movq	%rbp, %rcx
+	movq	8(%rsi), %rbp
+	movq	%r13, %rcx
 	rolq	$46, %rcx
 	xorq	%rax, %rcx
-	movq	%rbp, %rax
+	movq	%r13, %rax
 	rolq	$23, %rax
 	xorq	%rcx, %rax
-	movq	%r12, %rdx
-	andq	%rbp, %rdx
-	movq	%rbp, %rcx
+	movq	%r14, %r12
+	andq	%r13, %r12
+	movq	%r13, %rcx
 	notq	%rcx
-	andq	%r11, %rcx
-	movq	%r8, 88(%rsp)                   # 8-byte Spill
-	addq	%r8, %rdx
-	addq	%rcx, %rdx
-	addq	%rax, %rdx
-	movq	%r13, %rax
+	andq	%r8, %rcx
+	movq	%r9, 96(%rsp)                   # 8-byte Spill
+	addq	%r9, %r12
+	addq	%rcx, %r12
+	addq	%rax, %r12
+	movq	%r15, %rax
 	rolq	$36, %rax
 	movabsq	$4794697086780616226, %rcx      # imm = 0x428A2F98D728AE22
-	addq	%rcx, %rdx
-	movq	%r13, %rcx
+	addq	%rcx, %r12
+	movq	%r15, %rcx
 	rolq	$30, %rcx
-	movq	%r9, -16(%rsp)                  # 8-byte Spill
-	addq	%r9, %rdx
-	movq	%r13, %rsi
-	rolq	$25, %rsi
+	movq	%rdx, 16(%rsp)                  # 8-byte Spill
+	addq	%rdx, %r12
+	movq	%r15, %rdx
+	rolq	$25, %rdx
 	xorq	%rax, %rcx
-	xorq	%rcx, %rsi
+	xorq	%rcx, %rdx
 	movq	%r10, %rax
-	xorq	%r14, %rax
-	andq	%r13, %rax
-	movq	%r10, %r8
-	andq	%r14, %r8
-	xorq	%rax, %r8
-	addq	%rsi, %r8
-	addq	%rdx, %r8
-	bswapq	%rbx
-	movq	%rdi, 120(%rsp)                 # 8-byte Spill
-	addq	%rdi, %rdx
-	movq	%rdx, %rcx
+	xorq	%rbx, %rax
+	andq	%r15, %rax
+	movq	%r10, %r9
+	andq	%rbx, %r9
+	xorq	%rax, %r9
+	addq	%rdx, %r9
+	addq	%r12, %r9
+	bswapq	%rbp
+	movq	%rdi, 128(%rsp)                 # 8-byte Spill
+	addq	%rdi, %r12
+	movq	%r12, %rcx
 	rolq	$50, %rcx
-	movq	%r14, %rax
-	movq	%rdx, %rsi
-	rolq	$46, %rsi
-	andq	%r13, %rax
-	movq	%rdx, %rdi
+	movq	%rbx, %rax
+	movq	%r12, %rdx
+	rolq	$46, %rdx
+	andq	%r15, %rax
+	movq	%r12, %rdi
 	rolq	$23, %rdi
-	xorq	%rcx, %rsi
-	xorq	%rsi, %rdi
-	movq	%rdx, %r9
-	andq	%rbp, %r9
-	movq	%rdx, %rcx
+	xorq	%rcx, %rdx
+	xorq	%rdx, %rdi
+	movq	%r12, %r11
+	andq	%r13, %r11
+	movq	%r12, %rcx
 	notq	%rcx
-	andq	%r12, %rcx
-	movq	%r11, 96(%rsp)                  # 8-byte Spill
-	movq	%rbx, 48(%rsp)                  # 8-byte Spill
-	addq	%r11, %r9
-	addq	%rbx, %r9
-	addq	%rcx, %r9
+	andq	%r14, %rcx
+	movq	%r8, 104(%rsp)                  # 8-byte Spill
+	movq	%rbp, 56(%rsp)                  # 8-byte Spill
+	addq	%r8, %r11
+	addq	%rbp, %r11
+	addq	%rcx, %r11
 	movabsq	$8158064640168781261, %rcx      # imm = 0x7137449123EF65CD
-	addq	%rcx, %r9
-	addq	%rdi, %r9
-	movq	%r8, %rcx
-	rolq	$36, %rcx
-	movq	%r8, %rsi
-	rolq	$30, %rsi
-	xorq	%rcx, %rsi
-	movq	%r8, %rcx
-	rolq	$25, %rcx
-	xorq	%rsi, %rcx
-	movq	%r14, %rsi
-	xorq	%r13, %rsi
-	andq	%r8, %rsi
-	xorq	%rax, %rsi
-	addq	%rcx, %rsi
-	addq	%r9, %rsi
-	movq	16(%r15), %rbx
-	bswapq	%rbx
-	movq	%r10, 128(%rsp)                 # 8-byte Spill
-	addq	%r10, %r9
-	movq	%r9, %rcx
-	rolq	$50, %rcx
-	movq	%r8, %rax
-	movq	%r9, %rdi
-	rolq	$46, %rdi
-	andq	%r13, %rax
-	movq	%r9, %r10
-	rolq	$23, %r10
-	xorq	%rcx, %rdi
-	xorq	%rdi, %r10
-	movq	%r9, %r11
-	andq	%rdx, %r11
-	movq	%r9, %rcx
-	notq	%rcx
-	andq	%rbp, %rcx
-	movq	%r12, 104(%rsp)                 # 8-byte Spill
-	movq	%rbx, 40(%rsp)                  # 8-byte Spill
-	addq	%r12, %r11
-	addq	%rbx, %r11
 	addq	%rcx, %r11
-	movabsq	$-5349999486874862801, %rcx     # imm = 0xB5C0FBCFEC4D3B2F
-	addq	%rcx, %r11
-	addq	%r10, %r11
-	movq	%rsi, %rcx
+	addq	%rdi, %r11
+	movq	%r9, %rcx
 	rolq	$36, %rcx
-	movq	%rsi, %rdi
-	rolq	$30, %rdi
-	xorq	%rcx, %rdi
-	movq	%rsi, %rcx
+	movq	%r9, %rdx
+	rolq	$30, %rdx
+	xorq	%rcx, %rdx
+	movq	%r9, %rcx
 	rolq	$25, %rcx
-	xorq	%rdi, %rcx
-	movq	%r8, %rdi
-	xorq	%r13, %rdi
-	andq	%rsi, %rdi
+	xorq	%rdx, %rcx
+	movq	%rbx, %rdi
+	xorq	%r15, %rdi
+	andq	%r9, %rdi
 	xorq	%rax, %rdi
 	addq	%rcx, %rdi
 	addq	%r11, %rdi
-	movq	%r15, %r12
-	movq	24(%r15), %r15
-	bswapq	%r15
-	movq	%r14, 136(%rsp)                 # 8-byte Spill
-	addq	%r14, %r11
-	movq	%r11, %rax
-	rolq	$50, %rax
-	movq	%rsi, %rcx
-	movq	%r11, %r10
-	rolq	$46, %r10
-	andq	%r8, %rcx
-	movq	%r11, %rbx
-	rolq	$23, %rbx
-	xorq	%rax, %r10
-	xorq	%r10, %rbx
-	movq	%r11, %r10
-	andq	%r9, %r10
-	movq	%r11, %rax
-	notq	%rax
-	andq	%rdx, %rax
-	movq	%rbp, 112(%rsp)                 # 8-byte Spill
-	movq	%r15, 32(%rsp)                  # 8-byte Spill
-	addq	%rbp, %r10
-	addq	%r15, %r10
-	addq	%rax, %r10
-	movabsq	$-1606136188198331460, %rax     # imm = 0xE9B5DBA58189DBBC
-	addq	%rax, %r10
-	addq	%rbx, %r10
-	movq	%rdi, %rax
-	rolq	$36, %rax
-	movq	%rdi, %rbx
-	rolq	$30, %rbx
-	xorq	%rax, %rbx
-	movq	%rdi, %r14
-	rolq	$25, %r14
-	xorq	%rbx, %r14
-	movq	%rsi, %rax
-	xorq	%r8, %rax
-	andq	%rdi, %rax
-	xorq	%rcx, %rax
-	addq	%r14, %rax
-	addq	%r10, %rax
-	movq	32(%r12), %r14
-	bswapq	%r14
-	movq	%r13, 144(%rsp)                 # 8-byte Spill
-	addq	%r13, %r10
-	movq	%r10, %rcx
+	movq	16(%rsi), %rbp
+	bswapq	%rbp
+	movq	%r10, 136(%rsp)                 # 8-byte Spill
+	addq	%r10, %r11
+	movq	%r11, %rcx
 	rolq	$50, %rcx
+	movq	%r9, %rax
+	movq	%r11, %rdx
+	rolq	$46, %rdx
+	andq	%r15, %rax
+	movq	%r11, %r8
+	rolq	$23, %r8
+	xorq	%rcx, %rdx
+	xorq	%rdx, %r8
+	movq	%r11, %r10
+	andq	%r12, %r10
+	movq	%r11, %rcx
+	notq	%rcx
+	andq	%r13, %rcx
+	movq	%r14, 112(%rsp)                 # 8-byte Spill
+	movq	%rbp, 48(%rsp)                  # 8-byte Spill
+	addq	%r14, %r10
+	addq	%rbp, %r10
+	addq	%rcx, %r10
+	movabsq	$-5349999486874862801, %rcx     # imm = 0xB5C0FBCFEC4D3B2F
+	addq	%rcx, %r10
+	addq	%r8, %r10
+	movq	%rdi, %rcx
+	rolq	$36, %rcx
+	movq	%rdi, %rdx
+	rolq	$30, %rdx
+	xorq	%rcx, %rdx
+	movq	%rdi, %rcx
+	rolq	$25, %rcx
+	xorq	%rdx, %rcx
+	movq	%r9, %r8
+	xorq	%r15, %r8
+	andq	%rdi, %r8
+	xorq	%rax, %r8
+	addq	%rcx, %r8
+	addq	%r10, %r8
+	movq	24(%rsi), %r14
+	bswapq	%r14
+	movq	%rbx, 144(%rsp)                 # 8-byte Spill
+	addq	%rbx, %r10
+	movq	%r10, %rax
+	rolq	$50, %rax
+	movq	%rdi, %rdx
+	movq	%r10, %rcx
+	rolq	$46, %rcx
+	andq	%r9, %rdx
 	movq	%r10, %rbx
-	rolq	$46, %rbx
+	rolq	$23, %rbx
+	xorq	%rax, %rcx
 	xorq	%rcx, %rbx
 	movq	%r10, %rcx
-	rolq	$23, %rcx
-	xorq	%rbx, %rcx
-	movq	%r10, %rbx
-	andq	%r11, %rbx
-	movq	%r14, -32(%rsp)                 # 8-byte Spill
-	addq	%r14, %rdx
-	addq	%rbx, %rdx
-	movq	%r10, %rbx
+	andq	%r11, %rcx
+	movq	%r10, %rax
+	notq	%rax
+	andq	%r12, %rax
+	movq	%r13, 120(%rsp)                 # 8-byte Spill
+	movq	%r14, 8(%rsp)                   # 8-byte Spill
+	addq	%r13, %r14
+	addq	%r14, %rcx
+	addq	%rax, %rcx
+	movabsq	$-1606136188198331460, %rax     # imm = 0xE9B5DBA58189DBBC
+	addq	%rax, %rcx
+	addq	%rbx, %rcx
+	movq	%r8, %rax
+	rolq	$36, %rax
+	movq	%r8, %rbx
+	rolq	$30, %rbx
+	xorq	%rax, %rbx
+	movq	%r8, %r14
+	rolq	$25, %r14
+	xorq	%rbx, %r14
+	movq	%rdi, %rax
+	xorq	%r9, %rax
+	andq	%r8, %rax
+	xorq	%rdx, %rax
+	addq	%r14, %rax
+	addq	%rcx, %rax
+	movq	32(%rsi), %r14
+	bswapq	%r14
+	movq	%r15, 152(%rsp)                 # 8-byte Spill
+	addq	%r15, %rcx
+	movq	%rcx, %rdx
+	rolq	$50, %rdx
+	movq	%rcx, %rbx
+	rolq	$46, %rbx
+	xorq	%rdx, %rbx
+	movq	%rcx, %rdx
+	rolq	$23, %rdx
+	xorq	%rbx, %rdx
+	movq	%rcx, %rbx
+	andq	%r10, %rbx
+	movq	%r14, -24(%rsp)                 # 8-byte Spill
+	addq	%r14, %r12
+	addq	%rbx, %r12
+	movq	%rcx, %rbx
 	notq	%rbx
-	andq	%r9, %rbx
-	addq	%rbx, %rdx
+	andq	%r11, %rbx
+	addq	%rbx, %r12
 	movq	%rax, %rbx
 	rolq	$36, %rbx
 	movabsq	$4131703408338449720, %r14      # imm = 0x3956C25BF348B538
-	addq	%r14, %rdx
+	addq	%r14, %r12
 	movq	%rax, %r14
 	rolq	$30, %r14
-	addq	%rcx, %rdx
+	addq	%rdx, %r12
 	movq	%rax, %r15
 	rolq	$25, %r15
 	xorq	%rbx, %r14
 	xorq	%r14, %r15
-	movq	%rdi, %rbx
-	andq	%rsi, %rbx
-	movq	%rdi, %rcx
-	xorq	%rsi, %rcx
-	andq	%rax, %rcx
-	xorq	%rbx, %rcx
-	addq	%r15, %rcx
-	movq	40(%r12), %r14
-	bswapq	%r14
-	addq	%rdx, %r8
 	movq	%r8, %rbx
-	rolq	$50, %rbx
-	addq	%rdx, %rcx
+	andq	%rdi, %rbx
 	movq	%r8, %rdx
-	rolq	$46, %rdx
-	xorq	%rbx, %rdx
-	movq	%r8, %rbx
-	rolq	$23, %rbx
-	xorq	%rdx, %rbx
-	movq	%r8, %rdx
-	andq	%r10, %rdx
-	movq	%r14, -72(%rsp)                 # 8-byte Spill
-	addq	%r14, %r9
-	addq	%rdx, %r9
-	movq	%r8, %rdx
-	notq	%rdx
-	andq	%r11, %rdx
-	addq	%rdx, %r9
-	movq	%rcx, %rdx
-	rolq	$36, %rdx
-	movabsq	$6480981068601479193, %r14      # imm = 0x59F111F1B605D019
-	addq	%r14, %r9
-	movq	%rcx, %r14
-	rolq	$30, %r14
-	addq	%rbx, %r9
-	movq	%rcx, %rbx
-	rolq	$25, %rbx
-	xorq	%rdx, %r14
-	xorq	%r14, %rbx
-	movq	%rax, %r14
-	andq	%rdi, %r14
-	movq	%rax, %rdx
 	xorq	%rdi, %rdx
-	andq	%rcx, %rdx
-	xorq	%r14, %rdx
-	addq	%rbx, %rdx
-	movq	48(%r12), %r14
-	bswapq	%r14
-	addq	%r9, %rsi
-	movq	%rsi, %rbx
+	andq	%rax, %rdx
+	xorq	%rbx, %rdx
+	addq	%r15, %rdx
+	movq	40(%rsi), %r15
+	bswapq	%r15
+	addq	%r12, %r9
+	movq	%r9, %rbx
 	rolq	$50, %rbx
-	addq	%r9, %rdx
-	movq	%rsi, %r9
-	rolq	$46, %r9
-	xorq	%rbx, %r9
-	movq	%rsi, %rbx
+	addq	%r12, %rdx
+	movq	%r9, %r14
+	rolq	$46, %r14
+	xorq	%rbx, %r14
+	movq	%r9, %rbx
 	rolq	$23, %rbx
-	xorq	%r9, %rbx
-	movq	%rsi, %r9
-	andq	%r8, %r9
-	movq	%r14, -40(%rsp)                 # 8-byte Spill
+	xorq	%r14, %rbx
+	movq	%r9, %r14
+	andq	%rcx, %r14
+	movq	%r15, (%rsp)                    # 8-byte Spill
+	addq	%r15, %r11
 	addq	%r14, %r11
-	addq	%r9, %r11
-	movq	%rsi, %r9
-	notq	%r9
-	andq	%r10, %r9
-	addq	%r9, %r11
-	movq	%rdx, %r9
-	rolq	$36, %r9
-	movabsq	$-7908458776815382629, %r14     # imm = 0x923F82A4AF194F9B
+	movq	%r9, %r14
+	notq	%r14
+	andq	%r10, %r14
+	addq	%r14, %r11
+	movq	%rdx, %r15
+	rolq	$36, %r15
+	movabsq	$6480981068601479193, %r14      # imm = 0x59F111F1B605D019
 	addq	%r14, %r11
 	movq	%rdx, %r14
 	rolq	$30, %r14
 	addq	%rbx, %r11
 	movq	%rdx, %rbx
 	rolq	$25, %rbx
-	xorq	%r9, %r14
+	xorq	%r15, %r14
 	xorq	%r14, %rbx
-	movq	%rcx, %r9
-	andq	%rax, %r9
-	movq	%rcx, %r14
-	xorq	%rax, %r14
-	andq	%rdx, %r14
-	xorq	%r9, %r14
-	addq	%rbx, %r14
-	movq	56(%r12), %rbx
-	bswapq	%rbx
+	movq	%rax, %r14
+	andq	%r8, %r14
+	movq	%rax, %r13
+	xorq	%r8, %r13
+	andq	%rdx, %r13
+	xorq	%r14, %r13
+	addq	%rbx, %r13
+	movq	48(%rsi), %r14
+	bswapq	%r14
 	addq	%r11, %rdi
-	movq	%rdi, %r9
-	rolq	$50, %r9
-	addq	%r11, %r14
+	movq	%rdi, %rbx
+	rolq	$50, %rbx
+	addq	%r11, %r13
 	movq	%rdi, %r11
 	rolq	$46, %r11
-	xorq	%r9, %r11
-	movq	%rdi, %r9
-	rolq	$23, %r9
-	xorq	%r11, %r9
+	xorq	%rbx, %r11
+	movq	%rdi, %rbx
+	rolq	$23, %rbx
+	xorq	%r11, %rbx
 	movq	%rdi, %r11
-	andq	%rsi, %r11
-	movq	%rbx, 24(%rsp)                  # 8-byte Spill
-	addq	%rbx, %r10
+	andq	%r9, %r11
+	movq	%r14, 40(%rsp)                  # 8-byte Spill
+	addq	%r14, %r10
 	addq	%r11, %r10
 	movq	%rdi, %r11
 	notq	%r11
-	andq	%r8, %r11
-	addq	%r11, %r10
-	movq	%r14, %r11
-	rolq	$36, %r11
-	movabsq	$-6116909921290321640, %rbx     # imm = 0xAB1C5ED5DA6D8118
-	addq	%rbx, %r10
-	movq	%r14, %rbx
-	rolq	$30, %rbx
-	addq	%r9, %r10
-	movq	%r14, %r9
-	rolq	$25, %r9
-	xorq	%r11, %rbx
-	xorq	%rbx, %r9
-	movq	%rdx, %r11
 	andq	%rcx, %r11
-	movq	%rdx, %r13
-	xorq	%rcx, %r13
-	andq	%r14, %r13
-	xorq	%r11, %r13
-	addq	%r9, %r13
-	movq	64(%r12), %r11
-	bswapq	%r11
-	addq	%r10, %rax
-	movq	%rax, %r9
-	rolq	$50, %r9
-	addq	%r10, %r13
-	movq	%rax, %r10
-	rolq	$46, %r10
-	xorq	%r9, %r10
-	movq	%rax, %r9
-	rolq	$23, %r9
-	xorq	%r10, %r9
-	movq	%rax, %r10
-	andq	%rdi, %r10
-	movq	%r11, -24(%rsp)                 # 8-byte Spill
-	addq	%r11, %r8
-	addq	%r10, %r8
-	movq	%rax, %r10
-	notq	%r10
-	andq	%rsi, %r10
-	addq	%r10, %r8
-	movq	%r13, %r10
-	rolq	$36, %r10
-	movabsq	$-2880145864133508542, %r11     # imm = 0xD807AA98A3030242
-	addq	%r11, %r8
+	addq	%r11, %r10
 	movq	%r13, %r11
-	rolq	$30, %r11
-	addq	%r9, %r8
-	movq	%r13, %r15
-	rolq	$25, %r15
+	rolq	$36, %r11
+	movabsq	$-7908458776815382629, %r14     # imm = 0x923F82A4AF194F9B
+	addq	%r14, %r10
+	movq	%r13, %r14
+	rolq	$30, %r14
+	addq	%rbx, %r10
+	movq	%r13, %rbx
+	rolq	$25, %rbx
+	xorq	%r11, %r14
+	xorq	%r14, %rbx
+	movq	%rdx, %r11
+	andq	%rax, %r11
+	movq	%rsi, %r14
+	movq	%rdx, %rsi
+	xorq	%rax, %rsi
+	andq	%r13, %rsi
+	xorq	%r11, %rsi
+	addq	%rbx, %rsi
+	movq	56(%r14), %rbx
+	bswapq	%rbx
+	movq	%rbx, -16(%rsp)                 # 8-byte Spill
+	addq	%r10, %r8
+	movq	%r8, %r11
+	rolq	$50, %r11
+	addq	%r10, %rsi
+	movq	%r8, %r10
+	rolq	$46, %r10
+	xorq	%r11, %r10
+	movq	%r8, %r11
+	rolq	$23, %r11
 	xorq	%r10, %r11
-	xorq	%r11, %r15
-	movq	%r14, %r10
-	andq	%rdx, %r10
-	movq	%r14, %rbx
-	xorq	%rdx, %rbx
-	andq	%r13, %rbx
+	movq	%r8, %r10
+	andq	%rdi, %r10
+	addq	%rbx, %rcx
+	addq	%r10, %rcx
+	movq	%r8, %r10
+	notq	%r10
+	andq	%r9, %r10
+	addq	%r10, %rcx
+	movq	%rsi, %r10
+	rolq	$36, %r10
+	movabsq	$-6116909921290321640, %rbx     # imm = 0xAB1C5ED5DA6D8118
+	addq	%rbx, %rcx
+	movq	%rsi, %rbx
+	rolq	$30, %rbx
+	addq	%r11, %rcx
+	movq	%rsi, %r11
+	rolq	$25, %r11
 	xorq	%r10, %rbx
-	addq	%r15, %rbx
-	movq	72(%r12), %r9
-	bswapq	%r9
-	movq	%r9, 16(%rsp)                   # 8-byte Spill
-	addq	%r8, %rcx
-	movq	%rcx, %r10
+	xorq	%rbx, %r11
+	movq	%r13, %r10
+	andq	%rdx, %r10
+	movq	%r13, %rbx
+	xorq	%rdx, %rbx
+	andq	%rsi, %rbx
+	xorq	%r10, %rbx
+	addq	%r11, %rbx
+	movq	64(%r14), %r11
+	bswapq	%r11
+	addq	%rcx, %rax
+	movq	%rax, %r10
 	rolq	$50, %r10
-	addq	%r8, %rbx
-	movq	%rcx, %r8
-	rolq	$46, %r8
-	xorq	%r10, %r8
-	movq	%rcx, %r10
+	addq	%rcx, %rbx
+	movq	%rax, %rcx
+	rolq	$46, %rcx
+	xorq	%r10, %rcx
+	movq	%rax, %r10
 	rolq	$23, %r10
-	xorq	%r8, %r10
-	movq	%rcx, %r8
-	andq	%rax, %r8
-	addq	%r9, %rsi
-	addq	%r8, %rsi
-	movq	%rcx, %r8
-	notq	%r8
-	andq	%rdi, %r8
-	addq	%r8, %rsi
-	movq	%rbx, %r8
-	rolq	$36, %r8
-	movabsq	$1334009975649890238, %r9       # imm = 0x12835B0145706FBE
-	addq	%r9, %rsi
+	xorq	%rcx, %r10
+	movq	%rax, %rcx
+	andq	%r8, %rcx
+	movq	%r11, -8(%rsp)                  # 8-byte Spill
+	addq	%r11, %r9
+	addq	%rcx, %r9
+	movq	%rax, %rcx
+	notq	%rcx
+	andq	%rdi, %rcx
+	addq	%rcx, %r9
+	movq	%rbx, %rcx
+	rolq	$36, %rcx
+	movabsq	$-2880145864133508542, %r11     # imm = 0xD807AA98A3030242
+	addq	%r11, %r9
 	movq	%rbx, %r11
 	rolq	$30, %r11
-	addq	%r10, %rsi
+	addq	%r10, %r9
 	movq	%rbx, %r10
 	rolq	$25, %r10
-	xorq	%r8, %r11
+	xorq	%rcx, %r11
 	xorq	%r11, %r10
-	movq	%r13, %r8
-	andq	%r14, %r8
-	movq	%r13, %r15
-	xorq	%r14, %r15
-	andq	%rbx, %r15
-	xorq	%r8, %r15
-	addq	%r10, %r15
-	movq	%r12, %r11
-	movq	80(%r12), %r9
-	bswapq	%r9
-	movq	%r9, 8(%rsp)                    # 8-byte Spill
-	addq	%rsi, %rdx
-	movq	%rdx, %r8
-	rolq	$50, %r8
-	addq	%rsi, %r15
-	movq	%rdx, %rsi
-	rolq	$46, %rsi
-	xorq	%r8, %rsi
-	movq	%rdx, %r8
-	rolq	$23, %r8
-	xorq	%rsi, %r8
-	movq	%rdx, %rsi
-	andq	%rcx, %rsi
-	addq	%r9, %rdi
-	addq	%rsi, %rdi
-	movq	%rdx, %rsi
-	notq	%rsi
-	andq	%rax, %rsi
-	addq	%rsi, %rdi
-	movq	%r15, %rsi
-	rolq	$36, %rsi
-	movabsq	$2608012711638119052, %r9       # imm = 0x243185BE4EE4B28C
-	addq	%r9, %rdi
-	movq	%r15, %r10
-	rolq	$30, %r10
-	addq	%r8, %rdi
-	movq	%r15, %r8
-	rolq	$25, %r8
-	xorq	%rsi, %r10
-	xorq	%r10, %r8
-	movq	%rbx, %r10
-	andq	%r13, %r10
-	movq	%rbx, %r12
+	movq	%rsi, %rcx
+	andq	%r13, %rcx
+	movq	%rsi, %r12
 	xorq	%r13, %r12
-	andq	%r15, %r12
-	xorq	%r10, %r12
-	addq	%r8, %r12
-	movq	88(%r11), %rsi
-	bswapq	%rsi
-	movq	%rsi, -128(%rsp)                # 8-byte Spill
-	addq	%rdi, %r14
-	movq	%r14, %r8
-	rolq	$50, %r8
-	addq	%rdi, %r12
-	movq	%r14, %rdi
-	rolq	$46, %rdi
-	xorq	%r8, %rdi
-	movq	%r14, %r8
-	rolq	$23, %r8
-	xorq	%rdi, %r8
-	movq	%r14, %rdi
-	andq	%rdx, %rdi
-	addq	%rsi, %rax
-	addq	%rdi, %rax
-	movq	%r14, %rdi
-	notq	%rdi
-	andq	%rcx, %rdi
-	addq	%rdi, %rax
-	movq	%r12, %rdi
-	rolq	$36, %rdi
-	movabsq	$6128411473006802146, %rsi      # imm = 0x550C7DC3D5FFB4E2
-	addq	%rsi, %rax
+	andq	%rbx, %r12
+	xorq	%rcx, %r12
+	addq	%r10, %r12
+	movq	72(%r14), %r10
+	bswapq	%r10
+	movq	%r10, -72(%rsp)                 # 8-byte Spill
+	addq	%r9, %rdx
+	movq	%rdx, %rcx
+	rolq	$50, %rcx
+	addq	%r9, %r12
+	movq	%rdx, %r9
+	rolq	$46, %r9
+	xorq	%rcx, %r9
+	movq	%rdx, %rcx
+	rolq	$23, %rcx
+	xorq	%r9, %rcx
+	movq	%rdx, %r9
+	andq	%rax, %r9
+	addq	%r10, %rdi
+	addq	%r9, %rdi
+	movq	%rdx, %r9
+	notq	%r9
+	andq	%r8, %r9
+	addq	%r9, %rdi
+	movq	%r12, %r9
+	rolq	$36, %r9
+	movabsq	$1334009975649890238, %r10      # imm = 0x12835B0145706FBE
+	addq	%r10, %rdi
 	movq	%r12, %r10
 	rolq	$30, %r10
-	addq	%r8, %rax
-	movq	%r12, %r8
-	rolq	$25, %r8
-	xorq	%rdi, %r10
-	xorq	%r10, %r8
-	movq	%r15, %rdi
-	andq	%rbx, %rdi
-	movq	%r15, %rbp
-	xorq	%rbx, %rbp
-	andq	%r12, %rbp
-	xorq	%rdi, %rbp
-	addq	%r8, %rbp
-	movq	96(%r11), %rsi
-	bswapq	%rsi
-	addq	%rax, %r13
-	movq	%r13, %rdi
-	rolq	$50, %rdi
-	addq	%rax, %rbp
-	movq	%r13, %rax
-	rolq	$46, %rax
-	xorq	%rdi, %rax
-	movq	%r13, %rdi
-	rolq	$23, %rdi
-	xorq	%rax, %rdi
-	movq	%r13, %rax
-	andq	%r14, %rax
-	movq	%rsi, -120(%rsp)                # 8-byte Spill
-	addq	%rsi, %rcx
-	addq	%rax, %rcx
-	movq	%r13, %rax
-	notq	%rax
-	andq	%rdx, %rax
-	addq	%rax, %rcx
-	movq	%rbp, %rax
-	rolq	$36, %rax
-	movabsq	$8268148722764581231, %rsi      # imm = 0x72BE5D74F27B896F
-	addq	%rsi, %rcx
-	movq	%rbp, %r8
-	rolq	$30, %r8
-	addq	%rdi, %rcx
-	movq	%rbp, %r10
-	rolq	$25, %r10
-	xorq	%rax, %r8
-	xorq	%r8, %r10
-	movq	%r12, %rax
-	andq	%r15, %rax
-	movq	%r12, %rdi
-	xorq	%r15, %rdi
-	andq	%rbp, %rdi
-	xorq	%rax, %rdi
-	addq	%r10, %rdi
-	movq	104(%r11), %r10
-	bswapq	%r10
-	addq	%rcx, %rbx
-	movq	%rbx, %rax
-	rolq	$50, %rax
 	addq	%rcx, %rdi
+	movq	%r12, %rcx
+	rolq	$25, %rcx
+	xorq	%r9, %r10
+	xorq	%r10, %rcx
+	movq	%rbx, %r9
+	andq	%rsi, %r9
+	movq	%rbx, %rbp
+	xorq	%rsi, %rbp
+	andq	%r12, %rbp
+	xorq	%r9, %rbp
+	addq	%rcx, %rbp
+	movq	80(%r14), %rcx
+	movq	%r14, %r10
+	bswapq	%rcx
+	movq	%rcx, %r9
+	movq	%rcx, -80(%rsp)                 # 8-byte Spill
+	addq	%rdi, %r13
+	movq	%r13, %rcx
+	rolq	$50, %rcx
+	addq	%rdi, %rbp
+	movq	%r13, %rdi
+	rolq	$46, %rdi
+	xorq	%rcx, %rdi
+	movq	%r13, %rcx
+	rolq	$23, %rcx
+	xorq	%rdi, %rcx
+	movq	%r13, %rdi
+	andq	%rdx, %rdi
+	addq	%r9, %r8
+	addq	%rdi, %r8
+	movq	%r13, %rdi
+	notq	%rdi
+	andq	%rax, %rdi
+	addq	%rdi, %r8
+	movq	%rbp, %rdi
+	rolq	$36, %rdi
+	movabsq	$2608012711638119052, %r9       # imm = 0x243185BE4EE4B28C
+	addq	%r9, %r8
+	movq	%rbp, %r9
+	rolq	$30, %r9
+	addq	%rcx, %r8
+	movq	%rbp, %rcx
+	rolq	$25, %rcx
+	xorq	%rdi, %r9
+	xorq	%r9, %rcx
+	movq	%r12, %r9
+	andq	%rbx, %r9
+	movq	%r12, %r14
+	xorq	%rbx, %r14
+	andq	%rbp, %r14
+	xorq	%r9, %r14
+	addq	%rcx, %r14
+	movq	88(%r10), %rdi
+	bswapq	%rdi
+	addq	%r8, %rsi
+	movq	%rsi, %rcx
+	rolq	$50, %rcx
+	addq	%r8, %r14
+	movq	%rsi, %r8
+	rolq	$46, %r8
+	xorq	%rcx, %r8
+	movq	%rsi, %rcx
+	rolq	$23, %rcx
+	xorq	%r8, %rcx
+	movq	%rsi, %r8
+	andq	%r13, %r8
+	movq	%rdi, -128(%rsp)                # 8-byte Spill
+	addq	%rdi, %rax
+	addq	%r8, %rax
+	movq	%rsi, %r8
+	notq	%r8
+	andq	%rdx, %r8
+	addq	%r8, %rax
+	movq	%r14, %r8
+	rolq	$36, %r8
+	movabsq	$6128411473006802146, %rdi      # imm = 0x550C7DC3D5FFB4E2
+	addq	%rdi, %rax
+	movq	%r14, %r9
+	rolq	$30, %r9
+	addq	%rcx, %rax
+	movq	%r14, %rcx
+	rolq	$25, %rcx
+	xorq	%r8, %r9
+	xorq	%r9, %rcx
+	movq	%rbp, %r8
+	andq	%r12, %r8
+	movq	%rbp, %r9
+	xorq	%r12, %r9
+	andq	%r14, %r9
+	xorq	%r8, %r9
+	addq	%rcx, %r9
+	movq	96(%r10), %rdi
+	bswapq	%rdi
+	addq	%rax, %rbx
 	movq	%rbx, %rcx
-	rolq	$46, %rcx
-	xorq	%rax, %rcx
+	rolq	$50, %rcx
+	addq	%rax, %r9
 	movq	%rbx, %rax
-	rolq	$23, %rax
+	rolq	$46, %rax
 	xorq	%rcx, %rax
 	movq	%rbx, %rcx
-	andq	%r13, %rcx
-	addq	%r10, %rdx
-	addq	%rcx, %rdx
-	movq	%rbx, %rcx
-	notq	%rcx
-	andq	%r14, %rcx
-	addq	%rcx, %rdx
-	movq	%rdi, %rcx
-	rolq	$36, %rcx
-	movabsq	$-9160688886553864527, %rsi     # imm = 0x80DEB1FE3B1696B1
-	addq	%rsi, %rdx
-	movq	%rdi, %r8
-	rolq	$30, %r8
+	rolq	$23, %rcx
+	xorq	%rax, %rcx
+	movq	%rbx, %rax
+	andq	%rsi, %rax
+	movq	%rdi, -112(%rsp)                # 8-byte Spill
+	addq	%rdi, %rdx
 	addq	%rax, %rdx
-	movq	%rdi, %rax
-	rolq	$25, %rax
-	xorq	%rcx, %r8
-	xorq	%r8, %rax
-	movq	%rbp, %rcx
-	andq	%r12, %rcx
-	movq	%rbp, %r8
-	xorq	%r12, %r8
-	andq	%rdi, %r8
-	xorq	%rcx, %r8
-	addq	%rax, %r8
-	movq	112(%r11), %r9
-	bswapq	%r9
-	addq	%rdx, %r15
-	movq	%r15, %rax
+	movq	%rbx, %rax
+	notq	%rax
+	andq	%r13, %rax
+	addq	%rax, %rdx
+	movq	%r9, %rax
+	rolq	$36, %rax
+	movabsq	$8268148722764581231, %rdi      # imm = 0x72BE5D74F27B896F
+	addq	%rdi, %rdx
+	movq	%r9, %r8
+	rolq	$30, %r8
+	addq	%rcx, %rdx
+	movq	%r9, %rcx
+	rolq	$25, %rcx
+	xorq	%rax, %r8
+	xorq	%r8, %rcx
+	movq	%r14, %rax
+	andq	%rbp, %rax
+	movq	%r14, %r8
+	xorq	%rbp, %r8
+	andq	%r9, %r8
+	xorq	%rax, %r8
+	addq	%rcx, %r8
+	movq	104(%r10), %rdi
+	bswapq	%rdi
+	addq	%rdx, %r12
+	movq	%r12, %rax
 	rolq	$50, %rax
 	addq	%rdx, %r8
-	movq	%r15, %rcx
+	movq	%r12, %rcx
 	rolq	$46, %rcx
 	xorq	%rax, %rcx
-	movq	%r15, %rax
+	movq	%r12, %rax
 	rolq	$23, %rax
 	xorq	%rcx, %rax
-	movq	%r15, %rcx
+	movq	%r12, %rcx
 	andq	%rbx, %rcx
-	addq	%r9, %r14
-	addq	%rcx, %r14
-	movq	%r15, %rcx
+	movq	%rdi, -120(%rsp)                # 8-byte Spill
+	addq	%rdi, %r13
+	addq	%rcx, %r13
+	movq	%r12, %rcx
 	notq	%rcx
-	andq	%r13, %rcx
-	addq	%rcx, %r14
+	andq	%rsi, %rcx
+	addq	%rcx, %r13
 	movq	%r8, %rcx
 	rolq	$36, %rcx
-	movabsq	$-7215885187991268811, %rdx     # imm = 0x9BDC06A725C71235
-	addq	%rdx, %r14
+	movabsq	$-9160688886553864527, %rdx     # imm = 0x80DEB1FE3B1696B1
+	addq	%rdx, %r13
 	movq	%r8, %rdx
 	rolq	$30, %rdx
-	addq	%rax, %r14
+	addq	%rax, %r13
 	movq	%r8, %rax
 	rolq	$25, %rax
 	xorq	%rcx, %rdx
 	xorq	%rdx, %rax
-	movq	%rdi, %rcx
-	andq	%rbp, %rcx
-	movq	%rdi, %rsi
-	xorq	%rbp, %rsi
-	andq	%r8, %rsi
-	xorq	%rcx, %rsi
-	addq	%rax, %rsi
-	movq	%r11, %rax
-	movq	%r11, 152(%rsp)                 # 8-byte Spill
-	movq	120(%r11), %rdx
-	bswapq	%rdx
-	addq	%r14, %r12
-	movq	%r12, %rax
+	movq	%r9, %rcx
+	andq	%r14, %rcx
+	movq	%r9, %r11
+	xorq	%r14, %r11
+	andq	%r8, %r11
+	xorq	%rcx, %r11
+	addq	%rax, %r11
+	movq	112(%r10), %r15
+	bswapq	%r15
+	addq	%r13, %rbp
+	movq	%rbp, %rax
 	rolq	$50, %rax
-	addq	%r14, %rsi
-	movq	%r12, %rcx
+	addq	%r13, %r11
+	movq	%rbp, %rcx
 	rolq	$46, %rcx
 	xorq	%rax, %rcx
-	movq	%r12, %rax
+	movq	%rbp, %rax
 	rolq	$23, %rax
 	xorq	%rcx, %rax
-	movq	%r12, %rcx
-	andq	%r15, %rcx
-	movq	%rdx, -112(%rsp)                # 8-byte Spill
-	addq	%rdx, %r13
-	addq	%rcx, %r13
-	movq	%r12, %rcx
+	movq	%rbp, %rcx
+	andq	%r12, %rcx
+	addq	%r15, %rsi
+	addq	%rcx, %rsi
+	movq	%rbp, %rcx
 	notq	%rcx
 	andq	%rbx, %rcx
-	addq	%rcx, %r13
-	movq	%rsi, %rcx
+	addq	%rcx, %rsi
+	movq	%r11, %rcx
 	rolq	$36, %rcx
-	movabsq	$-4495734319001033068, %rdx     # imm = 0xC19BF174CF692694
-	addq	%rdx, %r13
-	movq	%rsi, %rdx
+	movabsq	$-7215885187991268811, %rdx     # imm = 0x9BDC06A725C71235
+	addq	%rdx, %rsi
+	movq	%r11, %rdx
 	rolq	$30, %rdx
-	addq	%rax, %r13
-	movq	%rsi, %rax
+	addq	%rax, %rsi
+	movq	%r11, %rax
 	rolq	$25, %rax
 	xorq	%rcx, %rdx
 	xorq	%rdx, %rax
 	movq	%r8, %rcx
-	andq	%rdi, %rcx
-	movq	%r8, %r11
-	xorq	%rdi, %r11
-	movq	%rsi, -80(%rsp)                 # 8-byte Spill
-	andq	%rsi, %r11
-	xorq	%rcx, %r11
-	addq	%rax, %r11
-	addq	%r13, %rbp
-	addq	%r13, %r11
-	xorl	%esi, %esi
+	andq	%r9, %rcx
+	movq	%r8, %rdi
+	xorq	%r9, %rdi
+	andq	%r11, %rdi
+	xorq	%rcx, %rdi
+	addq	%rax, %rdi
+	movq	%r10, 160(%rsp)                 # 8-byte Spill
+	movq	120(%r10), %rdx
+	bswapq	%rdx
+	addq	%rsi, %r14
+	movq	%r14, %rax
+	rolq	$50, %rax
+	addq	%rsi, %rdi
+	movq	%r14, %rcx
+	rolq	$46, %rcx
+	xorq	%rax, %rcx
+	movq	%r14, %rax
+	rolq	$23, %rax
+	xorq	%rcx, %rax
+	movq	%r14, %rcx
+	andq	%rbp, %rcx
+	movq	%rdx, -96(%rsp)                 # 8-byte Spill
+	addq	%rdx, %rbx
+	addq	%rcx, %rbx
+	movq	%r14, %rcx
+	notq	%rcx
+	movq	%r12, -88(%rsp)                 # 8-byte Spill
+	andq	%r12, %rcx
+	addq	%rcx, %rbx
+	movq	%rdi, %rcx
+	rolq	$36, %rcx
+	movabsq	$-4495734319001033068, %rdx     # imm = 0xC19BF174CF692694
+	addq	%rdx, %rbx
+	movq	%rdi, %rdx
+	rolq	$30, %rdx
+	addq	%rax, %rbx
+	movq	%rdi, %rax
+	rolq	$25, %rax
+	xorq	%rcx, %rdx
+	xorq	%rdx, %rax
+	movq	%r11, %rcx
+	andq	%r8, %rcx
+	movq	%r11, -104(%rsp)                # 8-byte Spill
+	movq	%r11, %rdx
+	xorq	%r8, %rdx
+	movq	%rdi, -64(%rsp)                 # 8-byte Spill
+	andq	%rdi, %rdx
+	xorq	%rcx, %rdx
+	addq	%rax, %rdx
+	addq	%rbx, %r9
+	addq	%rbx, %rdx
+	movq	%rdx, %rbx
+	xorl	%edi, %edi
 	.p2align	4, 0x90
 .LBB7_3:                                #   Parent Loop BB7_2 Depth=1
                                         # =>  This Inner Loop Header: Depth=2
-	movq	%r10, -104(%rsp)                # 8-byte Spill
-	movq	48(%rsp), %r14                  # 8-byte Reload
-	movq	%r14, %rax
+	movq	%r15, -48(%rsp)                 # 8-byte Spill
+	movq	56(%rsp), %r11                  # 8-byte Reload
+	movq	%r11, %rax
 	rorq	%rax
-	movq	%r14, %rcx
+	movq	%r11, %rcx
 	rolq	$56, %rcx
 	xorq	%rax, %rcx
-	movq	%rbp, %rdx
-	rolq	$50, %rdx
-	movq	%r14, %rax
-	shrq	$7, %rax
-	movq	%rbp, %r10
-	rolq	$46, %r10
-	xorq	%rcx, %rax
-	movq	%r11, %r13
-	movq	%rbp, %r11
-	rolq	$23, %r11
-	xorq	%rdx, %r10
-	xorq	%r10, %r11
-	movq	%r12, %rdx
-	andq	%rbp, %rdx
-	addq	%rbx, %rdx
-	movq	%rbp, %rcx
-	notq	%rcx
-	andq	%r15, %rcx
-	addq	%rdx, %rcx
 	movq	%r9, %rdx
-	rolq	$45, %rdx
-	movq	%r9, %r10
-	movq	%r9, -96(%rsp)                  # 8-byte Spill
-	rolq	$3, %r9
-	xorq	%rdx, %r9
-	addq	%r11, %rcx
-	movq	%r10, %rdx
-	shrq	$6, %rdx
-	xorq	%r9, %rdx
-	movq	%r13, %r9
-	rolq	$36, %r9
-	movq	%r13, %r10
-	rolq	$30, %r10
-	xorq	%r9, %r10
-	movq	%r13, %r9
-	movq	%r13, %r11
-	movq	%r13, -88(%rsp)                 # 8-byte Spill
-	rolq	$25, %r9
-	xorq	%r10, %r9
-	movq	%r8, %r10
-	movq	-80(%rsp), %r13                 # 8-byte Reload
-	xorq	%r13, %r10
-	movq	%r8, %rbx
-	andq	%r13, %rbx
-	andq	%r11, %r10
-	xorq	%r10, %rbx
-	addq	%r9, %rbx
-	movq	-16(%rsp), %r10                 # 8-byte Reload
-	addq	16(%rsp), %r10                  # 8-byte Folded Reload
-	addq	%rdx, %r10
-	movq	40(%rsp), %r11                  # 8-byte Reload
-	movq	%r11, %rdx
-	rorq	%rdx
-	movq	%r11, %r9
-	rolq	$56, %r9
-	xorq	%rdx, %r9
-	addq	%rax, %r10
+	rolq	$50, %rdx
 	movq	%r11, %rax
 	shrq	$7, %rax
-	xorq	%r9, %rax
+	movq	%r9, %rsi
+	rolq	$46, %rsi
+	xorq	%rcx, %rax
+	movq	%r9, %r10
+	rolq	$23, %r10
+	xorq	%rdx, %rsi
+	xorq	%rsi, %r10
+	movq	%r14, %rdx
+	andq	%r9, %rdx
+	addq	-88(%rsp), %rdx                 # 8-byte Folded Reload
+	movq	%r9, %rcx
+	notq	%rcx
+	andq	%rbp, %rcx
+	addq	%rdx, %rcx
+	movq	%r15, %rdx
+	rolq	$45, %rdx
+	movq	%r15, %rsi
+	rolq	$3, %rsi
+	xorq	%rdx, %rsi
 	addq	%r10, %rcx
-	addq	K512+128(,%rsi,8), %rcx
-	movq	%rsi, %r9
-	addq	%rcx, %rdi
+	movq	%r15, %rdx
+	shrq	$6, %rdx
+	xorq	%rsi, %rdx
+	movq	%rbx, %rsi
+	rolq	$36, %rsi
+	movq	%rbx, %r10
+	rolq	$30, %r10
+	xorq	%rsi, %r10
+	movq	%rbx, %rsi
+	rolq	$25, %rsi
+	xorq	%r10, %rsi
+	movq	-104(%rsp), %r12                # 8-byte Reload
+	movq	%r12, %r10
+	movq	-64(%rsp), %r13                 # 8-byte Reload
+	xorq	%r13, %r10
+	movq	%rbx, %r15
+	movq	%rbx, -32(%rsp)                 # 8-byte Spill
+	movq	%r12, %rbx
+	andq	%r13, %rbx
+	andq	%r15, %r10
+	xorq	%r10, %rbx
+	addq	%rsi, %rbx
+	movq	16(%rsp), %r15                  # 8-byte Reload
+	addq	-72(%rsp), %r15                 # 8-byte Folded Reload
+	addq	%rdx, %r15
+	movq	48(%rsp), %r10                  # 8-byte Reload
+	movq	%r10, %rdx
+	rorq	%rdx
+	movq	%r10, %rsi
+	rolq	$56, %rsi
+	xorq	%rdx, %rsi
+	addq	%rax, %r15
+	movq	%r10, %rax
+	shrq	$7, %rax
+	xorq	%rsi, %rax
+	addq	%r15, %rcx
+	movq	%rdi, -56(%rsp)                 # 8-byte Spill
+	leaq	K512(%rip), %rdx
+	addq	128(%rdx,%rdi,8), %rcx
+	addq	%rcx, %r8
 	addq	%rcx, %rbx
-	movq	-112(%rsp), %rsi                # 8-byte Reload
+	movq	-96(%rsp), %rsi                 # 8-byte Reload
 	movq	%rsi, %rcx
 	rolq	$45, %rcx
 	movq	%rsi, %rdx
@@ -1178,783 +1181,492 @@ sha512_block_data_order:                # @sha512_block_data_order
 	movq	%rsi, %rcx
 	shrq	$6, %rcx
 	xorq	%rdx, %rcx
-	addq	8(%rsp), %r14                   # 8-byte Folded Reload
-	addq	%rcx, %r14
-	movq	%rdi, %rcx
-	rolq	$50, %rcx
-	movq	%rdi, %rdx
-	rolq	$46, %rdx
-	xorq	%rcx, %rdx
-	addq	%rax, %r14
-	movq	%rdi, %rax
-	rolq	$23, %rax
-	xorq	%rdx, %rax
-	movq	%rbx, %rcx
-	rolq	$36, %rcx
-	movq	%rbx, %rdx
-	rolq	$30, %rdx
-	xorq	%rcx, %rdx
-	movq	%rbx, %rcx
-	movq	%rbx, -48(%rsp)                 # 8-byte Spill
-	rolq	$25, %rcx
-	xorq	%rdx, %rcx
-	movq	%r13, -80(%rsp)                 # 8-byte Spill
-	movq	%r13, %rdx
-	movq	-88(%rsp), %rsi                 # 8-byte Reload
-	andq	%rsi, %rdx
-	xorq	%rsi, %r13
-	andq	%rbx, %r13
-	xorq	%rdx, %r13
-	addq	%rcx, %r13
-	movq	%rdi, %rcx
-	andq	%rbp, %rcx
-	addq	%r14, %r15
-	movq	%r9, %rsi
-	movq	%r9, -64(%rsp)                  # 8-byte Spill
-	addq	K512+136(,%r9,8), %r15
-	addq	%rcx, %r15
-	movq	%rdi, %rcx
-	notq	%rcx
-	andq	%r12, %rcx
-	addq	%rcx, %r15
-	movq	32(%rsp), %rbx                  # 8-byte Reload
-	movq	%rbx, %rcx
-	rorq	%rcx
-	movq	%rbx, %rdx
-	rolq	$56, %rdx
-	xorq	%rcx, %rdx
-	addq	%rax, %r15
-	movq	%r10, -16(%rsp)                 # 8-byte Spill
-	movq	%r10, %rax
-	rolq	$45, %rax
-	movq	%rbx, %rcx
-	shrq	$7, %rcx
-	movq	%r10, %r9
-	rolq	$3, %r9
-	xorq	%rdx, %rcx
-	xorq	%rax, %r9
-	addq	%r15, %r8
-	addq	%r15, %r13
-	shrq	$6, %r10
-	xorq	%r9, %r10
-	addq	-128(%rsp), %r11                # 8-byte Folded Reload
+	addq	-80(%rsp), %r11                 # 8-byte Folded Reload
 	addq	%rcx, %r11
 	movq	%r8, %rcx
 	rolq	$50, %rcx
-	addq	%r10, %r11
+	movq	%r8, %rdx
+	rolq	$46, %rdx
+	xorq	%rcx, %rdx
+	addq	%rax, %r11
 	movq	%r8, %rax
-	rolq	$46, %rax
-	xorq	%rcx, %rax
-	addq	%r11, %r12
-	movq	%r8, %rcx
-	andq	%rdi, %rcx
-	addq	K512+144(,%rsi,8), %r12
-	addq	%rcx, %r12
-	movq	%r8, %rcx
-	notq	%rcx
-	andq	%rbp, %rcx
-	addq	%rcx, %r12
-	movq	-48(%rsp), %r10                 # 8-byte Reload
-	movq	%r10, %rcx
-	movq	-88(%rsp), %rdx                 # 8-byte Reload
-	andq	%rdx, %rcx
-	xorq	%rdx, %r10
-	andq	%r13, %r10
-	xorq	%rcx, %r10
-	movq	%r13, %rcx
+	rolq	$23, %rax
+	xorq	%rdx, %rax
+	movq	%rbx, %rcx
 	rolq	$36, %rcx
-	movq	%r13, %rdx
+	movq	%rbx, %rdx
 	rolq	$30, %rdx
 	xorq	%rcx, %rdx
+	movq	%rbx, %rcx
+	movq	%rbx, -88(%rsp)                 # 8-byte Spill
+	rolq	$25, %rcx
+	xorq	%rdx, %rcx
+	movq	%r13, -64(%rsp)                 # 8-byte Spill
+	movq	%r13, %rdx
+	movq	-32(%rsp), %rdi                 # 8-byte Reload
+	andq	%rdi, %rdx
+	xorq	%rdi, %r13
+	andq	%rbx, %r13
+	xorq	%rdx, %r13
+	addq	%rcx, %r13
+	movq	%r13, %rdi
 	movq	%r8, %rcx
+	andq	%r9, %rcx
+	addq	%r11, %rbp
+	leaq	K512(%rip), %rdx
+	movq	-56(%rsp), %rsi                 # 8-byte Reload
+	addq	136(%rdx,%rsi,8), %rbp
+	addq	%rcx, %rbp
+	movq	%r8, %rcx
+	notq	%rcx
+	andq	%r14, %rcx
+	addq	%rcx, %rbp
+	movq	8(%rsp), %r13                   # 8-byte Reload
+	movq	%r13, %rcx
+	rorq	%rcx
+	movq	%r13, %rdx
+	rolq	$56, %rdx
+	xorq	%rcx, %rdx
+	addq	%rax, %rbp
+	movq	%r15, 16(%rsp)                  # 8-byte Spill
+	movq	%r15, %rax
+	rolq	$45, %rax
+	movq	%r13, %rcx
+	shrq	$7, %rcx
+	movq	%r15, %rsi
+	rolq	$3, %rsi
+	xorq	%rdx, %rcx
+	xorq	%rax, %rsi
+	addq	%rbp, %r12
+	addq	%rbp, %rdi
+	shrq	$6, %r15
+	xorq	%rsi, %r15
+	addq	-128(%rsp), %r10                # 8-byte Folded Reload
+	addq	%rcx, %r10
+	movq	%r12, %rbx
+	movq	%r12, %rcx
+	rolq	$50, %rcx
+	addq	%r15, %r10
+	movq	%r12, %rax
+	rolq	$46, %rax
+	xorq	%rcx, %rax
+	addq	%r10, %r14
+	movq	%r12, %rcx
+	andq	%r8, %rcx
+	leaq	K512(%rip), %r15
+	movq	-56(%rsp), %rbp                 # 8-byte Reload
+	addq	144(%r15,%rbp,8), %r14
+	addq	%rcx, %r14
+	movq	%r12, %rcx
+	notq	%rcx
+	andq	%r9, %rcx
+	addq	%rcx, %r14
+	movq	-88(%rsp), %r12                 # 8-byte Reload
+	movq	%r12, %rcx
+	movq	-32(%rsp), %rdx                 # 8-byte Reload
+	andq	%rdx, %rcx
+	xorq	%rdx, %r12
+	movq	%rdi, 88(%rsp)                  # 8-byte Spill
+	andq	%rdi, %r12
+	xorq	%rcx, %r12
+	movq	%rdi, %rcx
+	rolq	$36, %rcx
+	movq	%rdi, %rdx
+	rolq	$30, %rdx
+	xorq	%rcx, %rdx
+	movq	%rbx, %rcx
 	rolq	$23, %rcx
 	xorq	%rax, %rcx
-	movq	%r13, %rax
-	movq	%r13, %r15
+	movq	%rdi, %rax
 	rolq	$25, %rax
 	xorq	%rdx, %rax
-	movq	-32(%rsp), %rsi                 # 8-byte Reload
-	movq	%rsi, %rdx
+	movq	-24(%rsp), %rdi                 # 8-byte Reload
+	movq	%rdi, %rdx
 	rorq	%rdx
-	movq	%rsi, %r9
-	rolq	$56, %r9
-	xorq	%rdx, %r9
-	addq	%rcx, %r12
-	movq	%rsi, %rcx
-	shrq	$7, %rcx
-	xorq	%r9, %rcx
-	addq	%rax, %r10
-	movq	%r14, 48(%rsp)                  # 8-byte Spill
-	movq	%r14, %rax
-	rolq	$45, %rax
-	movq	%r14, %rdx
-	rolq	$3, %rdx
-	xorq	%rax, %rdx
-	shrq	$6, %r14
-	xorq	%rdx, %r14
-	movq	-80(%rsp), %r13                 # 8-byte Reload
-	addq	%r12, %r13
-	addq	%r12, %r10
-	addq	-120(%rsp), %rbx                # 8-byte Folded Reload
-	addq	%rcx, %rbx
-	addq	%r14, %rbx
-	addq	%rbx, %rbp
-	movq	-64(%rsp), %r12                 # 8-byte Reload
-	addq	K512+152(,%r12,8), %rbp
-	movq	%r13, %rax
-	andq	%r8, %rax
-	addq	%rax, %rbp
-	movq	%r13, %rcx
-	rolq	$50, %rcx
-	movq	%r13, %rax
-	rolq	$46, %rax
-	xorq	%rcx, %rax
-	movq	%r13, %rcx
-	notq	%rcx
-	andq	%rdi, %rcx
-	addq	%rcx, %rbp
-	movq	%r15, 80(%rsp)                  # 8-byte Spill
-	movq	%r15, %rcx
-	movq	-48(%rsp), %rdx                 # 8-byte Reload
-	andq	%rdx, %rcx
-	movq	%r15, %r14
-	xorq	%rdx, %r14
-	movq	-72(%rsp), %rsi                 # 8-byte Reload
-	movq	%rsi, %rdx
-	rorq	%rdx
-	movq	%r10, %r9
-	andq	%r10, %r14
-	xorq	%rcx, %r14
-	movq	%rsi, %rcx
-	movq	%rsi, %r10
-	movq	%rsi, -72(%rsp)                 # 8-byte Spill
-	rolq	$56, %rcx
-	xorq	%rdx, %rcx
-	movq	%r9, %rdx
-	rolq	$36, %rdx
-	movq	%r9, %rsi
-	rolq	$30, %rsi
+	movq	%rdi, %rsi
+	rolq	$56, %rsi
 	xorq	%rdx, %rsi
-	movq	%r13, %r15
-	movq	%r13, %rdx
-	rolq	$23, %rdx
-	xorq	%rax, %rdx
-	movq	%r9, %rax
-	rolq	$25, %rax
-	xorq	%rsi, %rax
-	movq	%r10, %rsi
-	shrq	$7, %rsi
-	xorq	%rcx, %rsi
-	addq	%rdx, %rbp
-	movq	%r11, 40(%rsp)                  # 8-byte Spill
-	movq	%r11, %rcx
-	rolq	$45, %rcx
+	addq	%rcx, %r14
+	movq	%rdi, %rcx
+	shrq	$7, %rcx
+	xorq	%rsi, %rcx
+	addq	%rax, %r12
+	movq	%r11, 56(%rsp)                  # 8-byte Spill
+	movq	%r11, %rax
+	rolq	$45, %rax
 	movq	%r11, %rdx
 	rolq	$3, %rdx
-	xorq	%rcx, %rdx
-	addq	%rax, %r14
-	movq	%r11, %rax
-	shrq	$6, %rax
-	xorq	%rdx, %rax
-	movq	-32(%rsp), %rcx                 # 8-byte Reload
-	addq	-104(%rsp), %rcx                # 8-byte Folded Reload
-	addq	%rsi, %rcx
-	addq	%rax, %rcx
-	movq	%rcx, %rdx
-	movq	%rcx, -32(%rsp)                 # 8-byte Spill
-	movq	-88(%rsp), %r13                 # 8-byte Reload
-	addq	%rbp, %r13
-	addq	%rbp, %r14
-	movq	%r13, %rcx
+	xorq	%rax, %rdx
+	shrq	$6, %r11
+	xorq	%rdx, %r11
+	movq	-64(%rsp), %rdx                 # 8-byte Reload
+	addq	%r14, %rdx
+	addq	%r14, %r12
+	addq	-112(%rsp), %r13                # 8-byte Folded Reload
+	addq	%rcx, %r13
+	addq	%r11, %r13
+	movq	%r13, 8(%rsp)                   # 8-byte Spill
+	addq	%r13, %r9
+	addq	152(%r15,%rbp,8), %r9
+	movq	%rdx, %r15
+	movq	%rdx, %rax
+	movq	%rbx, %rdi
+	movq	%rbx, -104(%rsp)                # 8-byte Spill
+	andq	%rbx, %rax
+	addq	%rax, %r9
+	movq	%rdx, %rcx
 	rolq	$50, %rcx
-	movq	%r13, %rax
+	movq	%rdx, %rax
 	rolq	$46, %rax
 	xorq	%rcx, %rax
-	addq	%rdx, %rdi
-	movq	%r12, %r10
-	addq	K512+160(,%r12,8), %rdi
-	movq	%r13, %rcx
-	andq	%r15, %rcx
-	movq	%r15, %rbp
-	movq	%r15, -80(%rsp)                 # 8-byte Spill
-	addq	%rcx, %rdi
-	movq	%r13, %rcx
+	movq	%rdx, %rcx
 	notq	%rcx
 	andq	%r8, %rcx
-	addq	%rcx, %rdi
-	movq	%r9, %r11
-	movq	%r9, (%rsp)                     # 8-byte Spill
-	movq	%r9, %rcx
-	movq	80(%rsp), %r12                  # 8-byte Reload
-	andq	%r12, %rcx
-	movq	-40(%rsp), %r9                  # 8-byte Reload
-	movq	%r9, %rdx
-	rorq	%rdx
-	xorq	%r12, %r11
-	movq	%r9, %rsi
-	rolq	$56, %rsi
-	andq	%r14, %r11
-	xorq	%rcx, %r11
-	xorq	%rdx, %rsi
-	movq	%r9, %rcx
-	shrq	$7, %rcx
-	xorq	%rsi, %rcx
+	addq	%rcx, %r9
+	movq	88(%rsp), %r13                  # 8-byte Reload
+	movq	%r13, %rcx
+	movq	-88(%rsp), %rbp                 # 8-byte Reload
+	andq	%rbp, %rcx
+	movq	%r13, %r11
+	xorq	%rbp, %r11
+	movq	(%rsp), %r14                    # 8-byte Reload
 	movq	%r14, %rdx
+	rorq	%rdx
+	andq	%r12, %r11
+	xorq	%rcx, %r11
+	movq	%r14, %rcx
+	rolq	$56, %rcx
+	xorq	%rdx, %rcx
+	movq	%r12, %rdx
 	rolq	$36, %rdx
-	movq	%r14, %rsi
+	movq	%r12, %rsi
 	rolq	$30, %rsi
 	xorq	%rdx, %rsi
-	movq	%r13, -88(%rsp)                 # 8-byte Spill
-	movq	%r13, %rdx
+	movq	%r15, %rdx
+	movq	%r15, -64(%rsp)                 # 8-byte Spill
 	rolq	$23, %rdx
 	xorq	%rax, %rdx
-	movq	%r14, %rax
+	movq	%r12, %rax
 	rolq	$25, %rax
 	xorq	%rsi, %rax
-	movq	%rbx, 32(%rsp)                  # 8-byte Spill
-	movq	%rbx, %rsi
-	rolq	$45, %rsi
-	movq	%rbx, %r9
-	rolq	$3, %r9
-	xorq	%rsi, %r9
-	addq	%rdx, %rdi
-	movq	%rbx, %rdx
-	shrq	$6, %rdx
-	xorq	%r9, %rdx
+	movq	%r14, %rsi
+	shrq	$7, %rsi
+	xorq	%rcx, %rsi
+	addq	%rdx, %r9
+	movq	%r10, 48(%rsp)                  # 8-byte Spill
+	movq	%r10, %rcx
+	rolq	$45, %rcx
+	movq	%r10, %rdx
+	rolq	$3, %rdx
+	xorq	%rcx, %rdx
 	addq	%rax, %r11
-	movq	-72(%rsp), %r12                 # 8-byte Reload
-	addq	-96(%rsp), %r12                 # 8-byte Folded Reload
-	addq	%rcx, %r12
-	movq	-48(%rsp), %rbx                 # 8-byte Reload
-	addq	%rdi, %rbx
-	addq	%rdi, %r11
-	addq	%rdx, %r12
-	movq	%r12, -72(%rsp)                 # 8-byte Spill
-	movq	%rbx, %rax
-	rolq	$50, %rax
-	movq	%rbx, %rcx
-	rolq	$46, %rcx
-	xorq	%rax, %rcx
-	movq	%rcx, -56(%rsp)                 # 8-byte Spill
-	movq	K512+168(,%r10,8), %r15
-	addq	%r12, %r15
-	addq	%r8, %r15
-	movq	%rbx, -48(%rsp)                 # 8-byte Spill
-	movq	%rbx, %rax
-	andq	%r13, %rax
-	addq	%rax, %r15
-	movq	%rbx, %rax
-	notq	%rax
-	movq	24(%rsp), %rcx                  # 8-byte Reload
-	rolq	$56, %rcx
-	movq	%rcx, 64(%rsp)                  # 8-byte Spill
-	andq	%rbp, %rax
-	addq	%rax, %r15
-	movq	-24(%rsp), %rax                 # 8-byte Reload
-	rolq	$56, %rax
-	movq	%rax, 72(%rsp)                  # 8-byte Spill
-	movq	16(%rsp), %r12                  # 8-byte Reload
-	movq	%r12, %r10
-	rolq	$56, %r10
-	movq	8(%rsp), %rcx                   # 8-byte Reload
-	movq	%rcx, %rax
-	rolq	$56, %rax
-	movq	%r14, %r8
-	movq	%r14, 192(%rsp)                 # 8-byte Spill
-	movq	%r14, %r9
-	movq	(%rsp), %rsi                    # 8-byte Reload
-	andq	%rsi, %r9
-	movq	-128(%rsp), %rdx                # 8-byte Reload
-	movq	%rdx, %r14
-	rolq	$56, %r14
-	movq	-120(%rsp), %rdi                # 8-byte Reload
-	movq	%rdi, %rbp
-	rolq	$56, %rbp
-	xorq	%rsi, %r8
-	movq	-104(%rsp), %r13                # 8-byte Reload
-	movq	%r13, %rsi
-	rolq	$56, %rsi
-	andq	%r11, %r8
-	xorq	%r9, %r8
-	movq	24(%rsp), %rbx                  # 8-byte Reload
-	movq	%rbx, %r9
-	rorq	%r9
-	xorq	%r9, 64(%rsp)                   # 8-byte Folded Spill
-	movq	-24(%rsp), %r9                  # 8-byte Reload
-	rorq	%r9
-	xorq	%r9, 72(%rsp)                   # 8-byte Folded Spill
-	rorq	%r12
-	xorq	%r12, %r10
-	movq	%r10, 184(%rsp)                 # 8-byte Spill
-	rorq	%rcx
-	xorq	%rcx, %rax
-	movq	%rax, 176(%rsp)                 # 8-byte Spill
-	movq	%rdx, %r9
-	rorq	%r9
-	xorq	%r9, %r14
-	movq	%rdi, %r9
-	rorq	%r9
-	xorq	%r9, %rbp
-	movq	%r13, %r9
-	rorq	%r9
-	xorq	%r9, %rsi
-	movq	%r11, %rdx
-	movq	%r11, -8(%rsp)                  # 8-byte Spill
-	movq	%r11, %r9
-	rolq	$36, %r9
-	rolq	$30, %r11
-	xorq	%r9, %r11
-	movq	-48(%rsp), %r12                 # 8-byte Reload
-	movq	%r12, %r10
-	rolq	$23, %r10
-	xorq	-56(%rsp), %r10                 # 8-byte Folded Reload
-	rolq	$25, %rdx
-	xorq	%r11, %rdx
-	movq	-96(%rsp), %rdi                 # 8-byte Reload
-	movq	%rdi, %rcx
-	rorq	%rcx
-	movq	%rdi, %r9
-	rolq	$56, %r9
-	xorq	%rcx, %r9
-	addq	%r10, %r15
-	movq	-112(%rsp), %rax                # 8-byte Reload
-	movq	%rax, %r11
-	rorq	%r11
-	movq	%rax, %r10
-	rolq	$56, %r10
-	xorq	%r11, %r10
-	addq	%rdx, %r8
-	movq	-16(%rsp), %rdx                 # 8-byte Reload
-	movq	%rdx, %rcx
-	rorq	%rcx
-	movq	%rdx, %r11
-	rolq	$56, %r11
-	xorq	%rcx, %r11
-	movq	%rdx, %rcx
-	shrq	$7, %rcx
-	xorq	%r11, %rcx
-	movq	-40(%rsp), %r11                 # 8-byte Reload
-	addq	%rax, %r11
-	addq	%rax, %rcx
-	movq	%rcx, 168(%rsp)                 # 8-byte Spill
-	shrq	$7, %rax
-	xorq	%r10, %rax
-	addq	%rdi, %rax
-	movq	%rax, -56(%rsp)                 # 8-byte Spill
-	shrq	$7, %rdi
-	xorq	%r9, %rdi
-	movq	%r13, %rcx
-	addq	%r13, %rdi
-	movq	%rdi, -112(%rsp)                # 8-byte Spill
-	shrq	$7, %rcx
-	xorq	%rsi, %rcx
-	movq	-120(%rsp), %rax                # 8-byte Reload
-	addq	%rax, %rcx
-	movq	%rcx, -96(%rsp)                 # 8-byte Spill
-	movq	%rax, %rcx
-	shrq	$7, %rcx
-	xorq	%rbp, %rcx
-	movq	-128(%rsp), %rax                # 8-byte Reload
-	addq	%rax, %rcx
-	movq	%rcx, -104(%rsp)                # 8-byte Spill
-	shrq	$7, %rax
-	xorq	%r14, %rax
-	movq	8(%rsp), %rdx                   # 8-byte Reload
-	addq	%rdx, %rax
-	movq	%rax, -128(%rsp)                # 8-byte Spill
-	shrq	$7, %rdx
-	xorq	176(%rsp), %rdx                 # 8-byte Folded Reload
-	movq	16(%rsp), %rcx                  # 8-byte Reload
-	addq	%rcx, %rdx
-	movq	%rdx, -120(%rsp)                # 8-byte Spill
-	shrq	$7, %rcx
-	xorq	184(%rsp), %rcx                 # 8-byte Folded Reload
-	movq	-24(%rsp), %r10                 # 8-byte Reload
+	shrq	$6, %r10
+	xorq	%rdx, %r10
+	movq	-24(%rsp), %rcx                 # 8-byte Reload
+	addq	-120(%rsp), %rcx                # 8-byte Folded Reload
+	addq	%rsi, %rcx
 	addq	%r10, %rcx
 	movq	%rcx, %rdx
-	shrq	$7, %r10
-	xorq	72(%rsp), %r10                  # 8-byte Folded Reload
-	addq	%rbx, %r10
-	movq	-32(%rsp), %rcx                 # 8-byte Reload
-	movq	%rcx, %rsi
-	rolq	$45, %rsi
-	shrq	$7, %rbx
-	movq	%rcx, %rdi
-	rolq	$3, %rdi
-	xorq	64(%rsp), %rbx                  # 8-byte Folded Reload
-	xorq	%rsi, %rdi
-	movq	%rcx, %rsi
-	shrq	$6, %rsi
-	xorq	%rdi, %rsi
-	movq	%r11, %rcx
-	addq	%rbx, %rcx
-	movq	80(%rsp), %r9                   # 8-byte Reload
-	addq	%r15, %r9
-	addq	%r15, %r8
-	addq	%rsi, %rcx
-	movq	%rcx, -40(%rsp)                 # 8-byte Spill
-	movq	%r9, %rax
-	rolq	$50, %rax
-	movq	%r9, %rsi
-	rolq	$46, %rsi
-	xorq	%rax, %rsi
-	movq	%r9, %rax
-	rolq	$23, %rax
-	xorq	%rsi, %rax
-	movq	-64(%rsp), %r15                 # 8-byte Reload
-	movq	K512+176(,%r15,8), %rsi
-	addq	%rcx, %rsi
-	addq	-80(%rsp), %rsi                 # 8-byte Folded Reload
-	movq	%r9, %rdi
-	movq	%r12, %rcx
-	andq	%r12, %rdi
-	addq	%rdi, %rsi
-	movq	%r9, %rdi
-	movq	%r9, %r13
-	notq	%rdi
-	movq	%r8, %r9
-	rolq	$36, %r9
-	movq	-88(%rsp), %r14                 # 8-byte Reload
-	andq	%r14, %rdi
-	addq	%rdi, %rsi
-	movq	%r8, %rdi
-	rolq	$30, %rdi
-	xorq	%r9, %rdi
-	movq	%r8, %r9
-	rolq	$25, %r9
-	xorq	%rdi, %r9
-	movq	-8(%rsp), %rbp                  # 8-byte Reload
-	movq	%rbp, %rdi
-	movq	192(%rsp), %rbx                 # 8-byte Reload
-	andq	%rbx, %rdi
-	movq	%rbp, %r11
-	xorq	%rbx, %r11
-	andq	%r8, %r11
-	xorq	%rdi, %r11
-	addq	%rax, %rsi
-	addq	%r9, %r11
-	movq	-72(%rsp), %r12                 # 8-byte Reload
-	movq	%r12, %rax
-	rolq	$45, %rax
-	movq	%r12, %rdi
-	rolq	$3, %rdi
-	movq	(%rsp), %r9                     # 8-byte Reload
-	addq	%rsi, %r9
-	addq	%rsi, %r11
-	xorq	%rax, %rdi
-	movq	%r12, %rax
-	shrq	$6, %rax
-	xorq	%rdi, %rax
-	addq	-16(%rsp), %r10                 # 8-byte Folded Reload
-	addq	%rax, %r10
-	movq	K512+184(,%r15,8), %rsi
-	addq	%r10, %rsi
-	addq	%r14, %rsi
-	movq	%r9, %rax
-	andq	%r13, %rax
-	addq	%rax, %rsi
-	movq	%r9, %rax
-	rolq	$50, %rax
-	movq	%r9, %rdi
-	rolq	$46, %rdi
-	xorq	%rax, %rdi
-	movq	%r9, %rax
-	notq	%rax
-	andq	%rcx, %rax
-	addq	%rax, %rsi
-	movq	%r9, %rax
-	movq	%r9, %r14
-	movq	%r9, (%rsp)                     # 8-byte Spill
-	rolq	$23, %rax
-	xorq	%rdi, %rax
-	movq	%r11, %rdi
-	rolq	$36, %rdi
-	movq	%r11, %r9
-	rolq	$30, %r9
-	xorq	%rdi, %r9
-	movq	%r11, %rdi
-	rolq	$25, %rdi
-	xorq	%r9, %rdi
-	addq	%rax, %rsi
-	movq	%r8, %r9
-	andq	%rbp, %r9
-	movq	%r8, %rax
-	xorq	%rbp, %rax
-	movq	-40(%rsp), %r12                 # 8-byte Reload
-	movq	%r12, %r15
-	rolq	$45, %r15
-	andq	%r11, %rax
-	xorq	%r9, %rax
-	movq	%r12, %r9
-	rolq	$3, %r9
-	addq	%rdi, %rax
-	xorq	%r15, %r9
-	addq	%rsi, %rbx
-	addq	%rsi, %rax
-	movq	%r12, %rsi
-	shrq	$6, %rsi
-	xorq	%r9, %rsi
-	addq	48(%rsp), %rdx                  # 8-byte Folded Reload
-	addq	%rsi, %rdx
-	movq	%rbx, %rsi
-	rolq	$50, %rsi
-	movq	%rbx, %rdi
-	rolq	$46, %rdi
-	xorq	%rsi, %rdi
-	movq	%rbx, %rsi
-	rolq	$23, %rsi
-	xorq	%rdi, %rsi
-	movq	-64(%rsp), %r12                 # 8-byte Reload
-	movq	K512+192(,%r12,8), %rdi
-	addq	%rdx, %rdi
-	addq	%rcx, %rdi
-	movq	%rbx, %r9
-	andq	%r14, %r9
-	addq	%r9, %rdi
-	movq	%rbx, %r9
-	movq	%rbx, %r14
-	notq	%r9
-	movq	%rax, %r15
-	rolq	$36, %r15
-	andq	%r13, %r9
-	addq	%r9, %rdi
-	movq	%rax, %r9
-	rolq	$30, %r9
-	xorq	%r15, %r9
-	movq	%rax, %r15
-	rolq	$25, %r15
-	xorq	%r9, %r15
-	movq	%r11, %rbp
-	andq	%r8, %rbp
-	movq	%r11, %rbx
-	xorq	%r8, %rbx
-	andq	%rax, %rbx
-	xorq	%rbp, %rbx
-	addq	%rsi, %rdi
-	addq	%r15, %rbx
-	movq	%r10, %rsi
-	rolq	$45, %rsi
-	movq	%r10, %r15
-	rolq	$3, %r15
-	movq	-8(%rsp), %r9                   # 8-byte Reload
-	addq	%rdi, %r9
-	movq	%r9, -8(%rsp)                   # 8-byte Spill
-	addq	%rdi, %rbx
-	xorq	%rsi, %r15
-	movq	%r10, %rsi
-	shrq	$6, %rsi
-	xorq	%r15, %rsi
-	movq	-120(%rsp), %rcx                # 8-byte Reload
-	addq	40(%rsp), %rcx                  # 8-byte Folded Reload
-	addq	%rsi, %rcx
-	movq	%rcx, -120(%rsp)                # 8-byte Spill
-	movq	K512+200(,%r12,8), %rsi
-	addq	%rcx, %rsi
-	addq	%r13, %rsi
-	movq	%r9, %rdi
-	andq	%r14, %rdi
-	addq	%rdi, %rsi
-	movq	%r9, %rdi
-	rolq	$50, %rdi
-	movq	%r9, %r15
-	rolq	$46, %r15
-	xorq	%rdi, %r15
-	movq	%r9, %rdi
-	notq	%rdi
-	movq	(%rsp), %r13                    # 8-byte Reload
-	andq	%r13, %rdi
-	addq	%rdi, %rsi
-	movq	%r9, %rdi
-	rolq	$23, %rdi
-	xorq	%r15, %rdi
-	movq	%rbx, %r15
-	rolq	$36, %r15
-	movq	%rbx, %rbp
-	rolq	$30, %rbp
-	xorq	%r15, %rbp
-	movq	%rbx, %r9
-	rolq	$25, %r9
-	xorq	%rbp, %r9
-	addq	%rdi, %rsi
-	movq	%rax, %rdi
-	andq	%r11, %rdi
-	movq	%rax, %r15
-	xorq	%r11, %r15
-	movq	%rdx, -88(%rsp)                 # 8-byte Spill
-	movq	%rdx, %rbp
-	rolq	$45, %rbp
-	andq	%rbx, %r15
-	xorq	%rdi, %r15
-	movq	%rdx, %rdi
-	rolq	$3, %rdi
-	addq	%r9, %r15
-	xorq	%rbp, %rdi
-	addq	%rsi, %r8
-	addq	%rsi, %r15
-	movq	%rdx, %rsi
-	shrq	$6, %rsi
-	xorq	%rdi, %rsi
-	movq	-128(%rsp), %rcx                # 8-byte Reload
-	addq	32(%rsp), %rcx                  # 8-byte Folded Reload
-	addq	%rsi, %rcx
-	movq	%rcx, -128(%rsp)                # 8-byte Spill
-	movq	%r8, %rsi
-	rolq	$50, %rsi
-	movq	%r8, %rdi
-	rolq	$46, %rdi
-	xorq	%rsi, %rdi
-	movq	%r8, %r9
-	rolq	$23, %r9
-	xorq	%rdi, %r9
-	movq	K512+208(,%r12,8), %rdi
-	addq	%rcx, %rdi
-	addq	%r13, %rdi
-	movq	%r8, %rsi
-	movq	-8(%rsp), %rdx                  # 8-byte Reload
-	andq	%rdx, %rsi
-	addq	%rsi, %rdi
-	movq	%r8, %rsi
-	notq	%rsi
-	movq	%r15, %rbp
-	rolq	$36, %rbp
-	andq	%r14, %rsi
-	movq	%r14, %r13
-	addq	%rsi, %rdi
-	movq	%r15, %rsi
-	rolq	$30, %rsi
-	xorq	%rbp, %rsi
-	movq	%r15, %rbp
-	rolq	$25, %rbp
-	xorq	%rsi, %rbp
-	movq	%rbx, %r14
-	andq	%rax, %r14
-	movq	%rbx, %r12
-	xorq	%rax, %r12
-	andq	%r15, %r12
-	xorq	%r14, %r12
-	addq	%r9, %rdi
-	addq	%rbp, %r12
-	movq	-120(%rsp), %rcx                # 8-byte Reload
-	movq	%rcx, %r9
-	rolq	$45, %r9
-	movq	%rcx, %r14
-	rolq	$3, %r14
-	addq	%rdi, %r11
-	addq	%rdi, %r12
-	xorq	%r9, %r14
-	movq	%rcx, %rdi
-	shrq	$6, %rdi
-	xorq	%r14, %rdi
-	movq	-104(%rsp), %rcx                # 8-byte Reload
-	addq	-32(%rsp), %rcx                 # 8-byte Folded Reload
-	addq	%rdi, %rcx
-	movq	%rcx, -104(%rsp)                # 8-byte Spill
-	movq	-64(%rsp), %rsi                 # 8-byte Reload
-	movq	K512+216(,%rsi,8), %rdi
-	addq	%rcx, %rdi
-	addq	%r13, %rdi
-	movq	%r11, %r9
-	andq	%r8, %r9
-	addq	%r9, %rdi
-	movq	%r11, %r9
-	rolq	$50, %r9
-	movq	%r11, %r14
-	rolq	$46, %r14
-	xorq	%r9, %r14
-	movq	%r11, %r9
-	notq	%r9
-	andq	%rdx, %r9
-	addq	%r9, %rdi
-	movq	%r11, %r9
-	rolq	$23, %r9
-	xorq	%r14, %r9
-	movq	%r12, %r14
-	rolq	$36, %r14
-	movq	%r12, %rbp
-	rolq	$30, %rbp
-	xorq	%r14, %rbp
-	movq	%r12, %r14
-	rolq	$25, %r14
-	xorq	%rbp, %r14
-	addq	%r9, %rdi
-	movq	%r15, %r9
-	andq	%rbx, %r9
-	movq	%r15, %rbp
-	xorq	%rbx, %rbp
-	movq	-128(%rsp), %rcx                # 8-byte Reload
-	movq	%rcx, %r13
-	rolq	$45, %r13
-	andq	%r12, %rbp
-	xorq	%r9, %rbp
-	movq	%rcx, %r9
-	rolq	$3, %r9
-	addq	%r14, %rbp
-	xorq	%r13, %r9
-	addq	%rdi, %rax
-	addq	%rdi, %rbp
-	movq	%rcx, %rdi
-	shrq	$6, %rdi
-	xorq	%r9, %rdi
-	movq	-96(%rsp), %rcx                 # 8-byte Reload
-	addq	-72(%rsp), %rcx                 # 8-byte Folded Reload
-	addq	%rdi, %rcx
-	movq	%rcx, -96(%rsp)                 # 8-byte Spill
-	movq	%rax, %rdi
-	rolq	$50, %rdi
-	movq	%rax, %r9
-	rolq	$46, %r9
-	xorq	%rdi, %r9
-	movq	%rax, %r14
-	rolq	$23, %r14
-	xorq	%r9, %r14
-	movq	K512+224(,%rsi,8), %r9
-	addq	%rcx, %r9
-	addq	%rdx, %r9
-	movq	%rax, %rdi
-	andq	%r11, %rdi
-	addq	%rdi, %r9
-	movq	%rax, %rdi
-	notq	%rdi
-	movq	%rbp, %r13
-	rolq	$36, %r13
-	andq	%r8, %rdi
-	addq	%rdi, %r9
-	movq	%rbp, %rdi
-	rolq	$30, %rdi
-	xorq	%r13, %rdi
-	movq	%rbp, %r13
-	rolq	$25, %r13
-	xorq	%rdi, %r13
-	movq	%r12, %rsi
-	andq	%r15, %rsi
-	movq	%r12, %rdi
-	xorq	%r15, %rdi
-	andq	%rbp, %rdi
-	xorq	%rsi, %rdi
-	addq	%r14, %r9
-	addq	%r13, %rdi
-	movq	-104(%rsp), %rcx                # 8-byte Reload
-	movq	%rcx, %rsi
-	rolq	$45, %rsi
-	movq	%rcx, %r14
-	rolq	$3, %r14
+	movq	%rcx, -24(%rsp)                 # 8-byte Spill
+	movq	-32(%rsp), %rbx                 # 8-byte Reload
 	addq	%r9, %rbx
-	addq	%r9, %rdi
-	xorq	%rsi, %r14
-	movq	%rcx, %rsi
-	shrq	$6, %rsi
-	xorq	%r14, %rsi
-	movq	-112(%rsp), %rcx                # 8-byte Reload
-	addq	-40(%rsp), %rcx                 # 8-byte Folded Reload
-	addq	%rsi, %rcx
-	movq	%rcx, -112(%rsp)                # 8-byte Spill
-	movq	-64(%rsp), %rdx                 # 8-byte Reload
-	movq	K512+232(,%rdx,8), %rsi
+	addq	%r9, %r11
+	movq	%rbx, %rcx
+	rolq	$50, %rcx
+	movq	%rbx, %rax
+	rolq	$46, %rax
+	xorq	%rcx, %rax
+	addq	%rdx, %r8
+	leaq	K512(%rip), %rcx
+	movq	-56(%rsp), %r9                  # 8-byte Reload
+	addq	160(%rcx,%r9,8), %r8
+	movq	%rbx, %rcx
+	andq	%r15, %rcx
+	addq	%rcx, %r8
+	movq	%rbx, %rcx
+	movq	%rbx, %r15
+	notq	%rcx
+	andq	%rdi, %rcx
+	addq	%rcx, %r8
+	movq	%r12, %rbx
+	movq	%r12, 32(%rsp)                  # 8-byte Spill
+	movq	%r12, %rcx
+	andq	%r13, %rcx
+	movq	40(%rsp), %r10                  # 8-byte Reload
+	movq	%r10, %rdx
+	rorq	%rdx
+	xorq	%r13, %rbx
+	movq	%r10, %rsi
+	rolq	$56, %rsi
+	andq	%r11, %rbx
+	xorq	%rcx, %rbx
+	xorq	%rdx, %rsi
+	movq	%r10, %rcx
+	shrq	$7, %rcx
+	xorq	%rsi, %rcx
+	movq	%r11, %rdx
+	rolq	$36, %rdx
+	movq	%r11, %rsi
+	rolq	$30, %rsi
+	xorq	%rdx, %rsi
+	movq	%r15, -32(%rsp)                 # 8-byte Spill
+	movq	%r15, %rdx
+	rolq	$23, %rdx
+	xorq	%rax, %rdx
+	movq	%r11, %rax
+	rolq	$25, %rax
+	xorq	%rsi, %rax
+	movq	8(%rsp), %r10                   # 8-byte Reload
+	movq	%r10, %rsi
+	rolq	$45, %rsi
+	movq	%r10, %rdi
+	rolq	$3, %rdi
+	xorq	%rsi, %rdi
+	addq	%rdx, %r8
+	movq	%r10, %rdx
+	shrq	$6, %rdx
+	xorq	%rdi, %rdx
+	addq	%rax, %rbx
+	addq	-48(%rsp), %r14                 # 8-byte Folded Reload
+	addq	%rcx, %r14
+	addq	%r8, %rbp
+	addq	%r8, %rbx
+	addq	%rdx, %r14
+	movq	%r14, %rdx
+	movq	%r14, (%rsp)                    # 8-byte Spill
+	movq	%rbp, %rcx
+	rolq	$50, %rcx
+	movq	%rbp, %rax
+	movq	%rbp, -88(%rsp)                 # 8-byte Spill
+	rolq	$46, %rax
+	xorq	%rcx, %rax
+	leaq	K512(%rip), %rcx
+	movq	168(%rcx,%r9,8), %rsi
+	addq	%r14, %rsi
+	addq	-104(%rsp), %rsi                # 8-byte Folded Reload
+	movq	%rbp, %rcx
+	andq	%r15, %rcx
 	addq	%rcx, %rsi
-	addq	%r8, %rsi
+	movq	%rsi, %rdi
+	movq	%rbp, %rcx
+	notq	%rcx
+	movq	-16(%rsp), %r8                  # 8-byte Reload
+	movq	%r8, %rsi
+	rolq	$56, %rsi
+	movq	%rsi, -104(%rsp)                # 8-byte Spill
+	andq	-64(%rsp), %rcx                 # 8-byte Folded Reload
+	addq	%rcx, %rdi
+	movq	%rdi, %r14
+	movq	-8(%rsp), %rcx                  # 8-byte Reload
+	rolq	$56, %rcx
+	movq	%rcx, -40(%rsp)                 # 8-byte Spill
+	movq	%r8, -16(%rsp)                  # 8-byte Spill
+	movq	-72(%rsp), %rcx                 # 8-byte Reload
+	rolq	$56, %rcx
+	movq	%rcx, 80(%rsp)                  # 8-byte Spill
+	movq	-80(%rsp), %r15                 # 8-byte Reload
+	movq	%r15, %rbp
+	rolq	$56, %rbp
+	movq	%r11, 72(%rsp)                  # 8-byte Spill
+	movq	%r11, %rsi
+	movq	32(%rsp), %rdi                  # 8-byte Reload
+	andq	%rdi, %rsi
+	movq	-128(%rsp), %rdx                # 8-byte Reload
+	movq	%rdx, %r13
+	rolq	$56, %r13
+	movq	-112(%rsp), %r10                # 8-byte Reload
+	movq	%r10, %r9
+	rolq	$56, %r9
+	xorq	%rdi, %r11
+	movq	-120(%rsp), %r12                # 8-byte Reload
+	movq	%r12, %rdi
+	rolq	$56, %rdi
+	andq	%rbx, %r11
+	xorq	%rsi, %r11
+	rorq	%r8
+	xorq	%r8, -104(%rsp)                 # 8-byte Folded Spill
+	movq	-8(%rsp), %rcx                  # 8-byte Reload
+	rorq	%rcx
+	movq	-40(%rsp), %r8                  # 8-byte Reload
+	xorq	%rcx, %r8
+	movq	-72(%rsp), %rcx                 # 8-byte Reload
+	rorq	%rcx
+	xorq	%rcx, 80(%rsp)                  # 8-byte Folded Spill
+	movq	%r15, %rcx
+	rorq	%rcx
+	xorq	%rcx, %rbp
+	movq	%rdx, %rcx
+	rorq	%rcx
+	xorq	%rcx, %r13
+	movq	%r10, %rcx
+	rorq	%rcx
+	xorq	%rcx, %r9
+	movq	%r12, %rcx
+	rorq	%rcx
+	xorq	%rcx, %rdi
+	movq	%rbx, 24(%rsp)                  # 8-byte Spill
+	movq	%rbx, %rcx
+	rolq	$36, %rcx
+	movq	%rbx, %r10
+	rolq	$30, %r10
+	xorq	%rcx, %r10
+	movq	-88(%rsp), %r12                 # 8-byte Reload
+	movq	%r12, %rsi
+	rolq	$23, %rsi
+	xorq	%rax, %rsi
+	movq	%rbx, %rcx
+	rolq	$25, %rcx
+	xorq	%r10, %rcx
+	movq	-48(%rsp), %rbx                 # 8-byte Reload
+	movq	%rbx, %r10
+	rorq	%r10
+	movq	%rbx, %rdx
+	movq	%rbx, %r15
+	rolq	$56, %rdx
+	xorq	%r10, %rdx
+	addq	%rsi, %r14
+	movq	%r14, 176(%rsp)                 # 8-byte Spill
+	movq	-96(%rsp), %rax                 # 8-byte Reload
+	movq	%rax, %r10
+	rorq	%r10
+	movq	%rax, %rsi
+	rolq	$56, %rsi
+	xorq	%r10, %rsi
+	addq	%rcx, %r11
+	movq	16(%rsp), %rbx                  # 8-byte Reload
+	movq	%rbx, %rcx
+	rorq	%rcx
+	movq	%rbx, %r10
+	rolq	$56, %r10
+	xorq	%rcx, %r10
+	movq	%rbx, %rcx
+	shrq	$7, %rcx
+	xorq	%r10, %rcx
+	movq	40(%rsp), %r14                  # 8-byte Reload
+	addq	%rax, %r14
+	addq	%rax, %rcx
+	movq	%rcx, 184(%rsp)                 # 8-byte Spill
+	shrq	$7, %rax
+	xorq	%rsi, %rax
+	addq	%r15, %rax
+	movq	%rax, -40(%rsp)                 # 8-byte Spill
+	shrq	$7, %r15
+	xorq	%rdx, %r15
+	movq	-120(%rsp), %rax                # 8-byte Reload
+	addq	%rax, %r15
+	movq	%r15, -96(%rsp)                 # 8-byte Spill
+	movq	%rax, %rcx
+	shrq	$7, %rcx
+	xorq	%rdi, %rcx
+	movq	-112(%rsp), %rax                # 8-byte Reload
+	addq	%rax, %rcx
+	movq	%rcx, -120(%rsp)                # 8-byte Spill
+	movq	%rax, %rcx
+	shrq	$7, %rcx
+	xorq	%r9, %rcx
+	movq	-128(%rsp), %rax                # 8-byte Reload
+	addq	%rax, %rcx
+	movq	%rcx, -48(%rsp)                 # 8-byte Spill
+	shrq	$7, %rax
+	xorq	%r13, %rax
+	movq	-80(%rsp), %r10                 # 8-byte Reload
+	addq	%r10, %rax
+	movq	%rax, -112(%rsp)                # 8-byte Spill
+	shrq	$7, %r10
+	xorq	%rbp, %r10
+	movq	-72(%rsp), %rsi                 # 8-byte Reload
+	addq	%rsi, %r10
+	movq	%r10, -80(%rsp)                 # 8-byte Spill
+	movq	%rsi, %rax
+	shrq	$7, %rax
+	xorq	80(%rsp), %rax                  # 8-byte Folded Reload
+	movq	-8(%rsp), %rsi                  # 8-byte Reload
+	addq	%rsi, %rax
+	movq	%rax, -128(%rsp)                # 8-byte Spill
+	shrq	$7, %rsi
+	xorq	%r8, %rsi
+	movq	-16(%rsp), %rcx                 # 8-byte Reload
+	addq	%rcx, %rsi
+	movq	%rsi, %r10
+	movq	-24(%rsp), %rax                 # 8-byte Reload
+	movq	%rax, %rdi
+	rolq	$45, %rdi
+	shrq	$7, %rcx
+	movq	%rax, %r8
+	rolq	$3, %r8
+	xorq	-104(%rsp), %rcx                # 8-byte Folded Reload
+	xorq	%rdi, %r8
+	movq	%rax, %rdi
+	shrq	$6, %rdi
+	xorq	%r8, %rdi
+	addq	%rcx, %r14
+	movq	88(%rsp), %rsi                  # 8-byte Reload
+	movq	176(%rsp), %rax                 # 8-byte Reload
+	addq	%rax, %rsi
+	addq	%rax, %r11
+	addq	%rdi, %r14
+	movq	%rsi, %rcx
+	rolq	$50, %rcx
+	movq	%rsi, %rdi
+	rolq	$46, %rdi
+	xorq	%rcx, %rdi
+	movq	%rsi, %r8
+	rolq	$23, %r8
+	xorq	%rdi, %r8
+	movq	-56(%rsp), %rax                 # 8-byte Reload
+	leaq	K512(%rip), %rcx
+	movq	176(%rcx,%rax,8), %rdi
+	addq	%r14, %rdi
+	addq	-64(%rsp), %rdi                 # 8-byte Folded Reload
+	movq	%rsi, %rcx
+	movq	%r12, %r13
+	andq	%r12, %rcx
+	addq	%rcx, %rdi
+	movq	%rsi, %rcx
+	notq	%rcx
+	movq	%r11, %r9
+	rolq	$36, %r9
+	movq	-32(%rsp), %rbp                 # 8-byte Reload
+	andq	%rbp, %rcx
+	addq	%rcx, %rdi
+	movq	%r11, %rcx
+	rolq	$30, %rcx
+	xorq	%r9, %rcx
+	movq	%r11, %r9
+	rolq	$25, %r9
+	xorq	%rcx, %r9
+	movq	24(%rsp), %rdx                  # 8-byte Reload
+	movq	%rdx, %r15
+	movq	72(%rsp), %rbx                  # 8-byte Reload
+	andq	%rbx, %r15
+	movq	%rdx, %rcx
+	xorq	%rbx, %rcx
+	andq	%r11, %rcx
+	xorq	%r15, %rcx
+	addq	%r8, %rdi
+	addq	%r9, %rcx
+	movq	(%rsp), %r15                    # 8-byte Reload
+	movq	%r15, %r8
+	rolq	$45, %r8
+	movq	%r15, %r9
+	rolq	$3, %r9
+	movq	32(%rsp), %rbx                  # 8-byte Reload
+	addq	%rdi, %rbx
+	addq	%rdi, %rcx
+	xorq	%r8, %r9
+	movq	%r15, %rdi
+	shrq	$6, %rdi
+	xorq	%r9, %rdi
+	addq	16(%rsp), %r10                  # 8-byte Folded Reload
+	addq	%rdi, %r10
+	movq	%r10, -72(%rsp)                 # 8-byte Spill
+	leaq	K512(%rip), %rdi
+	movq	184(%rdi,%rax,8), %rdi
+	addq	%r10, %rdi
+	addq	%rbp, %rdi
 	movq	%rbx, %r8
-	andq	%rax, %r8
-	addq	%r8, %rsi
+	andq	%rsi, %r8
+	addq	%r8, %rdi
 	movq	%rbx, %r8
 	rolq	$50, %r8
 	movq	%rbx, %r9
@@ -1962,183 +1674,500 @@ sha512_block_data_order:                # @sha512_block_data_order
 	xorq	%r8, %r9
 	movq	%rbx, %r8
 	notq	%r8
-	andq	%r11, %r8
-	addq	%r8, %rsi
+	andq	%r12, %r8
+	addq	%r8, %rdi
 	movq	%rbx, %r8
+	movq	%rbx, 32(%rsp)                  # 8-byte Spill
 	rolq	$23, %r8
 	xorq	%r9, %r8
-	movq	%rdi, %r9
+	movq	%rcx, %r9
 	rolq	$36, %r9
-	movq	%rdi, %r14
-	rolq	$30, %r14
-	xorq	%r9, %r14
-	movq	%rdi, %r9
+	movq	%rcx, %r15
+	rolq	$30, %r15
+	xorq	%r9, %r15
+	movq	%rcx, %r9
 	rolq	$25, %r9
-	xorq	%r14, %r9
-	addq	%r8, %rsi
-	movq	%rbp, %r14
-	andq	%r12, %r14
-	movq	%rbp, %r8
+	xorq	%r15, %r9
+	addq	%r8, %rdi
+	movq	%r11, %r8
+	movq	%rdx, %rax
+	andq	%rdx, %r8
+	movq	%r11, %r15
+	xorq	%rdx, %r15
+	movq	%r14, %r12
+	rolq	$45, %r12
+	andq	%rcx, %r15
+	xorq	%r8, %r15
+	movq	%r14, %r8
+	movq	%r14, 40(%rsp)                  # 8-byte Spill
+	rolq	$3, %r8
+	addq	%r9, %r15
 	xorq	%r12, %r8
-	movq	-96(%rsp), %rcx                 # 8-byte Reload
-	movq	%rcx, %r13
-	rolq	$45, %r13
-	andq	%rdi, %r8
-	xorq	%r14, %r8
-	movq	%rcx, %r14
-	rolq	$3, %r14
+	movq	72(%rsp), %rax                  # 8-byte Reload
+	addq	%rdi, %rax
+	addq	%rdi, %r15
+	shrq	$6, %r14
+	xorq	%r8, %r14
+	movq	-128(%rsp), %rdx                # 8-byte Reload
+	addq	56(%rsp), %rdx                  # 8-byte Folded Reload
+	addq	%r14, %rdx
+	movq	%rdx, -128(%rsp)                # 8-byte Spill
+	movq	%rax, %rdi
+	rolq	$50, %rdi
+	movq	%rax, %r8
+	rolq	$46, %r8
+	xorq	%rdi, %r8
+	movq	%rax, %rdi
+	rolq	$23, %rdi
+	xorq	%r8, %rdi
+	leaq	K512(%rip), %rbp
+	movq	-56(%rsp), %r10                 # 8-byte Reload
+	movq	192(%rbp,%r10,8), %r8
+	addq	%rdx, %r8
+	addq	%r13, %r8
+	movq	%rax, %r9
+	andq	%rbx, %r9
 	addq	%r9, %r8
-	xorq	%r13, %r14
-	addq	%rsi, %r15
-	addq	%rsi, %r8
-	movq	%rcx, %rsi
-	shrq	$6, %rsi
-	xorq	%r14, %rsi
-	movq	-56(%rsp), %rcx                 # 8-byte Reload
-	addq	%r10, %rcx
-	addq	%rsi, %rcx
-	movq	%rcx, -56(%rsp)                 # 8-byte Spill
-	movq	%r15, %rsi
-	rolq	$50, %rsi
+	movq	%rax, %r9
+	movq	%rax, %r13
+	notq	%r9
+	movq	%r15, %rbx
+	rolq	$36, %rbx
+	andq	%rsi, %r9
+	addq	%r9, %r8
 	movq	%r15, %r9
+	rolq	$30, %r9
+	xorq	%rbx, %r9
+	movq	%r15, %r12
+	rolq	$25, %r12
+	xorq	%r9, %r12
+	movq	%rcx, %r9
+	andq	%r11, %r9
+	movq	%rcx, %rdx
+	xorq	%r11, %rdx
+	andq	%r15, %rdx
+	xorq	%r9, %rdx
+	addq	%rdi, %r8
+	addq	%r12, %rdx
+	movq	-72(%rsp), %rbx                 # 8-byte Reload
+	movq	%rbx, %rdi
+	rolq	$45, %rdi
+	movq	%rbx, %r9
+	rolq	$3, %r9
+	movq	24(%rsp), %rax                  # 8-byte Reload
+	addq	%r8, %rax
+	movq	%rax, 24(%rsp)                  # 8-byte Spill
+	addq	%r8, %rdx
+	xorq	%rdi, %r9
+	movq	%rbx, %rdi
+	shrq	$6, %rdi
+	xorq	%r9, %rdi
+	movq	-80(%rsp), %r14                 # 8-byte Reload
+	addq	48(%rsp), %r14                  # 8-byte Folded Reload
+	addq	%rdi, %r14
+	movq	%r10, %rbx
+	movq	200(%rbp,%r10,8), %rdi
+	addq	%r14, %rdi
+	movq	%r14, %r10
+	addq	%rsi, %rdi
+	movq	%rax, %r8
+	andq	%r13, %r8
+	addq	%r8, %rdi
+	movq	%rax, %r8
+	rolq	$50, %r8
+	movq	%rax, %r9
 	rolq	$46, %r9
-	xorq	%rsi, %r9
-	movq	%r15, %rsi
-	rolq	$23, %rsi
-	xorq	%r9, %rsi
-	movq	K512+240(,%rdx,8), %r9
-	addq	%rcx, %r9
-	addq	%r11, %r9
-	movq	%r15, %r11
-	andq	%rbx, %r11
-	addq	%r11, %r9
-	movq	%r15, %r11
-	notq	%r11
-	movq	%r8, %r14
-	rolq	$36, %r14
-	andq	%rax, %r11
-	addq	%r11, %r9
-	movq	%r8, %r11
-	rolq	$30, %r11
-	xorq	%r14, %r11
-	movq	%r8, %r14
-	rolq	$25, %r14
-	xorq	%r11, %r14
-	movq	%rdi, %r11
-	andq	%rbp, %r11
-	movq	%rdi, %r13
-	xorq	%rbp, %r13
-	andq	%r8, %r13
-	xorq	%r11, %r13
-	addq	%rsi, %r9
-	addq	%r14, %r13
-	movq	-112(%rsp), %rcx                # 8-byte Reload
-	movq	%rcx, %rsi
-	rolq	$45, %rsi
-	movq	%rcx, %r11
-	rolq	$3, %r11
-	addq	%r9, %r12
-	addq	%r9, %r13
-	xorq	%rsi, %r11
-	movq	%rcx, %rsi
-	shrq	$6, %rsi
-	xorq	%r11, %rsi
-	movq	168(%rsp), %rcx                 # 8-byte Reload
-	movq	-88(%rsp), %rdx                 # 8-byte Reload
-	addq	%rdx, %rcx
-	addq	%rsi, %rcx
-	movq	-64(%rsp), %r14                 # 8-byte Reload
-	movq	K512+248(,%r14,8), %rsi
-	addq	%rcx, %rsi
-	addq	%rax, %rsi
-	movq	%r12, %rax
-	andq	%r15, %rax
-	addq	%rax, %rsi
-	movq	%r12, %rax
-	rolq	$50, %rax
-	movq	%r12, %r9
-	rolq	$46, %r9
-	xorq	%rax, %r9
-	movq	%r12, %rax
-	notq	%rax
-	andq	%rbx, %rax
-	addq	%rax, %rsi
-	movq	%r12, %rax
-	rolq	$23, %rax
-	xorq	%r9, %rax
-	movq	%r13, %r9
+	xorq	%r8, %r9
+	movq	%rax, %r8
+	notq	%r8
+	movq	32(%rsp), %r14                  # 8-byte Reload
+	andq	%r14, %r8
+	addq	%r8, %rdi
+	movq	%rax, %r8
+	rolq	$23, %r8
+	xorq	%r9, %r8
+	movq	%rdx, %r9
 	rolq	$36, %r9
-	movq	%r13, %r11
-	rolq	$30, %r11
-	xorq	%r9, %r11
-	movq	%r13, %r9
+	movq	%rdx, %r12
+	rolq	$30, %r12
+	xorq	%r9, %r12
+	movq	%rdx, %r9
 	rolq	$25, %r9
-	xorq	%r11, %r9
+	xorq	%r12, %r9
+	addq	%r8, %rdi
+	movq	%r15, %r8
+	andq	%rcx, %r8
+	movq	%r15, %rbp
+	xorq	%rcx, %rbp
+	movq	-128(%rsp), %rsi                # 8-byte Reload
+	movq	%rsi, %rax
+	rolq	$45, %rax
+	andq	%rdx, %rbp
+	xorq	%r8, %rbp
+	movq	%rsi, %r8
+	rolq	$3, %r8
+	addq	%r9, %rbp
+	xorq	%rax, %r8
+	addq	%rdi, %r11
+	addq	%rdi, %rbp
+	movq	%rsi, %rax
+	shrq	$6, %rax
+	xorq	%r8, %rax
+	movq	-112(%rsp), %rsi                # 8-byte Reload
+	addq	8(%rsp), %rsi                   # 8-byte Folded Reload
 	addq	%rax, %rsi
-	movq	%r8, %rax
-	andq	%rdi, %rax
-	movq	%r8, %r11
+	movq	%rsi, -112(%rsp)                # 8-byte Spill
+	movq	%r11, %rax
+	rolq	$50, %rax
+	movq	%r11, %rdi
+	rolq	$46, %rdi
+	xorq	%rax, %rdi
+	movq	%r11, %rax
+	rolq	$23, %rax
+	xorq	%rdi, %rax
+	movq	%rbx, %r12
+	leaq	K512(%rip), %rdi
+	movq	208(%rdi,%rbx,8), %r8
+	addq	%rsi, %r8
+	addq	%r14, %r8
+	movq	%r11, %rdi
+	movq	24(%rsp), %rsi                  # 8-byte Reload
+	andq	%rsi, %rdi
+	addq	%rdi, %r8
+	movq	%r11, %rdi
+	notq	%rdi
+	movq	%rbp, %r9
+	rolq	$36, %r9
+	andq	%r13, %rdi
+	addq	%rdi, %r8
+	movq	%rbp, %rdi
+	rolq	$30, %rdi
+	xorq	%r9, %rdi
+	movq	%rbp, %r9
+	rolq	$25, %r9
+	xorq	%rdi, %r9
+	movq	%rdx, %rbx
+	andq	%r15, %rbx
+	movq	%rdx, %r14
+	xorq	%r15, %r14
+	andq	%rbp, %r14
+	xorq	%rbx, %r14
+	addq	%rax, %r8
+	addq	%r9, %r14
+	movq	%r10, %rdi
+	movq	%r10, -80(%rsp)                 # 8-byte Spill
+	movq	%r10, %rax
+	rolq	$45, %rax
+	movq	%r10, %r9
+	rolq	$3, %r9
+	addq	%r8, %rcx
+	addq	%r8, %r14
+	xorq	%rax, %r9
+	movq	%r10, %rax
+	shrq	$6, %rax
+	xorq	%r9, %rax
+	movq	-48(%rsp), %rdi                 # 8-byte Reload
+	addq	-24(%rsp), %rdi                 # 8-byte Folded Reload
+	addq	%rax, %rdi
+	leaq	K512(%rip), %rax
+	movq	216(%rax,%r12,8), %rax
+	addq	%rdi, %rax
+	movq	%rdi, %r10
+	addq	%r13, %rax
+	movq	%rcx, %r8
+	andq	%r11, %r8
+	addq	%r8, %rax
+	movq	%rcx, %r8
+	rolq	$50, %r8
+	movq	%rcx, %r9
+	rolq	$46, %r9
+	xorq	%r8, %r9
+	movq	%rcx, %r8
+	notq	%r8
+	andq	%rsi, %r8
+	addq	%r8, %rax
+	movq	%rcx, %r8
+	rolq	$23, %r8
+	xorq	%r9, %r8
+	movq	%r14, %r9
+	rolq	$36, %r9
+	movq	%r14, %rbx
+	rolq	$30, %rbx
+	xorq	%r9, %rbx
+	movq	%r14, %rdi
+	rolq	$25, %rdi
+	xorq	%rbx, %rdi
+	addq	%r8, %rax
+	movq	%rbp, %r8
+	andq	%rdx, %r8
+	movq	%rbp, %r12
+	xorq	%rdx, %r12
+	movq	-112(%rsp), %r9                 # 8-byte Reload
+	movq	%r9, %rbx
+	rolq	$45, %rbx
+	andq	%r14, %r12
+	xorq	%r8, %r12
+	movq	%r9, %r8
+	rolq	$3, %r8
+	addq	%rdi, %r12
+	xorq	%rbx, %r8
+	addq	%rax, %r15
+	addq	%rax, %r12
+	movq	%r9, %rax
+	shrq	$6, %rax
+	xorq	%r8, %rax
+	movq	-120(%rsp), %r8                 # 8-byte Reload
+	addq	(%rsp), %r8                     # 8-byte Folded Reload
+	addq	%rax, %r8
+	movq	%r8, -120(%rsp)                 # 8-byte Spill
+	movq	%r15, %rax
+	rolq	$50, %rax
+	movq	%r15, %rdi
+	rolq	$46, %rdi
+	xorq	%rax, %rdi
+	movq	%r15, %rax
+	rolq	$23, %rax
+	xorq	%rdi, %rax
+	movq	-56(%rsp), %r9                  # 8-byte Reload
+	leaq	K512(%rip), %rdi
+	movq	224(%rdi,%r9,8), %rdi
+	addq	%r8, %rdi
+	addq	%rsi, %rdi
+	movq	%r15, %r8
+	andq	%rcx, %r8
+	addq	%r8, %rdi
+	movq	%r15, %r8
+	notq	%r8
+	movq	%r12, %rbx
+	rolq	$36, %rbx
+	andq	%r11, %r8
+	addq	%r8, %rdi
+	movq	%r12, %r8
+	rolq	$30, %r8
+	xorq	%rbx, %r8
+	movq	%r12, %rbx
+	rolq	$25, %rbx
+	xorq	%r8, %rbx
+	movq	%r14, %r13
+	andq	%rbp, %r13
+	movq	%r14, %r8
+	xorq	%rbp, %r8
+	andq	%r12, %r8
+	xorq	%r13, %r8
+	addq	%rax, %rdi
+	addq	%rbx, %r8
+	movq	%r10, %r13
+	movq	%r10, -48(%rsp)                 # 8-byte Spill
+	movq	%r10, %rax
+	rolq	$45, %rax
+	movq	%r10, %rbx
+	rolq	$3, %rbx
+	addq	%rdi, %rdx
+	addq	%rdi, %r8
+	xorq	%rax, %rbx
+	movq	%r10, %rax
+	shrq	$6, %rax
+	xorq	%rbx, %rax
+	movq	-96(%rsp), %rsi                 # 8-byte Reload
+	addq	40(%rsp), %rsi                  # 8-byte Folded Reload
+	addq	%rax, %rsi
+	movq	%rsi, -96(%rsp)                 # 8-byte Spill
+	leaq	K512(%rip), %rax
+	movq	232(%rax,%r9,8), %rax
+	addq	%rsi, %rax
+	addq	%r11, %rax
+	movq	%rdx, %rdi
+	andq	%r15, %rdi
+	addq	%rdi, %rax
+	movq	%rdx, %rdi
+	rolq	$50, %rdi
+	movq	%rdx, %r11
+	rolq	$46, %r11
 	xorq	%rdi, %r11
-	movq	%r13, -80(%rsp)                 # 8-byte Spill
-	andq	%r13, %r11
-	xorq	%rax, %r11
-	addq	%r9, %r11
-	addq	%rsi, %rbp
-	addq	%rsi, %r11
-	movq	%r10, 24(%rsp)                  # 8-byte Spill
-	movq	%rdx, -24(%rsp)                 # 8-byte Spill
-	movq	-120(%rsp), %rax                # 8-byte Reload
-	movq	%rax, 16(%rsp)                  # 8-byte Spill
+	movq	%rdx, %rdi
+	notq	%rdi
+	andq	%rcx, %rdi
+	addq	%rdi, %rax
+	movq	%rdx, %rdi
+	rolq	$23, %rdi
+	xorq	%r11, %rdi
+	movq	%r8, %r11
+	rolq	$36, %r11
+	movq	%r8, %rbx
+	rolq	$30, %rbx
+	xorq	%r11, %rbx
+	movq	%r8, %r13
+	rolq	$25, %r13
+	xorq	%rbx, %r13
+	addq	%rdi, %rax
+	movq	%r12, %rdi
+	andq	%r14, %rdi
+	movq	%r12, %r9
+	xorq	%r14, %r9
+	movq	-120(%rsp), %rsi                # 8-byte Reload
+	movq	%rsi, %rbx
+	rolq	$45, %rbx
+	andq	%r8, %r9
+	xorq	%rdi, %r9
+	movq	%rsi, %rdi
+	rolq	$3, %rdi
+	addq	%r13, %r9
+	leaq	K512(%rip), %r13
+	xorq	%rbx, %rdi
+	addq	%rax, %rbp
+	addq	%rax, %r9
+	movq	%rsi, %rax
+	shrq	$6, %rax
+	xorq	%rdi, %rax
+	movq	-40(%rsp), %r11                 # 8-byte Reload
+	movq	-72(%rsp), %r10                 # 8-byte Reload
+	addq	%r10, %r11
+	addq	%rax, %r11
+	movq	%r11, -40(%rsp)                 # 8-byte Spill
+	movq	%rbp, %rax
+	rolq	$50, %rax
+	movq	%rbp, %rdi
+	rolq	$46, %rdi
+	xorq	%rax, %rdi
+	movq	%rbp, %rax
+	rolq	$23, %rax
+	xorq	%rdi, %rax
+	movq	-56(%rsp), %rsi                 # 8-byte Reload
+	movq	240(%r13,%rsi,8), %rdi
+	addq	%r11, %rdi
+	addq	%rcx, %rdi
+	movq	%rbp, %rcx
+	andq	%rdx, %rcx
+	addq	%rcx, %rdi
+	movq	%rbp, %rcx
+	notq	%rcx
+	movq	%r9, %rbx
+	rolq	$36, %rbx
+	andq	%r15, %rcx
+	addq	%rcx, %rdi
+	movq	%r9, %rcx
+	rolq	$30, %rcx
+	xorq	%rbx, %rcx
+	movq	%r9, %r11
+	rolq	$25, %r11
+	xorq	%rcx, %r11
+	movq	%r8, %rcx
+	andq	%r12, %rcx
+	movq	%r8, %rbx
+	xorq	%r12, %rbx
+	andq	%r9, %rbx
+	xorq	%rcx, %rbx
+	addq	%rax, %rdi
+	addq	%r11, %rbx
+	movq	-96(%rsp), %r11                 # 8-byte Reload
+	movq	%r11, %rax
+	rolq	$45, %rax
+	movq	%r11, %rcx
+	rolq	$3, %rcx
+	addq	%rdi, %r14
+	addq	%rdi, %rbx
+	xorq	%rax, %rcx
+	movq	%r11, %rax
+	shrq	$6, %rax
+	xorq	%rcx, %rax
+	movq	184(%rsp), %r13                 # 8-byte Reload
+	addq	-128(%rsp), %r13                # 8-byte Folded Reload
+	addq	%rax, %r13
+	leaq	K512(%rip), %rax
+	movq	248(%rax,%rsi,8), %rax
+	addq	%r13, %rax
+	addq	%r15, %rax
+	movq	%r14, %rcx
+	andq	%rbp, %rcx
+	addq	%rcx, %rax
+	movq	%r14, %rcx
+	rolq	$50, %rcx
+	movq	%r14, %rdi
+	rolq	$46, %rdi
+	xorq	%rcx, %rdi
+	movq	%r14, %rcx
+	notq	%rcx
+	movq	%rdx, -88(%rsp)                 # 8-byte Spill
+	andq	%rdx, %rcx
+	addq	%rcx, %rax
+	movq	%r14, %rcx
+	rolq	$23, %rcx
+	xorq	%rdi, %rcx
+	movq	%rbx, %rdi
+	rolq	$36, %rdi
+	movq	%rbx, %r11
+	rolq	$30, %r11
+	xorq	%rdi, %r11
+	movq	%rbx, %rdi
+	rolq	$25, %rdi
+	xorq	%r11, %rdi
+	addq	%rcx, %rax
+	movq	%r9, %rcx
+	andq	%r8, %rcx
+	movq	%r9, -104(%rsp)                 # 8-byte Spill
+	movq	%r9, %r15
+	movq	%r12, %r9
+	xorq	%r8, %r15
+	movq	%rbx, -64(%rsp)                 # 8-byte Spill
+	andq	%rbx, %r15
+	movq	%r15, %rbx
+	xorq	%rcx, %rbx
+	addq	%rdi, %rbx
+	addq	%rax, %r9
+	addq	%rax, %rbx
+	movq	%r10, -16(%rsp)                 # 8-byte Spill
 	movq	-128(%rsp), %rax                # 8-byte Reload
-	movq	%rax, 8(%rsp)                   # 8-byte Spill
-	movq	-104(%rsp), %rax                # 8-byte Reload
+	movq	%rax, -8(%rsp)                  # 8-byte Spill
+	movq	-80(%rsp), %rax                 # 8-byte Reload
+	movq	%rax, -72(%rsp)                 # 8-byte Spill
+	movq	-112(%rsp), %rax                # 8-byte Reload
+	movq	%rax, -80(%rsp)                 # 8-byte Spill
+	movq	-48(%rsp), %rax                 # 8-byte Reload
 	movq	%rax, -128(%rsp)                # 8-byte Spill
+	movq	-120(%rsp), %rax                # 8-byte Reload
+	movq	%rax, -112(%rsp)                # 8-byte Spill
 	movq	-96(%rsp), %rax                 # 8-byte Reload
 	movq	%rax, -120(%rsp)                # 8-byte Spill
-	movq	-112(%rsp), %r10                # 8-byte Reload
-	movq	%r14, %rax
-	addq	$16, %rax
-	movq	-56(%rsp), %r9                  # 8-byte Reload
-	movq	%rcx, -112(%rsp)                # 8-byte Spill
-	movq	%rax, %rsi
-	cmpq	$64, %rax
+	addq	$16, %rsi
+	movq	-40(%rsp), %r15                 # 8-byte Reload
+	movq	%r13, -96(%rsp)                 # 8-byte Spill
+	movq	%rsi, %rdi
+	cmpq	$64, %rsi
 	jb	.LBB7_3
 # %bb.4:                                #   in Loop: Header=BB7_2 Depth=1
-	movq	144(%rsp), %r13                 # 8-byte Reload
-	addq	%r11, %r13
-	movq	136(%rsp), %r14                 # 8-byte Reload
-	addq	-80(%rsp), %r14                 # 8-byte Folded Reload
-	movq	128(%rsp), %r10                 # 8-byte Reload
-	addq	%r8, %r10
-	movq	120(%rsp), %rax                 # 8-byte Reload
-	addq	%rdi, %rax
-	movq	%rax, %rdi
+	movq	152(%rsp), %r15                 # 8-byte Reload
+	addq	%rbx, %r15
+	movq	144(%rsp), %rbx                 # 8-byte Reload
+	addq	-64(%rsp), %rbx                 # 8-byte Folded Reload
+	movq	136(%rsp), %r10                 # 8-byte Reload
+	addq	-104(%rsp), %r10                # 8-byte Folded Reload
+	movq	128(%rsp), %rdi                 # 8-byte Reload
+	addq	%r8, %rdi
+	movq	120(%rsp), %r13                 # 8-byte Reload
+	addq	%r9, %r13
 	movq	112(%rsp), %rax                 # 8-byte Reload
-	addq	%rbp, %rax
-	movq	%rax, %rbp
-	movq	104(%rsp), %rax                 # 8-byte Reload
-	addq	%r12, %rax
-	movq	%rax, %r12
-	movq	96(%rsp), %r11                  # 8-byte Reload
-	addq	%r15, %r11
-	movq	88(%rsp), %r8                   # 8-byte Reload
-	addq	%rbx, %r8
-	movq	152(%rsp), %rsi                 # 8-byte Reload
+	addq	%r14, %rax
+	movq	%rax, %r14
+	movq	104(%rsp), %r8                  # 8-byte Reload
+	addq	%rbp, %r8
+	movq	96(%rsp), %r9                   # 8-byte Reload
+	addq	-88(%rsp), %r9                  # 8-byte Folded Reload
+	movq	160(%rsp), %rsi                 # 8-byte Reload
 	subq	$-128, %rsi
-	movq	56(%rsp), %rax                  # 8-byte Reload
-	movq	%r13, (%rax)
-	movq	%r14, 8(%rax)
+	movq	64(%rsp), %rax                  # 8-byte Reload
+	movq	%r15, (%rax)
+	movq	%rbx, 8(%rax)
 	movq	%r10, 16(%rax)
 	movq	%rdi, 24(%rax)
-	movq	%rbp, 32(%rax)
-	movq	%r12, 40(%rax)
-	movq	%r11, 48(%rax)
-	movq	%r8, 56(%rax)
-	movq	160(%rsp), %rdx                 # 8-byte Reload
+	movq	%r13, 32(%rax)
+	movq	%r14, 40(%rax)
+	movq	%r8, 48(%rax)
+	movq	%r9, 56(%rax)
+	movq	168(%rsp), %rdx                 # 8-byte Reload
 	decq	%rdx
 	jne	.LBB7_2
 .LBB7_5:
-	addq	$200, %rsp
+	addq	$192, %rsp
 	popq	%rbx
 	popq	%r12
 	popq	%r13
@@ -3123,44 +3152,46 @@ table_select:                           # @table_select
 	movb	%al, -96(%rsp)
 	#APP
 	#NO_APP
-	movslq	%esi, %rcx
-	movzbl	%dl, %edx
-	movl	%edx, %eax
-	xorl	$1, %eax
-	decq	%rax
-	sarq	$63, %rax
+	movslq	%esi, %rax
+	movzbl	%dl, %esi
+	movl	%esi, %ecx
+	xorl	$1, %ecx
+	decq	%rcx
+	sarq	$63, %rcx
 	#APP
 	#NO_APP
-	movd	%eax, %xmm0
+	movd	%ecx, %xmm0
 	punpcklbw	%xmm0, %xmm0            # xmm0 = xmm0[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0]
+	leaq	(%rax,%rax,2), %rcx
 	shlq	$8, %rcx
-	movdqa	k25519Precomp(%rcx,%rcx,2), %xmm2
+	leaq	k25519Precomp(%rip), %rdx
+	movdqa	(%rcx,%rdx), %xmm2
 	pand	%xmm0, %xmm2
 	pxor	-128(%rsp), %xmm2
 	movdqa	%xmm2, -128(%rsp)
-	movdqa	k25519Precomp+16(%rcx,%rcx,2), %xmm3
+	movdqa	16(%rcx,%rdx), %xmm3
 	pand	%xmm0, %xmm3
 	pxor	-112(%rsp), %xmm3
 	movdqa	%xmm3, -112(%rsp)
-	movdqa	k25519Precomp+32(%rcx,%rcx,2), %xmm4
+	movdqa	32(%rcx,%rdx), %xmm4
 	pand	%xmm0, %xmm4
 	pxor	-96(%rsp), %xmm4
 	movdqa	%xmm4, -96(%rsp)
-	movdqa	k25519Precomp+48(%rcx,%rcx,2), %xmm5
+	movdqa	48(%rcx,%rdx), %xmm5
 	pand	%xmm0, %xmm5
 	pxor	-80(%rsp), %xmm5
 	movdqa	%xmm5, -80(%rsp)
-	movdqa	k25519Precomp+64(%rcx,%rcx,2), %xmm6
+	movdqa	64(%rcx,%rdx), %xmm6
 	pand	%xmm0, %xmm6
 	pxor	-64(%rsp), %xmm6
 	movq	%rdi, 24(%rsp)                  # 8-byte Spill
 	movdqa	%xmm6, -64(%rsp)
-	pand	k25519Precomp+80(%rcx,%rcx,2), %xmm0
+	pand	80(%rcx,%rdx), %xmm0
 	pxor	-48(%rsp), %xmm0
 	movdqa	%xmm0, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$2, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3170,30 +3201,30 @@ table_select:                           # @table_select
 	punpcklbw	%xmm1, %xmm1            # xmm1 = xmm1[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0]
-	movdqa	k25519Precomp+96(%rcx,%rcx,2), %xmm7
+	movdqa	96(%rcx,%rdx), %xmm7
 	pand	%xmm1, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -128(%rsp)
-	movdqa	k25519Precomp+112(%rcx,%rcx,2), %xmm2
+	movdqa	112(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm3, %xmm2
 	movdqa	%xmm2, -112(%rsp)
-	movdqa	k25519Precomp+128(%rcx,%rcx,2), %xmm3
+	movdqa	128(%rcx,%rdx), %xmm3
 	pand	%xmm1, %xmm3
 	pxor	%xmm4, %xmm3
 	movdqa	%xmm3, -96(%rsp)
-	movdqa	k25519Precomp+144(%rcx,%rcx,2), %xmm4
+	movdqa	144(%rcx,%rdx), %xmm4
 	pand	%xmm1, %xmm4
 	pxor	%xmm5, %xmm4
 	movdqa	%xmm4, -80(%rsp)
-	movdqa	k25519Precomp+160(%rcx,%rcx,2), %xmm5
+	movdqa	160(%rcx,%rdx), %xmm5
 	pand	%xmm1, %xmm5
 	pxor	%xmm6, %xmm5
 	movdqa	%xmm5, -64(%rsp)
-	pand	k25519Precomp+176(%rcx,%rcx,2), %xmm1
+	pand	176(%rcx,%rdx), %xmm1
 	pxor	%xmm0, %xmm1
 	movdqa	%xmm1, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$3, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3203,30 +3234,30 @@ table_select:                           # @table_select
 	punpcklbw	%xmm0, %xmm0            # xmm0 = xmm0[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0]
-	movdqa	k25519Precomp+192(%rcx,%rcx,2), %xmm6
+	movdqa	192(%rcx,%rdx), %xmm6
 	pand	%xmm0, %xmm6
 	pxor	%xmm7, %xmm6
 	movdqa	%xmm6, -128(%rsp)
-	movdqa	k25519Precomp+208(%rcx,%rcx,2), %xmm7
+	movdqa	208(%rcx,%rdx), %xmm7
 	pand	%xmm0, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -112(%rsp)
-	movdqa	k25519Precomp+224(%rcx,%rcx,2), %xmm2
+	movdqa	224(%rcx,%rdx), %xmm2
 	pand	%xmm0, %xmm2
 	pxor	%xmm3, %xmm2
 	movdqa	%xmm2, -96(%rsp)
-	movdqa	k25519Precomp+240(%rcx,%rcx,2), %xmm3
+	movdqa	240(%rcx,%rdx), %xmm3
 	pand	%xmm0, %xmm3
 	pxor	%xmm4, %xmm3
 	movdqa	%xmm3, -80(%rsp)
-	movdqa	k25519Precomp+256(%rcx,%rcx,2), %xmm4
+	movdqa	256(%rcx,%rdx), %xmm4
 	pand	%xmm0, %xmm4
 	pxor	%xmm5, %xmm4
 	movdqa	%xmm4, -64(%rsp)
-	pand	k25519Precomp+272(%rcx,%rcx,2), %xmm0
+	pand	272(%rcx,%rdx), %xmm0
 	pxor	%xmm1, %xmm0
 	movdqa	%xmm0, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$4, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3236,30 +3267,30 @@ table_select:                           # @table_select
 	punpcklbw	%xmm1, %xmm1            # xmm1 = xmm1[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0]
-	movdqa	k25519Precomp+288(%rcx,%rcx,2), %xmm5
+	movdqa	288(%rcx,%rdx), %xmm5
 	pand	%xmm1, %xmm5
 	pxor	%xmm6, %xmm5
 	movdqa	%xmm5, -128(%rsp)
-	movdqa	k25519Precomp+304(%rcx,%rcx,2), %xmm6
+	movdqa	304(%rcx,%rdx), %xmm6
 	pand	%xmm1, %xmm6
 	pxor	%xmm7, %xmm6
 	movdqa	%xmm6, -112(%rsp)
-	movdqa	k25519Precomp+320(%rcx,%rcx,2), %xmm7
+	movdqa	320(%rcx,%rdx), %xmm7
 	pand	%xmm1, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -96(%rsp)
-	movdqa	k25519Precomp+336(%rcx,%rcx,2), %xmm2
+	movdqa	336(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm3, %xmm2
 	movdqa	%xmm2, -80(%rsp)
-	movdqa	k25519Precomp+352(%rcx,%rcx,2), %xmm3
+	movdqa	352(%rcx,%rdx), %xmm3
 	pand	%xmm1, %xmm3
 	pxor	%xmm4, %xmm3
 	movdqa	%xmm3, -64(%rsp)
-	pand	k25519Precomp+368(%rcx,%rcx,2), %xmm1
+	pand	368(%rcx,%rdx), %xmm1
 	pxor	%xmm0, %xmm1
 	movdqa	%xmm1, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$5, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3269,30 +3300,30 @@ table_select:                           # @table_select
 	punpcklbw	%xmm0, %xmm0            # xmm0 = xmm0[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0]
-	movdqa	k25519Precomp+384(%rcx,%rcx,2), %xmm4
+	movdqa	384(%rcx,%rdx), %xmm4
 	pand	%xmm0, %xmm4
 	pxor	%xmm5, %xmm4
 	movdqa	%xmm4, -128(%rsp)
-	movdqa	k25519Precomp+400(%rcx,%rcx,2), %xmm5
+	movdqa	400(%rcx,%rdx), %xmm5
 	pand	%xmm0, %xmm5
 	pxor	%xmm6, %xmm5
 	movdqa	%xmm5, -112(%rsp)
-	movdqa	k25519Precomp+416(%rcx,%rcx,2), %xmm6
+	movdqa	416(%rcx,%rdx), %xmm6
 	pand	%xmm0, %xmm6
 	pxor	%xmm7, %xmm6
 	movdqa	%xmm6, -96(%rsp)
-	movdqa	k25519Precomp+432(%rcx,%rcx,2), %xmm7
+	movdqa	432(%rcx,%rdx), %xmm7
 	pand	%xmm0, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -80(%rsp)
-	movdqa	k25519Precomp+448(%rcx,%rcx,2), %xmm2
+	movdqa	448(%rcx,%rdx), %xmm2
 	pand	%xmm0, %xmm2
 	pxor	%xmm3, %xmm2
-	pand	k25519Precomp+464(%rcx,%rcx,2), %xmm0
+	pand	464(%rcx,%rdx), %xmm0
 	movdqa	%xmm2, -64(%rsp)
 	pxor	%xmm1, %xmm0
 	movdqa	%xmm0, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$6, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3302,30 +3333,30 @@ table_select:                           # @table_select
 	punpcklbw	%xmm1, %xmm1            # xmm1 = xmm1[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0]
-	movdqa	k25519Precomp+480(%rcx,%rcx,2), %xmm3
+	movdqa	480(%rcx,%rdx), %xmm3
 	pand	%xmm1, %xmm3
 	pxor	%xmm4, %xmm3
 	movdqa	%xmm3, -128(%rsp)
-	movdqa	k25519Precomp+496(%rcx,%rcx,2), %xmm4
+	movdqa	496(%rcx,%rdx), %xmm4
 	pand	%xmm1, %xmm4
 	pxor	%xmm5, %xmm4
 	movdqa	%xmm4, -112(%rsp)
-	movdqa	k25519Precomp+512(%rcx,%rcx,2), %xmm5
+	movdqa	512(%rcx,%rdx), %xmm5
 	pand	%xmm1, %xmm5
 	pxor	%xmm6, %xmm5
 	movdqa	%xmm5, -96(%rsp)
-	movdqa	k25519Precomp+528(%rcx,%rcx,2), %xmm6
+	movdqa	528(%rcx,%rdx), %xmm6
 	pand	%xmm1, %xmm6
 	pxor	%xmm7, %xmm6
 	movdqa	%xmm6, -80(%rsp)
-	movdqa	k25519Precomp+544(%rcx,%rcx,2), %xmm7
+	movdqa	544(%rcx,%rdx), %xmm7
 	pand	%xmm1, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -64(%rsp)
-	pand	k25519Precomp+560(%rcx,%rcx,2), %xmm1
+	pand	560(%rcx,%rdx), %xmm1
 	pxor	%xmm0, %xmm1
 	movdqa	%xmm1, -48(%rsp)
-	movl	%edx, %eax
+	movl	%esi, %eax
 	xorl	$7, %eax
 	decq	%rax
 	sarq	$63, %rax
@@ -3335,59 +3366,59 @@ table_select:                           # @table_select
 	punpcklbw	%xmm0, %xmm0            # xmm0 = xmm0[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm0, %xmm0                # xmm0 = xmm0[0,0,0,0]
-	movdqa	k25519Precomp+576(%rcx,%rcx,2), %xmm2
+	movdqa	576(%rcx,%rdx), %xmm2
 	pand	%xmm0, %xmm2
 	pxor	%xmm3, %xmm2
 	movdqa	%xmm2, -128(%rsp)
-	movdqa	k25519Precomp+592(%rcx,%rcx,2), %xmm3
+	movdqa	592(%rcx,%rdx), %xmm3
 	pand	%xmm0, %xmm3
 	pxor	%xmm4, %xmm3
 	movdqa	%xmm3, -112(%rsp)
-	movdqa	k25519Precomp+608(%rcx,%rcx,2), %xmm4
+	movdqa	608(%rcx,%rdx), %xmm4
 	pand	%xmm0, %xmm4
 	pxor	%xmm5, %xmm4
 	movdqa	%xmm4, -96(%rsp)
-	movdqa	k25519Precomp+624(%rcx,%rcx,2), %xmm5
+	movdqa	624(%rcx,%rdx), %xmm5
 	pand	%xmm0, %xmm5
 	pxor	%xmm6, %xmm5
 	movdqa	%xmm5, -80(%rsp)
-	movdqa	k25519Precomp+640(%rcx,%rcx,2), %xmm6
+	movdqa	640(%rcx,%rdx), %xmm6
 	pand	%xmm0, %xmm6
 	pxor	%xmm7, %xmm6
 	movdqa	%xmm6, -64(%rsp)
-	pand	k25519Precomp+656(%rcx,%rcx,2), %xmm0
+	pand	656(%rcx,%rdx), %xmm0
 	pxor	%xmm1, %xmm0
 	movdqa	%xmm0, -48(%rsp)
-	xorl	$8, %edx
-	decq	%rdx
-	sarq	$63, %rdx
+	xorl	$8, %esi
+	decq	%rsi
+	sarq	$63, %rsi
 	#APP
 	#NO_APP
-	movd	%edx, %xmm1
+	movd	%esi, %xmm1
 	punpcklbw	%xmm1, %xmm1            # xmm1 = xmm1[0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7]
 	pshuflw	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0,4,5,6,7]
 	pshufd	$0, %xmm1, %xmm1                # xmm1 = xmm1[0,0,0,0]
-	movdqa	k25519Precomp+672(%rcx,%rcx,2), %xmm7
+	movdqa	672(%rcx,%rdx), %xmm7
 	pand	%xmm1, %xmm7
 	pxor	%xmm2, %xmm7
 	movdqa	%xmm7, -128(%rsp)
-	movdqa	k25519Precomp+688(%rcx,%rcx,2), %xmm2
+	movdqa	688(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm3, %xmm2
 	movdqa	%xmm2, -112(%rsp)
-	movdqa	k25519Precomp+704(%rcx,%rcx,2), %xmm2
+	movdqa	704(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm4, %xmm2
 	movdqa	%xmm2, -96(%rsp)
-	movdqa	k25519Precomp+720(%rcx,%rcx,2), %xmm2
+	movdqa	720(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm5, %xmm2
 	movdqa	%xmm2, -80(%rsp)
-	movdqa	k25519Precomp+736(%rcx,%rcx,2), %xmm2
+	movdqa	736(%rcx,%rdx), %xmm2
 	pand	%xmm1, %xmm2
 	pxor	%xmm6, %xmm2
 	movdqa	%xmm2, -64(%rsp)
-	pand	k25519Precomp+752(%rcx,%rcx,2), %xmm1
+	pand	752(%rcx,%rdx), %xmm1
 	pxor	%xmm0, %xmm1
 	movdqa	%xmm1, -48(%rsp)
 	movl	-100(%rsp), %eax
@@ -9720,7 +9751,8 @@ main:                                   # @main
 # %bb.0:
 	subq	$72, %rsp
 	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	movq	$message, 24(%rsp)
+	leaq	message(%rip), %rsi
+	movq	%rsi, 24(%rsp)
 	movq	$256, 32(%rsp)                  # imm = 0x100
 	movq	$0, 40(%rsp)
 	movq	$0, 48(%rsp)
@@ -9737,7 +9769,8 @@ main:                                   # @main
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
 	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	movq	$signature, 24(%rsp)
+	leaq	signature(%rip), %rdi
+	movq	%rdi, 24(%rsp)
 	movq	$64, 32(%rsp)
 	movq	$0, 40(%rsp)
 	movq	$0, 48(%rsp)
@@ -9754,7 +9787,8 @@ main:                                   # @main
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
 	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	movq	$private_key, 24(%rsp)
+	leaq	private_key(%rip), %rcx
+	movq	%rcx, 24(%rsp)
 	movq	$64, 32(%rsp)
 	movq	$0, 40(%rsp)
 	movq	$0, 48(%rsp)
@@ -9770,10 +9804,7 @@ main:                                   # @main
 	#NO_APP
 	movq	%rdx, 8(%rsp)
 	movq	8(%rsp), %rax
-	movl	$signature, %edi
-	movl	$message, %esi
 	movl	$256, %edx                      # imm = 0x100
-	movl	$private_key, %ecx
 	callq	ED25519_sign
 	xorl	%eax, %eax
 	addq	$72, %rsp
@@ -11101,7 +11132,7 @@ K512:
 	.quad	7801388544844847127             # 0x6c44198c4a475817
 	.size	K512, 640
 
-	.ident	"Debian clang version 16.0.6 (++20230610113325+7cbf1a259152-1~exp1~20230610233413.4)"
+	.ident	"Debian clang version 16.0.6 (++20231112084702+7cbf1a259152-1~exp1~20231112084757.16)"
 	.section	".note.GNU-stack","",@progbits
 	.addrsig
 	.addrsig_sym message

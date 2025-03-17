@@ -79,6 +79,7 @@ module FuncInterface = struct
     | Some out_mem_type ->
       let dep_context, taint_context = pr_type.context in
       Some { pr_type with
+        pc = pr_type.pc + 1;
         reg_type = out_reg_type;
         flag_type = out_flag_type;
         mem_type = out_mem_type;

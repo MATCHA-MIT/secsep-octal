@@ -16,13 +16,13 @@ let get_reg_taint (reg_taint: (Isa_basic.IsaBasic.register * bool) list) : (bool
       ) acc
   ) (List.init Isa_basic.IsaBasic.total_reg_num (fun _ -> None)) reg_taint
 
-let standalone_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
+let bench_salsa20_global : External_layouts.GlobalSymbolLayout.t = [
   "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], (SingleTop, TaintConst true)) ];
   "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], (SingleTop, TaintConst true)) ];
   "msg", [ ((SingleConst 0L, SingleConst 128L), RangeConst [(SingleConst 0L, SingleConst 128L)], (SingleTop, TaintConst true)) ];
 ]
 
-let standalone_salsa20 : Base_func_interface.mem_t = [
+let bench_salsa20 : Base_func_interface.mem_t = [
   "salsa20_words", [
     get_default_info (r RDI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [], SingleTop) ];
     get_default_info (r RSI), [ ((SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop) ];
@@ -39,7 +39,7 @@ let standalone_salsa20 : Base_func_interface.mem_t = [
   ]
 ]
 
-let standalone_salsa20_taint_api : Taint_api.TaintApi.t = [
+let bench_salsa20_taint_api : Taint_api.TaintApi.t = [
   "_start",
   get_reg_taint [],
   [
@@ -641,15 +641,15 @@ let () =
   Sexp.output_hum channel (Sexplib.Std.sexp_of_list Taint_type_infer.TaintTypeInfer.FuncInterface.sexp_of_t 
     (List.concat_map add_general_func_suffix [memset_interface; memcpy_interface]));
 
-  let channel = open_out "./interface/standalone_salsa20.symbol_layout" in
-  Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t standalone_salsa20_global);
+  let channel = open_out "./interface/bench_salsa20.symbol_layout" in
+  Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_salsa20_global);
 
-  let channel = open_out "./interface/standalone_salsa20.mem_interface" in
-  let stack = External_layouts.StackLayout.from_file "./out/standalone_salsa20.stack_layout" in
-  Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout standalone_salsa20 stack));
+  let channel = open_out "./interface/bench_salsa20.mem_interface" in
+  let stack = External_layouts.StackLayout.from_file "./out/bench_salsa20.stack_layout" in
+  Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout bench_salsa20 stack));
 
-  let channel = open_out "./interface/standalone_salsa20.taint_api" in
-  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_taint_api);
+  let channel = open_out "./interface/bench_salsa20.taint_api" in
+  Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t bench_salsa20_taint_api);
 
   let channel = open_out "./interface/standalone_salsa20_noinline.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t standalone_salsa20_noinline_global);
