@@ -747,7 +747,9 @@ let convert_taint_type_infers
   in
   let archs_of_func, func_is_forget = List.split packed in
   let get_is_forget (func: string) : (int * int) -> bool =
-    List.find (fun (func_name, _) -> func_name = func) func_is_forget |> snd
+    match List.find_opt (fun (func_name, _) -> func_name = func) func_is_forget with
+    | Some (_, f) -> f
+    | None -> (fun _ -> false)
   in
 
   Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));

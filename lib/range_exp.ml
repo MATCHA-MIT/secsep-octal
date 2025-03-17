@@ -20,9 +20,6 @@ module RangeExp = struct
   let canonicalize_range
       (l: SingleExp.t) (r: SingleExp.t) (step: int64)
       : SingleExp.t * SingleExp.t * int64 =
-    (* ensure l <= r *)
-    if SingleExp.cmp l r > 0 then
-      range_exp_error "RangeExp: l > r";
     if step = 0L then
       range_exp_error "RangeExp: step = 0";
 
