@@ -41,9 +41,10 @@ module ArchTypeBasic = struct
   [@@deriving sexp]
 
   let sub_ctx_map_helper
-      (ctx: Z3.context)
+      (smt_ctx: SmtEmitter.t)
       (a_type: t) (ctx_map: BasicType.map_t) : 
       RegType.t * FlagType.t * MemType.t * BasicType.ctx_t =
+    let ctx, _ = smt_ctx in
     let dep_ctx_map, taint_ctx_map = ctx_map in
     (*     
     Printf.printf "dep_ctx_map:\n%s\n" (DepType.sexp_of_map_t dep_ctx_map |> Sexplib.Sexp.to_string_hum);
@@ -65,7 +66,7 @@ module ArchTypeBasic = struct
         fun (off, slot_forget, range, entry) ->
           MemOffset.substitute dep_exp_sub_func off,
           slot_forget,
-          MemRange.substitute dep_exp_sub_func range,
+          MemRange.substitute smt_ctx dep_exp_sub_func range,
           basic_sub_func entry
       ) a_type.mem_type
     in
@@ -78,10 +79,9 @@ module ArchTypeBasic = struct
       (sub_a_type: t) (sup_a_type: t)
       (ctx_map: BasicType.map_t)
       (mem_map_opt: MemAnno.slot_t MemType.mem_content option) : bool =
-    let ctx, _ = smt_ctx in
     (* 1. subsitute sup_a_type with ctx_map *)
     let sup_reg_type, sup_flag_type, sup_mem_type, (sup_dep_context, sup_taint_context) =
-      sub_ctx_map_helper ctx sup_a_type ctx_map
+      sub_ctx_map_helper smt_ctx sup_a_type ctx_map
     in
     
     (*

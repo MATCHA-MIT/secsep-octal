@@ -30,6 +30,25 @@ module MemOffset = struct
     | CmpOverlap
   [@@deriving sexp]
 
+  let check_empty
+      (smt_ctx: SmtEmitter.t)
+      (o: t) : bool =
+    let l, r = o in
+    let ctx, _ = smt_ctx in
+    let ge_req = [ BitVector.mk_sge ctx l r ] in
+    let check = SmtEmitter.check_compliance smt_ctx in
+    check ge_req = SatYes
+
+  let check_adjacent
+      (smt_ctx: SmtEmitter.t)
+      (o1: t) (o2: t) : bool =
+    let ctx, _ = smt_ctx in
+    let _, r1 = o1 in
+    let l2, _ = o2 in
+    let r1p1 = BitVector.mk_add ctx r1 (DepType.get_const_exp ctx 1L (DepType.get_exp_bit_size r1)) in
+    let check = SmtEmitter.check_compliance smt_ctx in
+    check [ Boolean.mk_eq ctx r1p1 l2 ] = SatYes
+
   let offset_cmp
       (smt_ctx: SmtEmitter.t)
       (mode: off_cmp_mode)
@@ -132,6 +151,17 @@ module MemOffset = struct
     | Some size_byte -> Top ((Int64.to_int size_byte) * 8)
     | None -> Top DepType.top_unknown_size
 
+  let sort_offset_list
+      (smt_ctx: SmtEmitter.t)
+      (off_list: t list) : t list =
+    let off_cmp (x: t) (y: t) =
+      match offset_cmp smt_ctx CmpOverlap x y with
+      | Eq | Subset | Supset | LOverlap | GOverlap | Other -> 0
+      | Le -> -1
+      | Ge -> 1
+    in
+    List.sort off_cmp off_list
+
 end
 
 module MemRange = struct
@@ -145,16 +175,44 @@ module MemRange = struct
   let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
     MemOffset.insert_new_offset_list_merge smt_ctx r1 r2
 
+  let sanitize (smt_ctx: SmtEmitter.t) (ranges: t) : t =
+    let ranges = List.filter_map (fun range ->
+      if MemOffset.check_empty smt_ctx range then None (* remove empty ranges *)
+      else Some range
+    ) ranges
+    in
+    let ranges = MemOffset.sort_offset_list smt_ctx ranges in
+    (* Printf.printf "ranges before merge:\n%s\n" (sexp_of_t ranges |> Sexplib.Sexp.to_string_hum); *)
+    (* combine adjacent ranges *)
+    let rec helper (o_list: t) : t =
+      match o_list with
+      | [] -> []
+      | [x] -> [x]
+      | x1 :: x2 :: tl ->
+        if MemOffset.check_adjacent smt_ctx x1 x2 then begin
+          (fst x1, snd x2) :: helper tl
+        end else begin
+          x1 :: helper (x2 :: tl)
+        end
+    in
+    let ranges = helper ranges in
+    (* Printf.printf "ranges after merge:\n%s\n" (sexp_of_t ranges |> Sexplib.Sexp.to_string_hum); *)
+    ranges
+
   let substitute
+      (smt_ctx: SmtEmitter.t)
       (substitute_func: DepType.exp_t -> DepType.exp_t)
-      (range: t) : t =
-    List.map (MemOffset.substitute substitute_func) range
+      (ranges: t) : t =
+    let ranges = List.map (MemOffset.substitute substitute_func) ranges in
+    sanitize smt_ctx ranges
 
   let is_empty (r: t) : bool = r = []
 
   let check_subset
       (smt_ctx: SmtEmitter.t)
       (r1: t) (r2: t) : bool =
+    let r1 = sanitize smt_ctx r1 in
+    let r2 = sanitize smt_ctx r2 in
     (* Check whether r1 is a subset of r2*)
     let off_check_subset = MemOffset.offset_cmp smt_ctx CmpSubset in
     let remain_off_list =
@@ -180,6 +238,7 @@ module MemRange = struct
       (r1: t) (r2: t) : bool =
     (* Only in this case we will track detailed dep types of memory slots *)
     match r1, r2 with
+    | [], [] -> true
     | [ o1 ], [ o2 ] ->
       MemOffset.offset_cmp smt_ctx CmpEq o1 o2 = Eq
     | _ -> false
@@ -319,7 +378,6 @@ module MemType = struct
     let sub_off, sub_forget_type, sub_range, (sub_dep, sub_taint) = sub_slot in
     let sup_off, sup_forget_type, sup_range, (sup_dep, sup_taint) = sup_slot in
 
-    (*
     Printf.printf "check_slot_subtype %b:\n" off_must_eq;
     Printf.printf "sub_slot: %s %s %s %s %s\n" (MemOffset.sexp_of_t sub_off |> Sexplib.Sexp.to_string_hum)
       (string_of_bool sub_forget_type)
@@ -331,7 +389,6 @@ module MemType = struct
       (MemRange.sexp_of_t sup_range |> Sexplib.Sexp.to_string_hum)
       (DepType.sexp_of_t sup_dep |> Sexplib.Sexp.to_string_hum)
       (TaintType.sexp_of_t sup_taint |> Sexplib.Sexp.to_string_hum);
-    *)
 
     (* We add strongest constraint for whether corressponding slots should allow forget type - they should agree on this property. *)
     if not sub_forget_type = sup_forget_type then false else
@@ -351,7 +408,7 @@ module MemType = struct
         check_taint ()
       else
         let check_dep =
-          match sup_dep with
+          match sub_dep with
           | Top _ -> true
           | _ -> false
         in

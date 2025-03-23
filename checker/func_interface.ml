@@ -66,7 +66,7 @@ module FuncInterface = struct
     if not check_pr_reg then None else
     (* 3. Update reg, flag, mem, context, and check update rights at the same time *)
     let out_reg_type, out_flag_type, out_mem_type, (out_dep_context, out_taint_context) =
-      ArchTypeBasic.sub_ctx_map_helper (fst smt_ctx) func_interface.out_type call_anno.ctx_map
+      ArchTypeBasic.sub_ctx_map_helper smt_ctx func_interface.out_type call_anno.ctx_map
     in
     let out_mem_opt =
       MemType.set_mem_type_with_other smt_ctx

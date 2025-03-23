@@ -260,6 +260,11 @@ salsa20:                                # @salsa20
 	pushq	%r12
 	pushq	%rbx
 	subq	$200, %rsp
+	xorps	%xmm0, %xmm0
+	movaps	%xmm0, 112(%rsp)
+	movaps	%xmm0, 96(%rsp)
+	movaps	%xmm0, 80(%rsp)
+	movaps	%xmm0, 64(%rsp)
 	testq	%rsi, %rsi
 	je	.LBB2_6
 # %bb.1:
