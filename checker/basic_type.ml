@@ -122,7 +122,7 @@ module DepType = struct
     let eq_int (exp: exp_t) (i: int64) : bool =
       check_eq smt_ctx exp (BitVector.mk_numeral ctx (Int64.to_string i) (get_exp_bit_size exp))
     in
-    List.find_opt (eq_int exp) [1L; 2L; 4L; 8L; 16L]
+    List.find_opt (eq_int exp) [0L; 1L; 2L; 4L; 8L; 16L]
 
   let get_const_exp (ctx: context) (c: int64) (size: int) : exp_t =
     BitVector.mk_numeral ctx (Int64.to_string c) size

@@ -529,6 +529,10 @@ let convert_base_info
      We may want to remove base info from checker or change it to another format. *)
   convert_mem_generic ctx get_var_size (fun _ -> false) base_info convert_entry
 
+let func_interface_is_forget_slot (slot_ptr_idx: int * int) : bool =
+  let ptr, idx = slot_ptr_idx in
+  ptr = Type.Isa_basic.IsaBasic.rsp_idx && idx = 0
+
 let convert_function_interface
     (ctx: Z3.context)
     (fi: TaintTypeInfer.FuncInterface.t)
@@ -537,10 +541,6 @@ let convert_function_interface
   (* Printf.printf "converting function interface of %s\n" fi.func_name; *)
   (* <TODO> This is a dirty fix to generate is_forget field for interface in/out memory.
      Later we should either check its correctness or generate it from checker's in/out block type. *)
-  let is_forget_slot (slot_ptr_idx: int * int) : bool =
-    let ptr, idx = slot_ptr_idx in
-    ptr = Type.Isa_basic.IsaBasic.rsp_idx && idx = 0
-  in
   let var_size_map1 = infer_var_size_map ctx fi.in_reg fi.in_mem in
   let var_size_map2 = infer_var_size_map ctx fi.out_reg fi.out_mem in
   let func_vsm = append_func_var_size_map func_vsm fi.func_name (var_size_map1 @ var_size_map2) in
@@ -549,7 +549,7 @@ let convert_function_interface
     label = fi.func_name;
     reg_type = convert_reg_type ctx get_var_size_func fi.in_reg;
     flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.in_mem;
+    mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.in_mem;
     context = convert_context ctx get_var_size_func fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
     (* ignored fields *)
@@ -565,7 +565,7 @@ let convert_function_interface
     label = fi.func_name;
     reg_type = convert_reg_type ctx get_var_size_func fi.out_reg;
     flag_type = convert_flag_type ctx;
-    mem_type = convert_mem_type ctx get_var_size_func is_forget_slot fi.out_mem;
+    mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.out_mem;
     context = convert_context ctx get_var_size_func fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
 
     (* ignored fields *)
@@ -726,7 +726,7 @@ let convert_taint_type_infers
     (tti_list: TaintTypeInfer.t list)
     (func_vsm: func_var_size_map)
     : checker_func list =
-  let func_vsm, packed = List.fold_left_map (
+  let func_vsm, archs_of_func = List.fold_left_map (
     fun func_vsm tti ->
       (* <TODO> I want to rename stack_spill_info to forget (stack) slot list here. *)
       let stack_forget_slot_info = convert_is_forget_slot tti in
@@ -742,14 +742,8 @@ let convert_taint_type_infers
           func_vsm, converted
       ) func_vsm tti.func_type
       in
-      vsm, (arch, (tti.func_name, is_forget_slot))
+      (vsm, arch)
   ) func_vsm tti_list
-  in
-  let archs_of_func, func_is_forget = List.split packed in
-  let get_is_forget (func: string) : (int * int) -> bool =
-    match List.find_opt (fun (func_name, _) -> func_name = func) func_is_forget with
-    | Some (_, f) -> f
-    | None -> (fun _ -> false)
   in
 
   Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));
@@ -798,7 +792,7 @@ let convert_taint_type_infers
             end else begin
               let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
               let targ_get_var_size = get_size_finder_of_func func_vsm targ in
-              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size (get_is_forget targ))
+              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size func_interface_is_forget_slot)
             end
           | Nop -> ArchType.Isa.Nop
           | Syscall -> ArchType.Isa.Syscall

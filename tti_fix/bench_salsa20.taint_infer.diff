@@ -1,0 +1,10 @@
+4892,4893c4892
+<            (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -248))
+<              (SingleBExp SingleAdd (SingleVar 4) (SingleConst -184)))))
+---
+>            ())
+4904,4905c4903
+<            (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -120))
+<              (SingleBExp SingleAdd (SingleVar 4) (SingleConst -56)))))
+---
+>            ())

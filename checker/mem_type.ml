@@ -374,10 +374,13 @@ module MemType = struct
       (off_must_eq: bool)
       (sub_slot: entry_t mem_slot)
       (sup_slot: entry_t mem_slot) : bool =
+    (* for offset / initialized ranges, sup_slot is the subset of sub_slot *)
+    (* for types, sub_slot is the subset of sup_slot *)
     let offset_cmp = MemOffset.offset_cmp smt_ctx in
     let sub_off, sub_forget_type, sub_range, (sub_dep, sub_taint) = sub_slot in
     let sup_off, sup_forget_type, sup_range, (sup_dep, sup_taint) = sup_slot in
 
+    (*
     Printf.printf "check_slot_subtype %b:\n" off_must_eq;
     Printf.printf "sub_slot: %s %s %s %s %s\n" (MemOffset.sexp_of_t sub_off |> Sexplib.Sexp.to_string_hum)
       (string_of_bool sub_forget_type)
@@ -389,6 +392,8 @@ module MemType = struct
       (MemRange.sexp_of_t sup_range |> Sexplib.Sexp.to_string_hum)
       (DepType.sexp_of_t sup_dep |> Sexplib.Sexp.to_string_hum)
       (TaintType.sexp_of_t sup_taint |> Sexplib.Sexp.to_string_hum);
+    *)
+    (* Printf.printf "context:\n%s\n" (SmtEmitter.to_string smt_ctx); *)
 
     (* We add strongest constraint for whether corressponding slots should allow forget type - they should agree on this property. *)
     if not sub_forget_type = sup_forget_type then false else
@@ -407,13 +412,8 @@ module MemType = struct
         DepType.check_subtype smt_ctx sub_dep sup_dep &&
         check_taint ()
       else
-        let check_dep =
-          match sub_dep with
-          | Top _ -> true
-          | _ -> false
-        in
         MemRange.check_subset smt_ctx sup_range sub_range &&
-        check_dep &&
+        DepType.check_subtype smt_ctx sub_dep sup_dep &&
         check_taint ()
     else false
 
@@ -435,8 +435,9 @@ module MemType = struct
         let (sup_ptr, (sup_might_overlap, sup_read, sup_write)), sup_part_mem = sup in
         sub_ptr = sup_ptr &&
         sub_might_overlap = sup_might_overlap &&
-        imply_helper sub_read sup_read &&
-        imply_helper sub_write sup_write &&
+        (* for permission: target (sup) is the subtype of current (sub) *)
+        imply_helper sup_read sub_read &&
+        imply_helper sup_write sub_write &&
         List.fold_left2 (
           fun (acc: bool * int) (sub_slot: entry_t mem_slot) (sup_slot: entry_t mem_slot) ->
             let acc_check, slot_idx = acc in
@@ -472,6 +473,11 @@ module MemType = struct
       (smt_ctx: SmtEmitter.t)
       (sub_m_type: t) (sup_m_type: t)
       (mem_map: MemAnno.slot_t mem_content) : bool =
+    (*
+    Printf.printf "check_subtype_map:\n";
+    Printf.printf "sub_m_type:\n%s\n" (sexp_of_t sub_m_type |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "sup_m_type:\n%s\n" (sexp_of_t sup_m_type |> Sexplib.Sexp.to_string_hum);
+    *)
     (* This is used for function call.
        Items to check:
        1. Ptr info
@@ -491,21 +497,22 @@ module MemType = struct
        cannot represent the possibly overlap/non-overlap relation.
        But the good thing is that we do not need to check overlap issue here. It is included in the target context *)
     let sub_map_m_type = apply_mem_map sub_m_type mem_map in
+    (* Printf.printf "sub_map_m_type:\n%s\n" (sexp_of_t sub_map_m_type |> Sexplib.Sexp.to_string_hum); *)
     List.fold_left2 (
       fun (acc: bool) (sub: entry_t mem_part) (sup: entry_t mem_part) ->
         if not acc then acc else
         let (_, (_, sub_read, sub_write)), sub_part_mem = sub in
         let (_, (_, sup_read, sup_write)), sup_part_mem = sup in
-        let check_imp1 = imply_helper sub_read sup_read in
-        let check_imp2 = imply_helper sub_write sup_write in
+        (* for permission: target (sup) is the subtype of current (sub) *)
+        let check_imp1 = imply_helper sup_read sub_read in
+        let check_imp2 = imply_helper sup_write sub_write in
         let check_mem = List.fold_left2 (
           fun (acc_check: bool) 
-              (sub_info_slot: entry_t mem_slot)
+              (sub_slot: entry_t mem_slot)
               (sup_slot: entry_t mem_slot) ->
             if not acc_check then acc_check
             else
-              let (sub_off, sub_forget_type, sub_range, sub_entry) = sub_info_slot in
-              let slot_result = check_slot_subtype smt_ctx false (sub_off, sub_forget_type, sub_range, sub_entry) sup_slot in
+              let slot_result = check_slot_subtype smt_ctx false sub_slot sup_slot in
               (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
               slot_result
         ) true sub_part_mem sup_part_mem
@@ -810,11 +817,15 @@ module MemType = struct
       match new_part_mem_opt with
       | None -> None
       | Some new_part_mem ->
-        Some (List.map (
+        let new_mem_type = List.map (
           fun ((p, p_info), p_part_mem) ->
             if p = ptr then (p, p_info), new_part_mem
             else PtrInfo.invalidate_on_write ptr (p, p_info), p_part_mem
-        ) mem_type)
+        ) mem_type in
+        (* Printf.printf "mem before:\n%s\nmem_after:\n%s\n"
+          (Sexplib.Sexp.to_string_hum (sexp_of_t mem_type))
+          (Sexplib.Sexp.to_string_hum (sexp_of_t new_mem_type)); *)
+        Some (new_mem_type)
 
   let set_mem_type_with_other
       (smt_ctx: SmtEmitter.t)
