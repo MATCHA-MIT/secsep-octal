@@ -532,7 +532,9 @@ module FuncInterface (Entry: EntryType) = struct
         List.partition_map (
           fun (orig_cond: SingleContext.t) ->
             match SingleContext.try_sub_sol sub_sol_func orig_cond with
-            | Some simp_cond -> Left (orig_cond, simp_cond)
+            | Some simp_cond -> 
+              if SingleContext.has_top simp_cond then Right orig_cond (* Sol for single var in this cond has top *)
+              else Left (orig_cond, simp_cond)
             | None -> Right orig_cond (* Sol for single var in this cond is not resolved *)
         ) p_orig_context
       in
