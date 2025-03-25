@@ -730,6 +730,7 @@ module RangeSubtype = struct
           fun (x: type_rel) ->
             if x.sol = None then
               if List.is_empty x.subtype_list then
+                (* Try to find solution from equal var set. *)
                 let sol =
                   List.find_map (
                     fun ((range_var, _), range_sol) ->
@@ -764,11 +765,15 @@ module RangeSubtype = struct
                   List.map (
                     fun (sub, pc) -> 
                       if pc = (snd x.var_idx) then sub, pc
-                      else
+                      else begin
+                        SmtEmitter.push smt_ctx;
+                        update_br_context_helper smt_ctx block_subtype_list (snd x.var_idx) pc;
                         let sub = MemRange.repl_range_sol smt_ctx range_sol sub in
+                        SmtEmitter.pop smt_ctx 1;
                         sub, pc
                         (* We should not change the subtype's context here!!! *)
                         (* repl_br_map_sol single_sol_repl_helper get_block_var block_subtype_list (snd x.var_idx) (sub, pc) *)
+                      end
                   ) x.subtype_list
                 in
                 { x with subtype_list = subtype_list }, None
