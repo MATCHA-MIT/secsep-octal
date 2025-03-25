@@ -760,7 +760,6 @@ module RangeSubtype = struct
                   { x with sol = sol }, Some (x.var_idx, s)
                 | None -> x, None
               else
-              (* TODO: Possible issue: the smt_ctx here may not contain enough constraints on block variables. *)
                 let subtype_list =
                   List.map (
                     fun (sub, pc) -> 
