@@ -367,8 +367,6 @@ let infer_var_size_map
             (* inited range is not a single const range, use Top *)
             (v, -1) :: acc
         end
-      | SingleEntryType.SingleBExp _ | SingleEntryType.SingleUExp _ ->
-        failwith "expecting var/const/top for mem slot at the start of BB"
       | _ -> acc
   ) res mem_type
   in
@@ -660,6 +658,11 @@ let convert_call_anno
         |> Int64.to_int
       in
       let se = SingleEntryType.repl_local_var single_local_var_map se in
+      (* if pr_reg is a single var, then we know an extra info of var's size *)
+      let from_get_var_size = match se with
+      | SingleEntryType.SingleVar v -> fun var -> if var = v then Some reg_size else from_get_var_size var
+      | _ -> from_get_var_size
+      in
       let se' = convert_dep_type ctx se (get_var_size from_get_var_size) reg_size in
       let te' = convert_taint_type ctx te in
       (se', te')

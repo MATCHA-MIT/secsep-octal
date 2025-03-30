@@ -9749,65 +9749,14 @@ sc_muladd:                              # @sc_muladd
 	.type	main,@function
 main:                                   # @main
 # %bb.0:
-	subq	$72, %rsp
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	leaq	message(%rip), %rsi
-	movq	%rsi, 24(%rsp)
-	movq	$256, 32(%rsp)                  # imm = 0x100
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	pushq	%rax
 	leaq	signature(%rip), %rdi
-	movq	%rdi, 24(%rsp)
-	movq	$64, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	leaq	message(%rip), %rsi
 	leaq	private_key(%rip), %rcx
-	movq	%rcx, 24(%rsp)
-	movq	$64, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
 	movl	$256, %edx                      # imm = 0x100
 	callq	ED25519_sign
 	xorl	%eax, %eax
-	addq	$72, %rsp
+	popq	%rcx
 	retq
 .Lfunc_end17:
 	.size	main, .Lfunc_end17-main
