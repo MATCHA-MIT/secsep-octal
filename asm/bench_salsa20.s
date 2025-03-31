@@ -342,101 +342,43 @@ salsa20:                                # @salsa20
 .Lfunc_end2:
 	.size	salsa20, .Lfunc_end2-salsa20
                                         # -- End function
-	.globl	_start                          # -- Begin function _start
+	.globl	main                            # -- Begin function main
 	.p2align	4, 0x90
-	.type	_start,@function
-_start:                                 # @_start
+	.type	main,@function
+main:                                   # @main
 # %bb.0:
+	pushq	%rbp
 	pushq	%r15
 	pushq	%r14
-	pushq	%r12
 	pushq	%rbx
-	subq	$72, %rsp
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	leaq	key(%rip), %rbx
-	movq	%rbx, 24(%rsp)
-	movq	$32, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	xorl	%r12d, %r12d
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
-	leaq	nonce(%rip), %rax
-	movq	%rax, 24(%rsp)
-	movq	$8, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	pushq	%rax
+	xorl	%ebp, %ebp
+	movq	nonce(%rip), %rbx
 	leaq	msg(%rip), %r14
-	movq	%r14, 24(%rsp)
-	movq	$128, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	nonce(%rip), %r15
+	leaq	key(%rip), %r15
 	.p2align	4, 0x90
 .LBB3_1:                                # =>This Inner Loop Header: Depth=1
-	movl	%r12d, %eax
+	movl	%ebp, %eax
 	andl	$15, %eax
 	movl	$128, %esi
 	subl	%eax, %esi
 	movq	%r14, %rdi
-	movq	%rbx, %rdx
-	movq	%r15, %rcx
+	movq	%r15, %rdx
+	movq	%rbx, %rcx
 	callq	salsa20
-	incl	%r12d
-	cmpl	$100, %r12d
+	incl	%ebp
+	cmpl	$100, %ebp
 	jne	.LBB3_1
 # %bb.2:
-	#APP
-	movl	$60, %eax
-	xorl	%edi, %edi
-	syscall
-	hlt
-
-	#NO_APP
-	addq	$72, %rsp
+	xorl	%eax, %eax
+	addq	$8, %rsp
 	popq	%rbx
-	popq	%r12
 	popq	%r14
 	popq	%r15
+	popq	%rbp
 	retq
 .Lfunc_end3:
-	.size	_start, .Lfunc_end3-_start
+	.size	main, .Lfunc_end3-main
                                         # -- End function
 	.type	key,@object                     # @key
 	.data
@@ -466,5 +408,4 @@ msg:
 	.section	".note.GNU-stack","",@progbits
 	.addrsig
 	.addrsig_sym key
-	.addrsig_sym nonce
 	.addrsig_sym msg

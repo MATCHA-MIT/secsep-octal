@@ -4889,8 +4889,7 @@
          (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -248))
            (SingleBExp SingleAdd (SingleVar 4) (SingleConst -184)))
           (RangeConst
-           (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -248))
-             (SingleBExp SingleAdd (SingleVar 4) (SingleConst -184)))))
+           ())
           ((SingleVar 65) (TaintExp (2 45))))
          (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -184))
            (SingleBExp SingleAdd (SingleVar 4) (SingleConst -120)))
@@ -4901,8 +4900,7 @@
          (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -120))
            (SingleBExp SingleAdd (SingleVar 4) (SingleConst -56)))
           (RangeConst
-           (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -120))
-             (SingleBExp SingleAdd (SingleVar 4) (SingleConst -56)))))
+           ())
           ((SingleVar 67) (TaintExp (2 45))))
          (((SingleBExp SingleAdd (SingleVar 4) (SingleConst -48))
            (SingleBExp SingleAdd (SingleVar 4) (SingleConst -40)))

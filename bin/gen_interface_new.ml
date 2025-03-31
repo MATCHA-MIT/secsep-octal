@@ -35,7 +35,7 @@ let bench_salsa20 : Base_func_interface.mem_t = [
     get_default_info (r RDI), [ ((SingleConst 0L, SingleVar (r RSI)), RangeConst [(SingleConst 0L, SingleVar (r RSI))], SingleTop) ];
     get_default_info (r RDX), [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop) ]
   ];
-  "_start", [
+  "main", [
   ]
 ]
 

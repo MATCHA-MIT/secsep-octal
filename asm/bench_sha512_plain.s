@@ -2313,66 +2313,32 @@ SHA512:                                 # @SHA512
 	.type	main,@function
 main:                                   # @main
 # %bb.0:
-	pushq	%r15
+	pushq	%rbp
 	pushq	%r14
 	pushq	%rbx
-	subq	$64, %rsp
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
+	subq	$16, %rsp
+	movq	$256, 8(%rsp)                   # imm = 0x100
+	xorl	%ebp, %ebp
 	leaq	message(%rip), %rbx
-	movq	%rbx, 24(%rsp)
-	movq	$256, 32(%rsp)                  # imm = 0x100
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	xorl	%r15d, %r15d
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$1296236545, 16(%rsp)           # imm = 0x4D430001
 	leaq	out(%rip), %r14
-	movq	%r14, 24(%rsp)
-	movq	$64, 32(%rsp)
-	movq	$0, 40(%rsp)
-	movq	$0, 48(%rsp)
-	movq	$0, 56(%rsp)
-	leaq	16(%rsp), %rax
-	xorl	%edx, %edx
-	#APP
-	rolq	$3, %rdi
-	rolq	$13, %rdi
-	rolq	$61, %rdi
-	rolq	$51, %rdi
-	xchgq	%rbx, %rbx
-	#NO_APP
-	movq	%rdx, 8(%rsp)
-	movq	8(%rsp), %rax
-	movq	$256, 16(%rsp)                  # imm = 0x100
 	.p2align	4, 0x90
 .LBB7_1:                                # =>This Inner Loop Header: Depth=1
-	movl	%r15d, %eax
+	movl	%ebp, %eax
 	andl	$15, %eax
 	movl	$256, %esi                      # imm = 0x100
 	subl	%eax, %esi
 	movq	%rbx, %rdi
 	movq	%r14, %rdx
 	callq	SHA512
-	incl	%r15d
-	cmpl	$100, %r15d
+	incl	%ebp
+	cmpl	$100, %ebp
 	jne	.LBB7_1
 # %bb.2:
 	xorl	%eax, %eax
-	addq	$64, %rsp
+	addq	$16, %rsp
 	popq	%rbx
 	popq	%r14
-	popq	%r15
+	popq	%rbp
 	retq
 .Lfunc_end7:
 	.size	main, .Lfunc_end7-main
