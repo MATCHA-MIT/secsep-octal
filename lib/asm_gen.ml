@@ -36,7 +36,7 @@ module AsmGen = struct
     let str_of_reg_option (reg_option: Isa.register option): string =
       match reg_option with
       | None -> ""
-      | Some reg -> "%" ^ (Isa.string_of_reg reg)
+      | Some reg -> "%" ^ (Isa.string_of_reg_plain reg)
     in
     let str_of_scale_option (scale_option: Isa.scale option): string =
       match scale_option with
@@ -44,11 +44,11 @@ module AsmGen = struct
       | Some scale -> Isa.scale_to_string scale
     in
     match d, b, i, s with
-    | _, Some base, None, None -> Printf.sprintf "%s(%%%s)" (str_of_disp d) (Isa.string_of_reg base)
-    | None, Some base, Some index, Some scale -> Printf.sprintf "(%%%s, %%%s, %s)" (Isa.string_of_reg base) (Isa.string_of_reg index) (Isa.scale_to_string scale)
+    | _, Some base, None, None -> Printf.sprintf "%s(%%%s)" (str_of_disp d) (Isa.string_of_reg_plain base)
+    | None, Some base, Some index, Some scale -> Printf.sprintf "(%%%s, %%%s, %s)" (Isa.string_of_reg_plain base) (Isa.string_of_reg_plain index) (Isa.scale_to_string scale)
     | Some _, None, None, None -> Printf.sprintf "%s" (str_of_disp d)
-    | Some _, None, Some index, Some scale -> Printf.sprintf "%s(, %%%s, %s)" (str_of_disp d) (Isa.string_of_reg index) (Isa.scale_to_string scale)
-    | Some _, Some base, Some index, None -> Printf.sprintf "%s(%%%s, %%%s, )" (str_of_disp d) (Isa.string_of_reg base) (Isa.string_of_reg index)
+    | Some _, None, Some index, Some scale -> Printf.sprintf "%s(, %%%s, %s)" (str_of_disp d) (Isa.string_of_reg_plain index) (Isa.scale_to_string scale)
+    | Some _, Some base, Some index, None -> Printf.sprintf "%s(%%%s, %%%s, )" (str_of_disp d) (Isa.string_of_reg_plain base) (Isa.string_of_reg_plain index)
     | Some _, _, _, _ -> Printf.sprintf "%s(%s, %s, %s)" (str_of_disp d) (str_of_reg_option b) (str_of_reg_option i) (str_of_scale_option s)
     (* TODO: support more cases *)
     | _ -> asm_gen_error (Printf.sprintf "str_of_memop: not implemented: %s\n" (Isa.string_of_operand(Isa.MemOp (d, b, i, s, None))))
@@ -56,7 +56,7 @@ module AsmGen = struct
   let str_of_operand (ctx: context) (op: Isa.operand) : string =
     match op with
     | ImmOp imm -> str_of_immediate ctx true imm
-    | RegOp reg -> "%" ^ (Isa.string_of_reg reg)
+    | RegOp reg -> "%" ^ (Isa.string_of_reg_plain reg)
     | RegMultOp _ -> asm_gen_error "<TODO> not implemented yet"
     | LdOp (d, b, i, s, _, _)
     | StOp (d, b, i, s, _, _) -> 

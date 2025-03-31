@@ -140,6 +140,22 @@ module IsaBasic = struct
       | _ -> isa_error "expecting xmm register"
     end
 
+  let string_of_reg_plain (r: register) : string =
+    if not (is_xmm r) then
+      r |> string_of_sth reg_map |> Option.get
+    else begin
+      match r with
+      | XMM (idx, os) ->
+        let _ = match os with
+        | None -> ()
+        | Some os ->
+          if os <> xmm_full_off_size then
+            isa_error (Printf.sprintf "expecting xmm register with full size, got %s" (string_of_data_off_size (Some os)))
+        in
+        "xmm" ^ (string_of_int idx)
+      | _ -> isa_error "expecting xmm register"
+    end
+
   (* parser uses this to convert reg name to register *)
   (* XMM's offset & size is initialized to None *)
   let string_to_reg = string_to_sth reg_map
