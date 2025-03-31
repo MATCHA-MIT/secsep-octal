@@ -523,7 +523,7 @@ include ArchTypeBasic
         Printf.printf "Warning: instr after always-taken cond branch is not dead";
         false, curr_type
       end else
-        check_taken (), curr_type (* already at the last alive instruction, no further update *)
+        check_taken (), { curr_type with pc = curr_type.pc + 1 } (* update pc so block check can terminate *)
     | SmtEmitter.SatUnknown ->
       (* check_not_taken must be called later, as it adds assertions and changes the global ctx *)
       let taken_valid = check_taken() in
