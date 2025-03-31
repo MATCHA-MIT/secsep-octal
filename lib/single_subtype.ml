@@ -1485,13 +1485,18 @@ module SingleSubtype = struct
         if tv_rel.sol <> SolNone then acc, tv_rel
         else
           (* Merge same subtype exp, keep the smaller pc which means fewer constraints from cond branch *)
-          let rec merge (last_entry: (SingleEntryType.t * int) option) (sub_list: type_pc_list_t list) : type_pc_list_t list =
+          let rec merge (last_entry: type_pc_list_t option) (sub_list: type_pc_list_t list) : type_pc_list_t list =
             match last_entry, sub_list with
-            | _, [] -> []
-            | None, (hd_exp, hd_pc) :: tl -> (hd_exp, hd_pc) :: (merge (Some (hd_exp, list_tl hd_pc)) tl)
+            | None, [] -> []
+            | Some last, [] -> [ last ]
+            | None, hd :: tl -> merge (Some hd) tl
             | Some (last_exp, last_pc), (hd_exp, hd_pc) :: tl ->
-              if SingleEntryType.cmp hd_exp last_exp = 0 && last_pc = list_tl hd_pc then merge last_entry tl
-              else (hd_exp, hd_pc) :: (merge (Some (hd_exp, list_tl hd_pc)) tl)
+              if SingleEntryType.cmp hd_exp last_exp = 0 && list_tl last_pc = list_tl hd_pc then 
+                (* Keep one of last and hd which has smaller pc list (more direct subtype) *)
+                if List.length last_pc < List.length hd_pc then merge last_entry tl
+                else merge (Some (hd_exp, hd_pc)) tl
+              else (* Keep both last and hd since they are different, and use hd to merge with following *)
+                (last_exp, last_pc) :: (hd_exp, hd_pc) :: (merge (Some (hd_exp, hd_pc)) tl)
           in
           let subtype_list =
             merge None (List.sort (
