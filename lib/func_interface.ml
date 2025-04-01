@@ -261,7 +261,8 @@ module FuncInterface (Entry: EntryType) = struct
       let p_range, out_range_constraint, out_range_useful_var =
         if MemRange.is_val single_var_set c_out_range then
           let m_out_range = MemRange.repl_context_var single_var_map c_out_range in
-          MemRange.merge smt_ctx p_range m_out_range, [], MemRange.get_vars m_out_range
+          (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
+          MemRange.merge smt_ctx p_range m_out_range |> fst, [], MemRange.get_vars m_out_range
         else p_range, [ Constraint.Unknown (SingleTop, SingleTop) ], SingleExp.SingleVarSet.empty
       in
       let m_out_entry = (* m_out_entry is only used to update the slot when the corresponding part_mem is writable *)

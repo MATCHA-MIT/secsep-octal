@@ -66,6 +66,7 @@ module SingleSubtype = struct
   type var_pc_list_t = IsaBasic.imm_var_id * (int list) (* supertype var, path pc list *)
   [@@deriving sexp]
   type type_pc_t = SingleEntryType.t * int
+  [@@deriving sexp]
   type type_pc_list_t = SingleEntryType.t * (int list) (* subtype, path pc list *)
   [@@deriving sexp]
 
@@ -1544,12 +1545,12 @@ module SingleSubtype = struct
       (func_type: ArchType.t list)
       (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t)
-      (tv_rel: type_rel) : SingleExp.t option =
+      (tv_rel: type_rel) : SingleSol.t option =
     match tv_rel.sol with
     | SolSimple (SingleSet sol_set) ->
       begin match sol_set with
       | [] -> single_subtype_error "empty sol set"
-      | [ sol ] -> Some sol
+      | [ sol ] -> Some (SolSimple (Single sol))
       | _ ->
         (* 1. Filter direct subtypes *)
         let direct_subtype =
@@ -1613,18 +1614,25 @@ module SingleSubtype = struct
           SmtEmitter.pop smt_ctx 1;
           general_sol_candidate
         in
+        let simp_subtype_set = List.map fst single_direct_subtype |> SingleExpSet.of_list in
         let general_sol_candidate =
           List.fold_left get_equal_set 
-            (List.map fst single_direct_subtype |> SingleExpSet.of_list)
+            simp_subtype_set
             single_direct_subtype
           |> SingleExpSet.to_list
         in
         match general_sol_candidate with
-        | [] -> None
+        | [] -> 
+          if SingleExpSet.cardinal simp_subtype_set < List.length sol_set then begin
+            let simp_subtype_list = SingleExpSet.to_list simp_subtype_set in
+            Printf.printf "Partial merge sol for SymImm %d\n" (fst tv_rel.var_idx);
+            Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleEntryType.sexp_of_t simp_subtype_list));
+            Some (SolSimple (SingleSet simp_subtype_list)) 
+          end else None
         | hd :: _ -> 
           Printf.printf "Merge sol for SymImm %d\n" (fst tv_rel.var_idx);
           Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleEntryType.sexp_of_t general_sol_candidate));
-          Some hd (* TODO: Consider to pick the best one later *)
+          Some (SolSimple (Single hd)) (* TODO: Consider to pick the best one later *)
       end
     | _ -> None
 
@@ -1638,9 +1646,9 @@ module SingleSubtype = struct
       let merge_one_helper
         (acc: bool) (tv_rel: type_rel) : bool * type_rel =
         match merge_one_set_sol smt_ctx input_var_set func_type block_subtype_list tv_rel_list tv_rel with
-        | Some single_sol ->
+        | Some simp_sol ->
           true,
-          { tv_rel with sol = SolSimple (Single single_sol) }
+          { tv_rel with sol = simp_sol }
         | _ -> acc, tv_rel
       in
       let find_new_sol, tv_rel_list =

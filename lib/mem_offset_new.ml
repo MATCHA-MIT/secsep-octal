@@ -203,7 +203,7 @@ module MemOffset = struct
   let insert_new_offset_list_helper
       (prefer_to_merge: bool)
       (smt_ctx: SmtEmitter.t)
-      (ob_list: (t * bool) list) (new_o_list: t list) : (t * bool) list =
+      (ob_list: (t * bool) list) (new_o_list: t list) : ((t * bool) list) * bool =
     (* TODO: filter new_o_list, only focus on addresses involving rsp *)
     (* let stamp_beg = Unix.gettimeofday () in *)
     (* Printf.printf "\ninsert_new_offset_list:\n\ninitial ob_list begin\n"; *)
@@ -212,17 +212,20 @@ module MemOffset = struct
     (* List.iter (fun o -> Printf.printf "%s\n" (to_string o)) new_o_list; *)
     (* Printf.printf "\nend of debug output\n"; *)
     (* We assume offset in offset_list is sorted from smaller to larger *)
-    let rec insert_one_offset (ob_list: (t * bool) list) (new_o: t) : (t * bool) list =
+    let rec insert_one_offset (ob_list: (t * bool) list) (new_o: t) : (t * bool) list * bool =
       match ob_list with
-      | [] -> [ (new_o, true) ]
+      | [] -> [ (new_o, true) ], true
       | (hd_o, hd_updated) :: tl ->
         (* We just need heuristic quick cmp here since we are going to assert no_overflow after inserting offsets*)
         let cmp_mode = if prefer_to_merge then CmpOverlap else CmpAll in
         begin match offset_quick_cmp smt_ctx new_o hd_o cmp_mode with
-        | Eq | Subset -> (hd_o, hd_updated) :: tl
+        | Eq | Subset -> (hd_o, hd_updated) :: tl, true
         | Supset -> insert_one_offset tl new_o
-        | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl
-        | Ge -> (hd_o, hd_updated) :: (insert_one_offset tl new_o)
+        | Le -> (new_o, true) :: (hd_o, hd_updated) :: tl, true
+        | Ge -> 
+          let new_tl, insert_tl_success = insert_one_offset tl new_o in
+          (hd_o, hd_updated) :: new_tl, insert_tl_success
+          (* (hd_o, hd_updated) :: (insert_one_offset tl new_o) *)
         | LOverlap ->
           let new_l, _ = new_o in
           let _, hd_r = hd_o in
@@ -234,18 +237,21 @@ module MemOffset = struct
         | Other -> 
           Printf.printf "Warning insert_one_offset fail compare new offset %s with known offset %s\n" 
               (to_string new_o) (to_string hd_o);
-          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
-          (hd_o, hd_updated) :: tl
+          let full_cmp_result = offset_quick_cmp smt_ctx new_o hd_o CmpAll in 
+          Printf.printf "full cmp result %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_off_rel_t full_cmp_result));
+          SmtEmitter.pp_smt_ctx 0 smt_ctx;
+          (hd_o, hd_updated) :: tl, false
           (* mem_offset_error 
             (Printf.sprintf "insert_one_offset fail compare new offset %s with known offset %s" 
               (to_string new_o) (to_string hd_o)) *)
         end
     in
-    let result = List.fold_left insert_one_offset ob_list new_o_list in
+    let result, success_list = List.fold_left_map insert_one_offset ob_list new_o_list in
+    let success = List.fold_left (fun acc x -> acc && x) true success_list in
     (* Printf.printf "\nresult:\n";
     List.iter (fun (o, _) -> Printf.printf "%s\n" (to_string o)) result; *)
     (* Printf.printf "\ntime elapsed (insert_new_offset_list): %f\n" (Unix.gettimeofday () -. stamp_beg); *)
-    result
+    result, success
 
   let insert_new_offset_list (* = insert_new_offset_list_helper false *)
       (smt_ctx: SmtEmitter.t)
@@ -492,20 +498,23 @@ module MemRange = struct
       mem_range_error 
         (Printf.sprintf "Cannot add base %s to %s" (SingleExp.to_string base_ptr) (to_string r))
 
-  let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
+  let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t * bool =
     (* TODO: re-implement this later!!! *)
-    let helper (o1_list: MemOffset.t list) (o2_list: MemOffset.t list) : MemOffset.t list =
+    let helper (o1_list: MemOffset.t list) (o2_list: MemOffset.t list) : MemOffset.t list * bool =
       let ob_list = List.map (fun x -> (x, false)) o1_list in
-      let ob_list = MemOffset.insert_new_offset_list_merge smt_ctx ob_list (List.rev o2_list) in
-      List.map (fun (x, _) -> x) ob_list
+      let ob_list, success = MemOffset.insert_new_offset_list_merge smt_ctx ob_list (List.rev o2_list) in
+      List.map (fun (x, _) -> x) ob_list, success
     in
     match r1, r2 with
-    | RangeConst o1, RangeConst o2 -> RangeConst (helper o1 o2)
+    | RangeConst o1, RangeConst o2 -> 
+      let merged_o, merge_success = helper o1 o2 in
+      RangeConst merged_o, merge_success
+      (* RangeConst (helper o1 o2) *)
     | RangeVar v, RangeConst o | RangeConst o, RangeVar v -> 
-      if List.is_empty o then RangeVar v else RangeExp (v, o)
+      if List.is_empty o then RangeVar v, true else RangeExp (v, o), true
     | RangeExp (v, o1), RangeConst o2 | RangeConst o1, RangeExp (v, o2) -> 
-      let merged_o = helper o1 o2 in
-      if List.is_empty merged_o then RangeVar v else RangeExp (v, merged_o)
+      let merged_o, merge_success = helper o1 o2 in
+      if List.is_empty merged_o then RangeVar v, merge_success else RangeExp (v, merged_o), merge_success
     | _ -> mem_range_error (Printf.sprintf "Cannot merge %s and %s" (to_string r1) (to_string r2))
     (* let _ = smt_ctx in r1 @ r2 *)
 
@@ -519,11 +528,17 @@ module MemRange = struct
 
   let repl_range_sol
       (smt_ctx: SmtEmitter.t)
+      (single_sol_sub_sol_offset_to_offset_list_helper: (MemOffset.t * int) -> MemOffset.t list option)
       (* (single_sol_repl_helper: (SingleExp.t * int) -> SingleExp.t) *)
       (range_sol: ((range_var_id * int) * t) list) 
-      (r: t) : t =
+      (r_pc: t * int) : t =
       (* (r_pc: t * int) : t = *)
-    (* let r, pc = r_pc in *)
+    let r, pc = r_pc in
+    (* let assert_const_validity_helper
+        (const_part: MemOffset.t list) : unit =
+      let cond_list = List.map (fun (l, r) -> (SingleCondType.Lt, l, r)) const_part in
+      SingleCondType.add_assertions smt_ctx cond_list
+    in *)
     let find_var =
       match r with
       | RangeConst _ -> None
@@ -542,8 +557,47 @@ module MemRange = struct
       begin match find_sol with
       | Some sol -> 
         (* let sol = repl single_sol_repl_helper pc sol in *)
-        (* Printf.printf "!!! merge %s %s\n" (to_string sol) (to_string (RangeConst const_part)); *)
-        merge smt_ctx sol (RangeConst const_part)
+        (* if v = 103 then
+          Printf.printf "!!! merge %s %s\n" (to_string sol) (to_string (RangeConst const_part));
+        SmtEmitter.push smt_ctx;
+        assert_const_validity_helper const_part; *)
+        let result, merge_success = merge smt_ctx sol (RangeConst const_part) in
+        (* SmtEmitter.pop smt_ctx 1; *)
+        if merge_success then result else
+        begin match sol, const_part with
+        | RangeConst [off1], [off2] -> 
+          begin match single_sol_sub_sol_offset_to_offset_list_helper (off1, pc), single_sol_sub_sol_offset_to_offset_list_helper (off2, pc) with
+          | Some off1_list, Some off2_list ->
+            let simp_opt =
+              List.find_map (
+                fun (off1_l, off1_r) ->
+                  List.find_map (
+                    fun (off2_l, off2_r) ->
+                      if SingleExp.cmp off1_r off2_l = 0 then
+                        Some (fst off1, snd off2)
+                      else if SingleExp.cmp off2_r off1_l = 0 then
+                        Some (fst off2, snd off1)
+                      else None
+                  ) off2_list
+              ) off1_list
+            in
+            begin match simp_opt with
+            | Some simp_off -> 
+              Printf.printf "repl_range_sol heuristically merge %s %s\n" (to_string sol) (to_string (RangeConst const_part));
+              Printf.printf "get %s\n" (MemOffset.to_string simp_off);
+              RangeConst [simp_off]
+            | None ->
+              Printf.printf "Warning: repl_range_sol fail to merge %s %s\n" (to_string sol) (to_string (RangeConst const_part));
+              sol
+            end
+          | _ ->
+            Printf.printf "Warning: repl_range_sol fail to merge %s %s\n" (to_string sol) (to_string (RangeConst const_part));
+            sol
+          end
+        | _ -> 
+          Printf.printf "Warning: repl_range_sol fail to merge %s %s\n" (to_string sol) (to_string (RangeConst const_part));
+          sol
+        end
       | None -> r
       end
     

@@ -443,7 +443,8 @@ module MemType (Entry: EntryType) = struct
             fun (acc: MemRange.t * (Constraint.t list)) (slot: entry_t mem_slot) ->
               let acc_range, acc_cons = acc in
               let _, range, entry = slot in
-              MemRange.merge smt_ctx acc_range range,
+              (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
+              MemRange.merge smt_ctx acc_range range |> fst,
               (Entry.get_eq_taint_constraint merged_entry entry) @ acc_cons
           ) (RangeConst [], []) slot_list
         in
@@ -924,7 +925,8 @@ module MemType (Entry: EntryType) = struct
               let new_range: MemRange.t = RangeConst [orig_addr_off] in
               (Some (ptr, off, false, 1), cons), (off, new_range, new_val)
             end else begin
-              let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
+              (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
+              let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range |> fst else range in
               (Some (ptr, off, false, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, Entry.mem_partial_write_val entry_val new_val)
             end
           | _ -> acc, entry
@@ -1075,7 +1077,8 @@ module MemType (Entry: EntryType) = struct
             (off, new_range, new_val) 
           else
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
-            let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range else range in
+            (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
+            let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range |> fst else range in
             Some (
               (* I do not add range must known here, since it is not spill (will not be overwritten in current version) *)
               (Entry.get_must_known_taint_constraint entry_val) @ 

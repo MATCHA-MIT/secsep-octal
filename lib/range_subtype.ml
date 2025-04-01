@@ -300,12 +300,16 @@ module RangeSubtype = struct
             let off_l_next = SingleEntryType.eval (SingleEntryType.repl_var_exp off_l map_to_next) in
             let off_r_next = SingleEntryType.eval (SingleEntryType.repl_var_exp off_r map_to_next) in
             if SingleEntryType.cmp off_r off_l_next = 0 then
+              (* <TODO> The merge may fail here. Handle this later *)
               Some (MemRange.merge smt_ctx (RangeConst base_range)
-                (RangeConst [ full_l, SingleEntryType.eval (SingleEntryType.repl_var_exp off_l map_to_sup) ])
+                (RangeConst [ full_l, SingleEntryType.eval (SingleEntryType.repl_var_exp off_l map_to_sup) ]) 
+                |> fst
               )
             else if SingleEntryType.cmp off_l off_r_next = 0 then
+              (* <TODO> The merge may fail here. Handle this later *)
               Some (MemRange.merge smt_ctx (RangeConst base_range)
-                (RangeConst [ SingleEntryType.eval (SingleEntryType.repl_var_exp off_r map_to_sup), full_r ])
+                (RangeConst [ SingleEntryType.eval (SingleEntryType.repl_var_exp off_r map_to_sup), full_r ]) 
+                |> fst
               )
             else
               None
@@ -734,6 +738,7 @@ module RangeSubtype = struct
 
   let repl_range_val_sol
       (smt_ctx: SmtEmitter.t)
+      (single_sol_sub_sol_offset_to_offset_list_helper: (MemOffset.t * int) -> MemOffset.t list option)
       (* (single_sol_repl_helper: (SingleEntryType.t * int) -> SingleEntryType.t) *)
       (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t)
       (block_subtype_list: ArchType.block_subtype_t list)
@@ -790,7 +795,7 @@ module RangeSubtype = struct
                       else begin
                         SmtEmitter.push smt_ctx;
                         update_br_context_helper smt_ctx block_subtype_list (snd x.var_idx) pc;
-                        let sub = MemRange.repl_range_sol smt_ctx range_sol sub in
+                        let sub = MemRange.repl_range_sol smt_ctx single_sol_sub_sol_offset_to_offset_list_helper range_sol (sub, pc) in
                         SmtEmitter.pop smt_ctx 1;
                         sub, pc
                         (* We should not change the subtype's context here!!! *)
@@ -901,7 +906,11 @@ module RangeSubtype = struct
         in
         if List.length new_sol = 0 then tv_rel_list
         else
-          let tv_rel_list = repl_range_val_sol smt_ctx get_block_var block_subtype_list new_sol tv_rel_list in
+          let single_sol_sub_sol_offset_to_offset_list_helper =
+            SingleSubtype.sub_sol_offset_to_offset_list 
+              (fun x -> x) single_sol input_var_set
+          in
+          let tv_rel_list = repl_range_val_sol smt_ctx single_sol_sub_sol_offset_to_offset_list_helper get_block_var block_subtype_list new_sol tv_rel_list in
           let tv_rel_list = get_equal_var_constraint tv_rel_list in
           helper tv_rel_list (iter - 1)
       end
