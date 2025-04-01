@@ -461,12 +461,12 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
     get_const_default_info (r RCX), [ (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop ];
   ];
   "ge_p3_tobytes", [
-    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], SingleTop ];
+    get_default_info (r RDI), [ (SingleConst 0L, SingleConst 32L), RangeConst [], SingleTop ];
     get_const_default_info (r RSI), [
-      (SingleConst 0L, SingleConst 40L), RangeConst [], SingleTop;
-      (SingleConst 40L, SingleConst 80L), RangeConst [], SingleTop;
-      (SingleConst 80L, SingleConst 120L), RangeConst [], SingleTop;
-      (SingleConst 120L, SingleConst 160L), RangeConst [], SingleTop;
+      (SingleConst 0L, SingleConst 40L), RangeConst [(SingleConst 0L, SingleConst 40L)], SingleTop;
+      (SingleConst 40L, SingleConst 80L), RangeConst [(SingleConst 40L, SingleConst 80L)], SingleTop;
+      (SingleConst 80L, SingleConst 120L), RangeConst [(SingleConst 80L, SingleConst 120L)], SingleTop;
+      (SingleConst 120L, SingleConst 160L), RangeConst [(SingleConst 120L, SingleConst 160L)], SingleTop;
     ];
   ];
   "ED25519_sign", [
