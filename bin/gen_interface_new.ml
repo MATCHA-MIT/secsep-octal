@@ -40,7 +40,7 @@ let bench_salsa20 : Base_func_interface.mem_t = [
 ]
 
 let bench_salsa20_taint_api : Taint_api.TaintApi.t = [
-  "_start",
+  "main",
   get_reg_taint [],
   [
     get_default_info (r RSP), [];
