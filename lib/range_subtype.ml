@@ -33,6 +33,8 @@ module RangeSubtype = struct
     (* supertype_list: MemRange.range_var_id list; *)
     equal_var_set: IntSet.t;
     read_constraint_list: MemOffset.t list;
+    other_equal_var_has_empty_subtype: bool; (* This field is true if current var does not have empty subtype, while its equal vars have. *)
+    equal_var_has_read_constraint: bool; (* This field is true if current var or its equal var have read constraints. *)
   }
   [@@deriving sexp]
 
@@ -59,7 +61,9 @@ module RangeSubtype = struct
     List.iter (fun sub -> PP.print_lvl (lvl + 2) "%s;\n" (type_exp_to_string sub)) x.subtype_list;
     PP.print_lvl (lvl + 1) "]\n";
     PP.print_lvl (lvl + 1) "EqualSet: %s\n" (Sexplib.Sexp.to_string (IntSet.sexp_of_t x.equal_var_set));
-    PP.print_lvl (lvl + 1) "ReadConstraintList: %s\n" (Sexplib.Sexp.to_string (sexp_of_list MemOffset.sexp_of_t x.read_constraint_list))
+    PP.print_lvl (lvl + 1) "ReadConstraintList: %s\n" (Sexplib.Sexp.to_string (sexp_of_list MemOffset.sexp_of_t x.read_constraint_list));
+    PP.print_lvl (lvl + 1) "other_equal_var_has_empty_subtype: %b\n" (x.other_equal_var_has_empty_subtype);
+    PP.print_lvl (lvl + 1) "equal_var_has_read_constraint: %b\n" (x.equal_var_has_read_constraint)
 
   let pp_range_subtype (lvl: int) (tv_rels: t) =
     List.iter (fun x -> pp_type_rel lvl x) tv_rels
@@ -83,6 +87,8 @@ module RangeSubtype = struct
         equal_subtype_list = [];
         equal_var_set = IntSet.empty;
         read_constraint_list = [];
+        other_equal_var_has_empty_subtype = false;
+        equal_var_has_read_constraint = false;
       } in
       new_tv_rel :: tv_rel_list
 
@@ -145,6 +151,8 @@ module RangeSubtype = struct
             equal_subtype_list = []; 
             equal_var_set = IntSet.empty;
             read_constraint_list = [];
+            other_equal_var_has_empty_subtype = false;
+            equal_var_has_read_constraint = false;
           } :: acc
     ) [] mem_subtype
 
@@ -212,7 +220,7 @@ module RangeSubtype = struct
           | _ -> true
       ) tv_rel.subtype_list
     in
-    if List.length tv_rel.subtype_list = 0 || find_not_full <> None then None
+    if List.length tv_rel.subtype_list = 0 || find_not_full <> None || tv_rel.other_equal_var_has_empty_subtype then None
     else Some (RangeConst [ tv_rel.off ])
 
   let try_solve_empty 
@@ -237,7 +245,7 @@ module RangeSubtype = struct
             | _ -> false *)
         ) tv_rel.subtype_list
       in
-      if find_not_val <> None then None
+      if find_not_val <> None || tv_rel.equal_var_has_read_constraint then None
       else Some (RangeConst [])
     else None
 
@@ -438,6 +446,9 @@ module RangeSubtype = struct
             (* We need this since sometimes RangeExp(v, [l, r]) can generate 
                sol pattern [off_l, r] or [l, off_r] after v is resolved,
                but [l, r] cannot be a sol pattern. *)
+            (* Example to illustrate this case: slot [off_l, off_r] have two subtypes (1) emptyset; (2) v U [l, r]
+               If v = [off_l, l], and under the context of (1), there is [off_l, r]=emptyset (i.e., off_l=r), then [off_l, r] can be the sol template
+               If v = [r, off_r], and under the context of (1), there is [l, off_r]=emptyset (i.e., l=off_r), then [l, off_r] can be the sol template *)
             SingleCondType.check true smt_ctx [ Eq, (fst sup_full_off), r ] = SatYes
             || SingleCondType.check true smt_ctx [ Eq, l, (snd sup_full_off) ] = SatYes
           )) then 
@@ -527,7 +538,13 @@ module RangeSubtype = struct
     let sol_off_candidate = 
       List.fold_left get_sat_off_set sol_off_candidate single_naive_sub_list
     in
-    get_sol_helper sol_off_candidate
+    let sol = get_sol_helper sol_off_candidate in
+    (* Use other_equal_var_has_empty_subtype and equal_var_has_read_constraint to avoid generating too aggressive solution without checking equal var's constraints. *)
+    match sol with
+    | None -> sol
+    | Some (RangeConst []) -> if tv_rel.equal_var_has_read_constraint then None else sol
+    | Some (RangeConst _) -> if tv_rel.other_equal_var_has_empty_subtype then None else sol
+    | _ -> sol
 
   let try_solve_hybrid_slot
       (smt_ctx: SmtEmitter.t)
@@ -584,26 +601,29 @@ module RangeSubtype = struct
          If exp_off does not add extra constraints, then we can go without knowing RangeVar, otherwise we cannot *)
       if List.length const_sol_candidate_1 > List.length const_sol_candidate_2 then None else
       let no_exp_sol_candidate () : bool =
-        Printf.printf "<RangeVar %d> call no_exp_sol_candidate\n" (fst tv_rel.var_idx);
+        (* Printf.printf "<RangeVar %d> call no_exp_sol_candidate\n" (fst tv_rel.var_idx); *)
         let exp_sol_candidate =
           List.filter_map fst single_exp_sub_list |> List.map (fun x -> x, 0)
         in
-        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
+        (* Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst))); *)
         let exp_sol_candidate =
           List.fold_left (get_sat_off_set true) exp_sol_candidate single_const_sub_list
         in
-        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
+        (* Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst))); *)
         let exp_sol_candidate =
           List.fold_left (get_sat_off_set true) exp_sol_candidate single_const_sub_list
         in
-        Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
+        if not (List.is_empty exp_sol_candidate) then
+          Printf.printf "<RangeVar %d %d> call no_exp_sol_candidate\n" (fst tv_rel.var_idx) (snd tv_rel.var_idx);
+          Printf.printf "exp_sol_candidate %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list MemOffset.sexp_of_t (List.split exp_sol_candidate |> fst)));
         List.is_empty exp_sol_candidate
       in
 
       match get_sol_helper const_sol_candidate_1 with
       | None ->
         if List.find_opt (fun (x, _) -> x = None) single_const_sub_list <> None (* Has empty subtype *)
-          && no_exp_sol_candidate () then (* no exp sol candidate, empty set is not too conservative *)
+          && no_exp_sol_candidate () (* no exp sol candidate, empty set is not too conservative *)
+          && not tv_rel.equal_var_has_read_constraint then (* Use equal_var_has_read_constraint to avoid generating too aggressive solution without checking equal var's constraints. *)
           Some (RangeConst [])
         else None
       | Some sol ->
@@ -612,8 +632,10 @@ module RangeSubtype = struct
           | RangeConst [ sol_off ] -> MemOffset.cmp sol_off tv_rel.off = 0
           | _ -> false
         in
-        if is_full then Some sol else
-        if no_exp_sol_candidate () then Some sol else None
+        (* Use other_equal_var_has_empty_subtype to avoid generating too aggressive solution without checking equal var's constraints. *)
+        if (is_full || no_exp_sol_candidate ()) && (not tv_rel.other_equal_var_has_empty_subtype) then Some sol else None
+        (* if is_full then Some sol else
+        if no_exp_sol_candidate () then Some sol else None *)
 
   let solve_one_var
       (smt_ctx: SmtEmitter.t)
@@ -760,6 +782,7 @@ module RangeSubtype = struct
                   { x with sol = sol }, Some (x.var_idx, s)
                 | None -> x, None
               else
+                (* 1. Simplify subtype *)
                 let subtype_list =
                   List.map (
                     fun (sub, pc) -> 
@@ -775,7 +798,19 @@ module RangeSubtype = struct
                       end
                   ) x.subtype_list
                 in
-                { x with subtype_list = subtype_list }, None
+                (* 2. Add equal var back to subtype list if it is resolved, so that inference can also use equal var's sol *)
+                let new_subtype_list =
+                  List.filter_map (
+                    fun (equal_var_pc: var_idx_t) ->
+                      let equal_var, equal_pc = equal_var_pc in
+                      List.find_map (
+                        fun ((range_var, _), range_sol) ->
+                          if range_var = equal_var then Some (range_sol, equal_pc)
+                          else None
+                      ) range_sol
+                  ) x.equal_subtype_list
+                in
+                { x with subtype_list = new_subtype_list @ subtype_list }, None
             else x, None
         ) tv_rel_list |> List.split
       in
@@ -785,6 +820,56 @@ module RangeSubtype = struct
       else helper tv_rel_list range_sol
     in
     helper tv_rel_list range_sol
+
+  let get_equal_var_constraint
+      (tv_rel_list: t) : t =
+    let check_has_empty (tv_rel: type_rel) : bool =
+      List.find_opt (
+        fun (subtype: type_exp_t) ->
+          let sub, _ = subtype in
+          match sub with
+          | RangeConst [] -> true
+          | _ -> false
+      ) tv_rel.subtype_list <> None
+    in
+    let check_has_read_constraint (tv_rel: type_rel) = not (List.is_empty tv_rel.read_constraint_list) in
+    let helper
+        (acc: (bool * bool) IntMap.t)
+        (tv_rel: type_rel) : (bool * bool) IntMap.t =
+      let var_idx, _ = tv_rel.var_idx in
+      let var_has_empty_subtype, var_has_read_constraint =
+        match IntMap.find_opt var_idx acc with
+        | None -> false, false
+        | Some x -> x
+      in
+      if var_has_empty_subtype && var_has_read_constraint then acc
+      else
+        let new_entry = (var_has_empty_subtype || check_has_empty tv_rel, var_has_read_constraint || check_has_read_constraint tv_rel) in
+        if new_entry = (var_has_empty_subtype, var_has_read_constraint) then acc else
+        List.fold_left (
+          fun (acc: (bool * bool) IntMap.t) (key: MemRange.range_var_id) ->
+            IntMap.add key new_entry acc 
+        ) acc (IntSet.add var_idx tv_rel.equal_var_set |> IntSet.to_list)
+    in
+    let constraint_map = 
+      List.map (
+        fun (tv_rel: type_rel) -> 
+            (fst tv_rel.var_idx, (tv_rel.other_equal_var_has_empty_subtype, tv_rel.equal_var_has_read_constraint))
+      ) tv_rel_list |> IntMap.of_list 
+    in
+    let constraint_map = List.fold_left helper constraint_map tv_rel_list in
+    List.map (
+      fun (tv_rel: type_rel) ->
+        let var_idx, _ = tv_rel.var_idx in
+        match IntMap.find_opt var_idx constraint_map with
+        | None -> tv_rel
+        | Some (var_has_empty_subtype, var_has_read_constraint) ->
+          let var_has_empty_subtype =
+            if check_has_empty tv_rel then false (* If tv_rel itself has empty subtype, then no need to rely on other_equal_var_has_empty_subtype to filter *)
+            else var_has_empty_subtype
+          in
+          { tv_rel with other_equal_var_has_empty_subtype = var_has_empty_subtype; equal_var_has_read_constraint = var_has_read_constraint}
+    ) tv_rel_list
 
   let solve
       (smt_ctx: SmtEmitter.t)
@@ -800,6 +885,7 @@ module RangeSubtype = struct
     let ctx_map_map = ArchContextMap.init input_var_set block_subtype_list in
     Printf.printf "ctx_map_map\n%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map));
     let get_block_var = fun r -> SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) input_var_set in
+    let tv_rel_list = get_equal_var_constraint tv_rel_list in
     let rec helper (tv_rel_list: t) (iter: int) : t =
       if iter <= 0 then tv_rel_list
       else begin
@@ -816,6 +902,7 @@ module RangeSubtype = struct
         if List.length new_sol = 0 then tv_rel_list
         else
           let tv_rel_list = repl_range_val_sol smt_ctx get_block_var block_subtype_list new_sol tv_rel_list in
+          let tv_rel_list = get_equal_var_constraint tv_rel_list in
           helper tv_rel_list (iter - 1)
       end
     in
