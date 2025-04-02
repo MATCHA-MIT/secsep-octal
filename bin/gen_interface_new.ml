@@ -47,6 +47,7 @@ let bench_salsa20_taint_api : Taint_api.TaintApi.t = [
   ];
 ]
 
+(*
 let standalone_salsa20_noinline_global : External_layouts.GlobalSymbolLayout.t = [
   "key", [ ((SingleConst 0L, SingleConst 32L), RangeConst [(SingleConst 0L, SingleConst 32L)], (SingleTop, TaintConst true)) ];
   "nonce", [ ((SingleConst 0L, SingleConst 8L), RangeConst [(SingleConst 0L, SingleConst 8L)], (SingleTop, TaintConst true)) ];
@@ -77,6 +78,7 @@ let standalone_salsa20_noinline_taint_api : Taint_api.TaintApi.t = [
     get_default_info (r RSP), [];
   ];
 ]
+*)
 
 let bench_sha512_plain_global : External_layouts.GlobalSymbolLayout.t = [
   "K512",  [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], (SingleTop, TaintConst true) ];
@@ -118,6 +120,7 @@ let bench_sha512_plain_taint_api : Taint_api.TaintApi.t = [
   ];
 ]
 
+(*
 let bench_ed25519_plain_global : External_layouts.GlobalSymbolLayout.t = [
   "K512", [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], (SingleTop, TaintConst true) ];
   "k25519Precomp", [ ((SingleConst 0L, SingleConst 24576L), RangeConst [(SingleConst 0L, SingleConst 24576L)], (SingleTop, TaintConst true)) ];
@@ -282,6 +285,7 @@ let bench_ed25519_plain : Base_func_interface.mem_t = [
   "main", [
   ];
 ]
+*)
 
 let bench_ed25519_plain_noinline_global : External_layouts.GlobalSymbolLayout.t = [
   "K512", [ (SingleConst 0L, SingleConst 640L), RangeConst [(SingleConst 0L, SingleConst 640L)], (SingleTop, TaintConst true) ];
@@ -651,6 +655,7 @@ let () =
   let channel = open_out "./interface/bench_salsa20.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t bench_salsa20_taint_api);
 
+  (*
   let channel = open_out "./interface/standalone_salsa20_noinline.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t standalone_salsa20_noinline_global);
 
@@ -660,6 +665,7 @@ let () =
 
   let channel = open_out "./interface/standalone_salsa20_noinline.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t standalone_salsa20_noinline_taint_api);
+  *)
 
   let channel = open_out "./interface/bench_sha512_plain.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_sha512_plain_global);
@@ -671,12 +677,14 @@ let () =
   let channel = open_out "./interface/bench_sha512_plain.taint_api" in
   Sexp.output_hum channel (Taint_api.TaintApi.sexp_of_t bench_sha512_plain_taint_api);
 
+  (*
   let channel = open_out "./interface/bench_ed25519_plain.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_ed25519_plain_global);
 
   let channel = open_out "./interface/bench_ed25519_plain.mem_interface" in
   let stack = External_layouts.StackLayout.from_file "./out/bench_ed25519_plain.stack_layout" in
   Sexp.output_hum channel (Base_func_interface.sexp_of_t (Base_func_interface.add_stack_layout bench_ed25519_plain stack));
+  *)
 
   let channel = open_out "./interface/bench_ed25519_plain_noinline.symbol_layout" in
   Sexp.output_hum channel (External_layouts.GlobalSymbolLayout.sexp_of_t bench_ed25519_plain_noinline_global);

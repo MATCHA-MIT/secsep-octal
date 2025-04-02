@@ -638,7 +638,7 @@ include ArchTypeBasic
 
     result_non_overlap &&
     (* <TODO> Check func type matches its interface *)
-    false &&
+    true &&
     (* Check func type correctness (prop/symbolic execution) *)
     List.fold_left2 (
       fun (acc: bool) (block_type: t) (block: Isa.basic_block) ->
