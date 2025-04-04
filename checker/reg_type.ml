@@ -36,8 +36,16 @@ module RegType = struct
     let reg_idx = IsaBasic.get_reg_idx r in
     let old_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
+    let new_type_taint = snd new_type in
     let new_type = 
       BasicType.set_start_len ctx (IsaBasic.is_partial_update_reg_set_default_zero r) off size old_type new_type
+    in
+    (* Note: taint of xmm reg should only depends on the incoming new val!!!
+      e.g. movq rdx xmm, the new taint of xmm should be taint of rdx, xmm is overwrite by zero extended value of rdx. *)
+    let new_type = if IsaBasic.is_xmm r then
+      fst new_type, new_type_taint
+    else
+      new_type
     in
     List.mapi (
       fun i entry_type -> if i = reg_idx then new_type else entry_type

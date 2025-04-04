@@ -131,8 +131,12 @@ include ArchTypeBasic
       | Exp addr_exp ->
         let addr_off = MemOffset.addr_size_to_offset (fst smt_ctx) addr_exp size in
         let st_dep_type, st_taint_type = new_type in
-        if not (TaintType.check_subtype smt_ctx false st_taint_type taint_anno) then None
-        else
+        if not (TaintType.check_subtype smt_ctx false st_taint_type taint_anno) then begin
+          Printf.printf "set_st_op_type: taint subtype check failed\nst_taint_type=%s\ntaint_anno=%s\n"
+            (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t st_taint_type))
+            (Sexplib.Sexp.to_string_hum (TaintType.sexp_of_t taint_anno));
+          None
+        end else
           (* Note: we check taint_anno against original taint in set_mem_type *)
           let new_mem_opt =
             MemType.set_mem_type smt_ctx 
@@ -153,6 +157,9 @@ include ArchTypeBasic
       (curr_type: t)
       (dest: Isa.operand)
       (new_type: entry_t) (flag_update_list: (Isa.flag * entry_t) list) : t option =
+    (* Printf.printf "set_dest_op_type: dest=%s, type=%s\n"
+      (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand dest))
+      (Sexplib.Sexp.to_string_hum (sexp_of_entry_t new_type)); *)
     let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_update_list in
     match dest with
     | RegOp r ->

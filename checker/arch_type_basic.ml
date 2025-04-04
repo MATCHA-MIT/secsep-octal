@@ -107,6 +107,18 @@ module ArchTypeBasic = struct
       smt_ctx 
       sub_a_type.mem_type sup_mem_type mem_map_opt in
     let dep_ctx_check = SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes in
+    let _ = if not dep_ctx_check then begin
+      Printf.printf "dep ctx check failed\n";
+      Printf.printf "sup_a_type:\n%s\n" (sexp_of_t sup_a_type |> Sexplib.Sexp.to_string_hum);
+      List.iter (fun e ->
+        let single_check = SmtEmitter.check_compliance smt_ctx [e] = SatYes in
+        if not single_check then begin
+          Printf.printf "single check failed: %s\nctx=%s\n" (Z3.Expr.to_string e) (SmtEmitter.to_string smt_ctx);
+          Printf.printf "start ctx:\n%s\n" (BasicType.sexp_of_ctx_t sub_a_type.context |> Sexplib.Sexp.to_string_hum);
+        end
+      ) sup_dep_context
+    end
+    in
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
 
     Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b\n"

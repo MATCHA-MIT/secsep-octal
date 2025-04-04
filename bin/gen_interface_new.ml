@@ -1,4 +1,5 @@
 open Type
+open Type.Single_exp_basic
 
 let r = Isa_basic.IsaBasic.get_reg_idx
 let total_reg_num = Isa_basic.IsaBasic.total_reg_num
@@ -99,7 +100,7 @@ let bench_sha512_plain : Base_func_interface.mem_t = [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
-      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleExpBasic.SingleBExp (SingleExpBasic.SingleAdd, (SingleConst 80L), (SingleVar (total_reg_num + 3))))], SingleTop;
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
@@ -329,7 +330,7 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
-      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleExpBasic.SingleBExp (SingleExpBasic.SingleAdd, (SingleConst 80L), (SingleVar (total_reg_num + 3))))], SingleTop;
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];
@@ -429,7 +430,7 @@ let bench_ed25519_plain_noinline : Base_func_interface.mem_t = [
       (SingleConst 0L, SingleConst 64L), RangeConst [(SingleConst 0L, SingleConst 64L)], SingleTop;
       (SingleConst 64L, SingleConst 72L), RangeConst [(SingleConst 64L, SingleConst 72L)], SingleVar (total_reg_num + 1);
       (SingleConst 72L, SingleConst 80L), RangeConst [(SingleConst 72L, SingleConst 80L)], SingleVar (total_reg_num + 2);
-      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, SingleConst 208L)], SingleTop;
+      (SingleConst 80L, SingleConst 208L), RangeConst [(SingleConst 80L, (SingleExpBasic.SingleBExp (SingleExpBasic.SingleAdd, (SingleConst 80L), (SingleVar (total_reg_num + 3)))))], SingleTop;
       (SingleConst 208L, SingleConst 212L), RangeConst [(SingleConst 208L, SingleConst 212L)], SingleVar (total_reg_num + 3);
       (SingleConst 212L, SingleConst 216L), RangeConst [(SingleConst 212L, SingleConst 216L)], SingleVar (total_reg_num + 4);
     ];

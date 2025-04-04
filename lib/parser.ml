@@ -319,15 +319,15 @@ module Parser = struct
         fill_os_for_opr (0L, sz) opr
       ) operands size_list
     in
-    let fill_os (off_size_list: Isa.data_off_size list) =
-      List.map2 (fun (opr: Isa.operand) (os: Isa.data_off_size) ->
-        fill_os_for_opr os opr
-      ) operands off_size_list
-    in
     let fill' (opr_list: Isa.operand list) (size_list: Isa.data_size list) =
       List.map2 (fun (opr: Isa.operand) (sz: Isa.data_size) ->
         fill_os_for_opr (0L, sz) opr
       ) opr_list size_list
+    in
+    let fill_opr_os (opr_list: Isa.operand list) (off_size_list: Isa.data_off_size list) =
+      List.map2 (fun (opr: Isa.operand) (os: Isa.data_off_size) ->
+        fill_os_for_opr os opr
+      ) opr_list off_size_list
     in
 
     match mnemonic with
@@ -355,8 +355,20 @@ module Parser = struct
     | "pxor" | "pandn" | "pand" | "por" -> mnemonic, (fill [16L; 16L])
     | "pshufb" -> "pshuf", (fill [16L; 16L])
     | "pshufw" | "pshufd" | "pshuflw" | "pshufhw" -> "pshuf", (fill [1L; 16L; 16L])
-    | "punpcklbw" | "punpcklwd" | "punpckldq" | "punpcklqdq" -> "punpckl", (fill_os [(0L, 8L); (0L, 16L)])
-    | "punpckhbw" | "punpckhwd" | "punpckhdq" | "punpckhqdq" -> "punpckh", (fill_os [(8L, 8L); (0L, 16L)])
+    | "punpcklbw" | "punpcklwd" | "punpckldq" | "punpcklqdq" -> begin
+        if List.length operands != 2 then
+          parse_error "punpckl: expecting two xmm operands";
+        let opr1 = List.hd operands in
+        let opr2 = List.hd (List.tl operands) in
+        "punpckl", (fill_opr_os [opr1; opr2; opr2] [(0L, 8L); (0L, 8L); (0L, 16L)])
+      end
+    | "punpckhbw" | "punpckhwd" | "punpckhdq" | "punpckhqdq" -> begin
+        if List.length operands != 2 then
+          parse_error "punpckh: expecting two xmm operands";
+        let opr1 = List.hd operands in
+        let opr2 = List.hd (List.tl operands) in
+        "punpckh", (fill_opr_os [opr1; opr2; opr2] [(8L, 8L); (8L, 8L); (0L, 16L)])
+      end
     | "packusdw" | "packuswb" -> "packus", (fill [16L; 16L])
     | "packssdw" | "packsswb" -> "packss", (fill [16L; 16L])
     | "movaps" | "movapd" | "movups" | "movupd" -> "mov", (fill [16L; 16L])
