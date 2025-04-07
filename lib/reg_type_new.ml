@@ -38,7 +38,8 @@ module RegType (Entry: EntryType) = struct
       | _ -> Entry.set_taint_with_other (Entry.get_top_untaint_type ()) entry_type
     else
       let off, size = IsaBasic.get_reg_offset_size r in
-      Entry.read_val off size entry_type
+      let full_size = IsaBasic.get_reg_full_size r in
+      Entry.read_val (Some full_size) off size entry_type
 
   let set_reg_type_helper (allow_set_xmm: bool) (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in
@@ -53,10 +54,15 @@ module RegType (Entry: EntryType) = struct
       in
       List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
     else
+      let old_full_reg_type = List.nth reg_type reg_idx in
       let off, write_size = IsaBasic.get_reg_offset_size r in
       let full_size = IsaBasic.get_reg_full_size r in
-      let new_type = Entry.read_val 0L write_size new_type in
-      let new_type = Entry.ext_val Entry.ZeroExt off full_size new_type in
+      let new_type = Entry.read_val None 0L write_size new_type in
+      let new_type = match write_size with
+      | 1L | 2L -> Entry.write_gpr_partial off write_size old_full_reg_type new_type
+      | 4L | 8L -> Entry.ext_val Entry.ZeroExt off full_size new_type
+      | _ -> reg_type_error "set_reg_type_helper: expecting reg size of 1/2/4/8"
+      in
       List.mapi (fun idx r -> if idx = reg_idx then new_type else r) reg_type
 
   let set_reg_type = set_reg_type_helper false

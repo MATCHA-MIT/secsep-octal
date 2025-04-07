@@ -52,6 +52,7 @@ module ArchTypeBasic = struct
     *)
     let dep_sub_helper = DepType.substitute_exp_t ctx dep_ctx_map in
     let dep_exp_sub_func = DepType.substitute_exp_exp dep_sub_helper in
+    let dep_exp_sub_opt_func = DepType.substitute_exp_exp_opt dep_sub_helper in
     let dep_sub_func = DepType.substitute dep_sub_helper in
     let taint_sub_func = TaintType.substitute ctx taint_ctx_map in
     let basic_sub_func = BasicType.substitute dep_sub_func taint_sub_func in
@@ -70,7 +71,7 @@ module ArchTypeBasic = struct
           basic_sub_func entry
       ) a_type.mem_type
     in
-    let dep_context = List.map dep_exp_sub_func (fst a_type.context) in
+    let dep_context = List.filter_map dep_exp_sub_opt_func (fst a_type.context) in
     let taint_context = List.map taint_sub_func (snd a_type.context) in
     reg_type, flag_type, mem_type, (dep_context, taint_context)
 

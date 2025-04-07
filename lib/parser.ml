@@ -383,7 +383,8 @@ module Parser = struct
           (* suggest size for dest only *)
           List.map2 (fun (opr: Isa.operand) (sz: Isa.data_size) ->
             fill_os_for_opr (0L, sz) opr
-          ) operands [1L; op_size]
+          ) operands [op_size; op_size] 
+          (* though the immediate is 1-byte, we make it the same as the other operands to make checker's life easier *)
         end
       | _ -> begin
           (* suggest size for each operand *)

@@ -42,7 +42,12 @@ module DepType = struct
     | Top size -> size = top_bool_size
   
   let get_exp_bit_size (e: exp_t) : int =
-    Z3.BitVector.get_size (Z3.Expr.get_sort e)
+    if Z3.BitVector.is_bv e then
+      Z3.BitVector.get_size (Z3.Expr.get_sort e)
+    else if Z3.Boolean.is_bool e then
+      top_bool_size
+    else
+      dep_type_error (Printf.sprintf "get_exp_bit_size: unexpected expr type %s" (Z3.Expr.to_string e))
 
   let get_bit_size (e: t) : int =
     match e with
@@ -101,6 +106,13 @@ module DepType = struct
       dep_type_error 
       (Printf.sprintf "substitute_exp_exp get top for e %s" (Sexplib.Sexp.to_string_hum (sexp_of_exp_t e)))
     | Exp e -> e
+  
+  let substitute_exp_exp_opt 
+      (exp_substitute: exp_t -> t)
+      (e: exp_t) : exp_t option =
+    match exp_substitute e with
+    | Top _ -> None
+    | Exp e -> Some e
 
   let substitute
       (exp_substitute: exp_t -> t)
@@ -423,7 +435,7 @@ module DepType = struct
     BitVector.mk_sub_no_underflow ctx e0 e1 false |> Boolean.mk_not ctx
   
   let get_shl_carry (ctx: context) (e: exp_t) (cnt: exp_t) : exp_t =
-    let bv_size = BitVector.get_size (Expr.get_sort e) - 1 in
+    let bv_size = BitVector.get_size (Expr.get_sort e) in
     let top_bit = bv_size - 1 in
     let subcnt = BitVector.mk_sub ctx cnt (BitVector.mk_numeral ctx "1" bv_size) in
     let sub_shift = BitVector.mk_shl ctx e subcnt in

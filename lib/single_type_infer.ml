@@ -908,6 +908,7 @@ module SingleTypeInfer = struct
         (acc: FuncInterface.t list) (entry: Base_func_interface.entry_t) :
         (FuncInterface.t list) * t =
       let func_name, func_mem_interface, stack_spill_info = entry in
+      Printf.printf "Inferring func %s\n" func_name;
       let infer_state = infer_one_func prog acc func_name func_mem_interface stack_spill_info iter solver_iter in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;

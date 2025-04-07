@@ -70,9 +70,16 @@ module TaintBaseEntryType (Entry: EntryType) = struct
      if cmp_s = 0 then TaintExp.cmp t1 t2
      else cmp_s
 
-  let read_val (off: int64) (sz: int64) (e: t) : t =
+  let read_val (orig_sz: int64 option) (off: int64) (sz: int64) (e: t) : t =
     let single, taint = e in
-    Entry.read_val off sz single, taint
+    Entry.read_val orig_sz off sz single, taint
+
+  let write_gpr_partial (off: int64) (sz: int64) (orig_e: t) (write_e: t) : t =
+    let orig_single, orig_taint = orig_e in
+    let write_single, write_taint = write_e in
+    match off, sz with
+    | 0L, 1L | 0L, 2L | 1L, 1L -> Entry.write_gpr_partial off sz orig_single write_single, TaintExp.merge orig_taint write_taint
+    | _ -> taint_entry_type_error "write_gpr_partial: expecting off,sz=0,1/0,2/1,1"
 
   let mem_partial_read_val (e: t) : t =
     let single, taint = e in

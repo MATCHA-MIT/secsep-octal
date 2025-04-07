@@ -78,6 +78,7 @@ module FuncInterface = struct
       None
     | Some out_mem_type ->
       let dep_context, taint_context = pr_type.context in
+      SmtEmitter.add_assertions smt_ctx out_dep_context;
       Some { pr_type with
         pc = pr_type.pc + 1;
         reg_type = out_reg_type;

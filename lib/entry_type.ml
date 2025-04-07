@@ -34,7 +34,8 @@ module type EntryType = sig
   val to_ocaml_string: t -> string
   val empty_var_map_to_ocaml_string: string
   val cmp: t -> t -> int
-  val read_val: int64 -> int64 -> t -> t (* off -> sz -> type: read tppe of [off, off+sz] *)
+  val read_val: (int64 option) -> int64 -> int64 -> t -> t (* orig_sz -> off -> sz -> type: read tppe of [off, off+sz] *)
+  val write_gpr_partial : int64 -> int64 -> t -> t -> t (* off -> sz -> full_reg_type -> new_type *)
   val mem_partial_read_val: t -> t (* a lazy implementation to handle partially reading a mem entry *)
   val mem_partial_write_val: t -> t -> t (* a lazy implementation to handle partially writing a mem entry *)
   val ext_val: ext_t -> int64 -> int64 -> t -> t (* off -> sz -> type *)

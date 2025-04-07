@@ -32,9 +32,31 @@ include SingleExp
     | SingleVar v -> SingleVar (v + 1)
     | _ -> single_exp_error "next_var is not called on a single var"
 
-  let read_val (off: int64) (sz: int64) (e: t) : t =
-    let _ = sz in
-    if off = 0L then e else SingleTop
+  let read_val (orig_sz: int64 option) (off: int64) (sz: int64) (e: t) : t =
+    if Option.is_none orig_sz then begin if off = 0L then e else SingleTop end else
+    let orig_sz = Option.get orig_sz in
+    if off = 0L then begin
+      let mask = match sz with
+      | 1L when orig_sz > 1L -> 0xFFL
+      | 2L when orig_sz > 2L -> 0xFFFFL
+      (* when 4-byte register is used the variable represents the whole 8-byte registers (upper 32 bits are zero) *)
+      (* this asserts there's no extracting lower 32-bits using 4-byte register when the register is used as 8-byte *)
+      (* | 4L when orig_sz > 4L -> 0xFFFFFFFFL *)
+      | _ -> 0L
+      in
+      if mask = 0L then
+        e
+      else
+        SingleBExp (SingleAnd, e, SingleConst mask)
+    end else
+      SingleTop
+
+  let write_gpr_partial (off: int64) (sz: int64) (orig_e: t) (write_e: t) : t =
+    match off, sz with
+    | 0L, 1L -> SingleBExp (SingleAdd, write_e, SingleBExp (SingleAnd, orig_e, SingleConst 0xFFFFFFFFFFFFFF00L))
+    | 0L, 2L -> SingleBExp (SingleAdd, write_e, SingleBExp (SingleAnd, orig_e, SingleConst 0xFFFFFFFFFFFF0000L))
+    | 1L, 1L -> SingleBExp (SingleAdd, (SingleBExp (SingleMul, write_e, SingleConst 256L)), SingleBExp (SingleAnd, orig_e, SingleConst 0xFFFFFFFFFFFF00FFL))
+    | _ -> single_exp_error "write_gpr_partial: expecting off,sz=0,1/0,2/1,1"
 
   let mem_partial_read_val (e: t) : t =
     let _ = e in SingleTop
