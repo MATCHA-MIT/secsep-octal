@@ -82,43 +82,36 @@ let get_model (smt_ctx: t) : Model.model option =
           if Z3.Boolean.is_true e then None else Some e
       ) assertions
     in
-    if List.length assertions = 0 then SatYes 
-    else
-      let not_assertions =
-        List.map (
-          fun x -> Z3.Expr.simplify (Z3.Boolean.mk_not ctx x) None
-        ) assertions
-      in
-      let negation = Z3.Boolean.mk_or ctx not_assertions in
-      
-      (*
-      Printf.printf "\ncheck_compliance\n";
-      Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-        (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
-      (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-      (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
-      (* get string of all assertion and concat them *)
-      Printf.printf "assertion = \n%s\n\n" (
-        List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
-      );
-      Printf.printf "negation  = \n%s\n\n" (Z3.Expr.to_string negation);
-      *)
-      match Z3.Solver.check z3_solver assertions with
-      | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
-      | Z3.Solver.SATISFIABLE -> begin
-          match Z3.Solver.check z3_solver [negation] with
+    if List.length assertions = 0 then SatYes else
+    (*
+    Printf.printf "\ncheck_compliance\n";
+    Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+      (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
+    (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+    (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
+    (* get string of all assertion and concat them *)
+    Printf.printf "assertion (%d) = \n%s\n\n" (List.length assertions) (
+      List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
+    );
+    Printf.printf "negation  = \n%s\n\n" (Z3.Expr.to_string negation);
+    *)
+    match Z3.Solver.check z3_solver assertions with
+    | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
+    | Z3.Solver.UNSATISFIABLE -> begin
+        (* Printf.printf "satno\n"; *)
+        SatNo
+      end
+    | Z3.Solver.SATISFIABLE -> begin
+        let neg_sat = List.exists (fun assertion ->
+          (* Printf.printf "checking neg %s\n" (Z3.Expr.to_string assertion); *)
+          let neg = Z3.Boolean.mk_not ctx assertion in
+          match Z3.Solver.check z3_solver [neg] with
           | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
-          | Z3.Solver.SATISFIABLE ->
-            (* Printf.printf "both satyes\n"; *)
-            SatUnknown
-          | Z3.Solver.UNSATISFIABLE ->
-            (* Printf.printf "satyes\n"; *)
-            SatYes
-        end
-      | Z3.Solver.UNSATISFIABLE -> begin
-          (* Printf.printf "satno\n"; *)
-          SatNo
-        end
+          | Z3.Solver.SATISFIABLE -> true
+          | Z3.Solver.UNSATISFIABLE -> false
+        ) assertions in
+        if neg_sat then SatUnknown else SatYes
+      end
 
   let expr_var_str_of_single_var (var_idx: int) : string =
     Printf.sprintf "s%d" var_idx

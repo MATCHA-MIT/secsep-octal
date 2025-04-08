@@ -698,6 +698,9 @@ module Transform = struct
             let saves, restores = List.split (
               List.filter_map (fun (slot: callee_slot) ->
                 let reg, offset = slot in
+                (* don't need to preserve untaint for tainted callee-saved registers *)
+                let _, reg_taint = CallAnno.TaintRegType.get_reg_type anno.pr_reg reg in
+                if TaintExp.is_tainted (tv_ittt reg_taint) then None else
                 let disp = get_stack_slot_dyn_offset func_state.init_rsp_var_id offset curr_rsp in
                 let disp = if disp != 0L then Some (Isa.ImmNum (disp, Some 8L)) else None in
                 let mem_op = (disp, Some Isa.RSP, None, None, None) in

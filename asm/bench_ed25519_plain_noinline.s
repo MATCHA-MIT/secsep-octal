@@ -9749,14 +9749,35 @@ sc_muladd:                              # @sc_muladd
 	.type	main,@function
 main:                                   # @main
 # %bb.0:
+	pushq	%rbp
+	pushq	%r15
+	pushq	%r14
+	pushq	%rbx
 	pushq	%rax
-	leaq	signature(%rip), %rdi
-	leaq	message(%rip), %rsi
-	leaq	private_key(%rip), %rcx
+	xorl	%ebp, %ebp
+	leaq	signature(%rip), %rbx
+	leaq	message(%rip), %r14
+	leaq	private_key(%rip), %r15
+	.p2align	4, 0x90
+.LBB17_1:                               # =>This Inner Loop Header: Depth=1
+	movl	%ebp, %eax
+	andl	$15, %eax
 	movl	$256, %edx                      # imm = 0x100
+	subl	%eax, %edx
+	movq	%rbx, %rdi
+	movq	%r14, %rsi
+	movq	%r15, %rcx
 	callq	ED25519_sign
+	incl	%ebp
+	cmpl	$100, %ebp
+	jne	.LBB17_1
+# %bb.2:
 	xorl	%eax, %eax
-	popq	%rcx
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%r14
+	popq	%r15
+	popq	%rbp
 	retq
 .Lfunc_end17:
 	.size	main, .Lfunc_end17-main

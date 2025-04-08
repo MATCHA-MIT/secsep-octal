@@ -604,6 +604,15 @@ module DepType = struct
     ]
 
   let exe_shl (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let cnt = if (get_exp_bit_size cnt) < (get_exp_bit_size dst) then
+      if get_exp_bit_size cnt != 8 then
+        dep_type_error "exe_shl: cnt size is not 8-bit"
+      else
+        BitVector.mk_zero_ext ctx ((get_exp_bit_size dst) - (get_exp_bit_size cnt)) cnt
+    else
+      cnt
+    in
+    Printf.printf "shl: size of cnt/src: %d/%d\n" (get_exp_bit_size cnt) (get_exp_bit_size dst);
     let result = BitVector.mk_shl ctx dst cnt in
     Exp result, [
       CF, Exp (get_shl_carry ctx dst cnt);
@@ -614,6 +623,14 @@ module DepType = struct
     ]
 
   let exe_sar (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
+    let cnt = if (get_exp_bit_size cnt) < (get_exp_bit_size dst) then
+      if get_exp_bit_size cnt != 8 then
+        dep_type_error "exe_sar: cnt size is not 8-bit"
+      else
+        BitVector.mk_zero_ext ctx ((get_exp_bit_size dst) - (get_exp_bit_size cnt)) cnt
+    else
+      cnt
+    in
     let result = BitVector.mk_ashr ctx dst cnt in
     Exp result, [
       CF, Exp (get_shr_carry ctx dst cnt);
@@ -624,7 +641,14 @@ module DepType = struct
     ]
 
   let exe_shr (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
-    (* cnt should also have the same size as the other operand *)
+    let cnt = if (get_exp_bit_size cnt) < (get_exp_bit_size dst) then
+      if get_exp_bit_size cnt != 8 then
+        dep_type_error "exe_shr: cnt size is not 8-bit"
+      else
+        BitVector.mk_zero_ext ctx ((get_exp_bit_size dst) - (get_exp_bit_size cnt)) cnt
+    else
+      cnt
+    in
     let cnt = BitVector.mk_sign_ext ctx ((get_exp_bit_size dst) - (get_exp_bit_size cnt)) cnt in
     let result = BitVector.mk_lshr ctx dst cnt in
     Exp result, [

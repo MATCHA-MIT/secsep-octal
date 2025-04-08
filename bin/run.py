@@ -43,11 +43,13 @@ def run(cmd, log_file, msg):
     with open(log_file, "w") as f:
         start_time = time.time()
         result = subprocess.run(cmd, stdout=f, stderr=f)
+        print(f"({round(time.time() - start_time, 2)} seconds)", end="")
         if result.returncode != 0:
-            print(f"({Fore.RED}errcode: {result.returncode}{Fore.RESET})")
+            print(f" ({Fore.RED}errcode: {result.returncode}{Fore.RESET})")
             print(f"{Fore.YELLOW}log saved to {log_file}{Fore.RESET}", flush=True)
             exit(1)
-        print(f"({round(time.time() - start_time, 2)} seconds)", flush=True)
+        else:
+            print("", flush=True)
 
 
 def infer(benchmark, phase_beg, phase_end):

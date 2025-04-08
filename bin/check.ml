@@ -31,7 +31,11 @@ let () =
       let func_name, func_body, func_type, _ = checker_func in
       Printf.printf "=================================================================\n";
       Printf.printf "checking function %s\n" func_name;
-      Printf.printf "=================================================================\n";
+      Printf.printf "=================================================================\n%!";
+      (* if func_name <> "SHA512" then begin
+        Printf.printf "skipping check\n";
+        acc_success
+      end else *)
       let success = Arch_type.ArchType.type_prop_check_one_func
         smt_ctx
         fi_list
@@ -40,7 +44,7 @@ let () =
         func_body
       in
       Printf.printf "Function %s: %s\n" func_name (if success then "Passed" else "Failed");
-      Printf.printf "=================================================================\n\n\n\n\n";
+      Printf.printf "=================================================================\n\n\n\n\n%!";
       acc_success && success
   ) true checker_func_list
   in

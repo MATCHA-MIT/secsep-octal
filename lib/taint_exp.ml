@@ -274,5 +274,10 @@ module TaintExp = struct
     | TaintVar v -> TaintVarSet.singleton v
     | TaintExp s -> s
     | TaintUnknown -> TaintVarSet.empty
+  
+  let is_tainted (e: t) : bool =
+    match e with
+    | TaintConst true -> true
+    | _ -> false
 
 end

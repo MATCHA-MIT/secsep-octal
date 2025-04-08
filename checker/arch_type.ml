@@ -548,7 +548,7 @@ include ArchTypeBasic
       (block_type_list: t list)
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
-    Printf.printf "checking inst[%d] %s\n" curr_type.pc (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum);
+    Printf.printf "checking inst[%d] %s\n%!" curr_type.pc (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum);
     (* 1. Prop inst
        2. Ensure if can proceed to next inst, pc + 1 < dead_pc *)
     let find_block_helper (label: Isa.label) : t =
@@ -593,7 +593,7 @@ include ArchTypeBasic
       (block_type_list: t list)
       (block_type: t)
       (block: Isa.instruction list) : bool =
-    Printf.printf "checking block %s\n" block_type.label;
+    Printf.printf "checking block %s\n%!" block_type.label;
     (* Check block type:
        1. Check block well-formness
           1. s-val belongs to s-alloc for each mem slot

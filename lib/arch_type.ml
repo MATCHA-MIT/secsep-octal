@@ -1062,7 +1062,7 @@ module ArchType (Entry: EntryType) = struct
       (block_subtype: block_subtype_t list) :
       (t * bool * (block_subtype_t list)) * Isa.instruction =
     (* Update pc here!!! *)
-    (* Printf.printf "Prop inst %d %s%!\n" curr_type.pc (Isa.string_of_instruction inst); *)
+    Printf.printf "Prop inst %d %s%!\n" curr_type.pc (Isa.string_of_instruction inst);
     (* let unknown_before = List.length (Constraint.get_unknown curr_type.constraint_list) in *)
     let sub_sol_func (e: SingleExp.t) : MemOffset.t option =
       sub_sol_func (e, curr_type.pc)

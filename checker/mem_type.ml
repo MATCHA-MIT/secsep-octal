@@ -107,7 +107,51 @@ module MemOffset = struct
           let _, new_r = new_o in
           let hd_l, _ = hd_o in
           insert_one_offset tl (hd_l, new_r)
-        | Other -> mem_offset_error "insert_new_offset_list_merge fail"
+        | Other ->
+          let hd_l, hd_r = hd_o in
+          let new_l, new_r = new_o in
+          let get_max (x: Z3.Expr.expr) (y: Z3.Expr.expr) : Z3.Expr.expr =
+            let ctx = fst smt_ctx in
+            let v = Z3.Expr.mk_fresh_const ctx "max" (Z3.Expr.get_sort x) in
+            SmtEmitter.add_assertions smt_ctx [ Boolean.mk_and (fst smt_ctx) [
+              Z3.BitVector.mk_sge ctx v x;
+              Z3.BitVector.mk_sge ctx v y;
+              Boolean.mk_or ctx [
+                Boolean.mk_eq ctx v x;
+                Boolean.mk_eq ctx v y;
+              ]
+            ]];
+            v
+          in
+          let get_min (x: Z3.Expr.expr) (y: Z3.Expr.expr) : Z3.Expr.expr =
+            let ctx = fst smt_ctx in
+            let v = Z3.Expr.mk_fresh_const ctx "min" (Z3.Expr.get_sort x) in
+            SmtEmitter.add_assertions smt_ctx [ Boolean.mk_and (fst smt_ctx) [
+              Z3.BitVector.mk_sle ctx v x;
+              Z3.BitVector.mk_sle ctx v y;
+              Boolean.mk_or ctx [
+                Boolean.mk_eq ctx v x;
+                Boolean.mk_eq ctx v y;
+              ]
+            ]];
+            v
+          in
+          let merge_l, merge_r = if offset_cmp smt_ctx CmpSubset (new_l, new_l) hd_o = Subset then
+            (* let _ = Printf.printf "ok1: hd_l, max(hd_r, new_r) \n" in *)
+            hd_l, get_max hd_r new_r
+          else if offset_cmp smt_ctx CmpSubset (hd_l, hd_l) new_o = Subset then
+            (* let _ = Printf.printf "ok2: new_l, max(hd_r, new_r) \n" in *)
+            new_l, get_max hd_r new_r
+          else if offset_cmp smt_ctx CmpSubset (new_r, new_r) hd_o = Subset then
+            (* let _ = Printf.printf "ok3: min(new_l, hd_l), hd_r \n" in *)
+            get_min new_l hd_l, hd_r
+          else if offset_cmp smt_ctx CmpSubset (hd_r, hd_r) new_o = Subset then
+            (* let _ = Printf.printf "ok4: min(new_l, hd_l), new_r \n" in *)
+            get_min new_l hd_l, new_r
+          else
+            mem_offset_error "insert_new_offset_list_merge fail"
+          in
+          insert_one_offset tl (merge_l, merge_r)
         end
     in
     List.fold_left insert_one_offset old_list new_list
@@ -173,6 +217,9 @@ module MemRange = struct
   [@@deriving sexp]
 
   let merge (smt_ctx: SmtEmitter.t) (r1: t) (r2: t) : t =
+    (* Printf.printf "merge:\n%s\n%s\n"
+      (sexp_of_t r1 |> Sexplib.Sexp.to_string_hum)
+      (sexp_of_t r2 |> Sexplib.Sexp.to_string_hum); *)
     MemOffset.insert_new_offset_list_merge smt_ctx r1 r2
 
   let sanitize (smt_ctx: SmtEmitter.t) (ranges: t) : t =
@@ -412,8 +459,13 @@ module MemType = struct
         DepType.check_subtype smt_ctx sub_dep sup_dep &&
         check_taint ()
       else
+        let check_dep =
+          match sub_dep with
+          | Top _ -> true
+          | _ -> false
+        in
         MemRange.check_subset smt_ctx sup_range sub_range &&
-        DepType.check_subtype smt_ctx sub_dep sup_dep &&
+        check_dep &&
         check_taint ()
     else false
 
@@ -562,7 +614,10 @@ module MemType = struct
           Some (DepType.get_start_len ctx start len slot_dep, slot_taint)
         end
       | _ ->
-        Printf.printf "Warning: get_one_slot_type off check failed\n";
+        Printf.printf "Warning: get_one_slot_type failed, relationship=%s\naddr_off=%s\n"
+          (MemOffset.sexp_of_off_rel_t cmp_off |> Sexplib.Sexp.to_string_hum)
+          (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off));
+        Printf.printf "%s\n" (SmtEmitter.to_string smt_ctx);
         None
       end
     | _ ->
