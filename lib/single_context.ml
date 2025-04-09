@@ -217,4 +217,43 @@ module SingleContext = struct
     in
     List.fold_left helper (Left []) cond_list
 
+  let sub_sol_and_filter (sub_sol: SingleExp.t -> SingleExp.t) (cond: t) : t option =
+    let rec helper (cond: t) : t option =
+      match cond with
+      | Cond (c, l, r) -> begin
+        let sub_l = sub_sol l in
+        let sub_r = sub_sol r in
+        match sub_l, sub_r with
+        | SingleTop, _ -> None
+        | _, SingleTop -> None
+        | l', r' ->
+          if c = SingleCondType.Eq && SingleExp.cmp l' r' = 0 then
+            (* remove trivial conditions *)
+            None
+          else
+            Some (Cond (c, l', r'))
+        end
+      | NoOverflow e -> begin
+        let sub_e = sub_sol e in
+        match sub_e with
+        | SingleTop -> None
+        | _ -> Some (NoOverflow sub_e)
+        end
+      | Or cond_list ->
+        let sub_cond_list = List.filter_map helper cond_list in
+        if List.length sub_cond_list < List.length cond_list then None
+        else Some (Or sub_cond_list)
+      | And cond_list ->
+        let sub_cond_list = List.filter_map helper cond_list in
+        if List.length sub_cond_list < List.length cond_list then None
+        else Some (And sub_cond_list)
+    in
+    (* Printf.printf "sub_sol_and_filter: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t cond)); *)
+    let result = helper cond in
+    (* if Option.is_none result then
+      Printf.printf "this cond is filtered\n"
+    else
+      Printf.printf "result: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t (Option.get result))); *)
+    result
+
 end

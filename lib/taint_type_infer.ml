@@ -180,7 +180,7 @@ module TaintTypeInfer = struct
         infer_state.func_type
         (* infer_state.state_context *)
         infer_state.ret_subtype_list
-        sub_sol_for_taint
+        sub_sol sub_sol_for_taint
     in
 
     (* Note: our taint typing rules already constrain that input output mem has the same taint.

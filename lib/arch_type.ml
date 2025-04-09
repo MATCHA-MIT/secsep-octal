@@ -1251,6 +1251,7 @@ module ArchType (Entry: EntryType) = struct
       (func_type: t list)
       (* (context: SingleContext.t list) *)
       (out_single_subtype_list: (Isa.imm_var_id * (SingleExp.t list)) list)
+      (sub_sol_single: int -> SingleExp.t -> SingleExp.t)
       (sub_sol: int -> entry_t -> entry_t) : FuncInterface.t =
     let in_state = List.find (fun (x: t) -> x.label = func_name) func_type in
     let out_state = List.find (fun (x: t) -> x.label = Isa.ret_label) func_type in
@@ -1268,16 +1269,25 @@ module ArchType (Entry: EntryType) = struct
       | Single exp -> exp
       | _ -> SingleTop
     in *)
+
+    let in_reg = in_state.reg_type in
     let in_mem = MemType.merge_local_mem_quick_cmp smt_ctx in_state.mem_type in
+
+    let out_reg = List.map (sub_sol out_state.pc) out_state.reg_type in
+    let out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type) in
+    let out_context = List.filter_map (fun (context_entry: SingleContext.t) ->
+      SingleContext.sub_sol_and_filter (sub_sol_single out_state.pc) context_entry
+    ) out_state.context in
+
     let res: FuncInterface.t = {
       func_name = func_name;
-      in_reg = in_state.reg_type;
+      in_reg = in_reg;
       in_mem = in_mem;
       in_context = in_state.context;
       in_taint_context = [];
-      out_reg = List.map (sub_sol out_state.pc) out_state.reg_type;
-      out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type);
-      out_context = out_state.context;
+      out_reg = out_reg;
+      out_mem = out_mem;
+      out_context = out_context;
       out_single_subtype_list = out_single_subtype_list;
       base_info = find_all_base_info in_state.reg_type in_mem;
     }

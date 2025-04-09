@@ -78,7 +78,18 @@ module FuncInterface = struct
       None
     | Some out_mem_type ->
       let dep_context, taint_context = pr_type.context in
+
+      Printf.printf "adding out_ctx, original ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
+      (* List.iter (fun e ->
+        let single_check = SmtEmitter.check_compliance smt_ctx [e] != SatNo in
+        if not single_check then begin
+          Printf.printf "single check failed: %s\nctx=%s\n" (Z3.Expr.to_string e) (SmtEmitter.to_string smt_ctx);
+        end
+      ) out_dep_context; *)
+
       SmtEmitter.add_assertions smt_ctx out_dep_context;
+      Printf.printf "after adding out_ctx, ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
+      
       Some { pr_type with
         pc = pr_type.pc + 1;
         reg_type = out_reg_type;

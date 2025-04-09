@@ -112,12 +112,12 @@ module ArchTypeBasic = struct
       Printf.printf "dep ctx check failed\n";
       Printf.printf "sup_a_type:\n%s\n" (sexp_of_t sup_a_type |> Sexplib.Sexp.to_string_hum);
       List.iter (fun e ->
-        let single_check = SmtEmitter.check_compliance smt_ctx [e] = SatYes in
+        let single_check = SmtEmitter.check_compliance smt_ctx [e] != SatNo in
         if not single_check then begin
           Printf.printf "single check failed: %s\nctx=%s\n" (Z3.Expr.to_string e) (SmtEmitter.to_string smt_ctx);
-          Printf.printf "start ctx:\n%s\n" (BasicType.sexp_of_ctx_t sub_a_type.context |> Sexplib.Sexp.to_string_hum);
         end
-      ) sup_dep_context
+      ) sup_dep_context;
+      Printf.printf "%s\n" (SmtEmitter.to_string smt_ctx);
     end
     in
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in

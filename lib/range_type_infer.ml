@@ -155,7 +155,7 @@ module RangeTypeInfer = struct
       infer_state.func_type
       (* infer_state.state_context *)
       infer_state.ret_subtype_list
-      sub_sol
+      sub_sol sub_sol
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)

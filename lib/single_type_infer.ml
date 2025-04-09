@@ -878,7 +878,7 @@ module SingleTypeInfer = struct
       infer_state.func_type
       (* infer_state.state_context *)
       infer_state.ret_subtype_list
-      sub_sol
+      sub_sol sub_sol
 
   let pp_ocaml_infer_result (lvl: int) (buf: Buffer.t) (func_type_list: t list) =
     PP.bprint_lvl lvl buf "[\n";
