@@ -388,6 +388,7 @@ module SingleTypeInfer = struct
                 else None
             ) full_taken_hist
           in
+          (* Make assertion only for the case where the branch before the load/store is not taken. *)
           Right (List.map (
             fun (x: SingleContext.t) -> SingleContext.ctx_or x (Or taken_cond_list)
           ) tmp_ctx)
@@ -726,6 +727,7 @@ module SingleTypeInfer = struct
         (* 5. Extra block invariance infer (resolve tmp_context) *)
         let func_type, tmp_context_resolved = 
           if unknown_resolved && callee_context_resolved then
+            let func_type = List.map (SingleSubtype.add_range_constraint_to_block_tmp_context state.single_subtype) func_type in
             SingleBlockInvariance.solve state.smt_ctx true state.input_var_set func_type block_subtype state.single_subtype 100
           else
             func_type, false
