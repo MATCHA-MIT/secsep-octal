@@ -453,6 +453,21 @@ module IsaBasic = struct
     | Xorp
   [@@deriving sexp]
 
+  let bop_result_depends_on_flag (op: bop) : bool =
+    match op with
+    | Adc | Sbb | CmovEq -> true
+    | Add | Sub
+    | Mul | Imul
+    | Sal | Sar | Shl | Shr
+    | Rol | Ror
+    | Xor | And | Or
+    | Bt
+    | Punpck | Packxs
+    | Pshuf
+    | Padd | Psub | Psll | Psrl
+    | Pxor | Pandn | Pand | Por
+    | Xorp -> false
+
   let bop_opcode_map = [
     ("add", Add); ("adc", Adc); ("sub", Sub); ("sbb", Sbb);
     ("mul", Mul); ("imul", Imul);
@@ -484,7 +499,7 @@ module IsaBasic = struct
     ("Xorp", Xorp);
     ("Pshuf", Pshuf)
   ]
-  
+
   type uop =
     | Mov 
     | MovS | MovZ
@@ -493,6 +508,15 @@ module IsaBasic = struct
     | Neg
     | Inc | Dec
   [@@deriving sexp]
+
+  let uop_result_depends_on_flag (op: uop) : bool =
+    match op with
+    | Mov 
+    | MovS | MovZ
+    | Lea
+    | Not | Bswap
+    | Neg
+    | Inc | Dec -> false
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
@@ -516,6 +540,10 @@ module IsaBasic = struct
     | Shld
     | Shrd
   [@@deriving sexp]
+
+  let top_result_depends_on_flag (op: top) : bool =
+    match op with
+    | Shld | Shrd -> false
 
   let top_opcode_map = [
     ("shld", Shld);

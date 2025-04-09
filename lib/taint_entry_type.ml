@@ -155,8 +155,13 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let (dest_taint_type: TaintExp.t) =
       if (isa_bop = Xor || isa_bop = Xorp || isa_bop = Pxor) && same_op then
         TaintConst false
-      else
-        TaintExp.merge t1 t2
+      else begin
+        let new_t = TaintExp.merge t1 t2 in
+        if IsaBasic.bop_result_depends_on_flag isa_bop then
+          TaintExp.merge new_t (TaintExp.merge fl_taint fr_taint)
+        else
+          new_t
+      end
     in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_bop with
     | Add | Adc | Sub | Sbb | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or | Bt ->
@@ -175,7 +180,11 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let single, taint = e in
     let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_uop_inst isa_uop single (fl_entry, fr_entry) in
-    let dest_taint_type = taint in
+    let dest_taint_type = if IsaBasic.uop_result_depends_on_flag isa_uop then
+      TaintExp.merge taint (TaintExp.merge fl_taint fr_taint)
+    else
+      taint
+    in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_uop with
     | Mov | MovZ | MovS | Lea | Not | Bswap -> fl_taint, fr_taint
     | Neg | Inc | Dec -> dest_taint_type, TaintConst false
@@ -184,9 +193,14 @@ module TaintBaseEntryType (Entry: EntryType) = struct
 
   let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flags: flag_t) : t * flag_t =
     let single_list, t_list = List.split e_list in
-    let (fl_entry, _), (fr_entry, _) = flags in
+    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
     let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_top_inst isa_top single_list (fl_entry, fr_entry) in
     let dest_taint_type = List.fold_left TaintExp.merge (TaintConst false) t_list in
+    let dest_taint_type = if IsaBasic.top_result_depends_on_flag isa_top then
+      TaintExp.merge dest_taint_type (TaintExp.merge fl_taint fr_taint)
+    else
+      dest_taint_type
+    in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_top with
     | Shld
     | Shrd -> dest_taint_type, TaintConst false

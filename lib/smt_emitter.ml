@@ -108,7 +108,10 @@ let get_model (smt_ctx: t) : Model.model option =
           let neg = Z3.Boolean.mk_not ctx assertion in
           match Z3.Solver.check z3_solver [neg] with
           | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
-          | Z3.Solver.SATISFIABLE -> true
+          | Z3.Solver.SATISFIABLE ->
+            (* Printf.printf "%s could be false\n" (Z3.Expr.to_string assertion);
+            Printf.printf "%s\n" (Z3.Model.to_string (get_model smt_ctx |> Option.get)); *)
+            true
           | Z3.Solver.UNSATISFIABLE -> false
         ) assertions in
         if neg_sat then SatUnknown else SatYes
