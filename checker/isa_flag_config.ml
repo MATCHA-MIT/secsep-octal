@@ -78,6 +78,6 @@ module IsaFlagConfig = struct
   let get_top_config (top: IsaBasic.top) : t =
     match top with
     | Shld
-    | Shrd -> [], [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
+    | Shrd -> [ CF ], [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
    
 end

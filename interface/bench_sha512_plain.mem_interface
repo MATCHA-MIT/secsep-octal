@@ -82,10 +82,7 @@
      (((SingleConst 72) (SingleConst 80))
       (RangeConst (((SingleConst 72) (SingleConst 80)))) (SingleVar 34))
      (((SingleConst 80) (SingleConst 208))
-      (RangeConst
-       (((SingleConst 80)
-         (SingleBExp SingleAdd (SingleConst 80) (SingleVar 35)))))
-      SingleTop)
+      (RangeConst (((SingleConst 80) (SingleConst 208)))) SingleTop)
      (((SingleConst 208) (SingleConst 212))
       (RangeConst (((SingleConst 208) (SingleConst 212)))) (SingleVar 35))
      (((SingleConst 212) (SingleConst 216))

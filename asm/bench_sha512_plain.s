@@ -149,6 +149,14 @@ SHA512_Init:                            # @SHA512_Init
 	movq	%rax, 208(%rdi)
 	xorps	%xmm0, %xmm0
 	movups	%xmm0, 64(%rdi)
+	movups	%xmm0, 80(%rdi)
+	movups	%xmm0, 96(%rdi)
+	movups	%xmm0, 112(%rdi)
+	movups	%xmm0, 128(%rdi)
+	movups	%xmm0, 144(%rdi)
+	movups	%xmm0, 160(%rdi)
+	movups	%xmm0, 176(%rdi)
+	movups	%xmm0, 192(%rdi)
 	movl	$1, %eax
 	retq
 .Lfunc_end2:
@@ -2142,6 +2150,14 @@ SHA512:                                 # @SHA512
 	xorps	%xmm0, %xmm0
 	movups	%xmm0, 64(%rsp)
 	leaq	80(%rsp), %r14
+	movups	%xmm0, 80(%rsp)
+	movups	%xmm0, 96(%rsp)
+	movups	%xmm0, 112(%rsp)
+	movups	%xmm0, 128(%rsp)
+	movups	%xmm0, 144(%rsp)
+	movups	%xmm0, 160(%rsp)
+	movups	%xmm0, 176(%rsp)
+	movups	%xmm0, 192(%rsp)
 	testq	%rsi, %rsi
 	je	.LBB6_1
 # %bb.2:

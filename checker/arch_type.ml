@@ -214,9 +214,13 @@ include ArchTypeBasic
       (dest: Isa.operand) (src_ops: Isa.operand list) : bool * t =
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) src_ops in
-    (* Printf.printf "exe_nary src_type_list:\n";
-    List.iter (fun entry -> Printf.printf "%s" (Sexplib.Sexp.to_string_hum (sexp_of_entry_t entry))) src_type_list;
-    Printf.printf "\n"; *)
+    (* List.iter (fun src -> Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand src))) src_ops;
+    Printf.printf "exe_nary: dest = %s\nsrcs:\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand dest));
+    List.iter2 (fun src src_type ->
+      Printf.printf "\t%s -> %s\n"
+        (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand src))
+        (Sexplib.Sexp.to_string_hum (sexp_of_entry_t src_type));
+    ) src_ops src_type_list; *)
     if List.length src_type_list <> n then false, curr_type else
     let ctx, _ = smt_ctx in
     let dest_type, flag_update_list =
@@ -561,13 +565,19 @@ include ArchTypeBasic
       type_prop_uncond_branch smt_ctx curr_type targ_type br_anno
     | Jcond (br_cond, br_target, br_anno) ->
       let targ_type = find_block_helper br_target in
-      type_prop_cond_branch smt_ctx curr_type targ_type br_cond br_anno
+      let result = type_prop_cond_branch smt_ctx curr_type targ_type br_cond br_anno in
+      (* Printf.printf "cond branch met, next type:\n%s\n" (sexp_of_t (snd result) |> Sexplib.Sexp.to_string_hum); *)
+      result
     | Call (callee_name, call_anno) ->
       let callee_interface = FuncInterface.get_func_interface func_interface_list callee_name in
       let curr_type = shift_rsp smt_ctx curr_type (-8L) in
+      (* Printf.printf "type before call:\n%s\n" (sexp_of_t curr_type |> Sexplib.Sexp.to_string_hum); *)
       let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
       begin match result with
-      | Some next_type -> true, shift_rsp smt_ctx next_type 8L
+      | Some next_type ->
+        let next_type = shift_rsp smt_ctx next_type 8L in
+        (* Printf.printf "type after call:\n%s\n" (sexp_of_t next_type |> Sexplib.Sexp.to_string_hum); *)
+        true, next_type
       | None -> false, curr_type
       end
     | _ ->

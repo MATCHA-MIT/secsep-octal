@@ -589,19 +589,56 @@ module DepType = struct
     let subtrahend = BitVector.mk_add ctx src flag_inc in
     exe_sub ctx dst subtrahend dest_size
 
-  let exe_multiplicative (ctx: context) (dst: exp_t) (src: exp_t) (dest_size: int) (signed: bool) : exe_result = 
-    let src_size = dest_size / 2 in
-    let ext_func = if signed then BitVector.mk_sign_ext else BitVector.mk_zero_ext in
-    let src_ext = ext_func ctx src_size src in
-    let dst_ext = ext_func ctx src_size dst in
-    let result = BitVector.mk_mul ctx dst_ext src_ext in
-    let top_half = mk_extract_wrapper ctx (dest_size - 1) src_size result in
-    let zero = BitVector.mk_numeral ctx "0" src_size in
-    let flags = Boolean.mk_not ctx (Boolean.mk_eq ctx top_half zero) in 
+  let exe_mul (ctx: context) (opr1: exp_t) (opr2: exp_t) (dest_size: int) : exe_result =
+    let opr1_size = get_exp_bit_size opr1 in
+    let opr2_size = get_exp_bit_size opr2 in
+    if opr1_size <> opr2_size || opr1_size * 2 != dest_size then
+      failwith (Printf.sprintf "exe_imul: invalid opr size: opr1 size = %d, opr2 size = %d" opr1_size opr2_size);
+    let opr1_ext = BitVector.mk_zero_ext ctx opr1_size opr1 in
+    let opr2_ext = BitVector.mk_zero_ext ctx opr1_size opr2 in
+    let result = BitVector.mk_mul ctx opr1_ext opr2_ext in
+    let upperhalf = mk_extract_wrapper ctx (dest_size - 1) opr1_size result in
+    let zero = BitVector.mk_numeral ctx "0" opr1_size in
+    let upperhalf_not_zero = Boolean.mk_not ctx (Boolean.mk_eq ctx upperhalf zero) in
     Exp result, [
-      CF, Exp flags;
-      OF, Exp flags;
+      CF, Exp upperhalf_not_zero;
+      OF, Exp upperhalf_not_zero;
     ]
+
+  (* dst and src are just two sources; real dst can be something else *)
+  let exe_imul (ctx: context) (opr1: exp_t) (opr2: exp_t) (dest_size: int) : exe_result =
+    let opr1_size = get_exp_bit_size opr1 in
+    let opr2_size = get_exp_bit_size opr2 in
+    if dest_size = opr1_size then begin
+      if opr2_size != opr1_size && opr2_size != 8 then
+        failwith (Printf.sprintf "exe_imul: invalid opr size: opr1 size = %d, opr2 size = %d, expecting 8-bit immediate on opr2" opr1_size opr2_size);
+      (* covers 2-opr form and 3-opr form *)
+      let tmp_size = opr1_size * 2 in
+      let opr1_ext = BitVector.mk_sign_ext ctx (tmp_size - opr1_size) opr1 in
+      let opr2_ext = BitVector.mk_sign_ext ctx (tmp_size - opr2_size) opr2 in
+      let tmp = BitVector.mk_mul ctx opr1_ext opr2_ext in
+      let result = mk_extract_wrapper ctx (opr1_size - 1) 0 tmp in
+      let re_ext = BitVector.mk_sign_ext ctx (tmp_size - opr1_size) result in
+      let flag_val = Boolean.mk_not ctx (Boolean.mk_eq ctx re_ext tmp) in
+      Exp result, [
+        CF, Exp flag_val;
+        OF, Exp flag_val;
+      ]
+    end else begin
+      if opr1_size = opr2_size && dest_size = opr1_size * 2 then begin
+        let opr1_ext = BitVector.mk_sign_ext ctx (dest_size - opr1_size) opr1 in
+        let opr2_ext = BitVector.mk_sign_ext ctx (dest_size - opr2_size) opr2 in
+        let result = BitVector.mk_mul ctx opr1_ext opr2_ext in
+        let lowerhalf = mk_extract_wrapper ctx (opr1_size - 1) 0 result in
+        let re_ext = BitVector.mk_sign_ext ctx (dest_size - opr1_size) lowerhalf in
+        let flag_val = Boolean.mk_not ctx (Boolean.mk_eq ctx re_ext result) in
+        Exp result, [
+          CF, Exp flag_val;
+          OF, Exp flag_val;
+        ]
+      end else
+        failwith (Printf.sprintf "exe_imul: invalid opr size: opr1 size = %d, opr2 size = %d" opr1_size opr2_size)
+    end
 
   let exe_shl (ctx: context) (dst: exp_t) (cnt: exp_t) (flag_lookup: IsaBasic.flag -> exp_t) : exe_result =
     let cnt = if (get_exp_bit_size cnt) < (get_exp_bit_size dst) then
@@ -765,17 +802,27 @@ module DepType = struct
     
 
   let exe_shld (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
-    let cflg_bv = bool_to_bv ctx cflg 1 in 
-    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx cflg_bv dst) src in
+    let dst_size = get_exp_bit_size dst in
+    let src_size = get_exp_bit_size src in
+    if dst_size <> src_size then
+      failwith (Printf.sprintf "exe_shld: invalid dst size: %d != %d" dst_size src_size);
+
+    let cflg_bv = bool_to_bv ctx cflg 1 in
+    let merged = BitVector.mk_concat ctx cflg_bv (BitVector.mk_concat ctx dst src) in
+
     let cnt = mk_extract_wrapper ctx 4 0 cnt in
-    let shifted = BitVector.mk_shl ctx merged cnt in
-    let result = mk_extract_wrapper ctx (dest_size - 1) 0 shifted in
-    let dst_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) dst in
-    let result_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) result in
-    let cflg_bit = mk_extract_wrapper ctx dest_size dest_size shifted in
+    let cnt_ext = BitVector.mk_zero_ext ctx ((get_exp_bit_size merged) - 5) cnt in
+    let shifted = BitVector.mk_shl ctx merged cnt_ext in
+
+    let result = mk_extract_wrapper ctx (dst_size + src_size - 1) src_size shifted in
+    if get_exp_bit_size result != dest_size then
+      failwith (Printf.sprintf "exe_shld: invalid result size: %d != %d" (get_exp_bit_size result) dest_size);
+    let dst_sign = mk_extract_wrapper ctx (dst_size - 1) (dst_size - 1) dst in
+    let result_sign = mk_extract_wrapper ctx (dst_size - 1) (dst_size - 1) result in
+    let cflg_bit = mk_extract_wrapper ctx (dst_size + src_size) (dst_size + src_size) shifted in
     let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
     let oflg =
-      let cnt_one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
+      let cnt_one = BitVector.mk_numeral ctx "1" (get_exp_bit_size cnt) in
       Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt cnt_one)
         (Boolean.mk_not ctx (Boolean.mk_eq ctx dst_sign result_sign))
         (Boolean.mk_false ctx)
@@ -789,17 +836,27 @@ module DepType = struct
     ]
 
   let exe_shrd (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
-    let cflg_bv = bool_to_bv ctx cflg 1 in 
-    let merged = BitVector.mk_concat ctx src (BitVector.mk_concat ctx dst cflg_bv) in
+    let dst_size = get_exp_bit_size dst in
+    let src_size = get_exp_bit_size src in
+    if dst_size <> src_size then
+      failwith (Printf.sprintf "exe_shld: invalid dst size: %d != %d" dst_size src_size);
+
+    let cflg_bv = bool_to_bv ctx cflg 1 in
+    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx src dst) cflg_bv in
+
     let cnt = mk_extract_wrapper ctx 4 0 cnt in
-    let shifted = BitVector.mk_lshr ctx merged cnt in
-    let result = mk_extract_wrapper ctx dest_size 1 shifted in
-    let dst_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) dst in
-    let result_sign = mk_extract_wrapper ctx (dest_size - 1) (dest_size - 1) result in
+    let cnt_ext = BitVector.mk_zero_ext ctx ((get_exp_bit_size merged) - 5) cnt in
+    let shifted = BitVector.mk_lshr ctx merged cnt_ext in
+
+    let result = mk_extract_wrapper ctx dst_size 1 shifted in
+    if get_exp_bit_size result != dest_size then
+      failwith (Printf.sprintf "exe_shrd: invalid result size: %d != %d" (get_exp_bit_size result) dest_size);
+    let dst_sign = mk_extract_wrapper ctx (dst_size - 1) (dst_size - 1) dst in
+    let result_sign = mk_extract_wrapper ctx (dst_size - 1) (dst_size - 1) result in
     let cflg_bit = mk_extract_wrapper ctx 0 0 shifted in
     let cflg = ml_to_z3_bool ctx (BitVector.is_bv_bit1 cflg_bit) in
     let oflg =
-      let cnt_one = BitVector.mk_numeral ctx "1" (BitVector.get_size (Expr.get_sort cnt)) in
+      let cnt_one = BitVector.mk_numeral ctx "1" (get_exp_bit_size cnt) in
       Boolean.mk_ite ctx (Boolean.mk_eq ctx cnt cnt_one)
         (Boolean.mk_not ctx (Boolean.mk_eq ctx dst_sign result_sign))
         (Boolean.mk_false ctx)
@@ -837,8 +894,8 @@ module DepType = struct
       | Adc,    [ dst; src ], [ cflg ] -> exe_adc ctx dst src cflg dest_size
       | Sub,    [ dst; src ], [ ]      -> exe_sub ctx dst src dest_size
       | Sbb,    [ dst; src ], [ cflg ] -> exe_sbb ctx dst src cflg dest_size
-      | Mul,    [ dst; src ], [ ]      -> exe_multiplicative ctx dst src dest_size false
-      | Imul,   [ dst; src ], [ ]      -> exe_multiplicative ctx dst src dest_size true
+      | Mul,    [ dst; src ], [ ]      -> exe_mul ctx dst src dest_size
+      | Imul,   [ dst; src ], [ ]      -> exe_imul ctx dst src dest_size
       | Sal,    [ dst; cnt ], [ ]
       | Shl,    [ dst; cnt ], [ ]      -> exe_shl ctx dst cnt flag_lookup
       | Sar,    [ dst; cnt ], [ ]      -> exe_sar ctx dst cnt flag_lookup
@@ -913,7 +970,12 @@ module DepType = struct
       match op, src_exp_list, src_flag_list with
       | Shld, [ dst; src; cnt ], [ cflg ] -> exe_shld ctx dst src cnt cflg dest_size
       | Shrd, [ dst; src; cnt ], [ cflg ] -> exe_shrd ctx dst src cnt cflg dest_size
-      | _ -> dep_type_error "<TODO> not implemented yet"
+      | _ ->
+        Printf.printf "top not handled: op=%s\nsrc_list=%s\nsrc_flag_list=%s\n"
+          (IsaBasic.sexp_of_top op |> Sexplib.Sexp.to_string_hum)
+          (List.map Expr.to_string src_exp_list |> String.concat ", ")
+          (List.map Expr.to_string src_flag_list |> String.concat ", ");
+        dep_type_error "<TODO> not implemented yet"
       end
   
   let check_subtype

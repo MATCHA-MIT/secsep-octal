@@ -190,8 +190,8 @@ def main():
 
     if args.command == "all":
         infer(args.benchmark, 0, InferPhase.NumPhases.value - 1)
-        check(args.benchmark, 0, CheckPhase.NumPhases.value - 1)
         transform(args.benchmark, args.out)
+        check(args.benchmark, 0, CheckPhase.NumPhases.value - 1)
     elif args.command == "infer":
         infer(args.benchmark, args.phase_beg, args.phase_end)
     elif args.command == "check":

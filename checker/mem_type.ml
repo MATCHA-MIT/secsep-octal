@@ -312,6 +312,14 @@ module MemType = struct
   type t = entry_t mem_content
   [@@deriving sexp]
 
+  (* making debug output easier *)
+
+  type entry_mem_slot = entry_t mem_slot
+  [@@deriving sexp]
+
+  type mem_anno_mem_slot = MemAnno.slot_t mem_slot
+  [@@deriving sexp]
+
   let map_full
       (func: 'a mem_slot -> 'b mem_slot)
       (mem: 'a mem_content) : 'b mem_content =
@@ -595,6 +603,9 @@ module MemType = struct
       (smt_ctx: SmtEmitter.t)
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t) : entry_t option =
+    (* Printf.printf "get_one_slot_type:\ntarget address: %s\nslot: %s\n"
+      (addr_off |> MemOffset.sexp_of_t |> Sexplib.Sexp.to_string_hum)
+      (slot |> sexp_of_entry_mem_slot |> Sexplib.Sexp.to_string_hum); *)
     let ctx, _ = smt_ctx in
     let _, _, slot_range, (slot_dep, slot_taint) = slot in
     match slot_range with
@@ -896,6 +907,10 @@ module MemType = struct
       | Some mem_type ->
         let off1, update_slot_forget_type, update_range, update_type = update_slot in
         let off2, slot_forget_type, slot_range, slot_info = slot_map in
+        (* Printf.printf "set_mem_type:\ncurr mem:%s\nupdate_slot:%s\nslot_map:%s\n"
+          (mem_type |> sexp_of_t |> Sexplib.Sexp.to_string_hum)
+          (update_slot |> sexp_of_entry_mem_slot |> Sexplib.Sexp.to_string_hum)
+          (slot_map |> sexp_of_mem_anno_mem_slot |> Sexplib.Sexp.to_string_hum); *)
         (* Check whether the two slots agree on whether to forget valid range/taint. *)
         if slot_forget_type <> update_slot_forget_type then begin
           Printf.printf "Warning: (%s, %s) set_mem_type_with_other forget type field mismatch (%b, %b)\n"
