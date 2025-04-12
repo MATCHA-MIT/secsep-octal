@@ -214,9 +214,9 @@ module RangeSubtype = struct
       List.find_opt (
         fun (x, _) ->
           match x with
-          | MemRange.RangeConst [ off ]
-          | MemRange.RangeExp (_, [ off ]) ->
-            MemOffset.cmp off tv_rel.off <> 0
+          | MemRange.RangeConst [ off ] -> MemOffset.cmp off tv_rel.off <> 0
+          | MemRange.RangeExp (sub_v, [ off ]) ->
+            MemOffset.cmp off tv_rel.off <> 0 && sub_v <> (fst tv_rel.var_idx)
           | _ -> true
       ) tv_rel.subtype_list
     in
@@ -431,7 +431,7 @@ module RangeSubtype = struct
       | _ -> None
       end
 
-    let get_sat_off_set_helper
+  let get_sat_off_set_helper
       (smt_ctx: SmtEmitter.t)
       (block_subtype_list: ArchType.block_subtype_t list)
       (sup_pc: int)
@@ -457,7 +457,7 @@ module RangeSubtype = struct
             || SingleCondType.check true smt_ctx [ Eq, l, (snd sup_full_off) ] = SatYes
           )) then 
           Eq 
-      else Other
+        else Other
       | Some sub_off -> 
         MemOffset.offset_quick_cmp smt_ctx sol_candidate_off sub_off MemOffset.CmpEqSubset
     in
@@ -652,10 +652,10 @@ module RangeSubtype = struct
       (new_sol_list: (var_idx_t * MemRange.t) list) (tv_rel: type_rel) : 
       ((var_idx_t * MemRange.t) list) * type_rel =
     let rule_list = [
+      try_solve_full;
       try_solve_extra_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map;
       try_solve_const_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list;
       try_solve_hybrid_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list;
-      try_solve_full;
       try_solve_empty input_var_set;
       (* try_solve_non_val smt_ctx get_block_var block_subtype_list; *)
     ] in
