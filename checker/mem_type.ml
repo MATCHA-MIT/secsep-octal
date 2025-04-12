@@ -76,7 +76,16 @@ module MemOffset = struct
     | CmpEqSubset ->
       if check eq_req = SatYes then Eq
       else if check subset_req = SatYes then Subset
-      else Other
+      else begin
+        (* let e1 = List.hd subset_req in
+        let e2 = List.hd (List.tl subset_req) in
+        let result1 = check [e1] in
+        let result2 = check [e2] in
+        Printf.printf "subset(1): %s -> %s\nsubset(2): %s -> %s\n" 
+          (Expr.to_string e1) (SmtEmitter.sexp_of_sat_result_t result1 |> Sexplib.Sexp.to_string_hum)
+          (Expr.to_string e2) (SmtEmitter.sexp_of_sat_result_t result2 |> Sexplib.Sexp.to_string_hum); *)
+        Other
+      end
     | CmpOverlap ->
       if check eq_req = SatYes then Eq
       else if check subset_req = SatYes then Subset

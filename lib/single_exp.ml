@@ -388,8 +388,8 @@ include SingleExpBasic
     let rec helper (e: t) : int64 =
       match e with
       | SingleConst num ->
-        if Int64.rem num 16L = 0L then 16L
-        else if Int64.rem num 8L = 0L then 8L
+        (* if Int64.rem num 16L = 0L then 16L *)
+        if Int64.rem num 8L = 0L then 8L
         else if Int64.rem num 4L = 0L then 4L
         else if Int64.rem num 2L = 0L then 2L
         else 1L

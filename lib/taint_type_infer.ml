@@ -102,6 +102,7 @@ module TaintTypeInfer = struct
         extra_call_context_hist = block_single_type.extra_call_context_hist;
         local_var_map = TaintEntryType.get_empty_var_map;
         useful_var = block_single_type.useful_var;
+        useful_constrained_var = block_single_type.useful_constrained_var;
         global_var = block_single_type.global_var;
         prop_mode = ArchType.TypeInferTaint;
       }

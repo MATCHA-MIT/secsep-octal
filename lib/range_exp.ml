@@ -17,6 +17,17 @@ module RangeExp = struct
     | Top
   [@@deriving sexp]
 
+  let get_var (r: t) : SingleExp.SingleVarSet.t =
+    match r with
+    | Single s -> SingleExp.get_vars s
+    | Range (l, r, _) ->
+      let l_vars = SingleExp.get_vars l in
+      let r_vars = SingleExp.get_vars r in
+      SingleExp.SingleVarSet.union l_vars r_vars
+    | SingleSet e_list ->
+      List.fold_left (fun acc e -> SingleExp.SingleVarSet.union acc (SingleExp.get_vars e)) SingleExp.SingleVarSet.empty e_list
+    | Top -> SingleExp.SingleVarSet.empty
+
   let canonicalize_range
       (l: SingleExp.t) (r: SingleExp.t) (step: int64)
       : SingleExp.t * SingleExp.t * int64 =

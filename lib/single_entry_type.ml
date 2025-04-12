@@ -41,6 +41,7 @@ include SingleExp
       | 2L when orig_sz > 2L -> 0xFFFFL
       (* when 4-byte register is used the variable represents the whole 8-byte registers (upper 32 bits are zero) *)
       (* this asserts there's no extracting lower 32-bits using 4-byte register when the register is used as 8-byte *)
+      (* adding this will cause taint infer failed (spotted on salsa20) *)
       (* | 4L when orig_sz > 4L -> 0xFFFFFFFFL *)
       | _ -> 0L
       in

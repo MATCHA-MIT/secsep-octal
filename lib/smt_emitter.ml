@@ -84,18 +84,21 @@ let get_model (smt_ctx: t) : Model.model option =
       ) assertions
     in
     if List.length assertions = 0 then SatYes else
+
     (*
-    Printf.printf "\ncheck_compliance\n";
-    Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-      (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
-    (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-    (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
-    (* get string of all assertion and concat them *)
-    Printf.printf "assertion (%d) = \n%s\n\n" (List.length assertions) (
-      List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
-    );
-    Printf.printf "negation  = \n%s\n\n" (Z3.Expr.to_string negation);
+    let _ = begin
+      Printf.printf "\ncheck_compliance\n";
+      Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+        (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
+      (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
+      (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
+      (* get string of all assertion and concat them *)
+      Printf.printf "assertion (%d) = \n%s\n\n" (List.length assertions) (
+        List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
+      );
+    end in
     *)
+
     match Z3.Solver.check z3_solver assertions with
     | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
     | Z3.Solver.UNSATISFIABLE -> begin
@@ -109,8 +112,8 @@ let get_model (smt_ctx: t) : Model.model option =
           match Z3.Solver.check z3_solver [neg] with
           | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
           | Z3.Solver.SATISFIABLE ->
-            (* Printf.printf "%s could be false\n" (Z3.Expr.to_string assertion);
-            Printf.printf "%s\n" (Z3.Model.to_string (get_model smt_ctx |> Option.get)); *)
+            (* Printf.printf "this expr is not always true:\n%s\n" (Z3.Expr.to_string assertion);
+            Printf.printf "counter example:\n%s\n" (Z3.Model.to_string (get_model smt_ctx |> Option.get)); *)
             true
           | Z3.Solver.UNSATISFIABLE -> false
         ) assertions in

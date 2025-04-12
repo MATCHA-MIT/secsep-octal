@@ -117,6 +117,7 @@ module ArchTypeBasic = struct
           (SmtEmitter.sexp_of_sat_result_t result |> Sexplib.Sexp.to_string_hum);
       ) sup_dep_context;
       Printf.printf "%s\n" (SmtEmitter.to_string smt_ctx);
+      Printf.printf "orignal sup's context:\n%s\n" (sup_a_type.context |> BasicType.sexp_of_ctx_t |> Sexplib.Sexp.to_string_hum);
     end;
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
 

@@ -611,7 +611,9 @@ include ArchTypeBasic
     SmtEmitter.push smt_ctx;
     add_block_context_to_solver smt_ctx block_type;
 
+    Printf.printf "checking valid region...\n";
     let check_valid_region = MemType.check_valid_region smt_ctx block_type.mem_type in
+    Printf.printf "valid region: %b\n" check_valid_region;
 
     let check_prop =
       if block_type.pc >= block_type.dead_pc then true else

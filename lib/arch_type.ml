@@ -58,6 +58,7 @@ module ArchType (Entry: EntryType) = struct
     (* smt_ctx: SmtEmitter.t; *)
     local_var_map: Entry.local_var_map_t;
     useful_var: SingleExp.SingleVarSet.t;
+    useful_constrained_var: SingleExp.SingleVarSet.t;
     global_var: SingleExp.SingleVarSet.t;
     prop_mode: prop_mode_t;
     (* Maybe add constraint set here!!! *)
@@ -169,6 +170,7 @@ module ArchType (Entry: EntryType) = struct
       extra_call_context_hist = [];
       local_var_map = Entry.get_empty_var_map;
       useful_var = SingleExp.SingleVarSet.empty;
+      useful_constrained_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
       prop_mode = prop_mode;
     }
@@ -201,6 +203,7 @@ module ArchType (Entry: EntryType) = struct
       extra_call_context_hist = [];
       local_var_map = Entry.get_empty_var_map;
       useful_var = SingleExp.SingleVarSet.empty;
+      useful_constrained_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
       prop_mode = prop_mode;
     }
@@ -236,6 +239,7 @@ module ArchType (Entry: EntryType) = struct
       dead_pc = update.dead_pc;
       local_var_map = update.local_var_map;
       useful_var = update.useful_var;
+      useful_constrained_var = update.useful_constrained_var;
       full_not_taken_hist = update.full_not_taken_hist;
       constraint_list = update.constraint_list;
       extra_call_subtype_list = update.extra_call_subtype_list;
@@ -586,7 +590,10 @@ module ArchType (Entry: EntryType) = struct
       let ld_op_constraint = Entry.update_ld_taint_constraint src_type taint_anno in
       (
         src_type,
-        { curr_type with useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful },
+        { curr_type with
+          useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful;
+          useful_constrained_var = SingleExp.SingleVarSet.union curr_type.useful_constrained_var src_useful;
+        },
         ld_op_constraint @ src_constraint,
         LdOp (disp, base, index, scale, size, (slot_anno, taint_anno))
       )
@@ -614,7 +621,10 @@ module ArchType (Entry: EntryType) = struct
       let next_type, dest_constraint, dest_useful, slot_anno =
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type addr_type size_type slot_anno new_type
       in
-      { next_type with useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful },
+      { next_type with
+        useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful;
+        useful_constrained_var = SingleExp.SingleVarSet.union next_type.useful_constrained_var dest_useful;
+      },
       st_op_constraint @ dest_constraint,
       StOp (disp, base, index, scale, size, (slot_anno, taint_anno))
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
@@ -763,8 +773,11 @@ module ArchType (Entry: EntryType) = struct
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type dest_addr_type size_type dest_slot_anno new_type
       in
       let next_type = add_constraints next_type (src_constraint @ ld_op_constraint @ dest_constraint @ st_op_constraint) in
+      let combined = SingleExp.SingleVarSet.union src_useful dest_useful in
       { next_type with
-        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful |> SingleExp.SingleVarSet.union dest_useful },
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union combined;
+        useful_constrained_var = next_type.useful_constrained_var |> SingleExp.SingleVarSet.union combined;
+      },
       RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno))
     | RepLods (size, (src_slot_anno, src_taint_anno)) ->
       let rcx_type = get_reg_type curr_type RCX in
@@ -778,7 +791,9 @@ module ArchType (Entry: EntryType) = struct
       let next_type = set_reg_type curr_type RAX new_type in
       let next_type = add_constraints next_type (src_constraint @ ld_op_constraint) in
       { next_type with
-        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful },
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful;
+        useful_constrained_var = next_type.useful_constrained_var |> SingleExp.SingleVarSet.union src_useful;
+      },
       RepLods (size, (src_slot_anno, src_taint_anno))
     | RepStos (size, (dest_slot_anno, dest_taint_anno)) ->
       let rcx_type = get_reg_type curr_type RCX in
@@ -791,7 +806,9 @@ module ArchType (Entry: EntryType) = struct
       in
       let next_type = add_constraints next_type (dest_constraint @ st_op_constraint) in
       { next_type with
-        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union dest_useful },
+        useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union dest_useful;
+        useful_constrained_var = next_type.useful_constrained_var |> SingleExp.SingleVarSet.union dest_useful;
+      },
       RepStos (size, (dest_slot_anno, dest_taint_anno))
     | Xchg (dest0, dest1, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in

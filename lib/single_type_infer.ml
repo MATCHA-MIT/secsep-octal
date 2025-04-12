@@ -575,6 +575,71 @@ module SingleTypeInfer = struct
     ) block_subtype;
     ()
 
+  let add_var_bound_constraint (state: t) : t =
+    let useful_constrained_var = List.fold_left (fun (acc: SingleEntryType.SingleVarSet.t) (arch_type: ArchType.t) ->
+      Printf.printf "useful constrained var in %s: %s\n"
+        arch_type.label
+        (arch_type.useful_constrained_var |> SingleEntryType.SingleVarSet.sexp_of_t |> Sexplib.Sexp.to_string_hum);
+      let new_vars = List.fold_left (fun acc (block_var: Isa.imm_var_id) ->
+        let range = SingleSubtype.sub_sol_single_to_range
+          (fun x -> x) (* I *)
+          state.single_subtype
+          state.input_var_set
+          (SingleVar block_var, arch_type.pc)
+        in
+        let input_vars = Range_exp.RangeExp.get_var range in
+        Printf.printf "block var %d --> input vars: %s\n"
+          block_var
+          (input_vars |> SingleEntryType.SingleVarSet.sexp_of_t |> Sexplib.Sexp.to_string_hum);
+        SingleEntryType.SingleVarSet.union input_vars acc
+      ) SingleEntryType.SingleVarSet.empty (SingleEntryType.SingleVarSet.to_list arch_type.useful_constrained_var)
+      in
+      SingleEntryType.SingleVarSet.union acc new_vars
+    ) SingleEntryType.SingleVarSet.empty state.func_type
+    in
+    {state with
+      func_type = List.map (fun (arch_type: ArchType.t) ->
+        (* only add constraints for the entry block *)
+        if arch_type.label <> state.func_name then arch_type else
+
+        let vars = SingleEntryType.SingleVarSet.inter state.input_var_set useful_constrained_var in
+        (* Printf.printf "input and userful constrainted vars: %s\n" (SingleEntryType.SingleVarSet.sexp_of_t vars |> Sexplib.Sexp.to_string_hum); *)
+        (* ignore callee saved regs *)
+        let callee_saved_reg_vars = arch_type.reg_type
+          |> List.filteri (fun i _ -> Isa.is_reg_idx_callee_saved i)
+          |> List.filter_map (fun s ->
+               match s with
+               | SingleEntryType.SingleVar v -> Some v
+               | _ -> None
+             )
+        in
+        (* Printf.printf "removing callee saved reg vars: %s\n" (SingleEntryType.SingleVarSet.sexp_of_t (SingleEntryType.SingleVarSet.of_list callee_saved_reg_vars) |> Sexplib.Sexp.to_string_hum); *)
+        (* ignore callee saved regs *)
+        let vars = SingleEntryType.SingleVarSet.diff vars (SingleEntryType.SingleVarSet.of_list callee_saved_reg_vars) in
+        (* ignore pointers *)
+        let memory_ptr_vars = arch_type.mem_type
+          |> List.map (fun (mem_part: SingleEntryType.t Mem_type_new.MemTypeBasic.mem_part) ->
+            let (ptr, _), _ = mem_part in ptr
+          )
+        in
+        (* Printf.printf "removing pointer vars: %s\n" (SingleEntryType.SingleVarSet.sexp_of_t (SingleEntryType.SingleVarSet.of_list memory_ptr_vars) |> Sexplib.Sexp.to_string_hum); *)
+        let vars = SingleEntryType.SingleVarSet.diff vars (SingleEntryType.SingleVarSet.of_list memory_ptr_vars) in
+
+        Printf.printf "func %s block %s: adding bound constr for %d vars: %s\n"
+          state.func_name arch_type.label
+          (SingleEntryType.SingleVarSet.cardinal vars)
+          (SingleEntryType.SingleVarSet.sexp_of_t vars |> Sexplib.Sexp.to_string_hum);
+        let new_context = List.fold_left (
+          fun c_list (var: Isa.imm_var_id) ->
+            (SingleContext.Cond (SingleCondType.Le, SingleEntryType.SingleConst 0L, SingleEntryType.SingleVar var)) ::
+            (SingleContext.Cond (SingleCondType.Lt, SingleEntryType.SingleVar var, SingleEntryType.SingleConst (Int64.shift_left 1L 31))) ::
+            c_list
+        ) arch_type.context (SingleEntryType.SingleVarSet.to_list vars)
+        in
+        { arch_type with context = new_context }
+      ) state.func_type;
+    }
+
   let infer_one_func
       (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
@@ -851,6 +916,7 @@ module SingleTypeInfer = struct
         end else begin
           let state = (
             if iter_left = 1 then begin
+              Printf.printf "Infer failed for %s\n" func_name;
               Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
               List.iter (
                 fun (label, unknown_list) -> 
@@ -912,10 +978,13 @@ module SingleTypeInfer = struct
       let func_name, func_mem_interface, stack_spill_info = entry in
       Printf.printf "Inferring func %s\n" func_name;
       let infer_state = infer_one_func prog acc func_name func_mem_interface stack_spill_info iter solver_iter in
+      let infer_state = add_var_bound_constraint infer_state in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;
       pp_func_type 0 infer_state;
-      FuncInterface.pp_func_interface 0 func_interface;
+      Printf.printf "Interface of %s:\n%s\n"
+        func_name
+        (func_interface |> FuncInterface.sexp_of_t |> Sexplib.Sexp.to_string_hum);
       (* let buf = Buffer.create 1000 in
       pp_ocaml_state 0 buf infer_state;
       Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
@@ -952,6 +1021,19 @@ module SingleTypeInfer = struct
       Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsyms global_symbol_layout
     ) func_mem_interface_list
     in
+
+    (* let func_mem_interface_list = List.filter (fun (interface: Base_func_interface.entry_t) ->
+      let func_name, _, _ = interface in
+      match func_name with
+      | "sha512_block_data_order"
+      | "SHA512_Init"
+      | "SHA512_Update"
+      | "SHA512_Final" 
+      | "SHA512"
+      (* | "table_select" *)
+        -> true
+      | _ -> false
+    ) func_mem_interface_list in *)
 
     Printf.printf "%d\n" (List.length func_mem_interface_list);
     Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map (fun (_, x, _) -> x) func_mem_interface_list)));
