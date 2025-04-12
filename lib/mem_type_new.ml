@@ -1330,10 +1330,10 @@ module MemType (Entry: EntryType) = struct
             else [(SingleContext.NoOverflow len)]
           in
           len_no_overflow_constraint @ [
-            SingleContext.Cond (Lt, SingleExp.SingleConst 0L, l);
+            SingleContext.Cond (Lt, SingleConst 0L, l);
             SingleContext.Cond (Le, l, r); 
-            SingleContext.Cond (Le, SingleExp.SingleConst 0L, len);
-            SingleContext.Cond (Le, len, SingleExp.SingleConst (Int64.shift_left 1L 32));
+            SingleContext.Cond (Le, SingleConst 0L, len);
+            SingleContext.Cond (Lt, len, SingleConst (Int64.shift_left 1L 31));
           ]
       ) boundary_list
 

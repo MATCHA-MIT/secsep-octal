@@ -631,8 +631,8 @@ module SingleTypeInfer = struct
           (SingleEntryType.SingleVarSet.sexp_of_t vars |> Sexplib.Sexp.to_string_hum);
         let new_context = List.fold_left (
           fun c_list (var: Isa.imm_var_id) ->
-            (SingleContext.Cond (SingleCondType.Le, SingleEntryType.SingleConst 0L, SingleEntryType.SingleVar var)) ::
-            (SingleContext.Cond (SingleCondType.Lt, SingleEntryType.SingleVar var, SingleEntryType.SingleConst (Int64.shift_left 1L 31))) ::
+            (SingleContext.Cond (Le, SingleConst 0L, SingleVar var)) ::
+            (SingleContext.Cond (Lt, SingleVar var, SingleConst (Int64.shift_left 1L 31))) ::
             c_list
         ) arch_type.context (SingleEntryType.SingleVarSet.to_list vars)
         in
