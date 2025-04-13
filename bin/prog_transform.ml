@@ -5,14 +5,31 @@ open Asm_gen
 let usage_msg = "transform -name <proram_name>"
 let program_name = ref ""
 let output_name = ref ""
+let delta_string : string ref = ref ""
+let disable_tf_push_pop = ref false
+let disable_tf_call = ref false
 
 let speclist = [
   ("-name", Arg.Set_string program_name, "Set program name");
-  ("-out", Arg.Set_string output_name, "Set output asm filename")
+  ("-out", Arg.Set_string output_name, "Set output asm filename");
+  ("--delta", Arg.Set_string delta_string, "Absolute offset from public stack to secret stack");
+  ("--no-push-pop", Arg.Set disable_tf_push_pop, "Disable push/pop transformation (security property harmed!!!)");
+  ("--no-call", Arg.Set disable_tf_call, "Disable call untaint preservation transformation");
 ]
 
 let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
+
+  let delta = Int64.of_string_opt !delta_string |> Option.value ~default:0x100000L in
+  if delta <= 0L then
+    failwith "expecting positive delta value";
+
+  let tf_config : Transform.Transform.tf_config_t = {
+    delta = delta;
+    disable_tf_push_pop = !disable_tf_push_pop;
+    disable_tf_call = !disable_tf_call;
+  } in
+
   let taint_infer_result_fi =
     Taint_type_infer.TaintTypeInfer.FuncInterface.fi_list_from_file (get_related_filename !program_name "out" "instantiate_interface")
   in
@@ -24,7 +41,7 @@ let () =
     (* if ti.func_name <> "salsa20_words" && ti.func_name <> "salsa20_block" then None else *)
     if Option.get ti.alive then begin
       let init_mem_unity = Transform.Transform.get_func_init_mem_unity ti in
-      Some (Transform.Transform.transform_one_function taint_infer_result_fi ti init_mem_unity)
+      Some (Transform.Transform.transform_one_function tf_config taint_infer_result_fi ti init_mem_unity)
     end else
       None
   ) taint_infer_result_states in

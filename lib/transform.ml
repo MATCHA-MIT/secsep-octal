@@ -9,6 +9,8 @@ open Branch_anno
 open Call_anno
 open Single_exp
 open Pretty_print
+open Sexplib
+open Sexplib.Std
 
 exception TransformError of string
 let transform_error msg = raise (TransformError ("[Transform Error] " ^ msg))
@@ -151,7 +153,18 @@ module Transform = struct
 
   type tv_fault_t = Isa_basic.IsaBasic.label * Isa_basic.IsaBasic.label * TaintExp.taint_var_id * string
 
-  let delta: int64 = -0x100000L (* -1MB *)
+  type tf_config_t = {
+    delta: int64;
+    disable_tf_push_pop: bool;
+    disable_tf_call: bool;
+  }
+  [@@deriving sexp]
+
+  let tf_config : tf_config_t ref = ref {
+    delta = -1L; (* to be overriden by input config; this value will fail the sanity check *)
+    disable_tf_push_pop = false;
+    disable_tf_call = false;
+  }
 
   let is_bb_transformed (bb: basic_block) : bool =
     List.exists (fun (tf: InstTransform.t) -> tf.changed) bb.insts
@@ -316,8 +329,8 @@ module Transform = struct
   let add_delta_on_disp (mem_op: Isa.mem_op) : Isa.mem_op =
     let d, b, i, s, sz = mem_op in
     match d with
-    | None -> (Some (ImmNum (delta, sz)), b, i, s, sz)
-    | Some x -> (Some (add_delta_on_imm x delta), b, i, s, sz)
+    | None -> (Some (ImmNum (!tf_config.delta, sz)), b, i, s, sz)
+    | Some x -> (Some (add_delta_on_imm x !tf_config.delta), b, i, s, sz)
 
   let transform_instruction
       (func_state: func_state)
@@ -440,7 +453,7 @@ module Transform = struct
         let taint_anno = Option.get taint_anno in
         let taint_anno = tv_ittt taint_anno in (* mocking *)
         let offset_as_disp, sf1 = match taint_anno with
-        | TaintConst true -> Some (Isa.ImmNum (delta, Some 8L)), []
+        | TaintConst true -> Some (Isa.ImmNum (!tf_config.delta, Some 8L)), []
         | TaintConst false -> None, []
         | TaintVar v -> None, [(v, "push/pop with variable taint")] (* soft fault *)
         | TaintExp v_set -> None, TaintExp.TaintVarSet.to_list v_set |> List.map (fun x -> (x, "ld/st with variable taint")) (* soft fault *)
@@ -464,15 +477,17 @@ module Transform = struct
           else
             css
           in
-          (inst_st, [inst_rsp_sub], [], false), css', sf
-          (* let _, _ = inst_rsp_sub, inst_st in
-          (orig, [], [], false), css', sf *)
+          if !tf_config.disable_tf_push_pop then
+            (orig, [], [], false), css', sf
+          else
+            (inst_st, [inst_rsp_sub], [], false), css', sf
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
-          (inst_ld, [], [inst_rsp_add], false), css, sf
-          (* let _, _ = inst_ld, inst_rsp_add in
-          (orig, [], [], false), css, sf *)
+          if !tf_config.disable_tf_push_pop then
+            (orig, [], [], false), css, sf
+          else
+            (inst_ld, [], [inst_rsp_add], false), css, sf
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> (orig, [], [], true), css, [] (* handled in another pass *)
@@ -537,8 +552,8 @@ module Transform = struct
     let res = match tf.orig with
     | BInst (Add, dst, src1, src2) -> begin
         let replaced = match src1, src2 with
-        | ImmOp imm, _ -> Some (Isa.ImmOp (add_delta_on_imm imm delta), src2)
-        | _, ImmOp imm -> Some (src1, Isa.ImmOp (add_delta_on_imm imm delta))
+        | ImmOp imm, _ -> Some (Isa.ImmOp (add_delta_on_imm imm !tf_config.delta), src2)
+        | _, ImmOp imm -> Some (src1, Isa.ImmOp (add_delta_on_imm imm !tf_config.delta))
         | _ -> None (* TODO: not supported yet, can we do better? *)
         in
         match replaced with
@@ -572,7 +587,7 @@ module Transform = struct
           InstTransform.assign tf
             tf.orig
             []
-            [Isa.make_inst_add_i_r delta reg]
+            [Isa.make_inst_add_i_r !tf_config.delta reg]
             true
         )
       end
@@ -642,7 +657,7 @@ module Transform = struct
                   if Isa.is_reg_callee_saved reg then
                     transform_error "trying to temporarily transform a callee saved register, unexpceted";
                   (
-                    (Isa.make_inst_add_i_r delta reg) :: acc_inst_pre,
+                    (Isa.make_inst_add_i_r !tf_config.delta reg) :: acc_inst_pre,
                     acc_inst_post (* no need to restore, since the register is caller saved *),
                     acc_sf
                   )
@@ -688,8 +703,8 @@ module Transform = struct
                     | TaintUnknown -> transform_error "Unexpected unknown taint annotation for BaseAsSlot"
                   in
                   (
-                    (Isa.make_inst_add_i_m64 delta mem_op) :: acc_inst_pre,
-                    (Isa.make_inst_add_i_m64 (Int64.neg delta) mem_op) :: acc_inst_post,
+                    (Isa.make_inst_add_i_m64 !tf_config.delta mem_op) :: acc_inst_pre,
+                    (Isa.make_inst_add_i_m64 (Int64.neg !tf_config.delta) mem_op) :: acc_inst_post,
                     sf @ acc_sf
                   )
                 | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
@@ -893,10 +908,20 @@ module Transform = struct
 
   (* Step 5 *)
   let transform_one_function
+      (set_tf_config: tf_config_t)
       (fi_list: FuncInterface.t list)
       (ti_state: TaintTypeInfer.t)
       (init_mem_unity: mem_unity_t)
       : func_state * (tv_fault_t list) =
+    (* apply config *)
+    Printf.printf "setting tf_config to\n%s\n" (sexp_of_tf_config_t set_tf_config |> Sexp.to_string_hum);
+    tf_config := set_tf_config;
+    if !tf_config.delta <= 0L then
+      failwith "delta passed in should be positive";
+    (* delta is negative from now on*)
+    tf_config := {!tf_config with delta = Int64.neg !tf_config.delta};
+
+    (* Step 1 *)
     let func_state = init_func_state ti_state init_mem_unity in
 
     (* mocking tv ittt *)
@@ -919,27 +944,35 @@ module Transform = struct
     in
 
     (* call handling pass *)
-    let sf2, bbs = List.fold_left_map (
-      fun acc_sf bb ->
-        let bb', sf = transform_basic_block_calls func_state tv_ittt fi_list bb in
-        sf @ acc_sf, bb'
-    ) [] func_state.bbs in
-    let func_state = {
-      func_state with
-      bbs = bbs;
-    }
+    let func_state, sf2 = if !tf_config.disable_tf_call then
+      func_state, []
+    else begin
+      let sf2, bbs = List.fold_left_map (
+        fun acc_sf bb ->
+          let bb', sf = transform_basic_block_calls func_state tv_ittt fi_list bb in
+          sf @ acc_sf, bb'
+      ) [] func_state.bbs in
+      let func_state = {
+        func_state with
+        bbs = bbs;
+      }
+      in
+      func_state, sf2
+    end
     in
-    (* let _ = fi_list in
-    let sf2 = [] in *)
 
     (* simplify push/pop sequence *)
-    let bbs = List.map (
-      fun bb -> simplify_bb_push_pops func_state bb
-    ) func_state.bbs in
-    let func_state = {
-      func_state with
-      bbs = bbs;
-    }
+    let func_state = if !tf_config.disable_tf_push_pop then
+      func_state
+    else begin
+      let bbs = List.map (
+        fun bb -> simplify_bb_push_pops func_state bb
+      ) func_state.bbs in
+      {
+        func_state with
+        bbs = bbs;
+      }
+    end
     in
 
     let sf = sf1 @ sf2 |> List.sort_uniq (fun info1 info2 ->
