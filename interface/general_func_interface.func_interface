@@ -37,12 +37,12 @@
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (Cond (Lt (SingleConst 0) (SingleVar 4)))
     (Cond
      (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
     (Cond (Le (SingleConst 0) (SingleConst 8)))
-    (Cond (Le (SingleConst 8) (SingleConst 4294967296)))))
+    (Cond (Lt (SingleConst 8) (SingleConst 2147483648)))))
   (in_taint_context ())
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
@@ -117,12 +117,12 @@
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (Cond (Lt (SingleConst 0) (SingleVar 4)))
     (Cond
      (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
     (Cond (Le (SingleConst 0) (SingleConst 8)))
-    (Cond (Le (SingleConst 8) (SingleConst 4294967296)))))
+    (Cond (Lt (SingleConst 8) (SingleConst 2147483648)))))
   (in_taint_context ())
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
@@ -213,17 +213,17 @@
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (NoOverflow (SingleVar 2)) (Cond (Lt (SingleConst 0) (SingleVar 6)))
     (Cond
      (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (Cond (Lt (SingleConst 0) (SingleVar 4)))
     (Cond
      (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
     (Cond (Le (SingleConst 0) (SingleConst 8)))
-    (Cond (Le (SingleConst 8) (SingleConst 4294967296)))))
+    (Cond (Lt (SingleConst 8) (SingleConst 2147483648)))))
   (in_taint_context (((TaintVar 33) (TaintVar 32))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))
@@ -324,17 +324,17 @@
     (Cond
      (Le (SingleVar 7) (SingleBExp SingleAdd (SingleVar 7) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (NoOverflow (SingleVar 2)) (Cond (Lt (SingleConst 0) (SingleVar 6)))
     (Cond
      (Le (SingleVar 6) (SingleBExp SingleAdd (SingleVar 6) (SingleVar 2))))
     (Cond (Le (SingleConst 0) (SingleVar 2)))
-    (Cond (Le (SingleVar 2) (SingleConst 4294967296)))
+    (Cond (Lt (SingleVar 2) (SingleConst 2147483648)))
     (Cond (Lt (SingleConst 0) (SingleVar 4)))
     (Cond
      (Le (SingleVar 4) (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))))
     (Cond (Le (SingleConst 0) (SingleConst 8)))
-    (Cond (Le (SingleConst 8) (SingleConst 4294967296)))))
+    (Cond (Lt (SingleConst 8) (SingleConst 2147483648)))))
   (in_taint_context (((TaintVar 33) (TaintVar 32))))
   (out_reg
    ((SingleTop (TaintConst true)) (SingleTop (TaintConst true))

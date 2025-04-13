@@ -465,10 +465,14 @@ module Transform = struct
             css
           in
           (inst_st, [inst_rsp_sub], [], false), css', sf
+          (* let _, _ = inst_rsp_sub, inst_st in
+          (orig, [], [], false), css', sf *)
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
           (inst_ld, [], [inst_rsp_add], false), css, sf
+          (* let _, _ = inst_ld, inst_rsp_add in
+          (orig, [], [], false), css, sf *)
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> (orig, [], [], true), css, [] (* handled in another pass *)
@@ -801,16 +805,16 @@ module Transform = struct
         Some imm
       | _ -> None
     in
-    let helper (acc_insts: InstTransform.t list) (tf: InstTransform.t) : InstTransform.t list =
-      if acc_insts = [] then [tf] else
+    let helper (acc_insts: InstTransform.t list) (y: InstTransform.t) : InstTransform.t list =
+      if acc_insts = [] then [y] else
       let x = List.hd acc_insts in
-      let x, tf = match x.orig, tf.orig with
+      let x, y = match x.orig, y.orig with
       | Push _, Push _ ->
         if List.length x.inst_pre != 1 || List.length x.inst_post != 0 ||
-           List.length tf.inst_pre != 1 || List.length tf.inst_post != 0 then
+           List.length y.inst_pre != 1 || List.length y.inst_post != 0 then
           transform_error "unexpected transformed push";
         let acc_offset = extract_offset_helper (List.hd x.inst_pre) |> Option.get in
-        let new_offset = extract_offset_helper (List.hd tf.inst_pre) |> Option.get in
+        let new_offset = extract_offset_helper (List.hd y.inst_pre) |> Option.get in
 
         let x_inst = match x.inst with
         | UInst(Mov, StOp(offset_as_disp, Some RSP, None, None, o_size, mem_anno), o') ->
@@ -820,23 +824,69 @@ module Transform = struct
           | _ -> transform_error "unexpected transformed disp"
           in
           Isa.UInst (Mov, StOp(Some (ImmNum (disp, Some 8L)), Some RSP, None, None, o_size, mem_anno), o')
-        | _ -> transform_error "unexpected transformed push";
+        | _ -> transform_error (Printf.sprintf "unexpected transformed push: %s" (Isa.sexp_of_instruction x.inst |> Sexplib.Sexp.to_string_hum));
         in
 
         let x = { x with
           inst = x_inst;
           inst_pre = [];
         } in
-
-        let tf = { tf with
+        let y = { y with
           inst_pre = [Isa.make_inst_add_i_r (Int64.add acc_offset new_offset) Isa.RSP]
         } in
+        (x, y)
+      | Push _, _ ->
+        (* swap add and store for the last push in a row, so that store happens first *)
+        if List.length x.inst_pre != 1 || List.length x.inst_post != 0 then
+          transform_error "last consecutive push should be transformed";
+        let acc_offset = extract_offset_helper (List.hd x.inst_pre) |> Option.get in
 
-        (x, tf)
-      | Pop _, Pop _ -> (x, tf)
-      | _, _ -> (x, tf)
+        let x_inst = match x.inst with
+        | UInst(Mov, StOp(offset_as_disp, Some RSP, None, None, o_size, mem_anno), o') ->
+          let disp = match offset_as_disp with
+          | None -> acc_offset
+          | Some (ImmNum (v, _)) -> Int64.add v acc_offset
+          | _ -> transform_error "unexpected transformed disp"
+          in
+          Isa.UInst (Mov, StOp(Some (ImmNum (disp, Some 8L)), Some RSP, None, None, o_size, mem_anno), o')
+        | _ -> transform_error (Printf.sprintf "unexpected transformed push: %s" (Isa.sexp_of_instruction x.inst |> Sexplib.Sexp.to_string_hum));
+        in
+
+        let x = { x with
+          inst = x_inst;
+          inst_pre = [];
+          inst_post = [Isa.make_inst_add_i_r acc_offset Isa.RSP];
+        } in
+        (x, y)
+      | Pop _, Pop _ ->
+        if List.length x.inst_pre != 0 || List.length x.inst_post != 1 &&
+           List.length y.inst_pre != 0 || List.length y.inst_post != 1 then
+          transform_error "unexpected transformed push";
+        let acc_offset = extract_offset_helper (List.hd x.inst_post) |> Option.get in
+        let new_offset = extract_offset_helper (List.hd y.inst_post) |> Option.get in
+
+        let y_inst = match y.inst with
+        | UInst(Mov, o', LdOp(offset_as_disp, Some RSP, None, None, o_size, mem_anno)) ->
+          let disp = match offset_as_disp with
+          | None -> acc_offset
+          | Some (ImmNum (v, _)) -> Int64.add v acc_offset
+          | _ -> transform_error "unexpected transformed disp"
+          in
+          Isa.UInst (Mov, o', LdOp(Some (ImmNum (disp, Some 8L)), Some RSP, None, None, o_size, mem_anno))
+        | _ -> transform_error (Printf.sprintf "unexpected transformed pop: %s" (Isa.sexp_of_instruction y.inst |> Sexplib.Sexp.to_string_hum));
+        in
+
+        let x = { x with
+          inst_post = [];
+        } in
+        let y = { y with
+          inst = y_inst;
+          inst_post = [Isa.make_inst_add_i_r (Int64.add acc_offset new_offset) Isa.RSP]
+        } in
+        (x, y)
+      | _, _ -> (x, y)
       in
-      tf :: x :: (List.tl acc_insts)
+      y :: x :: (List.tl acc_insts)
     in
     let new_insts = List.fold_left helper [] bb.insts in
     { bb with insts = List.rev new_insts }
@@ -879,8 +929,9 @@ module Transform = struct
       bbs = bbs;
     }
     in
+    (* let _ = fi_list in
+    let sf2 = [] in *)
 
-    (*
     (* simplify push/pop sequence *)
     let bbs = List.map (
       fun bb -> simplify_bb_push_pops func_state bb
@@ -890,7 +941,6 @@ module Transform = struct
       bbs = bbs;
     }
     in
-    *)
 
     let sf = sf1 @ sf2 |> List.sort_uniq (fun info1 info2 ->
       let f1, b1, v1, r1 = info1 in
