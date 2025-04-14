@@ -664,16 +664,17 @@ module Parser = struct
     in
     helper split_here [] [] lines |> List.rev
 
-  let parse_program (source: string) : Isa.prog =
-    let lines = source
+  let preprocess (source: string) : string list =
+    source
       |> String.split_on_char '\n'
       |> List.concat_map (fun line -> line_processor line)
-    in
 
-    (* divide linees into groups based on BB and global symbols *)
+  let parse_program (source: string) : Isa.prog =
+    (* divide lines into groups based on BB and global symbols *)
     let lines_of_bbs_of_gsyms =
+      preprocess source |>
       (* split by global symbols *)
-      split_helper Isa.line_is_global_label lines |>
+      split_helper Isa.line_is_global_label |>
       (* within each global symbol, split by labels to get BBs *)
       List.map (fun lines_of_gs ->
         split_helper Isa.line_is_label lines_of_gs

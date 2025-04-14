@@ -7,14 +7,14 @@ let program_name = ref ""
 let output_name = ref ""
 let delta_string : string ref = ref ""
 let disable_tf_push_pop = ref false
-let disable_tf_call = ref false
+let disable_tf_call_preservation = ref false
 
 let speclist = [
   ("-name", Arg.Set_string program_name, "Set program name");
   ("-out", Arg.Set_string output_name, "Set output asm filename");
   ("--delta", Arg.Set_string delta_string, "Absolute offset from public stack to secret stack");
   ("--no-push-pop", Arg.Set disable_tf_push_pop, "Disable push/pop transformation (security property harmed!!!)");
-  ("--no-call", Arg.Set disable_tf_call, "Disable call untaint preservation transformation");
+  ("--no-call-preservation", Arg.Set disable_tf_call_preservation, "Disable call untaint preservation transformation");
 ]
 
 let () =
@@ -27,7 +27,7 @@ let () =
   let tf_config : Transform.Transform.tf_config_t = {
     delta = delta;
     disable_tf_push_pop = !disable_tf_push_pop;
-    disable_tf_call = !disable_tf_call;
+    disable_tf_call_preservation = !disable_tf_call_preservation;
   } in
 
   let taint_infer_result_fi =

@@ -156,14 +156,14 @@ module Transform = struct
   type tf_config_t = {
     delta: int64;
     disable_tf_push_pop: bool;
-    disable_tf_call: bool;
+    disable_tf_call_preservation: bool;
   }
   [@@deriving sexp]
 
   let tf_config : tf_config_t ref = ref {
     delta = -1L; (* to be overriden by input config; this value will fail the sanity check *)
     disable_tf_push_pop = false;
-    disable_tf_call = false;
+    disable_tf_call_preservation = false;
   }
 
   let is_bb_transformed (bb: basic_block) : bool =
@@ -714,7 +714,11 @@ module Transform = struct
             let curr_rsp_taint = tv_ittt curr_rsp_taint in (* mocking *)
             if curr_rsp_taint = TaintConst true then
               transform_error "RSP is tainted, not expected";
-            let saves, restores = List.split (
+
+            (* untaint preservation for callee-saved registers *)
+            let saves, restores = if !tf_config.disable_tf_call_preservation then
+              [], []
+            else List.split (
               List.filter_map (fun (slot: callee_slot) ->
                 let reg, offset = slot in
                 (* don't need to preserve untaint for tainted callee-saved registers *)
@@ -728,6 +732,7 @@ module Transform = struct
                 Some (inst_save, inst_restore)
               ) func_state.callee_saving_slots
             ) in
+
             let inst_pre = saves @ inst_pre in
             let inst_post = inst_post @ restores in
             (* transformation done *)
@@ -944,21 +949,15 @@ module Transform = struct
     in
 
     (* call handling pass *)
-    let func_state, sf2 = if !tf_config.disable_tf_call then
-      func_state, []
-    else begin
-      let sf2, bbs = List.fold_left_map (
-        fun acc_sf bb ->
-          let bb', sf = transform_basic_block_calls func_state tv_ittt fi_list bb in
-          sf @ acc_sf, bb'
-      ) [] func_state.bbs in
-      let func_state = {
-        func_state with
-        bbs = bbs;
-      }
-      in
-      func_state, sf2
-    end
+    let sf2, bbs = List.fold_left_map (
+      fun acc_sf bb ->
+        let bb', sf = transform_basic_block_calls func_state tv_ittt fi_list bb in
+        sf @ acc_sf, bb'
+    ) [] func_state.bbs in
+    let func_state = {
+      func_state with
+      bbs = bbs;
+    }
     in
 
     (* simplify push/pop sequence *)

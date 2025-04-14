@@ -135,7 +135,7 @@ def transform(
         arg_list.append("--no-push-pop")
         msg += " (push/pop TF disabled)"
     if no_call:
-        arg_list.append("--no-call")
+        arg_list.append("--no-call-preservation")
         msg += " (call untaint preservation TF disabled)"
 
     run(arg_list, f"{OUT_DIR}/{name}.transform{tf_suffix}.log", msg)
@@ -207,7 +207,7 @@ def main():
         required=False,
     )
     parser_tf.add_argument("--no-push-pop", action="store_true", required=False)
-    parser_tf.add_argument("--no-call", action="store_true", required=False)
+    parser_tf.add_argument("--no-call-preservation", action="store_true", required=False)
 
     parser_tfvar = subparsers.add_parser(
         "transform-var", description="transform program with variable config"

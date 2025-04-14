@@ -5,3 +5,4 @@ out
 *.out
 test/asm/*.prog
 .vscode/
+eval/

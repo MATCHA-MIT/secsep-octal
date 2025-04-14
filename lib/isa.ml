@@ -184,6 +184,20 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
   }
   [@@deriving sexp]
 
+  let count_instrs (p: prog) : int =
+    List.fold_left (
+      fun acc (func: func) ->
+        List.fold_left (
+          fun acc (bb: basic_block) ->
+            List.fold_left (
+              fun acc (inst: instruction) ->
+                match inst with
+                | Directive _ -> acc
+                | _ -> acc + 1
+            ) acc bb.insts
+        ) acc func.body
+    ) 0 p.funcs
+
   let get_func_of_prog (p: prog) (func_name: label) : func =
     List.find (fun (x: func) -> x.name = func_name) p.funcs
   
