@@ -4,33 +4,17 @@ import click
 import re
 import logging
 from enum import Enum
-import argparse
 import subprocess
 import shutil
 from pathlib import Path
 import pandas as pd
 
 
-class LevelBasedFormatter(logging.Formatter):
-    FORMATS = {
-        logging.DEBUG: "[DEBUG] {%(filename)s:%(funcName)s:%(lineno)d} %(message)s",
-        logging.INFO: "[INFO]  %(message)s",
-        logging.WARNING: "[WARN]  %(message)s",
-        logging.ERROR: "[ERROR] {%(filename)s:%(funcName)s:%(lineno)d} %(message)s",
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self._fmt)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
-
-
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-handler = logging.StreamHandler()
-handler.setFormatter(LevelBasedFormatter())
 logger = logging.getLogger()
-logger.addHandler(handler)
+logging.basicConfig(
+    format="[%(levelname)s] - %(message)s",
+    level=logging.INFO,
+)
 logger.setLevel(logging.INFO)
 
 
@@ -40,14 +24,13 @@ GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
 EVAL_DIR = OCTAL_DIR / "eval"
 
 
-BENCH_CONFIG = [
-    ("salsa20", "bench_salsa20"),
-    ("boringssl_sha512", "bench_sha512_plain"),
-    ("boringssl_ed25519", "bench_ed25519_plain_noinline"),
-]
+class Benchmark(Enum):
+    Salsa20 = ("salsa20", "bench_salsa20")
+    SHA512 = ("boringssl_sha512", "bench_sha512_plain")
+    ED25519 = ("boringssl_ed25519", "bench_ed25519_plain_noinline")
 
 
-class TFCode(Enum):
+class TF(Enum):
     Origin = 0
     Octal = 1
     OctalNoPushPop = 2
@@ -57,9 +40,9 @@ class TFCode(Enum):
     ProspectSec = 6
 
 
-def run_gem5_on_tf(tf: TFCode) -> bool:
+def run_gem5_on_tf(tf: TF) -> bool:
     match tf:
-        case TFCode.Origin | TFCode.Octal | TFCode.ProspectPub | TFCode.ProspectSec:
+        case TF.Origin | TF.Octal | TF.OctalNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
             return True
         case _:
             return False
@@ -76,31 +59,32 @@ HW_ENCODE_MAP = {
 }
 
 
-def get_bench_tf_name(bench: str, tf: TFCode) -> str:
+def get_bench_tf_name(bench: str, tf: TF) -> str:
     match tf:
-        case TFCode.Origin:
+        case TF.Origin:
             return bench
-        case TFCode.Octal:
+        case TF.Octal:
             return f"{bench}_tf"
-        case TFCode.OctalNoPushPop:
+        case TF.OctalNoPushPop:
             return f"{bench}_tf1"
-        case TFCode.OctalNoCallPreserv:
+        case TF.OctalNoCallPreserv:
             return f"{bench}_tf2"
-        case TFCode.OctalNoPushPopNoCallPreserv:
+        case TF.OctalNoPushPopNoCallPreserv:
             return f"{bench}_tf3"
-        case TFCode.ProspectPub:
+        case TF.ProspectPub:
             return f"{bench}_annotated_pub_stack"
-        case TFCode.ProspectSec:
+        case TF.ProspectSec:
             return f"{bench}_annotated_sec_stack"
         case _:
-            logger.error(f"Unknown TFCode: {tf}")
+            logger.error(f"Unknown TF: {tf}")
             exit(1)
 
 
-def get_bin_asm(app: str, bench: str, tf: TFCode) -> tuple[Path, Path]:
+def get_bin_asm(app: str, bench: str, tf: TF) -> tuple[Path, Path]:
     bench_tf = get_bench_tf_name(bench, tf)
     bin_path = BENCH_DIR / "out" / app / "bin" / bench_tf
     asm_path = BENCH_DIR / "src" / app / f"{bench_tf}.s"
+    compiled_asm_path = BENCH_DIR / "out" / app / "asm" / f"{bench_tf}.asm"
 
     assert bin_path and asm_path
     if not bin_path.exists():
@@ -109,17 +93,21 @@ def get_bin_asm(app: str, bench: str, tf: TFCode) -> tuple[Path, Path]:
     if not asm_path.exists():
         logger.error(f"Source ASM not found: {asm_path}")
         exit(1)
+    if not compiled_asm_path.exists():
+        logger.error(f"Compiled ASM not found: {compiled_asm_path}")
+        exit(1)
     logger.debug(
         f"app={app}, bench={bench}, tf={tf}, bin_path={bin_path}, asm_path={asm_path}"
     )
-    return bin_path, asm_path
+    return bin_path, asm_path, compiled_asm_path
 
 
-def collect_bin_asm(bin_file: Path, asm_file: Path):
+def collect_bin_asm(bin_file: Path, asm_file: Path, compiled_asm_file: Path):
     target_dir = EVAL_DIR / "bench"
     target_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(bin_file, target_dir / bin_file.name)
     shutil.copy(asm_file, target_dir / asm_file.name)
+    shutil.copy(compiled_asm_file, target_dir / compiled_asm_file.name)
 
 
 def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
@@ -241,10 +229,28 @@ def get_gem5_result(
             logger.error(f"Failed to run gem5 for {bench_tf}: {result.stderr}")
             exit(1)
 
-    output_dir = EVAL_DIR / "gem5"
-    output_dir.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                gem5_docker,
+                "python3",
+                "scripts/get_decl.py",
+                app,
+                bench_tf,
+                HWMode.DefenseOn.value,
+            ]
+        )
+        if result.returncode != 0:
+            logger.error(f"Failed to run get_decl.py for {bench_tf}: {result.stderr}")
+            exit(1)
+        out_decl_file = GEM5_DIR / "results" / "raw_data" / f"{app}-{bench_tf}" / HWMode.DefenseOn.value / "declassify_inst"
+        decl_file = EVAL_DIR / "declassification" / f"{bench_tf}.decl.txt"
+        decl_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(out_decl_file, decl_file)
+
     for hw in HWMode:
-        raw_stats_file = (
+        out_stats_file = (
             GEM5_DIR
             / "results"
             / "raw_data"
@@ -252,8 +258,9 @@ def get_gem5_result(
             / hw.value
             / "stats.txt"
         )
-        stats_file = output_dir / f"{bench_tf}-{hw.value}.txt"
-        shutil.copy(raw_stats_file, stats_file)
+        stats_file = EVAL_DIR / "gem5" / f"{bench_tf}-{hw.value}.txt"
+        stats_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(out_stats_file, stats_file)
 
         with open(stats_file, "r") as f:
             content = f.read()
@@ -289,13 +296,35 @@ def get_overhead(base: dict, curr: dict) -> dict:
             continue
         std_key = key + "_std"
 
-        base_val = base[key]
-        base_std = base[std_key] if std_key in base else None
-        curr_val = curr[key]
-        curr_std = curr[std_key] if std_key in curr else None
+        if key.find("gem5") == -1:
+            base_val = base[key]
+            base_std = base[std_key] if std_key in base else None
+            curr_val = curr[key]
+            curr_std = curr[std_key] if std_key in curr else None
 
-        growth = (curr_val - base_val) / base_val
-        std = (base_std**2 + curr_std**2) ** 0.5 if base_std is not None and curr_std is not None else None
+            growth = (curr_val - base_val) / base_val
+            std = (base_std**2 + curr_std**2) ** 0.5 if base_std is not None and curr_std is not None else None
+
+        else:
+            # special handling for gem5 stats
+            # metrics with def on should be compared with original benchmark with def off
+            matching = re.compile(r"gem5_(\w+)_def-(\w+)").match(key)
+            if not matching:
+                logger.error(f"Failed to match gem5 key: {key}")
+                exit(1)
+            metric, mode = matching.groups()
+            logger.debug(f"key={key} --> metric={metric}, mode={mode}")
+            if mode == "off":
+                base_val = base[f"gem5_{metric}_def-off"]
+                curr_val = curr[f"gem5_{metric}_def-off"]
+            else:
+                if mode != "on":
+                    logger.error(f"Unknown mode: {mode}")
+                    exit(1)
+                base_val = base[f"gem5_{metric}_def-off"]
+                curr_val = curr[f"gem5_{metric}_def-on"]
+            growth = (curr_val - base_val) / base_val
+            std = None
 
         overhead[key] = (base_val, curr_val, growth, std)
 
@@ -338,12 +367,20 @@ def print_overhead(overhead: dict):
 @click.option("-o", "--out", type=click.Path(), required=False)
 def main(verbose, gem5_docker, skip_gem5, delta, out):
     if verbose:
+        print("verbose")
         logger.setLevel(logging.DEBUG)
+
+    if not skip_gem5:
+        print(f"Will run gem5, confirm? (y/n) ", end="")
+        confirm = input()
+        if confirm.lower() != "y":
+            logger.info("Will skip running gem5")
+            skip_gem5 = True
 
     df_index = pd.MultiIndex.from_product(
         [
-            [bench for _, bench in BENCH_CONFIG],
-            [tf.name for tf in TFCode],
+            [bench.name for bench in Benchmark],
+            [tf.name for tf in TF],
         ],
         names=["Benchmark", "TF"],
     )
@@ -361,33 +398,37 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
     df_columns.extend([f"overhead_{col}" for col in df_columns])
     df = pd.DataFrame(columns=df_columns, index=df_index)
 
-    for app, bench in BENCH_CONFIG:
+    for bench in Benchmark:
+        bench_app, bench_name = bench.value
         results = {}
-        for tf in TFCode:
-            bench_tf = get_bench_tf_name(bench, tf)
-            bin_path, asm_path = get_bin_asm(app, bench, tf)
-            collect_bin_asm(bin_path, asm_path)
+        for tf in TF:
+            bench_name_tf = get_bench_tf_name(bench_name, tf)
+            bin_path, asm_path, compiled_asm = get_bin_asm(bench_app, bench_name, tf)
+            collect_bin_asm(bin_path, asm_path, compiled_asm)
 
             result = {}
             get_asm_line_count(result, asm_path)
             get_perf(result, bin_path)
             if run_gem5_on_tf(tf):
-                get_gem5_result(result, gem5_docker, skip_gem5, delta, app, bench_tf)
+                get_gem5_result(result, gem5_docker, skip_gem5, delta, bench_app, bench_name_tf)
             results[tf] = result
 
             for key, value in result.items():
-                df.loc[(bench, tf.name), key] = value
+                df.loc[(bench.name, tf.name), key] = value
             
 
-        for tf in TFCode:
-            if tf == TFCode.Origin:
+        for tf in TF:
+            if tf == TF.Origin:
                 continue
-            overhead = get_overhead(results[TFCode.Origin], results[tf])
-            for key, (_, _, growth, std) in overhead.items():
-                df.loc[(bench, tf.name), f"overhead_{key}"] = growth
+            overhead = get_overhead(results[TF.Origin], results[tf])
+            for key in overhead:
+                if overhead[key] is None:
+                    continue
+                _, _, growth, std = overhead[key]
+                df.loc[(bench.name, tf.name), f"overhead_{key}"] = growth
                 if std is not None:
-                    df.loc[(bench, tf.name), f"overhead_{key}_std"] = std
-            print(f"Overhead of {bench} / {tf.name}")
+                    df.loc[(bench.name, tf.name), f"overhead_{key}_std"] = std
+            print(f"Overhead of {bench_name} / {tf.name}")
             print_overhead(overhead)
             print()
     

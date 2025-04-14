@@ -6,3 +6,4 @@ out
 test/asm/*.prog
 .vscode/
 eval/
+__pycache__/
