@@ -233,7 +233,7 @@ def main():
             args.out,
             args.delta,
             args.no_push_pop,
-            args.no_call,
+            args.no_call_preservation,
         )
     elif args.command == "transform-var":
         transform_var(args.benchmark)
