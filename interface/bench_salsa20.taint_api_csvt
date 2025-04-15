@@ -45,10 +45,10 @@
       (RangeConst
        (((SingleVar 2) (SingleBExp SingleAdd (SingleVar 2) (SingleConst 32)))))
       (true))))))
- (_start
+ (main
   (() () () () () () () () () () () () () () () () () () () () () () () () ()
    () () () () () () ())
   (((4 (() true true))
-    ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -512))
+    ((((SingleBExp SingleAdd (SingleVar 4) (SingleConst -448))
        (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8)))
       (RangeConst ()) ()))))))

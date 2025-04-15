@@ -1,4 +1,0 @@
-((table_select
-  ((-2
-    ((((SingleConst 0) (SingleConst 24576))
-      (RangeConst (((SingleConst 0) (SingleConst 24576)))) SingleTop))))))
