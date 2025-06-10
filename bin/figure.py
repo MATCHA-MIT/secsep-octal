@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 
 
-from eval import Benchmark, TF, EVAL_DIR
+from eval import Benchmark, TF
 
 
 TASKS = [
@@ -67,6 +67,7 @@ def load_dataset(path: Path) -> pd.DataFrame:
 def draw(
     data: pd.DataFrame,
     output_dir: Path,
+    prefix: str,
     metric: str = None,
     ylabel: str = None,
     benchmark_list: list[Benchmark] = list(Benchmark),
@@ -159,16 +160,21 @@ def draw(
 
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_dir / f"{metric}.pdf", dpi=100, bbox_inches="tight", pad_inches=0)
+    if prefix != "":
+        filename = f"{prefix}-{metric}.pdf"
+    else:
+        filename = f"{metric}.pdf"
+    plt.savefig(output_dir / filename, dpi=100, bbox_inches="tight", pad_inches=0)
 
 
 @click.command()
 @click.argument("dataset-path", type=click.Path(exists=True, dir_okay=False))
-def main(dataset_path):
+@click.option("--prefix", type=str, default="", help="Prefix for output files.")
+def main(dataset_path, prefix):
     df = load_dataset(Path(dataset_path))
-    out_dir = EVAL_DIR / "figures"
+    out_dir = Path(dataset_path).parent / "figures"
     for task in TASKS:
-        draw(df, out_dir, **task)
+        draw(df, out_dir, prefix=prefix, **task)
 
 
 if __name__ == "__main__":

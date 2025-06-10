@@ -134,9 +134,7 @@ module TaintInstantiate = struct
     in
     List.map (
       fun (func_name, reg_api, mem_api) ->
-        let interface = 
-          List.find (fun (x: FuncInterface.t) -> x.func_name = func_name) func_interface_list 
-        in
+        let interface = FuncInterface.find_fi func_interface_list func_name |> Option.get in
 
         let map = List.fold_left2 helper [] interface.in_reg reg_api in
 

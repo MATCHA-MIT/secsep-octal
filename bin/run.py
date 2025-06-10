@@ -141,11 +141,11 @@ def transform(
     run(arg_list, f"{OUT_DIR}/{name}.transform{tf_suffix}.log", msg)
 
 
-def transform_var(benchmark):
-    transform(benchmark, no_push_pop=True, no_call=True, tf_suffix="3")
-    transform(benchmark, no_call=True, tf_suffix="2")
-    transform(benchmark, no_push_pop=True, tf_suffix="1")
-    transform(benchmark)
+def transform_var(benchmark, delta=None):
+    transform(benchmark, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3")
+    transform(benchmark, delta=delta, no_call=True, tf_suffix="2")
+    transform(benchmark, delta=delta, no_push_pop=True, tf_suffix="1")
+    transform(benchmark, delta=delta)
 
 
 def main():
@@ -212,16 +212,28 @@ def main():
     parser_tfvar = subparsers.add_parser(
         "transform-var", description="transform program with variable config"
     )
+    parser_tfvar.add_argument(
+        "--delta",
+        type=str,
+        help="absolute offset between public and secret stack",
+        required=False,
+    )
     parser_tfvar.add_argument("benchmark", type=str, help="benchmark to transform")
 
     parser_all = subparsers.add_parser("all", description="Run all phases")
+    parser_all.add_argument(
+        "--delta",
+        type=str,
+        help="absolute offset between public and secret stack",
+        required=False,
+    )
     parser_all.add_argument("benchmark", type=str, help="benchmark to run")
 
     args = parser.parse_args()
 
     if args.command == "all":
         infer(args.benchmark, 0, InferPhase.NumPhases.value - 1)
-        transform_var(args.benchmark)
+        transform_var(args.benchmark, args.delta)
         check(args.benchmark, 0, CheckPhase.NumPhases.value - 1)
     elif args.command == "infer":
         infer(args.benchmark, args.phase_beg, args.phase_end)
@@ -236,7 +248,7 @@ def main():
             args.no_call_preservation,
         )
     elif args.command == "transform-var":
-        transform_var(args.benchmark)
+        transform_var(args.benchmark, args.delta)
     else:
         print("Invalid command", args.command)
         exit(1)

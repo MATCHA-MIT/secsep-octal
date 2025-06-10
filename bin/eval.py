@@ -8,6 +8,7 @@ import subprocess
 import shutil
 from pathlib import Path
 import pandas as pd
+import datetime
 
 
 logger = logging.getLogger()
@@ -21,7 +22,7 @@ logger.setLevel(logging.INFO)
 OCTAL_DIR = Path(__file__).parent.parent
 BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
-EVAL_DIR = OCTAL_DIR / "eval"
+EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
 
 class Benchmark(Enum):
@@ -223,6 +224,7 @@ def get_gem5_result(
                 f"^{bench_tf}$",
                 "--delta",
                 delta,
+                # "--debug-flags=Process"
             ]
         )
         if result.returncode != 0:
@@ -366,6 +368,13 @@ def print_overhead(overhead: dict):
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
 def main(verbose, gem5_docker, skip_gem5, delta, out):
+    EVAL_DIR.mkdir(parents=True, exist_ok=True)
+    with open(EVAL_DIR / "config.txt", "w") as f:
+        f.write(f"gem5_docker={gem5_docker}\n")
+        f.write(f"skip_gem5={skip_gem5}\n")
+        f.write(f"delta={delta}\n")
+        f.write(f"out={out}\n")
+
     if verbose:
         print("verbose")
         logger.setLevel(logging.DEBUG)
@@ -402,6 +411,8 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
         bench_app, bench_name = bench.value
         results = {}
         for tf in TF:
+            # if tf == TF.OctalNoPushPop or tf == TF.OctalNoPushPopNoCallPreserv or tf == TF.ProspectPub or tf == TF.ProspectSec:
+            #     continue
             bench_name_tf = get_bench_tf_name(bench_name, tf)
             bin_path, asm_path, compiled_asm = get_bin_asm(bench_app, bench_name, tf)
             collect_bin_asm(bin_path, asm_path, compiled_asm)
@@ -420,6 +431,8 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
         for tf in TF:
             if tf == TF.Origin:
                 continue
+            # if tf == TF.OctalNoPushPop or tf == TF.OctalNoPushPopNoCallPreserv or tf == TF.ProspectPub or tf == TF.ProspectSec:
+            #     continue
             overhead = get_overhead(results[TF.Origin], results[tf])
             for key in overhead:
                 if overhead[key] is None:
@@ -432,19 +445,21 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
             print_overhead(overhead)
             print()
     
-    if out:
-        out = Path(out)
-        out_suffix = out.suffix
-        match out_suffix:
-            case ".csv":
-                logger.info(f"Saving result to CSV file {out}")
-                df.to_csv(out)
-            case ".json":
-                logger.info(f"Saving result to JSON file {out}")
-                df.to_json(out)
-            case ".xlsx":
-                logger.info(f"Saving result to Excel file {out}")
-                df.to_excel(out)
+    if out is None:
+        out = EVAL_DIR / "result.csv"
+        logger.info(f"No output file specified, saving to {out}")
+    out = Path(out)
+    out_suffix = out.suffix
+    match out_suffix:
+        case ".csv":
+            logger.info(f"Saving result to CSV file {out}")
+            df.to_csv(out)
+        case ".json":
+            logger.info(f"Saving result to JSON file {out}")
+            df.to_json(out)
+        case ".xlsx":
+            logger.info(f"Saving result to Excel file {out}")
+            df.to_excel(out)
 
 
 if __name__ == "__main__":
