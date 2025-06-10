@@ -9,7 +9,10 @@ module StackLayout = struct
 
   module MemType = MemType (SingleEntryType)
 
-  type entry_t = IsaBasic.label * (((SingleEntryType.t * bool) MemTypeBasic.mem_slot) list)
+  type layout_t = ((SingleEntryType.t * bool) MemTypeBasic.mem_slot) list
+  [@@deriving sexp]
+
+  type entry_t = IsaBasic.label * layout_t
   [@@deriving sexp]
 
   type t = entry_t list

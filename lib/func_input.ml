@@ -5,6 +5,8 @@ open Isa_basic
 open Reg_type_new
 open Mem_type_new
 open Smt_emitter
+open External_layouts
+open Stack_spill_info
 open Sexplib.Std
 
 module FuncInputEntry = struct
@@ -97,11 +99,40 @@ module FuncInput = struct
   module RegType = RegType(FuncInputEntry)
   module MemType = MemType(FuncInputEntry)
 
-  type t = {
+  type raw_entry = {
     func_name: IsaBasic.label;
     reg_type: RegType.t;
     mem_type: MemType.t;
+    stack_layout: StackLayout.layout_t;
   }
   [@@deriving sexp]
+
+  type raw_t = raw_entry list
+  [@@deriving sexp]
+
+  type entry = {
+    func_name: IsaBasic.label;
+    reg_type: RegType.t;
+    mem_type: MemType.t;
+    stack_spill_info: StackSpillInfo.t;
+  }
+  [@@deriving sexp]
+
+  type t = entry list
+  [@@deriving sexp]
+
+  let parse (source: string) : t =
+    let open Sexplib in
+    let raw = raw_t_of_sexp (Sexp.of_string source) in
+    List.map (
+      fun { func_name; reg_type; mem_type; stack_layout } ->
+        let _, stack_spill_info = StackLayout.split_layout stack_layout in
+        {
+          func_name = func_name;
+          reg_type = reg_type;
+          mem_type = mem_type;
+          stack_spill_info = StackSpillInfo.init stack_spill_info;
+        }
+    ) raw
 
 end
