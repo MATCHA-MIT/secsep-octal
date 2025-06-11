@@ -8,7 +8,9 @@ let speclist = [
   ("-name", Arg.Set_string program_name, "Set program name");
 ]
 
-let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
+let () =  
+  Arg.parse speclist (fun _ -> ()) usage_msg;
+
   (* 1. Parse func and func_input *)
   let p = Parser.Parser.prog_from_file (read_file (get_related_filename !program_name "out" "prog")) in
   let func_input_list = 
