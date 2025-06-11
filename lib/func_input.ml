@@ -2,10 +2,11 @@ open Single_entry_type
 open Taint_exp
 open Constraint
 open Isa_basic
+open Isa
+open Ptr_info
 open Reg_type_new
 open Mem_type_new
 open Smt_emitter
-open External_layouts
 open Stack_spill_info
 open Sexplib.Std
 
@@ -104,12 +105,37 @@ module GlobalSymbolLayout = struct
   type t = symbol_layout_t list
   [@@deriving sexp]
 
+  let get_func_global_mem
+      (all_global: t) 
+      (imm_var_map: IsaBasic.imm_var_map) 
+      (used_symbols: IsaBasic.label list) : FuncInputEntry.t MemTypeBasic.mem_content =
+    let helper (symbol: IsaBasic.label) : FuncInputEntry.t MemTypeBasic.mem_part =
+      let var_id = IsaBasic.StrM.find symbol imm_var_map in
+      let layout_opt =
+        List.find_map (
+          fun (label, layout) ->
+            if label = symbol then
+              Some (
+                (* If symbol start with "."*)
+                PtrInfo.get_read_write_info var_id true (not (IsaBasic.is_compiler_gen_rom symbol)),
+                layout
+              )
+            else None
+        ) all_global
+      in
+      match layout_opt with
+      | None -> global_symbol_layout_error (Printf.sprintf "cannot find layout of global symbol %s\n" symbol)
+      | Some layout -> layout
+    in
+    List.map helper used_symbols
+
 end
 
 module FuncInput = struct
 
   module RegType = RegType(FuncInputEntry)
   module MemType = MemType(FuncInputEntry)
+  module Isa = Isa (Full_mem_anno.FullMemAnno) (Branch_anno.BranchAnno) (Call_anno.CallAnno)
 
   type entry_t = {
     func_name: IsaBasic.label;
@@ -121,5 +147,25 @@ module FuncInput = struct
 
   type t = (entry_t list) * GlobalSymbolLayout.t
   [@@deriving sexp]
+
+  type single_infer_interface_t = IsaBasic.label
+
+  let parse (source: string) : t =
+    t_of_sexp (Sexplib.Sexp.of_string source)
+
+  let update_global_symbol_layout 
+      (prog: Isa.prog) (func_input: t) : entry_t list =
+    let func_interface_list, all_global = func_input in
+    let helper (func_interface: entry_t) : entry_t = 
+      let func_opt = List.find_opt (fun (x: Isa.func) -> x.name = func_interface.func_name) prog.funcs in
+      match func_opt with
+      | None -> func_interface
+      | Some func ->
+        { func_interface with 
+          mem_type = func_interface.mem_type @ 
+            (GlobalSymbolLayout.get_func_global_mem all_global prog.imm_var_map func.related_gsyms)  
+        }
+    in
+    List.map helper func_interface_list
 
 end

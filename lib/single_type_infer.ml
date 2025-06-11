@@ -4,6 +4,7 @@ open Single_exp
 open Single_entry_type
 open Mem_offset_new
 (* open Range_exp *)
+open Mem_type_new
 open Stack_spill_info
 open Cond_type_new
 open Single_context
@@ -21,6 +22,7 @@ open Full_mem_anno
 open Branch_anno
 open Call_anno
 open Block_alive
+open Func_input
 open Sexplib.Std
 
 module SingleTypeInfer = struct
@@ -957,27 +959,27 @@ module SingleTypeInfer = struct
     ) func_type_list;
     PP.bprint_lvl lvl buf "]\n"
 
-  let filter_func_interface
-      (func_mem_interface_list: Base_func_interface.t)
-      (func_name_list: Isa.label list) : Base_func_interface.t =
+  let filter_func_input
+      (func_mem_input_list: FuncInput.entry_t list)
+      (func_name_list: Isa.label list) : FuncInput.entry_t list =
     let func_name_set = StringSet.of_list func_name_list in
     List.filter (
-      fun (x, _, _) -> StringSet.mem x func_name_set
-    ) func_mem_interface_list
+      fun (x: FuncInput.entry_t) -> StringSet.mem x.func_name func_name_set
+    ) func_mem_input_list
 
   let infer
       (prog: Isa.prog)
-      (func_mem_interface_list: Base_func_interface.t)
+      (func_input_list: FuncInput.entry_t list) (* this should already contain global symbols *)
       (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
-      (global_symbol_layout: External_layouts.GlobalSymbolLayout.t)
       (iter: int)
       (solver_iter: int) : t list =
     let helper 
-        (acc: FuncInterface.t list) (entry: Base_func_interface.entry_t) :
+        (acc: FuncInterface.t list) (entry: FuncInput.entry_t) :
         (FuncInterface.t list) * t =
-      let func_name, func_mem_interface, stack_spill_info = entry in
+      let func_name = entry.func_name in
+      let func_mem_interface = MemTypeBasic.map (fun (x, _) -> x) entry.mem_type in
       Printf.printf "Inferring func %s\n" func_name;
-      let infer_state = infer_one_func prog acc func_name func_mem_interface stack_spill_info iter solver_iter in
+      let infer_state = infer_one_func prog acc func_name func_mem_interface entry.stack_spill_info iter solver_iter in
       let infer_state = add_var_bound_constraint infer_state in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;
@@ -985,16 +987,13 @@ module SingleTypeInfer = struct
       Printf.printf "Interface of %s:\n%s\n"
         func_name
         (func_interface |> FuncInterface.sexp_of_t |> Sexplib.Sexp.to_string_hum);
-      (* let buf = Buffer.create 1000 in
-      pp_ocaml_state 0 buf infer_state;
-      Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
       func_interface :: acc, infer_state
     in
     let general_func_interface_list = FuncInterfaceConverter.get_single_func_interface general_func_interface_list in
-    (* let func_mem_interface_list = List.filteri (fun i _ -> i = 12) func_mem_interface_list in *)
-    (* let func_mem_interface_list = [List.nth func_mem_interface_list 2 ] in *)
-    (* let func_mem_interface_list = 
-      filter_func_interface func_mem_interface_list [
+
+    (* Uncomment this to select functions to infer *)
+    (* let func_input_list = 
+      filter_func_input func_input_list [
         (* "ge_p3_tobytes";
         "fe_tobytes";
         "fe_mul_impl"; *)
@@ -1015,30 +1014,10 @@ module SingleTypeInfer = struct
       ] 
     in *)
 
-    let func_mem_interface_list = List.map (fun (interface: Base_func_interface.entry_t) ->
-      let label, _, _ = interface in
-      let func = List.find (fun (f: Parser.Parser.Isa.func) -> String.equal f.name label) prog.funcs in
-      Base_func_interface.add_global_symbol_layout interface prog.imm_var_map func.related_gsyms global_symbol_layout
-    ) func_mem_interface_list
-    in
+    Printf.printf "%d\n" (List.length func_input_list);
+    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list FuncInput.MemType.sexp_of_t (List.map (fun (x: FuncInput.entry_t) -> x.mem_type) func_input_list)));
 
-    (* let func_mem_interface_list = List.filter (fun (interface: Base_func_interface.entry_t) ->
-      let func_name, _, _ = interface in
-      match func_name with
-      | "sha512_block_data_order"
-      | "SHA512_Init"
-      | "SHA512_Update"
-      | "SHA512_Final" 
-      | "SHA512"
-      (* | "table_select" *)
-        -> true
-      | _ -> false
-    ) func_mem_interface_list in *)
-
-    Printf.printf "%d\n" (List.length func_mem_interface_list);
-    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.MemType.sexp_of_t (List.map (fun (_, x, _) -> x) func_mem_interface_list)));
-
-    let _, infer_result = List.fold_left_map helper general_func_interface_list func_mem_interface_list in
+    let _, infer_result = List.fold_left_map helper general_func_interface_list func_input_list in
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;
     Printf.printf "let %s_single_infer_state : SingleTypeInfer.t list =\n" prog_name;
