@@ -12,7 +12,7 @@ let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
   (* 1. Parse func and func_input *)
-  let p = Parser.Parser.prog_from_file (read_file (get_related_filename !program_name "out" "prog")) in
+  let p = Parser.Parser.prog_from_file (get_related_filename !program_name "out" "prog") in
   let func_input_list = 
     Func_input.FuncInput.parse_input (read_file (get_related_filename !program_name "out" "input")) in
 
