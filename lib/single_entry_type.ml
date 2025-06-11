@@ -134,10 +134,10 @@ include SingleExp
     | Dec ->
       eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) |> set_flag_helper
 
-  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (_: flag_t) : t * flag_t =
+  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (flags: flag_t) : t * flag_t =
     match isa_top with
-    | Shld
-    | Shrd -> SingleTop |> set_flag_helper
+    | Shld | Shrd -> SingleTop |> set_flag_helper
+    | Shufp -> SingleTop, flags
 
   let get_taint_exp (_: t) : TaintExp.t option = None
 

@@ -388,8 +388,8 @@ module DepType = struct
   (* TODO: deprecated? *)
   let top_update_flag_list (op: IsaBasic.top) : IsaBasic.flag list =
     match op with
-    | Shld
-    | Shrd -> [ CF; PF; ZF; SF; OF ]
+    | Shld | Shrd -> [ CF; PF; ZF; SF; OF ]
+    | Shufp -> []
 
   let get_top_flag_list (flag_list: IsaBasic.flag list) : (IsaBasic.flag * t) list =
     List.map (fun f -> f, get_top_flag ()) flag_list

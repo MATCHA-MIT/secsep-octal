@@ -383,6 +383,7 @@ module IsaBasic = struct
     # Current supported instructions that does not have single-letter size suffix
   
     mov[sz](bq|wq|lq|bl|wl|bw): move with signed/zero extension
+    movsd
 
     c(btw|wtl|ltq): size conversion
 
@@ -393,6 +394,8 @@ module IsaBasic = struct
     pshufb: packed shuffle, 2 operands
     pshuf[wd]: packed shuffle, 3 operands
     pshuf[lh]w: 3 operands
+
+    shufp[sd]: shuffle packed, 3 operands (3 source and 1 dest)
 
     punpck[hl](bw|wd|dq|qdq)
 
@@ -537,22 +540,24 @@ module IsaBasic = struct
   ]
 
   type top =
-    | Shld
-    | Shrd
+    | Shld | Shrd
+    | Shufp
   [@@deriving sexp]
 
   let top_result_depends_on_flag (op: top) : bool =
     match op with
-    | Shld | Shrd -> false
+    | Shld | Shrd
+    | Shufp -> false
 
   let top_opcode_map = [
-    ("shld", Shld);
-    ("shrd", Shrd);
+    ("shld", Shld); ("shrd", Shrd);
+    ("shufp", Shufp);
   ]
 
   let top_opcode_ocaml_str_map = [
-    ("Shld", Shld);
-    ("Shrd", Shrd);
+    ("Shld", Shld); ("Shrd", Shrd);
+    ("Shufp", Shufp);
+
   ]
 
   type branch_cond =

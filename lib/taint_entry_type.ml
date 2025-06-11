@@ -202,8 +202,8 @@ module TaintBaseEntryType (Entry: EntryType) = struct
       dest_taint_type
     in
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_top with
-    | Shld
-    | Shrd -> dest_taint_type, TaintConst false
+    | Shld | Shrd -> dest_taint_type, TaintConst false
+    | Shufp -> fl_taint, fr_taint
     in
     (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 

@@ -339,6 +339,7 @@ module Parser = struct
     | "movsbl" -> "movs", (fill [1L; 4L])
     | "movswl" -> "movs", (fill [2L; 4L])
     | "movsbw" -> "movs", (fill [1L; 2L])
+    | "movsd"  -> "movs", (fill [8L; 16L])
     (* move with zero-extension *)
     | "movzbq" -> "movz", (fill [1L; 8L])
     | "movzwq" -> "movz", (fill [2L; 8L])
@@ -355,6 +356,7 @@ module Parser = struct
     | "pxor" | "pandn" | "pand" | "por" -> mnemonic, (fill [16L; 16L])
     | "pshufb" -> "pshuf", (fill [16L; 16L])
     | "pshufw" | "pshufd" | "pshuflw" | "pshufhw" -> "pshuf", (fill [1L; 16L; 16L])
+    | "shufps" | "shufpd" -> "shufp", (fill [1L; 16L; 16L])
     | "punpcklbw" | "punpcklwd" | "punpckldq" | "punpcklqdq" -> begin
         if List.length operands != 2 then
           parse_error "punpckl: expecting two xmm operands";
