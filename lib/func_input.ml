@@ -94,23 +94,24 @@ module FuncInputEntry = struct
 
 end
 
+module GlobalSymbolLayout = struct
+  exception GlobalSymbolLayout of string
+  let global_symbol_layout_error msg = raise (GlobalSymbolLayout ("[Global Symbol Layout Error] " ^ msg))
+
+  type symbol_layout_t = IsaBasic.label * ((FuncInputEntry.t MemTypeBasic.mem_slot) list)
+  [@@deriving sexp]
+
+  type t = symbol_layout_t list
+  [@@deriving sexp]
+
+end
+
 module FuncInput = struct
 
   module RegType = RegType(FuncInputEntry)
   module MemType = MemType(FuncInputEntry)
 
-  type raw_entry = {
-    func_name: IsaBasic.label;
-    reg_type: RegType.t;
-    mem_type: MemType.t;
-    stack_layout: StackLayout.layout_t;
-  }
-  [@@deriving sexp]
-
-  type raw_t = raw_entry list
-  [@@deriving sexp]
-
-  type entry = {
+  type entry_t = {
     func_name: IsaBasic.label;
     reg_type: RegType.t;
     mem_type: MemType.t;
@@ -118,21 +119,7 @@ module FuncInput = struct
   }
   [@@deriving sexp]
 
-  type t = entry list
+  type t = (entry_t list) * GlobalSymbolLayout.t
   [@@deriving sexp]
-
-  let parse (source: string) : t =
-    let open Sexplib in
-    let raw = raw_t_of_sexp (Sexp.of_string source) in
-    List.map (
-      fun { func_name; reg_type; mem_type; stack_layout } ->
-        let _, stack_spill_info = StackLayout.split_layout stack_layout in
-        {
-          func_name = func_name;
-          reg_type = reg_type;
-          mem_type = mem_type;
-          stack_spill_info = StackSpillInfo.init stack_spill_info;
-        }
-    ) raw
 
 end
