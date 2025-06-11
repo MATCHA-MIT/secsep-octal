@@ -10,9 +10,9 @@ let speclist = [
   ("-input-dir", Arg.Set_string input_dir, "Set input dir name");
 ]
 
-let get_path = get_related_filename !program_name !input_dir
-
 let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
+  let get_path = get_related_filename !program_name !input_dir in
+
   (* 1. Parse program*)
   let p = Parser.Parser.parse_program (read_file (get_path "s")) in
   Parser.Parser.prog_to_file (get_related_filename !program_name "out" "prog") p;
