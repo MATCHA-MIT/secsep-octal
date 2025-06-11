@@ -60,7 +60,12 @@ module IsaFlagConfig = struct
     | Xor | And | Or -> 
       [],
       [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
-    | CmovEq -> [ ZF ], []
+    | CmovNe | CmovE -> [ ZF ], []
+    | CmovL | CmovG -> [ SF; OF ], []
+    | CmovLe | CmovGe -> [ ZF; SF; OF ], []
+    | CmovB | CmovA -> [ CF ], []
+    | CmovBe | CmovAe -> [ ZF; CF ], []
+    | CmovOther -> [ CF; PF; AF; ZF; SF; OF ], []
     | Bt -> [], [ CF, false ]
     | Punpck | Packxs -> [], []
     | Pshuf -> [], []

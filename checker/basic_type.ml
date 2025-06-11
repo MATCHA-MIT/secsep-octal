@@ -370,7 +370,8 @@ module DepType = struct
     | Sal | Sar | Shl | Shr -> [ CF; PF; ZF; SF; OF ] 
     | Rol | Ror -> [ CF; OF ]
     | Xor | And | Or -> [ CF; PF; ZF; SF; OF ]
-    | CmovEq -> []
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther -> []
     | Bt -> [ CF ]
     | Punpck | Packxs -> []
     | Pshuf -> []
@@ -905,7 +906,7 @@ module DepType = struct
       | Xor,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_xor dst src
       | And,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_and dst src
       | Or,     [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_or  dst src
-      | CmovEq, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
+      | CmovE, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
       | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
       | Punpck, [ _; _ ],     [ ]      -> Top 128, [ ]
       | Packxs, [ _; _ ],     [ ]      -> Top 128, [ ]

@@ -166,7 +166,8 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_bop with
     | Add | Adc | Sub | Sbb | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or | Bt ->
       dest_taint_type, TaintConst false
-    | CmovEq
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther
     | Punpck | Packxs
     | Pshuf
     | Padd | Psub | Pxor | Pand | Pandn | Por

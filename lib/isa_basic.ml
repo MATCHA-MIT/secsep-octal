@@ -430,7 +430,10 @@ module IsaBasic = struct
     "rol"; "ror";
     "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
     "bt";
-    "cmove"; (* TODO: add better support for parsing cmovxx *)
+
+    "cmovne"; "cmove"; "cmovl"; "cmovle";
+    "cmovg"; "cmovge"; "cmovb"; "cmovbe";
+    "cmova"; "cmovae"; (* TODO: add better support for parsing cmovxx *)
 
     "xchg";
     "push"; "pop";
@@ -447,7 +450,8 @@ module IsaBasic = struct
     | Sal | Sar | Shl | Shr (* Sal = Shl, Sar is signed, Shr is unsigned*)
     | Rol | Ror
     | Xor | And | Or
-    | CmovEq
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther
     | Bt
     | Punpck | Packxs
     | Pshuf
@@ -458,7 +462,9 @@ module IsaBasic = struct
 
   let bop_result_depends_on_flag (op: bop) : bool =
     match op with
-    | Adc | Sbb | CmovEq -> true
+    | Adc | Sbb -> true
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther -> true
     | Add | Sub
     | Mul | Imul
     | Sal | Sar | Shl | Shr
@@ -477,7 +483,9 @@ module IsaBasic = struct
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
-    ("cmove", CmovEq);
+    ("cmovne", CmovNe); ("cmove", CmovE); ("cmovl", CmovL); ("cmovle", CmovLe);
+    ("cmovg", CmovG); ("cmovge", CmovGe); ("cmovb", CmovB); ("cmovbe", CmovBe);
+    ("cmova", CmovA); ("cmovae", CmovAe);
     ("bt", Bt);
     ("punpckh", Punpck); ("punpckl", Punpck);
     ("packus", Packxs); ("packss", Packxs);
@@ -493,7 +501,9 @@ module IsaBasic = struct
     ("Sal", Sal); ("Sar", Sar); ("Shl", Shl); ("Shr", Shr);
     ("Rol", Rol); ("Ror", Ror);
     ("Xor", Xor); ("And", And); ("Or", Or);
-    ("CmovEq", CmovEq);
+    ("CmovNe", CmovNe); ("CmovE", CmovE); ("CmovL", CmovL); ("CmovLe", CmovLe);
+    ("CmovG", CmovG); ("CmovGe", CmovGe); ("CmovB", CmovB); ("CmovBe", CmovBe);
+    ("CmovA", CmovA); ("CmovAe", CmovAe);
     ("Bt", Bt);
     ("Punpck", Punpck);
     ("Packxs", Packxs);

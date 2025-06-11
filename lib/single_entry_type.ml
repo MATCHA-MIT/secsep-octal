@@ -112,7 +112,8 @@ include SingleExp
     | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
     | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
     | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
-    | CmovEq -> SingleTop |> set_flag_helper
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther -> SingleTop |> set_flag_helper
     | Bt -> (* bit test, set CF to the bit *)
       let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
       e1, (result, get_const_type (IsaBasic.ImmNum (0L, None)))
