@@ -15,7 +15,7 @@ open Smt_emitter
 open Full_mem_anno
 open Branch_anno
 open Call_anno
-open Taint_api
+open Func_input
 open Sexplib.Std
 
 module TaintTypeInfer = struct
@@ -60,7 +60,66 @@ module TaintTypeInfer = struct
   let pp_func_type (lvl: int) (infer_state: t) =
     List.iter (fun x -> ArchType.pp_arch_type lvl x) infer_state.func_type
 
-  let init (range_infer_state: RangeTypeInfer.t) (taint_api_list: TaintApi.t) : t =
+  let get_taint_arch_type
+      (taint_input_list: FuncInput.entry_t list)
+      (acc_taint_exp: TaintExp.t) (single_arch_type: RangeTypeInfer.ArchType.t) :
+      TaintExp.t * ArchType.RegType.t * ArchType.MemType.t =
+    let taint_var_no_default_helper
+    (acc: TaintExp.t) (entry: SingleEntryType.t) :
+        TaintExp.t * TaintEntryType.t =
+      TaintExp.next_var acc, (entry, acc)
+    in
+
+    let taint_var_helper
+        (acc: TaintExp.t) (entry: SingleEntryType.t * (bool option)) :
+        TaintExp.t * TaintEntryType.t = 
+      let single_entry, taint_instance_opt = entry in
+      match taint_instance_opt with
+      | None -> taint_var_no_default_helper acc single_entry
+      | Some taint -> acc, (single_entry, TaintConst taint)
+    in
+    
+    let merge_mem_taint
+        (single_mem_type: 'a ArchType.MemType.mem_content)
+        (taint_mem_input: ('b * (bool option)) ArchType.MemType.mem_content) : 
+        ('a * (bool option)) ArchType.MemType.mem_content =
+      let helper 
+          (single_mem_part: 'a ArchType.MemType.mem_part)
+          (taint_mem_part: ('b * (bool option)) ArchType.MemType.mem_part) :
+          ('a * (bool option)) ArchType.MemType.mem_part =
+        let single_ptr, single_entry_list = single_mem_part in
+        let taint_ptr, taint_entry_list = taint_mem_part in
+        if (fst single_ptr) <> (fst taint_ptr) then taint_type_infer_error "merge_mem_taint ptr mismatch"
+        else if (fst single_ptr) = Isa.rsp_idx then
+          (* We skip rsp since stack entry number might be changed after sinlge infer and we do not need stack taint input *)
+          single_ptr, List.map (fun (x, y, z) -> x, y, (z, None)) single_entry_list
+        else
+          single_ptr, List.map2 (fun (x, y, z) (_, _, (_, t)) -> (x, y, (z, t))) single_entry_list taint_entry_list
+      in
+      List.map2 helper single_mem_type taint_mem_input
+    in
+
+    match List.find_opt (fun (x: FuncInput.entry_t) -> x.func_name = single_arch_type.label) taint_input_list with
+    | None ->
+      let acc_taint_exp, reg_type = 
+        List.fold_left_map taint_var_no_default_helper acc_taint_exp single_arch_type.reg_type 
+      in
+      let acc_taint_exp, mem_type =
+        ArchType.MemType.fold_left_map taint_var_no_default_helper acc_taint_exp single_arch_type.mem_type
+      in
+      acc_taint_exp, reg_type, mem_type
+    | Some taint_input ->
+      let reg_type = List.map2 (fun x (_, t) -> x, t) single_arch_type.reg_type taint_input.reg_type in
+      let acc_taint_exp, reg_type =
+        List.fold_left_map taint_var_helper acc_taint_exp reg_type
+      in
+      let mem_type = merge_mem_taint single_arch_type.mem_type taint_input.mem_type in
+      let acc_taint_exp, mem_type =
+        ArchType.MemType.fold_left_map taint_var_helper acc_taint_exp mem_type
+      in
+      acc_taint_exp, reg_type, mem_type
+
+  let init (range_infer_state: RangeTypeInfer.t) (taint_input_list: FuncInput.entry_t list) : t =
     let start_var = TaintExp.TaintVar 1 in
     let helper_code
         (acc: TaintExp.t) (block: Isa.basic_block) :
@@ -83,7 +142,7 @@ module TaintTypeInfer = struct
       let acc, new_mem_type =
         ArchType.MemType.fold_left_map inner_helper acc block_single_type.mem_type
       in *)
-      let acc, new_reg_type, new_mem_type = TaintApi.get_taint_arch_type taint_api_list acc block_single_type in
+      let acc, new_reg_type, new_mem_type = get_taint_arch_type taint_input_list acc block_single_type in
       acc, {
         label = block_single_type.label;
         pc = block_single_type.pc;
@@ -248,9 +307,9 @@ module TaintTypeInfer = struct
 
   let infer_one_func
       (func_interface_list: FuncInterface.t list)
-      (taint_api_list: TaintApi.t)
+      (taint_input_list: FuncInput.entry_t list)
       (range_infer_state: RangeTypeInfer.t) : t =
-    let state = init range_infer_state taint_api_list in
+    let state = init range_infer_state taint_input_list in
     Printf.printf "Infer func %s\n" range_infer_state.func_name;
     (* Printf.printf "Before infer, func\n";
     let buf = Buffer.create 1000 in
@@ -332,12 +391,12 @@ module TaintTypeInfer = struct
   let infer 
       (range_infer_state_list: RangeTypeInfer.t list)
       (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
-      (taint_api_list: TaintApi.t) : 
+      (taint_input_list: FuncInput.entry_t list) : 
       (FuncInterface.t list) * (t list) =
     let helper
         (acc: FuncInterface.t list) (entry: RangeTypeInfer.t) :
         (FuncInterface.t list) * t =
-      let infer_state = infer_one_func acc taint_api_list entry in
+      let infer_state = infer_one_func acc taint_input_list entry in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" infer_state.func_name;
       (* pp_func_type 0 infer_state; *)
