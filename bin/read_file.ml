@@ -9,4 +9,4 @@ let read_file (filename: string) : string =
     raise e
 
 let get_related_filename (prog_name: string) (out_dir: string) (suffix: string) : string =
-  Printf.sprintf "./%s/%s.%s" out_dir prog_name suffix
+  Printf.sprintf "./%s/%s/%s.%s" out_dir prog_name prog_name suffix
