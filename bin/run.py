@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import click
+from functools import wraps
 from enum import Enum
 import argparse
 import subprocess
@@ -7,22 +9,23 @@ from pathlib import Path
 import time
 from colorama import Fore
 
-OUT_DIR = "out"
+script_dir = Path(__file__).resolve().parent
+proj_dir = script_dir.parent
 
 
 class InferPhase(Enum):
-    SingleTypeInfer = 0
-    RangeTypeInfer = 1
-    TaintTypeInfer = 2
-    TaintInstantiation = 3
+    PreprocessInput = 0
+    SingleTypeInfer = 1
+    RangeTypeInfer = 2
+    TaintTypeInfer = 3
     NumPhases = 4
 
 
 InferPhaseDescription = """Run inference on the benchmark:
-    0: Single Type Infer
-    1: Range Type Infer
-    2: Taint Type Infer
-    3: Taint Instantiation
+    0: Preprocess Input
+    1: Single Type Infer
+    2: Range Type Infer
+    3: Taint Type Infer
 """
 
 
@@ -36,6 +39,35 @@ CheckPhaseDescription = """Run checker on the infer result:
     0: Conversion
     1: Check
 """
+
+@click.group()
+def cli():
+    pass
+
+
+def cli_command():
+    context_settings = dict(
+        help_option_names=["-h", "--help"],
+        max_content_width=88,
+    )
+
+    def decorator(func):
+        @cli.command(context_settings=context_settings)
+        @click.option(
+            "--name",
+            type=click.STRING,
+        )
+        @click.option(
+            "--input-dir",
+            type=Path,
+        )
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def run(cmd, log_file, msg):
@@ -55,62 +87,82 @@ def run(cmd, log_file, msg):
             print("", flush=True)
 
 
-def infer(benchmark, phase_beg, phase_end):
-    name = Path(benchmark).stem
+@cli_command()
+@click.option(
+    "--phase",
+    nargs=2, 
+    type=click.Tuple([int, int]),
+    default=(0, 3),
+)
+def infer(name: str, input_dir: Path, phase):
+    output_dir = proj_dir / "out" / name
+    output_dir.mkdir(exist_ok=True, parents=True)
+
+    phase_beg, phase_end = phase
 
     for i in range(phase_beg, phase_end + 1):
-        if i == InferPhase.SingleTypeInfer.value:
+        if i == InferPhase.PreprocessInput.value:
             run(
                 [
                     "dune",
                     "exec",
-                    "infer_single",
+                    "preprocess_input",
                     "--",
+                    "-input-dir",
+                    str(input_dir),
                     "-name",
                     name,
-                    "-asm",
-                    benchmark,
                 ],
-                f"{OUT_DIR}/{name}.single_infer.log",
+                output_dir / f"{name}.preprocess.log",
+                "Running Preprocess Input",
+            )
+        elif i == InferPhase.SingleTypeInfer.value:
+            run(
+                ["dune", "exec", "infer_single", "--", "-name", name],
+                output_dir / f"{name}.single_infer.log",
                 "Running Single Type Infer",
             )
         elif i == InferPhase.RangeTypeInfer.value:
             run(
                 ["dune", "exec", "infer_range", "--", "-name", name],
-                f"{OUT_DIR}/{name}.range_infer.log",
+                output_dir / f"{name}.range_infer.log",
                 "Running Range Type Infer",
             )
         elif i == InferPhase.TaintTypeInfer.value:
             run(
                 ["dune", "exec", "infer_taint", "--", "-name", name],
-                f"{OUT_DIR}/{name}.taint_infer.log",
+                output_dir / f"{name}.taint_infer.log",
                 "Running Taint Type Infer",
-            )
-        elif i == InferPhase.TaintInstantiation.value:
-            run(
-                ["dune", "exec", "instantiate_taint", "--", "-name", name],
-                f"{OUT_DIR}/{name}.instantiate.log",
-                "Running Taint Instantiation",
             )
         else:
             print("Invalid phase", i)
             exit(1)
 
 
-def check(benchmark, phase_beg, phase_end):
-    name = Path(benchmark).stem
+@cli_command()
+@click.option(
+    "--phase",
+    nargs=2, 
+    type=click.Tuple([int, int]),
+    default=(0, 1),
+)
+def check(name: str, phase):
+    output_dir = proj_dir / "out" / name
+    output_dir.mkdir(exist_ok=True, parents=True)
+
+    phase_beg, phase_end = phase
 
     for i in range(phase_beg, phase_end + 1):
         if i == CheckPhase.Conversion.value:
             run(
                 ["dune", "exec", "convert", "--", "-name", name],
-                f"{OUT_DIR}/{name}.conversion.log",
+                output_dir / f"{name}.conversion.log",
                 "Running Conversion",
             )
         elif i == CheckPhase.Check.value:
             run(
-                ["dune", "exec", "check", "--", "-name", name],
-                f"{OUT_DIR}/{name}.check.log",
+                ["dune", "exec", "check", "--", "-name", name],\
+                output_dir / f"{name}.check.log",
                 "Running Check",
             )
         else:
@@ -118,12 +170,13 @@ def check(benchmark, phase_beg, phase_end):
             exit(1)
 
 
-def transform(
-    benchmark, out=None, delta=None, no_push_pop=None, no_call=None, tf_suffix=""
+def transform_helper(
+    name: str, out=None, delta=None, no_push_pop=None, no_call=None, tf_suffix=""
 ):
-    name = Path(benchmark).stem
     if out is None:
-        out = f"{OUT_DIR}/{name}.tf{tf_suffix}.asm"
+        output_dir = proj_dir / "out" / name
+        output_dir.mkdir(exist_ok=True, parents=True)
+        out = output_dir / f"{name}.tf{tf_suffix}.asm"
 
     arg_list = ["dune", "exec", "prog_transform", "--", "-name", name, "-out", out]
     msg = f"Transforming program"
@@ -138,121 +191,52 @@ def transform(
         arg_list.append("--no-call-preservation")
         msg += " (call untaint preservation TF disabled)"
 
-    run(arg_list, f"{OUT_DIR}/{name}.transform{tf_suffix}.log", msg)
+    run(arg_list, output_dir / f"{name}.transform{tf_suffix}.log", msg)
 
 
-def transform_var(benchmark, delta=None):
-    transform(benchmark, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3")
-    transform(benchmark, delta=delta, no_call=True, tf_suffix="2")
-    transform(benchmark, delta=delta, no_push_pop=True, tf_suffix="1")
-    transform(benchmark, delta=delta)
+@cli_command()
+@click.option(
+    "--delta", # hex format
+    type=click.STRING,
+)
+@click.option(
+    "--tf-option", 
+    is_flag=True,
+)
+@click.option(
+    "--no-push-pop", 
+    is_flag=True,
+)
+@click.option(
+    "--no-call", 
+    is_flag=True,
+)
+def transform(
+    name: str, delta: str, 
+    tf_option: bool,
+    no_push_pop: bool,
+    no_call: bool,
+):
+    delta=int(delta, 16)
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command")
-    subparsers.required = True
-
-    parser_infer = subparsers.add_parser(
-        "infer",
-        description=InferPhaseDescription,
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    parser_infer.add_argument("benchmark", type=str, help="benchmark to infer")
-    parser_infer.add_argument(
-        "phase_beg",
-        nargs="?",
-        type=int,
-        help="first phase to run",
-        default=0,
-    )
-    parser_infer.add_argument(
-        "phase_end",
-        nargs="?",
-        type=int,
-        help="last phase to run",
-        default=InferPhase.NumPhases.value - 1,
-    )
-
-    parser_check = subparsers.add_parser(
-        "check",
-        description=CheckPhaseDescription,
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    parser_check.add_argument("benchmark", type=str, help="benchmark to check")
-    parser_check.add_argument(
-        "phase_beg",
-        nargs="?",
-        type=int,
-        help="first phase to run",
-        default=0,
-    )
-    parser_check.add_argument(
-        "phase_end",
-        nargs="?",
-        type=int,
-        help="last phase to run",
-        default=CheckPhase.NumPhases.value - 1,
-    )
-
-    parser_tf = subparsers.add_parser("transform", description="transform program")
-    parser_tf.add_argument("benchmark", type=str, help="benchmark to transform")
-    parser_tf.add_argument(
-        "--out", type=str, help="output path of the transformed program", required=False
-    )
-    parser_tf.add_argument(
-        "--delta",
-        type=str,
-        help="absolute offset between public and secret stack",
-        required=False,
-    )
-    parser_tf.add_argument("--no-push-pop", action="store_true", required=False)
-    parser_tf.add_argument("--no-call-preservation", action="store_true", required=False)
-
-    parser_tfvar = subparsers.add_parser(
-        "transform-var", description="transform program with variable config"
-    )
-    parser_tfvar.add_argument(
-        "--delta",
-        type=str,
-        help="absolute offset between public and secret stack",
-        required=False,
-    )
-    parser_tfvar.add_argument("benchmark", type=str, help="benchmark to transform")
-
-    parser_all = subparsers.add_parser("all", description="Run all phases")
-    parser_all.add_argument(
-        "--delta",
-        type=str,
-        help="absolute offset between public and secret stack",
-        required=False,
-    )
-    parser_all.add_argument("benchmark", type=str, help="benchmark to run")
-
-    args = parser.parse_args()
-
-    if args.command == "all":
-        infer(args.benchmark, 0, InferPhase.NumPhases.value - 1)
-        transform_var(args.benchmark, args.delta)
-        check(args.benchmark, 0, CheckPhase.NumPhases.value - 1)
-    elif args.command == "infer":
-        infer(args.benchmark, args.phase_beg, args.phase_end)
-    elif args.command == "check":
-        check(args.benchmark, args.phase_beg, args.phase_end)
-    elif args.command == "transform":
-        transform(
-            args.benchmark,
-            args.out,
-            args.delta,
-            args.no_push_pop,
-            args.no_call_preservation,
-        )
-    elif args.command == "transform-var":
-        transform_var(args.benchmark, args.delta)
+    if tf_option is None:
+        transform_helper(name, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3")
+        transform_helper(name, delta=delta, no_call=True, tf_suffix="2")
+        transform_helper(name, delta=delta, no_push_pop=True, tf_suffix="1")
+        transform_helper(name, delta=delta)
     else:
-        print("Invalid command", args.command)
-        exit(1)
+        if no_push_pop:
+            if no_call:
+                tf_suffix="3"
+            else:
+                tf_suffix="1"
+        else:
+            if no_call:
+                tf_suffix="2"
+            else:
+                tf_suffix=""
+        transform_helper(name, delta=delta, no_push_pop=no_push_pop, no_call=no_call, tf_suffix=tf_suffix)
 
 
 if __name__ == "__main__":
-    main()
+    cli()
