@@ -127,7 +127,7 @@ module IsaBasic = struct
     ("r15", R15); ("r15d", R15D); ("r15w", R15W); ("r15b", R15B);
     ("xmm0", XMM (0, None)); ("xmm1", XMM (1, None)); ("xmm2", XMM (2, None)); ("xmm3", XMM (3, None)); 
     ("xmm4", XMM (4, None)); ("xmm5", XMM (5, None)); ("xmm6", XMM (6, None)); ("xmm7", XMM (7, None)); 
-    ("xmm8", XMM (80, None)); ("xmm9", XMM (9, None)); ("xmm10", XMM (10, None)); ("xmm11", XMM (11, None)); 
+    ("xmm8", XMM (8, None)); ("xmm9", XMM (9, None)); ("xmm10", XMM (10, None)); ("xmm11", XMM (11, None)); 
     ("xmm12", XMM (12, None)); ("xmm13", XMM (13, None)); ("xmm14", XMM (14, None)); ("xmm15", XMM (15, None)); 
   ]
 
