@@ -76,6 +76,13 @@ module SingleSubtype = struct
     | hd :: [] -> hd
     | _ :: tl -> list_tl tl
 
+  let merge_pc_list (pc_list1: 'a list) (pc_list2: 'a list) : 'a list =
+    match pc_list1, pc_list2 with
+    | [], _ | _, [] -> single_subtype_error "cannot merge empty pc_list"
+    (* | l1, [] -> l1
+    | [], l2 -> l2 *)
+    | _, _ -> [ List.hd pc_list1; list_tl pc_list2 ]
+
   type type_rel = {
     var_idx: var_pc_t;
     sol: SingleSol.t;
@@ -195,7 +202,7 @@ module SingleSubtype = struct
       let tv_rel =
         List.fold_left (
           fun acc_tv_rel (sub_a_exp, sub_a_pc_list) ->
-            add_one_sub_super acc_tv_rel (sub_a_exp, sub_a_pc_list @ a_pc_list) b_idx
+            add_one_sub_super acc_tv_rel (sub_a_exp, merge_pc_list sub_a_pc_list a_pc_list) b_idx
             (* add_one_sub_super acc_tv_rel (sub_a_exp, sub_a_pc_list) b_idx *)
         ) tv_rel a_entry.subtype_list in
       add_one_sub_super tv_rel a_exp_pc b_idx
@@ -210,7 +217,7 @@ module SingleSubtype = struct
         fun acc_tv_rel (sup_b, b_pc_list) ->
         (* fun acc_tv_rel (sup_b, _) -> *)
           let a_exp, a_pc_list = a_exp_pc in
-          add_sub_sub_super var_pc_map acc_tv_rel (a_exp, a_pc_list @ b_pc_list) sup_b
+          add_sub_sub_super var_pc_map acc_tv_rel (a_exp, merge_pc_list a_pc_list b_pc_list) sup_b
           (* add_sub_sub_super var_pc_map acc_tv_rel (a_exp, a_pc_list) sup_b *)
       ) tv_rel b_entry.supertype_list
     in
