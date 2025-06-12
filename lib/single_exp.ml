@@ -421,7 +421,9 @@ include SingleExpBasic
       end
     | SingleUExp (uop, l) ->
       [ [SingleUExp (uop, convert_t (eval_t l))] ]
-    | _ -> [ [e] ]
+    | SingleITE ((cond, cl, cr), l, r) ->
+      [ [SingleITE ((cond, cl |> eval_t |> convert_t, cr |> eval_t |> convert_t), l |> eval_t |> convert_t, r |> eval_t |> convert_t)] ]
+    | SingleTop | SingleConst _ | SingleVar _ -> [ [e] ]
 
   let eval (e: t) : t =
     (* Printf.printf "====================\n";
@@ -453,7 +455,7 @@ include SingleExpBasic
         Int64.mul (helper e1) (helper e2)
       | SingleBExp (SingleAnd, _, SingleConst c) | SingleBExp (SingleAnd, SingleConst c, _) ->
         helper (SingleConst (Int64.neg c))
-      | _ -> 1L
+      | SingleTop | SingleBExp _ | SingleUExp _ | SingleITE _ -> 1L
     in
     helper e  
 
@@ -487,7 +489,8 @@ include SingleExpBasic
         else SingleBExp (SingleAnd, helper e, SingleConst c)
       | SingleBExp (bop, e1, e2) -> SingleBExp (bop, helper e1, helper e2)
       | SingleUExp (uop, e1) -> SingleUExp (uop, helper e1)
-      | _ -> e
+      | SingleITE ((cond, cl, cr), l, r) -> SingleITE ((cond, helper cl, helper cr), helper l, helper r)
+      | SingleTop | SingleConst _ | SingleVar _ -> e
     in
     eval (helper e)
 
@@ -524,10 +527,10 @@ include SingleExpBasic
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     match e with
-    | SingleBExp _ | SingleUExp _ ->
+    | SingleBExp _ | SingleUExp _ | SingleITE _ ->
       let new_idx = -pc in
       (new_idx, e) :: map, SingleVar new_idx
-    | _ -> map, e
+    | SingleTop | SingleConst _ | SingleVar _ -> map, e
 
   let add_local_var (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
     match e1 with
@@ -540,7 +543,7 @@ include SingleExpBasic
       | None -> (v, e2) :: map
       end
     | SingleTop -> map
-    | _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
+    | SingleConst _ | SingleBExp _ | SingleUExp _ | SingleITE _ -> single_exp_error (Printf.sprintf "add_local_var cannot add %s->%s" (to_string e1) (to_string e2))
 
   let add_local_var_simp (simp_func: t -> t) (map: local_var_map_t) (e1: t) (e2: t) : local_var_map_t =
     match e1 with
@@ -554,7 +557,7 @@ include SingleExpBasic
       | None -> (v, e2) :: map
       end
     | SingleTop -> map
-    | _ -> single_exp_error (Printf.sprintf "add_context_map cannot add %s->%s" (to_string e1) (to_string e2))
+    | SingleConst _ | SingleBExp _ | SingleUExp _ | SingleITE _ -> single_exp_error (Printf.sprintf "add_context_map cannot add %s->%s" (to_string e1) (to_string e2))
 
   let add_local_global_var (map: local_var_map_t) (global_var: SingleVarSet.t) : local_var_map_t =
     List.fold_left (
@@ -734,7 +737,7 @@ include SingleExpBasic
       let left_ptr = filter_single_var l in
       let right_ptr = filter_single_var r in
       SingleVarSet.union left_ptr right_ptr
-    | _ -> SingleVarSet.empty
+    | SingleTop | SingleConst _ | SingleBExp _ | SingleUExp _ | SingleITE _ -> SingleVarSet.empty
 
   let find_base (e: t) (ptr_set: SingleVarSet.t) : IsaBasic.imm_var_id option =
     let p_set = filter_single_var e in
@@ -776,7 +779,7 @@ include SingleExpBasic
     | SingleVar var when var = base_id -> Some 0L
     | SingleBExp (SingleAdd, SingleVar var, SingleConst off) when var = base_id -> Some off
     | SingleBExp (SingleAdd, SingleConst off, SingleVar var) when var = base_id -> Some off
-    | _ -> None
+    | SingleTop | SingleConst _ | SingleVar _ | SingleBExp _ | SingleUExp _ | SingleITE _ -> None
 
   let split_val (e: t) (off_list: (t * t) list) : t list =
     (* We do not check the off list is continuous here since we checked before we call split_val *)
