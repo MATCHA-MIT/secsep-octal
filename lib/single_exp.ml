@@ -509,7 +509,13 @@ include SingleExpBasic
         | Some e1', Some e2' -> Some (SingleBExp (bop, e1', e2'))
         | _ -> None
       end else None
-    | _ -> None
+    | SingleITE ((cond, cond_l, cond_r), l, r) -> begin
+        match try_eval_div l div, try_eval_div r div with
+        | Some l', Some r' ->
+          Some (SingleITE ((cond, cond_l, cond_r), l', r'))
+        | _ -> None
+      end
+    | SingleTop | SingleVar _ | SingleUExp _ -> None
 
   let is_div (e: t) (div: int64) : bool =
     if div = 1L then true
@@ -660,7 +666,13 @@ include SingleExpBasic
     | SingleVar x -> SingleVarSet.singleton x
     | SingleBExp (_, e1, e2) -> SingleVarSet.union (get_vars e1) (get_vars e2)
     | SingleUExp (_, e) -> get_vars e
-    | _ -> SingleVarSet.empty
+    | SingleITE ((_, cond_l, cond_r), then_exp, else_exp) ->
+      let s1 = get_vars cond_l in
+      let s2 = get_vars cond_r in
+      let s3 = get_vars then_exp in
+      let s4 = get_vars else_exp in
+      SingleVarSet.union (SingleVarSet.union s1 s2) (SingleVarSet.union s3 s4)
+    | SingleTop | SingleConst _  -> SingleVarSet.empty
 
   let is_val (global_var: SingleVarSet.t) (e: t) : bool =
     SingleVarSet.is_empty (SingleVarSet.diff (get_vars e) global_var)
@@ -678,7 +690,11 @@ include SingleExpBasic
     | SingleVar v -> if v = idx then v_exp else e
     | SingleBExp (bop, e1, e2) -> SingleBExp (bop, repl_var_exp e1 v_idx_exp, repl_var_exp e2 v_idx_exp)
     | SingleUExp (uop, e) -> SingleUExp (uop, repl_var_exp e v_idx_exp)
-    | _ -> e
+    | SingleITE ((cond, cond_l, cond_r), l, r) ->
+      SingleITE ((cond, repl_var_exp cond_l v_idx_exp, repl_var_exp cond_r v_idx_exp), 
+                 repl_var_exp l v_idx_exp, 
+                 repl_var_exp r v_idx_exp)
+    | SingleTop | SingleConst _ -> e
 
   let rec get_imm_type (i: IsaBasic.immediate) : t =
     match i with
