@@ -775,14 +775,20 @@ module SingleTypeInfer = struct
         (* 9. Single type infer *)
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
+        Printf.printf "\n\n%s: Infer iter %d before init single_subtype%!\n\n" func_name curr_iter;
         let single_subtype, block_subtype = SingleSubtype.init func_name block_subtype in
-        Printf.printf "\n\n%s: Infer iter %d after init single_subtype%!\n\n" func_name curr_iter;
+        SingleSubtype.pp_single_subtype 0 single_subtype;
+        Printf.printf "\n\n%s: Infer iter %d after init single_subtype len %d %!\n\n" func_name curr_iter (List.length single_subtype);
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = 
           SingleSubtype.solve_vars single_subtype block_subtype state.input_var_set solver_iter
-          |> SingleSubtype.remove_top_subtype (* Optimization to speedup sub_sol *)
+          (* |> SingleSubtype.remove_top_subtype  *)
+          (* Optimization to speedup sub_sol *)
         in
+        Printf.printf "After infer, single subtype len %d%!\n" (List.length single_subtype);
+        SingleSubtype.pp_single_subtype 0 single_subtype;
+        let single_subtype = SingleSubtype.remove_top_subtype single_subtype in
         let state = 
           { state with 
             func_type = 
@@ -794,8 +800,8 @@ module SingleTypeInfer = struct
             block_subtype = block_subtype 
           } 
         in
-        Printf.printf "After infer, single subtype%!\n";
-        SingleSubtype.pp_single_subtype 0 state.single_subtype;
+        (* Printf.printf "After infer, single subtype%!\n";
+        SingleSubtype.pp_single_subtype 0 state.single_subtype; *)
 
         SmtEmitter.pop state.smt_ctx 1;
 
