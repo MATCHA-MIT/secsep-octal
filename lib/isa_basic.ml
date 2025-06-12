@@ -431,9 +431,9 @@ module IsaBasic = struct
     "xor"; "and"; "or"; "not"; "bswap"; "neg"; "inc"; "dec";
     "bt";
 
-    "cmovne"; "cmove"; "cmovl"; "cmovle";
-    "cmovg"; "cmovge"; "cmovb"; "cmovbe";
-    "cmova"; "cmovae"; (* TODO: add better support for parsing cmovxx *)
+    "cmovne"; "cmove"; "cmovle"; "cmovl";
+    "cmovge"; "cmovg"; "cmovbe"; "cmovb";
+    "cmovae"; "cmova"; (* TODO: add better support for parsing cmovxx *)
 
     "xchg";
     "push"; "pop";
@@ -483,9 +483,9 @@ module IsaBasic = struct
     ("sal", Sal); ("sar", Sar); ("shl", Shl); ("shr", Shr);
     ("rol", Rol); ("ror", Ror);
     ("xor", Xor); ("and", And); ("or", Or);
-    ("cmovne", CmovNe); ("cmove", CmovE); ("cmovl", CmovL); ("cmovle", CmovLe);
-    ("cmovg", CmovG); ("cmovge", CmovGe); ("cmovb", CmovB); ("cmovbe", CmovBe);
-    ("cmova", CmovA); ("cmovae", CmovAe);
+    ("cmovne", CmovNe); ("cmove", CmovE); ("cmovle", CmovLe); ("cmovl", CmovL);
+    ("cmovge", CmovGe); ("cmovg", CmovG); ("cmovbe", CmovBe); ("cmovb", CmovB);
+    ("cmovae", CmovAe); ("cmova", CmovA);
     ("bt", Bt);
     ("punpckh", Punpck); ("punpckl", Punpck);
     ("packus", Packxs); ("packss", Packxs);
@@ -502,8 +502,8 @@ module IsaBasic = struct
     ("Rol", Rol); ("Ror", Ror);
     ("Xor", Xor); ("And", And); ("Or", Or);
     ("CmovNe", CmovNe); ("CmovE", CmovE); ("CmovL", CmovL); ("CmovLe", CmovLe);
-    ("CmovG", CmovG); ("CmovGe", CmovGe); ("CmovB", CmovB); ("CmovBe", CmovBe);
-    ("CmovA", CmovA); ("CmovAe", CmovAe);
+    ("CmovGe", CmovGe); ("CmovG", CmovG); ("CmovBe", CmovBe); ("CmovB", CmovB);
+    ("CmovAe", CmovAe); ("CmovA", CmovA);
     ("Bt", Bt);
     ("Punpck", Punpck);
     ("Packxs", Packxs);
