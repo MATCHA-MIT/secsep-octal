@@ -1167,6 +1167,11 @@ module SingleSubtype = struct
       else
         single_subtype_error "get_range_helper step = 0L"
     in
+    let get_range_l_r (range: RangeExp.t) : SingleEntryType.t * SingleEntryType.t =
+      match range with
+      | Range (l, r, _) -> l, r
+      | _ -> single_subtype_error "get_range_l_r is not range"
+    in
     let bound_match 
         (on_left: bool) (cond: ArchType.CondType.cond)
         (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t) (step: int64) : (RangeExp.t * RangeExp.t * RangeExp.t) option =
@@ -1197,12 +1202,16 @@ module SingleSubtype = struct
       let end_val_resume = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst resume_loop_bound_off)) in
       let range_in = get_range_helper begin_val end_val_in step in
       let range_resume = get_range_helper begin_val end_val_resume step in
-      let new_len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val_in, begin_val)) in
+      let range_out : RangeExp.t =
+        let in_l, in_r = get_range_l_r range_in in
+        if step > 0L then Single in_r else Single in_l
+      in
+      (* let new_len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val_in, begin_val)) in
       let new_len_div_step = SingleEntryType.is_div new_len_val step in
       let range_out : RangeExp.t = 
         if len_div_step || new_len_div_step then Single end_val_in
         else get_range_helper (SingleExp.eval (SingleBExp (SingleAdd, end_val_resume, SingleConst 1L))) end_val_in (if step > 0L then 1L else -1L)
-      in
+      in *)
       Some (range_in, range_resume, range_out)
     in
     let gen_self_loop_sol
