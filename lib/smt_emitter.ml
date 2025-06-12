@@ -135,6 +135,25 @@ let get_model (smt_ctx: t) : Model.model option =
     if bv_sz >= target_sz then bv
     else BitVector.mk_sign_ext ctx (target_sz - bv_sz) bv
   
+  let expr_of_ite_cond
+      (z3_ctx: Z3.context)
+      (cond: SingleExpBasic.single_cond)
+      (l: exp_t)
+      (r: exp_t)
+      : exp_t =
+    match cond with
+    | SingleCondNe -> Boolean.mk_not z3_ctx (Boolean.mk_eq z3_ctx l r)
+    | SingleCondE -> Boolean.mk_eq z3_ctx l r
+    | SingleCondL -> BitVector.mk_slt z3_ctx l r
+    | SingleCondLe -> BitVector.mk_sle z3_ctx l r
+    | SingleCondG -> BitVector.mk_sgt z3_ctx l r
+    | SingleCondGe -> BitVector.mk_sge z3_ctx l r
+    | SingleCondB -> BitVector.mk_ult z3_ctx l r
+    | SingleCondBe -> BitVector.mk_ule z3_ctx l r
+    | SingleCondA -> BitVector.mk_ugt z3_ctx l r
+    | SingleCondAe -> BitVector.mk_uge z3_ctx l r
+    | SingleCondOther -> smt_emitter_error "expr_of_ite: unexpected condition"
+  
   let expr_of_single_exp ?(get_var_size: (int -> int option) option = None)
       (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =
     (* let add_constr = true in *)
@@ -190,6 +209,13 @@ let get_model (smt_ctx: t) : Model.model option =
           match op with
           | SingleNot -> BitVector.mk_not z3_ctx e
         end
+      | SingleITE ((cond, cond_l_se, cond_r_se), then_se, else_se) ->
+        let cond_l = helper cond_l_se in
+        let cond_r = helper cond_r_se in
+        let ite_cond = expr_of_ite_cond z3_ctx cond cond_l cond_r in
+        let then_exp = helper then_se in
+        let else_exp = helper else_se in
+        Boolean.mk_ite z3_ctx ite_cond then_exp else_exp
       in
       signed_ext_bv z3_ctx bv_width e
     in
@@ -243,6 +269,13 @@ let get_model (smt_ctx: t) : Model.model option =
           match op with
           | SingleNot -> BitVector.mk_not z3_ctx e, constraint_list
         end
+      | SingleITE ((cond, cond_l_se, cond_r_se), then_se, else_se) ->
+        let cond_l, constraint_list = helper cond_l_se constraint_list in
+        let cond_r, constraint_list = helper cond_r_se constraint_list in
+        let ite_cond = expr_of_ite_cond z3_ctx cond cond_l cond_r in
+        let then_exp, constraint_list = helper then_se constraint_list in
+        let else_exp, constraint_list = helper else_se constraint_list in
+        Boolean.mk_ite z3_ctx ite_cond then_exp else_exp, constraint_list
       in
       e |> signed_ext_bv z3_ctx bv_width, cl
     in

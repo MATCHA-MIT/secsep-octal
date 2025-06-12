@@ -816,6 +816,7 @@ module SingleSubtype = struct
           Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
+      | SingleITE _ -> Top
       in
       RangeExp.canonicalize result
     in

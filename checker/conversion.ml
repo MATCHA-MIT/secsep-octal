@@ -12,6 +12,7 @@ open Type.Taint_entry_type
 open Type.Taint_exp
 open Type.Single_context
 open Type.Set_sexp
+open Type.Smt_emitter
 open Branch_anno
 open Call_anno
 open Sexplib.Std
@@ -92,6 +93,12 @@ let rec convert_dep_type_inner
     (se: SingleEntryType.t)
     (get_var_size: int -> int option)
     : DepType.t =
+  let check_top_sz (e: DepType.t) = begin
+    match e with
+    | Top sz ->
+      if sz != intermediate_sz then failwith "Top size mismatched";
+    | Exp _ -> ()
+  end in
   let raw_res = match se with
   | SingleTop -> DepType.Top intermediate_sz
   | SingleConst c -> DepType.Exp (Z3.BitVector.mk_numeral ctx (Int64.to_string c) intermediate_sz)
@@ -107,13 +114,6 @@ let rec convert_dep_type_inner
     let e2 = convert_dep_type_inner ctx e2 get_var_size in
     (
       match bop, e1, e2 with
-      | _, DepType.Top sz1, DepType.Top sz2 ->
-        if sz1 != sz2 || sz1 != intermediate_sz then failwith "Top size mismatched" else
-        DepType.Top sz1
-      | _, DepType.Top sz, _
-      | _, _, DepType.Top sz ->
-        if sz != intermediate_sz then failwith "Top size mismatched" else
-        DepType.Top sz
       | _, DepType.Exp e1', DepType.Exp e2' -> begin
           let e = match bop with
           | SingleAdd -> Z3.BitVector.mk_add ctx e1' e2'
@@ -129,19 +129,49 @@ let rec convert_dep_type_inner
           in
           DepType.Exp e
         end
+      | _, _, _ -> begin
+          check_top_sz e1;
+          check_top_sz e2;
+          DepType.Top intermediate_sz
+        end
     )
-  | SingleUExp (uop, e) ->
-    let e = convert_dep_type_inner ctx e get_var_size in
-    match uop, e with
-    | _, DepType.Top sz ->
-      if sz != intermediate_sz then failwith "Top size mismatched" else
-      DepType.Top sz
-    | _, DepType.Exp e' -> begin
-        let out_e = match uop with
-        | SingleNot -> Z3.BitVector.mk_not ctx e'
-        in
-        DepType.Exp out_e
-      end
+  | SingleUExp (uop, e) -> begin
+      let e = convert_dep_type_inner ctx e get_var_size in
+      match uop, e with
+      | _, DepType.Exp e' -> begin
+          let out_e = match uop with
+          | SingleNot -> Z3.BitVector.mk_not ctx e'
+          in
+          DepType.Exp out_e
+        end
+      | _, _ -> begin
+          check_top_sz e;
+          DepType.Top intermediate_sz
+        end
+    end
+  | SingleITE ((cond, cond_l, cond_r), then_exp, else_exp) -> begin
+      let cond_l = convert_dep_type_inner ctx cond_l get_var_size in
+      let cond_r = convert_dep_type_inner ctx cond_r get_var_size in
+      let then_exp = convert_dep_type_inner ctx then_exp get_var_size in
+      let else_exp = convert_dep_type_inner ctx else_exp get_var_size in
+      match cond_l, cond_r, then_exp, else_exp with
+      | DepType.Exp cond_l', DepType.Exp cond_r', DepType.Exp then_exp', DepType.Exp else_exp' ->
+        let ite_cond = SmtEmitter.expr_of_ite_cond ctx cond cond_l' cond_r' in
+        let ite = Z3.Boolean.mk_ite ctx ite_cond then_exp' else_exp' in
+        DepType.Exp ite
+      | _, _, _, _ ->
+        let check_match (e: DepType.t) = begin
+          match e with
+          | Top sz ->
+            if sz != intermediate_sz then failwith "Top size mismatched";
+          | Exp _ -> ()
+        end in
+        check_match cond_l;
+        check_match cond_r;
+        check_match then_exp;
+        check_match else_exp;
+        DepType.Top intermediate_sz
+    end
   in
   match raw_res with
   | DepType.Top sz ->

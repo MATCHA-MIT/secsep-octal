@@ -25,12 +25,27 @@ module SingleExpBasic = struct
     | SingleNot
   [@@deriving sexp]
 
+  type single_cond =
+    | SingleCondNe
+    | SingleCondE
+    | SingleCondL
+    | SingleCondLe
+    | SingleCondG
+    | SingleCondGe
+    | SingleCondB
+    | SingleCondBe
+    | SingleCondA
+    | SingleCondAe
+    | SingleCondOther
+  [@@deriving sexp, compare]
+
   type t =
     | SingleTop
     | SingleConst of int64
     | SingleVar of IsaBasic.imm_var_id
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
+    | SingleITE of (single_cond * t * t) * t * t
   [@@deriving sexp]
 
   type single_var_type_t =

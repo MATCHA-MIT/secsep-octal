@@ -97,6 +97,25 @@ include SingleExp
   let set_flag_helper (dest_type: t) =
     dest_type, (dest_type, get_const_type (IsaBasic.ImmNum (0L, None)))
 
+  let exe_cmov (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) : t * flag_t =
+    (* Printf.printf "exe_cmov cond ? %s : %s\n" (SingleExp.to_string e2) (SingleExp.to_string e1); *)
+    let fl, fr = flags in
+    let res = match isa_bop with
+    | CmovNe -> SingleITE ((SingleCondNe, fl, fr), e2, e1)
+    | CmovE -> SingleITE ((SingleCondE, fl, fr), e2, e1)
+    | CmovL -> SingleITE ((SingleCondL, fl, fr), e2, e1)
+    | CmovLe -> SingleITE ((SingleCondLe, fl, fr), e2, e1)
+    | CmovG -> SingleITE ((SingleCondG, fl, fr), e2, e1)
+    | CmovGe -> SingleITE ((SingleCondGe, fl, fr), e2, e1)
+    | CmovB -> SingleITE ((SingleCondB, fl, fr), e2, e1)
+    | CmovBe -> SingleITE ((SingleCondBe, fl, fr), e2, e1)
+    | CmovA -> SingleITE ((SingleCondA, fl, fr), e2, e1)
+    | CmovAe -> SingleITE ((SingleCondAe, fl, fr), e2, e1)
+    | CmovOther -> SingleITE ((SingleCondOther, fl, fr), e2, e1)
+    | _ -> single_exp_error "exe_cmov: expecting cmovxx"
+    in
+    eval res |> set_flag_helper
+
   let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     match isa_bop with
     | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
@@ -113,7 +132,8 @@ include SingleExp
     | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
     | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
     | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
-    | CmovB | CmovBe | CmovA | CmovAe | CmovOther -> SingleTop |> set_flag_helper
+    | CmovB | CmovBe | CmovA | CmovAe | CmovOther ->
+      exe_cmov isa_bop e1 e2 flags
     | Bt -> (* bit test, set CF to the bit *)
       let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
       e1, (result, get_const_type (IsaBasic.ImmNum (0L, None)))
