@@ -662,14 +662,14 @@ module SingleTypeInfer = struct
               if StringSet.mem x.label state.alive_blocks then 
               let unknown_list = Constraint.get_unknown x.constraint_list in
               acc + List.length unknown_list,
-              (x.label, unknown_list)
-              else acc, (x.label, [])
+              (x.label, x.pc, unknown_list)
+              else acc, (x.label, x.pc, [])
           ) 0 state.func_type 
         in
         Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
         List.iter (
-          fun (label, unknown_list) -> 
-            Printf.printf "%s\n" label;
+          fun (label, pc, unknown_list) -> 
+            Printf.printf "%s %d\n" label pc;
             MemOffset.pp_unknown_list 0 unknown_list
         ) label_unknown_list;
         
@@ -868,8 +868,8 @@ module SingleTypeInfer = struct
               Printf.printf "Infer failed for %s\n" func_name;
               Printf.printf "After infer, %d unknown off, unknown list:\n" num_unknown;
               List.iter (
-                fun (label, unknown_list) -> 
-                  Printf.printf "%s\n" label;
+                fun (label, pc, unknown_list) -> 
+                  Printf.printf "%s %d\n" label pc;
                   MemOffset.pp_unknown_list 0 unknown_list
               ) label_unknown_list;
               { state with func = update_branch_anno block_subtype state.func }
