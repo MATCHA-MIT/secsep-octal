@@ -1011,6 +1011,7 @@ module SingleSubtype = struct
   let update_sol_set_correlation
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : t =
+    (* NOTE: I did not check pc history here, so I may find incorrect correlation!!! *)
     let rec helper_outer (tv_rel_list: t) : t =
       match tv_rel_list with
       | [] -> []
@@ -1086,11 +1087,11 @@ module SingleSubtype = struct
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt (fun x -> x) tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
-        (
+        (* (
           let var_idx, _ = tv_rel.var_idx in
           if var_idx = 114 then
             Printf.printf "sub_range_list: \n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list RangeExp.sexp_of_t sub_range_list));
-        );
+        ); *)
         if List.length sub_range_opt_list <> List.length sub_range_list then tv_rel
         else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then { tv_rel with sol = SolSimple (Top) }
         else begin
