@@ -12,7 +12,7 @@ module SingleBrInverseMap = struct
 
   module BrSingleMapMap = IntMapSexp (
     struct
-      type t = SingleEntryType.local_var_map_t
+      type t = SingleEntryType.local_var_map_t * IntSet.t
       [@@deriving sexp]
     end
   )
@@ -49,29 +49,35 @@ module SingleBrInverseMap = struct
     in
     let helper_inner
         (target_useful_var: IntSet.t)
+        (br_local_var_map: SingleEntryType.local_var_map_t)
         (br_pc: int)
         (acc: target_br_map_t * br_target_map_t) (target_e: SingleEntryType.t) (br_e: SingleEntryType.t) : 'a =
-      match target_e, br_e with
-      | SingleVar target_v, SingleVar br_v ->
+      match target_e with
+      | SingleVar target_v ->
         if IntSet.mem target_v target_useful_var then
-          let target_br_map, br_target_map = acc in
-          IntMap.update target_v update_target_br_map target_br_map,
-          VarPcMap.update (br_v, br_pc) (update_br_target_map target_v) br_target_map
+          match SingleEntryType.repl_local_var br_local_var_map br_e with
+          | SingleVar br_v ->
+            let target_br_map, br_target_map = acc in
+            IntMap.update target_v update_target_br_map target_br_map,
+            VarPcMap.update (br_v, br_pc) (update_br_target_map target_v) br_target_map
+          | _ -> acc
         else acc
-        | _ -> acc
+      | _ -> acc
     in
     let helper_outer
         (target_block: ArchType.t)
         (acc: target_br_map_t * br_target_map_t) (br_block: ArchType.t) : 
         target_br_map_t * br_target_map_t =
-      let helper = helper_inner target_block.useful_var br_block.pc in
+      let helper = helper_inner target_block.useful_var br_block.local_var_map br_block.pc in
       let acc = List.fold_left2 helper acc target_block.reg_type br_block.reg_type in
       ArchType.MemType.fold_left2 helper acc target_block.mem_type br_block.mem_type
     in
     let target_block, br_block_list = block_subtype in
     List.fold_left (helper_outer target_block) (IntMap.empty, VarPcMap.empty) br_block_list
 
-  let init (block_subtype_list: ArchType.block_subtype_t list) : t =
+  let init 
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (input_var_set: IntSet.t) : t =
     let helper
         (acc: t)
         (block_subtype: ArchType.block_subtype_t) : t =
@@ -97,13 +103,25 @@ module SingleBrInverseMap = struct
         fun (acc: t) ((br_v, br_pc), target_v_set) ->
           let entry = (br_v, SingleEntryType.SingleVar (pick_target_v target_v_set)) in
           BrSingleMapMap.update br_pc (
-            fun (x: SingleEntryType.local_var_map_t option) ->
+            fun (x: (SingleEntryType.local_var_map_t * IntSet.t) option) ->
               match x with
-              | None -> Some [entry]
-              | Some orig_map -> Some (entry :: orig_map)
+              | None -> Some ([entry], IntSet.add br_v input_var_set)
+              | Some (orig_map, orig_set) -> Some (entry :: orig_map, IntSet.add br_v orig_set)
           ) acc
       ) acc br_target_list
     in
     List.fold_left helper BrSingleMapMap.empty block_subtype_list
+
+  let repl_br_context_var
+      (br_context_map: t)
+      (e_pc: SingleEntryType.t * int) : SingleEntryType.t =
+    let e, br_pc = e_pc in
+    match BrSingleMapMap.find_opt br_pc br_context_map with
+    | None -> SingleTop
+    | Some (context_map, mapped_var_set) -> (* NOTE: mapped_var_set include mapped block var and input var. *)
+      if SingleEntryType.is_val mapped_var_set e then
+        (* Since we already ensure all block vars are mapped, we can use repl_var to keep input var (not in the context map). *)
+        SingleEntryType.repl_var context_map e
+      else SingleTop
 
 end

@@ -6,6 +6,7 @@ open Range_exp
 open Cond_type_new
 open Single_context
 open Arch_type
+open Single_br_inverse_map
 open Set_sexp
 open Smt_emitter
 open Pretty_print
@@ -1042,6 +1043,7 @@ module SingleSubtype = struct
       (tv_rel: type_rel)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
+      (single_br_inverse_map: SingleBrInverseMap.t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : 
       type_rel =
     (* let target_idx, target_pc = tv_rel.var_idx in *)
@@ -1050,6 +1052,26 @@ module SingleSubtype = struct
       | Some _ -> { tv_rel with sol = SolSimple Top }
       | None -> tv_rel
     in *)
+    let try_solve_single_corr (tv_rel: type_rel) : type_rel =
+      let subtype_list = (* Only keep direct subtype and repl them with inverse context var map *)
+        List.filter_map (
+          fun (e, pc_list) ->
+            match pc_list with
+            | [] -> single_subtype_error "try_solve_single_corr: get empty pc list"
+            | hd_pc :: [] -> Some (SingleBrInverseMap.repl_br_context_var single_br_inverse_map (e, hd_pc))
+            | _ -> None
+        ) tv_rel.subtype_list
+        |> SingleExpSet.of_list |> SingleExpSet.to_list (* Remove repeated sutypes *)
+      in
+      match subtype_list with
+      | [] -> tv_rel
+      | SingleTop :: [] -> tv_rel
+      | SingleVar v :: [] -> 
+        if v = fst tv_rel.var_idx then tv_rel 
+        else { tv_rel with sol = SolSimple (Single (SingleVar v)) }
+      | hd_e :: [] -> { tv_rel with sol = SolSimple (Single hd_e) }
+      | _ -> tv_rel
+    in
     let try_solve_single_sub_val (tv_rel: type_rel) : type_rel =
       let subtype_list = (* remove non-input SingleVar *)
         List.filter (
@@ -1455,6 +1477,7 @@ module SingleSubtype = struct
     in
     let solve_rules = [
       (* try_solve_top; *)
+      try_solve_single_corr;
       try_solve_loop_cond;
       try_solve_single_sub_val;
     ] in
@@ -1521,6 +1544,7 @@ module SingleSubtype = struct
       (* (smt_ctx: SmtEmitter.t) *)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
+      (single_br_inverse_map: SingleBrInverseMap.t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : t * bool =
     let new_sol_list, new_subtype = List.fold_left_map (
       fun acc tv_rel ->
@@ -1534,6 +1558,7 @@ module SingleSubtype = struct
             | None, hd :: tl -> merge (Some hd) tl
             | Some (last_exp, last_pc), (hd_exp, hd_pc) :: tl ->
               if SingleEntryType.cmp hd_exp last_exp = 0 && list_tl last_pc = list_tl hd_pc then 
+                (* NOTE: in current implementation, I only keep the first and last pc, so the length can only be one or two.*)
                 (* Keep one of last and hd which has smaller pc list (more direct subtype) *)
                 if List.length last_pc < List.length hd_pc then merge last_entry tl
                 else merge (Some (hd_exp, hd_pc)) tl
@@ -1549,7 +1574,7 @@ module SingleSubtype = struct
             ) tv_rel.subtype_list)
           in
           let tv_rel = { tv_rel with subtype_list = subtype_list } in
-          let tv_rel = try_solve_one_var tv_rel tv_rel_list block_subtype input_var_set in
+          let tv_rel = try_solve_one_var tv_rel tv_rel_list block_subtype single_br_inverse_map input_var_set in
           if tv_rel.sol = SolNone then acc, tv_rel
           else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel
     ) [] tv_rel_list
@@ -1566,6 +1591,7 @@ module SingleSubtype = struct
       (* (smt_ctx: SmtEmitter.t) *)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
+      (single_br_inverse_map: SingleBrInverseMap.t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (num_iter: int) : t =
     let rec helper
@@ -1573,7 +1599,7 @@ module SingleSubtype = struct
         (num_iter: int) : t =
       if num_iter = 0 then update_sol_set_correlation tv_rel_list input_var_set
       else begin
-        let new_subtype, found_new_sol = try_solve_vars tv_rel_list block_subtype input_var_set in
+        let new_subtype, found_new_sol = try_solve_vars tv_rel_list block_subtype single_br_inverse_map input_var_set in
         if found_new_sol then helper new_subtype (num_iter - 1)
         else update_sol_set_correlation new_subtype input_var_set
       end
