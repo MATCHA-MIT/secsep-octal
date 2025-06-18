@@ -784,7 +784,7 @@ module SingleTypeInfer = struct
         pp_graph block_subtype; *)
         let single_br_inverse_map = SingleBrInverseMap.init block_subtype state.input_var_set in
         let single_subtype = 
-          SingleSubtype.solve_vars single_subtype block_subtype single_br_inverse_map state.input_var_set solver_iter
+          SingleSubtype.solve_vars state.smt_ctx single_subtype block_subtype single_br_inverse_map state.input_var_set solver_iter
           (* |> SingleSubtype.remove_top_subtype  *)
           (* Optimization to speedup sub_sol *)
         in
