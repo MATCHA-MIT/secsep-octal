@@ -1155,6 +1155,22 @@ module ArchType (Entry: EntryType) = struct
       (curr_type, update_with_end_type curr_type block_subtype), block
     else (curr_type, block_subtype), block
 
+  let get_branch_block
+      (block_subtype_list: block_subtype_t list)
+      (target_br_pc: int * int) : t =
+    let target_pc, br_pc = target_br_pc in
+    let find_branch_block =
+      List.find_map (
+        fun (sup, sub_list) ->
+          if sup.pc = target_pc then
+            List.find_opt (fun sub -> sub.pc = br_pc) sub_list
+          else None
+      ) block_subtype_list
+    in
+    match find_branch_block with
+    | None -> arch_type_error (Printf.sprintf "get_branch_block cannot find target_pc %d branch_pc %d" target_pc br_pc)
+    | Some branch_block -> branch_block
+
   let get_branch_hist
       (block_subtype_list: block_subtype_t list)
       (branch_pc: int) : (CondType.t * int) list =
