@@ -5,8 +5,8 @@ open Set_sexp
 
 
 module SingleBrInverseMap = struct
-  exception SingleBrInverseMap of string
-  let single_br_inverse_map_error msg = raise (SingleBrInverseMap ("[Single Br Inverse Map Error] " ^ msg))
+  exception SingleBrInverseMapError of string
+  let single_br_inverse_map_error msg = raise (SingleBrInverseMapError ("[Single Br Inverse Map Error] " ^ msg))
 
   module ArchType = ArchType (SingleEntryType)
 
