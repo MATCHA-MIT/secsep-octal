@@ -1,21 +1,18 @@
 open Pretty_print
 open Entry_type_basic
+open Single_exp_basic
 open Single_exp
 open Smt_emitter
 open Isa_basic
-
-module CondTypeBase = struct
-  type cond = 
-    | Eq | Ne
-    | Le | Lt (* Signed comparison *)
-    | Be | Bt (* Unsigned comparison *)
-  [@@deriving sexp]
-end
+open Sexplib
+open Sexplib.Std
 
 module CondType (Entry: EntryTypeBasic) = struct
-include CondTypeBase
   exception CondTypeError of string
   let cond_type_error msg = raise (CondTypeError ("[Cond Type Error] " ^ msg))
+
+  type cond = CondTypeBase.t
+  [@@deriving sexp]
 
   type entry_t = Entry.t
   [@@deriving sexp]
@@ -34,11 +31,7 @@ include CondTypeBase
 
   let to_string (cond: t) =
     let c, l, r = cond in
-    let s = match c with
-    | Eq -> "Eq" | Ne -> "Ne"
-    | Le -> "Le" | Lt -> "Lt"
-    | Be -> "Be" | Bt -> "Bt"
-    in
+    let s = CondTypeBase.to_string c in
     Printf.sprintf "%s(%s,%s)" s (Entry.to_string l) (Entry.to_string r)
     (* s ^ "(" ^ (Entry.to_string l) ^ "," ^ (Entry.to_string r) ^ ")" *)
 
@@ -268,4 +261,19 @@ include (CondType (SingleExp))
     let _, l, r = e in
     SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
 
+end
+
+module SingleCondSet = struct
+  include Set.Make (
+    struct
+      let compare = SingleCondType.cmp
+      type t = SingleCondType.t
+    end
+  )
+
+  let t_of_sexp (s_exp: Sexp.t) : t = 
+    of_list (list_of_sexp SingleCondType.t_of_sexp s_exp)
+
+  let sexp_of_t (s: t) : Sexp.t = 
+    sexp_of_list SingleCondType.sexp_of_t (elements s)
 end

@@ -2,6 +2,7 @@ open Pretty_print
 open Smt_emitter
 open Isa_basic
 open Ptr_info
+open Single_exp_basic
 open Single_exp
 open Entry_type
 open Mem_offset_new
@@ -624,7 +625,7 @@ module MemType (Entry: EntryType) = struct
     let get_heuristic_part_mem_with_addr
         (part_mem: (MemOffset.t * 'a * 'b) list) 
         (addr: SingleExp.t) (is_addr_left: bool) : MemOffset.t option =
-      let cmp_op = if is_addr_left then SingleCondType.Lt else SingleCondType.Le in
+      let cmp_op = if is_addr_left then CondTypeBase.Lt else CondTypeBase.Le in
       List.find_map (
         fun (entry: MemOffset.t * 'a * 'b) ->
           let off, _, _ = entry in

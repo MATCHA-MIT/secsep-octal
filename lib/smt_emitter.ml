@@ -137,22 +137,17 @@ let get_model (smt_ctx: t) : Model.model option =
   
   let expr_of_ite_cond
       (z3_ctx: Z3.context)
-      (cond: SingleExpBasic.single_cond)
+      (cond: CondTypeBase.t)
       (l: exp_t)
       (r: exp_t)
       : exp_t =
     match cond with
-    | SingleCondNe -> Boolean.mk_not z3_ctx (Boolean.mk_eq z3_ctx l r)
-    | SingleCondE -> Boolean.mk_eq z3_ctx l r
-    | SingleCondL -> BitVector.mk_slt z3_ctx l r
-    | SingleCondLe -> BitVector.mk_sle z3_ctx l r
-    | SingleCondG -> BitVector.mk_sgt z3_ctx l r
-    | SingleCondGe -> BitVector.mk_sge z3_ctx l r
-    | SingleCondB -> BitVector.mk_ult z3_ctx l r
-    | SingleCondBe -> BitVector.mk_ule z3_ctx l r
-    | SingleCondA -> BitVector.mk_ugt z3_ctx l r
-    | SingleCondAe -> BitVector.mk_uge z3_ctx l r
-    | SingleCondOther -> smt_emitter_error "expr_of_ite: unexpected condition"
+    | Ne -> Boolean.mk_not z3_ctx (Boolean.mk_eq z3_ctx l r)
+    | Eq -> Boolean.mk_eq z3_ctx l r
+    | Lt -> BitVector.mk_slt z3_ctx l r
+    | Le -> BitVector.mk_sle z3_ctx l r
+    | Bt -> BitVector.mk_ult z3_ctx l r
+    | Be -> BitVector.mk_ule z3_ctx l r
   
   let expr_of_single_exp ?(get_var_size: (int -> int option) option = None)
       (smt_ctx: t) (se: SingleExpBasic.t) (add_constr: bool) : exp_t =

@@ -101,17 +101,17 @@ include SingleExp
     (* Printf.printf "exe_cmov cond ? %s : %s\n" (SingleExp.to_string e2) (SingleExp.to_string e1); *)
     let fl, fr = flags in
     let res = match isa_bop with
-    | CmovNe -> SingleITE ((SingleCondNe, fl, fr), e2, e1)
-    | CmovE -> SingleITE ((SingleCondE, fl, fr), e2, e1)
-    | CmovL -> SingleITE ((SingleCondL, fl, fr), e2, e1)
-    | CmovLe -> SingleITE ((SingleCondLe, fl, fr), e2, e1)
-    | CmovG -> SingleITE ((SingleCondG, fl, fr), e2, e1)
-    | CmovGe -> SingleITE ((SingleCondGe, fl, fr), e2, e1)
-    | CmovB -> SingleITE ((SingleCondB, fl, fr), e2, e1)
-    | CmovBe -> SingleITE ((SingleCondBe, fl, fr), e2, e1)
-    | CmovA -> SingleITE ((SingleCondA, fl, fr), e2, e1)
-    | CmovAe -> SingleITE ((SingleCondAe, fl, fr), e2, e1)
-    | CmovOther -> SingleITE ((SingleCondOther, fl, fr), e2, e1)
+    | CmovNe -> SingleITE ((Ne, fl, fr), e2, e1)
+    | CmovE -> SingleITE ((Eq, fl, fr), e2, e1)
+    | CmovL -> SingleITE ((Lt, fl, fr), e2, e1)
+    | CmovLe -> SingleITE ((Le, fl, fr), e2, e1)
+    | CmovG -> SingleITE ((Lt, fr, fl), e2, e1)
+    | CmovGe -> SingleITE ((Le, fr, fl), e2, e1)
+    | CmovB -> SingleITE ((Bt, fl, fr), e2, e1)
+    | CmovBe -> SingleITE ((Be, fl, fr), e2, e1)
+    | CmovA -> SingleITE ((Bt, fr, fl), e2, e1)
+    | CmovAe -> SingleITE ((Be, fr, fl), e2, e1)
+    | CmovOther -> SingleTop
     | _ -> single_exp_error "exe_cmov: expecting cmovxx"
     in
     eval res |> set_flag_helper

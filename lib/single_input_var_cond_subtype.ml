@@ -4,7 +4,6 @@ open Cond_type_new
 open Arch_type
 open Set_sexp
 open Sexplib.Std
-open Sexplib
 open Single_context
 open Smt_emitter
 
@@ -15,20 +14,7 @@ module SingleInputVarCondSubtype = struct
   module CondType = CondType (SingleEntryType)
   module ArchType = ArchType (SingleEntryType)
 
-  module CondSet = struct
-    include Set.Make (
-      struct
-        let compare = CondType.cmp
-        type t = CondType.t
-      end
-    )
-
-    let t_of_sexp (s_exp: Sexp.t) : t = 
-      of_list (list_of_sexp CondType.t_of_sexp s_exp)
-  
-    let sexp_of_t (s: t) : Sexp.t = 
-      sexp_of_list CondType.sexp_of_t (elements s)
-  end
+  module CondSet = SingleCondSet
 
   type pc_cond_t = (IsaBasic.label * int) * CondSet.t
   [@@deriving sexp]

@@ -40,19 +40,7 @@ include SingleExpBasic
       in
       "S-UnaryExp (" ^ op_str ^ ", " ^ (to_string e) ^ ")"
     | SingleITE ((cond, cond_l_exp, cond_r_exp), then_exp, else_exp) ->
-      let cond_str = match cond with
-      | SingleCondNe -> "Ne"
-      | SingleCondE -> "E"
-      | SingleCondL -> "L"
-      | SingleCondLe -> "Le"
-      | SingleCondG -> "G"
-      | SingleCondGe -> "Ge"
-      | SingleCondB -> "B"
-      | SingleCondBe -> "Be"
-      | SingleCondA -> "A"
-      | SingleCondAe -> "Ae"
-      | SingleCondOther -> "Other"
-      in
+      let cond_str = CondTypeBase.to_string cond in
       Printf.sprintf "S-ITE ((%s, %s, %s), %s, %s)"
         cond_str (to_string cond_l_exp) (to_string cond_r_exp)
         (to_string then_exp) (to_string else_exp)
@@ -82,19 +70,7 @@ include SingleExpBasic
       in
       Printf.sprintf "SingleUExp (%s, %s)" op_str (to_ocaml_string e)
     | SingleITE ((cond, cond_l_exp, cond_r_exp), then_exp, else_exp) ->
-      let cond_str = match cond with
-      | SingleCondNe -> "SingleCondNe"
-      | SingleCondE -> "SingleCondE"
-      | SingleCondL -> "SingleCondL"
-      | SingleCondLe -> "SingleCondLe"
-      | SingleCondG -> "SingleCondG"
-      | SingleCondGe -> "SingleCondGe"
-      | SingleCondB -> "SingleCondB"
-      | SingleCondBe -> "SingleCondBe"
-      | SingleCondA -> "SingleCondA"
-      | SingleCondAe -> "SingleCondAe"
-      | SingleCondOther -> "SingleCondOther"
-      in
+      let cond_str = CondTypeBase.to_string cond in
       Printf.sprintf "SingleITE ((%s, %s, %s), %s, %s)"
         cond_str (to_ocaml_string cond_l_exp) (to_ocaml_string cond_r_exp)
         (to_ocaml_string then_exp) (to_ocaml_string else_exp)
@@ -194,7 +170,7 @@ include SingleExpBasic
     | SingleUExp _, SingleBExp _ -> -1
     | SingleUExp _, _ -> 1
     | SingleITE ((cond1, cond1_l, cond1_r), then1, else1), SingleITE ((cond2, cond2_l, cond2_r), then2, else2) ->
-      let c_cond = compare_single_cond cond1 cond2 in
+      let c_cond = CondTypeBase.compare cond1 cond2 in
       let c_cond_l = cmp cond1_l cond2_l in
       let c_cond_r = cmp cond1_r cond2_r in
       let c_cond =
@@ -425,6 +401,30 @@ include SingleExpBasic
       [ [SingleITE ((cond, cl |> eval_t |> convert_t, cr |> eval_t |> convert_t), l |> eval_t |> convert_t, r |> eval_t |> convert_t)] ]
     | SingleTop | SingleConst _ | SingleVar _ -> [ [e] ]
 
+  let rec reorder_ite (e: t) : t =
+    (* NOTE: this is a simple but inefficient implementation. If the exp to be eval is too complex, consider to improve it!!! *)
+    match e with
+    | SingleTop | SingleConst _ | SingleVar _ -> e
+    | SingleBExp (op, e1, e2) ->
+      let e1 = reorder_ite e1 in
+      let e2 = reorder_ite e2 in
+      begin match e1, e2 with
+      | SingleITE (cond1, cl1, cr1), _ ->
+        SingleITE (cond1, reorder_ite (SingleBExp (op, cl1, e2)), reorder_ite (SingleBExp (op, cr1, e2)))
+      | _, SingleITE (cond2, cl2, cr2) ->
+        SingleITE (cond2, reorder_ite (SingleBExp (op, e1, cl2)), reorder_ite (SingleBExp (op, e1, cr2)))
+      | _ -> e
+      end
+    | SingleUExp (op, e0) ->
+      let e0 = reorder_ite e0 in
+      begin match e0 with
+      | SingleITE (cond, cl, cr) ->
+        SingleITE (cond, reorder_ite (SingleUExp (op, cl)), reorder_ite (SingleUExp (op, cr)))
+      | _ -> e
+      end
+    | SingleITE (cond, cl, cr) ->
+      SingleITE (cond, reorder_ite cl, reorder_ite cr)
+
   let eval (e: t) : t =
     (* Printf.printf "====================\n";
     pp_single_exp 0 e;
@@ -433,7 +433,8 @@ include SingleExpBasic
     Printf.printf "\n--------------------\n";
     pp_single_exp 0 (convert_t (eval_t e));
     Printf.printf "\n====================\n"; *)
-    convert_t (eval_t e)
+    (* convert_t (eval_t (e)) *)
+    e |> reorder_ite |> eval_t |> convert_t
 
   let get_align (align_map: (int * int64) list) (e: t) : int64 = 
     let rec helper (e: t) : int64 =

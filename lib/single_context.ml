@@ -1,4 +1,5 @@
 open Smt_emitter
+open Single_exp_basic
 open Single_exp
 open Cond_type_new
 open Sexplib.Std
@@ -227,7 +228,7 @@ module SingleContext = struct
         | SingleTop, _ -> None
         | _, SingleTop -> None
         | l', r' ->
-          if c = SingleCondType.Eq && SingleExp.cmp l' r' = 0 then
+          if c = CondTypeBase.Eq && SingleExp.cmp l' r' = 0 then
             (* remove trivial conditions *)
             None
           else

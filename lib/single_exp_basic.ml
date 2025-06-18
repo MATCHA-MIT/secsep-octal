@@ -2,6 +2,21 @@ open Isa_basic
 open Set_sexp
 open Sexplib.Std
 
+module CondTypeBase = struct
+  type t = 
+    | Eq | Ne
+    | Le | Lt (* Signed comparison *)
+    | Be | Bt (* Unsigned comparison *)
+  [@@deriving sexp, compare]
+
+  let to_string (cond: t) : string =
+    match cond with
+    | Eq -> "Eq" | Ne -> "Ne"
+    | Le -> "Le" | Lt -> "Lt"
+    | Be -> "Be" | Bt -> "Bt"
+
+end
+
 module SingleExpBasic = struct
   exception SingleExpError of string
   let single_exp_error msg = raise (SingleExpError ("[Single Exp Error] " ^ msg))
@@ -25,27 +40,13 @@ module SingleExpBasic = struct
     | SingleNot
   [@@deriving sexp]
 
-  type single_cond =
-    | SingleCondNe
-    | SingleCondE
-    | SingleCondL
-    | SingleCondLe
-    | SingleCondG
-    | SingleCondGe
-    | SingleCondB
-    | SingleCondBe
-    | SingleCondA
-    | SingleCondAe
-    | SingleCondOther
-  [@@deriving sexp, compare]
-
   type t =
     | SingleTop
     | SingleConst of int64
     | SingleVar of IsaBasic.imm_var_id
     | SingleBExp of single_bop * t * t
     | SingleUExp of single_uop * t
-    | SingleITE of (single_cond * t * t) * t * t
+    | SingleITE of (CondTypeBase.t * t * t) * t * t
   [@@deriving sexp]
 
   type single_var_type_t =

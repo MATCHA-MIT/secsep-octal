@@ -1,4 +1,5 @@
 open Isa_basic
+open Single_exp_basic
 open Single_exp
 open Cond_type_new
 open Range_exp
@@ -78,13 +79,13 @@ module MemOffset = struct
 
     let l1, r1 = o1 in
     let l2, r2 = o2 in
-    let eq_req = [ (SingleCondType.Eq, l1, l2); (SingleCondType.Eq, r1, r2) ] in
-    let le_req = [ (SingleCondType.Le, r1, l2) ] in
-    let ge_req = [ (SingleCondType.Le, r2, l1) ] in
-    let subset_req = [ (SingleCondType.Le, l2, l1); (SingleCondType.Le, r1, r2) ] in
-    let supset_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, r2, r1) ] in
-    let loverlap_req = [ (SingleCondType.Le, l1, l2); (SingleCondType.Le, l2, r1) ] in
-    let goverlap_req = [ (SingleCondType.Le, l1, r2); (SingleCondType.Le, r2, r1) ] in
+    let eq_req = [ (CondTypeBase.Eq, l1, l2); (CondTypeBase.Eq, r1, r2) ] in
+    let le_req = [ (CondTypeBase.Le, r1, l2) ] in
+    let ge_req = [ (CondTypeBase.Le, r2, l1) ] in
+    let subset_req = [ (CondTypeBase.Le, l2, l1); (CondTypeBase.Le, r1, r2) ] in
+    let supset_req = [ (CondTypeBase.Le, l1, l2); (CondTypeBase.Le, r2, r1) ] in
+    let loverlap_req = [ (CondTypeBase.Le, l1, l2); (CondTypeBase.Le, l2, r1) ] in
+    let goverlap_req = [ (CondTypeBase.Le, l1, r2); (CondTypeBase.Le, r2, r1) ] in
     let check = SingleCondType.check is_quick smt_ctx in
 
     (* let z3_ctx, _ = smt_ctx in
@@ -285,7 +286,7 @@ module MemOffset = struct
 
   let is_empty (smt_ctx: SmtEmitter.t) (o: t) : bool =
     let l, r = o in
-    SingleCondType.check true smt_ctx [ SingleCondType.Eq, l, r ] = SatYes
+    SingleCondType.check true smt_ctx [ CondTypeBase.Eq, l, r ] = SatYes
 
   let diff (smt_ctx: SmtEmitter.t) (o: t) (ro_list: t list) : t list =
     (* o - ro_list *)
