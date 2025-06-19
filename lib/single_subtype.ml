@@ -45,6 +45,13 @@ module SingleSol = struct
       else cmp_pc
     | SolCond _, _ -> 1
 
+  let get_vars (s: t) : IntSet.t =
+    match s with
+    | SolNone -> IntSet.empty
+    | SolSimple r -> RangeExp.get_var r
+    | SolCond (_, r1, r2, r3) ->
+      RangeExp.get_var r1 |> (IntSet.union (RangeExp.get_var r2)) |> (IntSet.union (RangeExp.get_var r3))
+
   let to_string (e: t) : string =
     match e with
     | SolNone -> "SolNone"
@@ -672,11 +679,50 @@ module SingleSubtype = struct
     | None -> Top
 
   let is_sol_resolved
-      (is_val_helper: SingleExp.SingleVarSet.t -> 'a -> bool)
+      (* (is_val_helper: SingleExp.SingleVarSet.t -> 'a -> bool) *)
       (tv_rel_list: t)
       (input_var_set: SingleExp.SingleVarSet.t)
       (e: 'a) : bool =
-    let resolved_vars = 
+    (* New logic: if any block var in e has any unresolved dependency, then e is not resolved. *)
+    let e_block_vars = IntSet.diff (SingleExp.get_vars e) input_var_set in
+    if IntSet.is_empty e_block_vars then true else
+    let dep_map =
+      List.fold_left (
+        fun (acc: IntSet.t IntMap.t) (tv_rel: type_rel) ->
+          match tv_rel.sol with
+          | SolNone -> acc
+          | _ -> IntMap.add (fst tv_rel.var_idx) (SingleSol.get_vars tv_rel.sol) acc
+      ) IntMap.empty tv_rel_list
+    in
+    let rec check_dep (checked_dep_set: IntSet.t) (unchecked_var_set: IntSet.t) : bool =
+      (* checked_dep_set include 
+          (1) input var; 
+          (2) block var that has Sol (directly dep checked); 
+          (3) block var in unchecked_var_set to be checked in this round. *)
+      let acc_resolved, acc_unchecked_set =
+        List.fold_left (
+          fun (acc: bool * IntSet.t) (var_to_check: int) ->
+            let acc_resolved, acc_unchecked_set = acc in
+            if not acc_resolved then acc
+            else begin
+              match IntMap.find_opt var_to_check dep_map with
+              | Some var_dep_set ->
+                (* var_to_check has dep in var_dep_set, filter dep var not in checked_dep_set 
+                    (has not been checked or not in the to_check_list) *)
+                true,
+                IntSet.union acc_unchecked_set (IntSet.diff var_dep_set checked_dep_set)
+              | None -> (* var_to_check does not have sol, dep check fail *)
+                false, acc_unchecked_set
+            end
+        ) (true, IntSet.empty) (IntSet.to_list unchecked_var_set)
+      in
+      if not acc_resolved then false
+      else if IntSet.is_empty acc_unchecked_set then true
+      else check_dep (IntSet.union checked_dep_set acc_unchecked_set) acc_unchecked_set
+    in
+    check_dep (IntSet.union input_var_set e_block_vars) e_block_vars
+
+    (* let resolved_vars = 
       List.filter_map (
         fun (x: type_rel) -> 
           (* match x.sol with
@@ -685,11 +731,11 @@ module SingleSubtype = struct
           if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None
       ) tv_rel_list
     in
-    is_val_helper (
+    SingleExp.is_val (
       SingleExp.SingleVarSet.union 
         (SingleExp.SingleVarSet.of_list resolved_vars) 
         input_var_set
-    ) e
+    ) e *)
 
   let substitute_one_exp_single_sol
       (exp_pc: type_pc_list_t)
@@ -949,7 +995,7 @@ module SingleSubtype = struct
       List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
     in
     if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) e then *)
-    if is_sol_resolved SingleExp.is_val tv_rel_list input_var_set e then
+    if is_sol_resolved tv_rel_list input_var_set e then
       match sub_sol_single_to_range_naive_repl false tv_rel_list input_var_set e_pc e with
       | Single e -> let e = eval_helper e in Some (e, e)
       | Range (l, r, _) -> Some (eval_helper l, eval_helper r)
@@ -1078,7 +1124,7 @@ module SingleSubtype = struct
       List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
     in
     if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then *)
-    if is_sol_resolved SingleExp.is_val tv_rel_list input_var_set exp then
+    if is_sol_resolved tv_rel_list input_var_set exp then
       Some (sub_sol_single_to_range eval_helper tv_rel_list input_var_set e)
     else None
 
@@ -1344,8 +1390,8 @@ module SingleSubtype = struct
       in
       let end_val_in = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst in_loop_bound_off)) in
       let end_val_resume = SingleEntryType.eval (SingleBExp (SingleAdd, end_val, SingleConst resume_loop_bound_off)) in
-      let range_in = get_range_helper begin_val end_val_in step in
-      let range_resume = get_range_helper begin_val end_val_resume step in
+      let range_in = get_range_helper begin_val end_val_in step in (* range_in is canonicalized *)
+      let range_resume = get_range_helper begin_val end_val_resume step in (* range_resume is canonicalized *)
       let range_out : RangeExp.t =
         let in_l, in_r = get_range_l_r range_in in
         if step > 0L then Single in_r else Single in_l
@@ -1507,7 +1553,7 @@ module SingleSubtype = struct
             else if SingleEntryType.cmp new_r (SingleVar var_idx) = 0 then Some (false, new_l, false)
             else None
           in
-          Printf.printf "Find var %d var step %s cond %s\n" target_idx (SingleExp.to_string var_step) (ArchType.CondType.to_string (cond, l, r));
+          Printf.printf "Find var %d var step %s cond %s\n" target_idx (SingleExp.to_string var_step) (ArchType.CondType.to_string (cond, new_l, new_r));
           match find_cond_var_step with
           | Some (on_left, bound, step_before_cmp) -> 
             (* let inc = (step > 0L) in *)
@@ -1522,7 +1568,38 @@ module SingleSubtype = struct
               | None -> SingleTop
               end
             ) in *)
-            if bound <> SingleTop && SingleEntryType.is_val input_var_set bound then begin
+            (* Goal: Support bound represented by block var. Need to sub block var in the current bound with block var from the counter var's block.
+                1. Identify all block var
+                2. Identify the counter's var block pc
+                3. Build a map, from counter block var to bound block var, where the mapping relation is found by checking supertype. *)
+            let unify_bound_block_var
+                (bound: SingleExp.t) (target_pc: int) (same_block: bool) : SingleExp.t =
+              if not (is_sol_resolved tv_rel_list input_var_set bound) then SingleTop else
+              if same_block || bound = SingleTop then bound else
+              let bound_var_set = SingleExp.get_vars bound in
+              let bound_block_var_set = IntSet.inter bound_var_set input_var_set in
+              if IntSet.is_empty bound_block_var_set then bound else
+              let remain_bound_block_var_set, bound_context_map =
+                List.fold_left (
+                  fun (acc: IntSet.t * SingleExp.local_var_map_t) (tv_rel: type_rel) ->
+                    let v_idx, v_pc = tv_rel.var_idx in
+                    if v_pc = target_pc then
+                      let acc_remain_var, acc_map = acc in
+                      let v_super_idx_set = List.map (fun (x, _) -> x) tv_rel.supertype_list |> IntSet.of_list in
+                      let acc_remain_var = IntSet.diff acc_remain_var v_super_idx_set in
+                      let new_mapped_var = IntSet.inter acc_remain_var v_super_idx_set in
+                      let acc_map = List.map (fun x -> (x, SingleExp.SingleVar v_idx)) (IntSet.to_list new_mapped_var) @ acc_map in
+                      acc_remain_var, acc_map
+                    else acc
+                ) (bound_block_var_set, []) tv_rel_list
+              in
+              if IntSet.is_empty remain_bound_block_var_set then
+                (* Since we already ensure all block vars are mapped, we can use repl_var to keep input var (not in the context map). *)
+                SingleExp.repl_var bound_context_map bound
+              else SingleTop (* Important: if we cannot unify block, then we should return SingleTop and not use the non-unified bound!!! *)
+            in
+            let bound = unify_bound_block_var bound target_pc target_idx_branch_pc_same_block in
+            if bound <> SingleTop (* && SingleEntryType.is_val input_var_set bound *) then begin
               Printf.printf "Bound is val %s\n" (SingleExp.to_string bound);
               let sol = gen_self_loop_sol base bound step step_before_cmp cond_pc resume_loop_on_taken cond on_left target_idx_branch_pc_same_block in
               { tv_rel with sol = sol }
