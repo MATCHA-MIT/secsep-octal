@@ -26,6 +26,25 @@ module SingleSol = struct
       (* This is used to simplify inference process, not for type check!!! *)
   [@@deriving sexp]
 
+  let cmp (s1: t) (s2: t) : int =
+    match s1, s2 with
+    | SolNone, SolNone -> 0
+    | SolNone, _ -> -1
+    | SolSimple _, SolNone -> 1
+    | SolSimple r1, SolSimple r2 -> RangeExp.cmp r1 r2
+    | SolSimple _, SolCond _ -> -1
+    | SolCond (pc1, a1, b1, c1), SolCond (pc2, a2, b2, c2) ->
+      let cmp_pc = compare pc1 pc2 in
+      if cmp_pc = 0 then
+        let cmp_a = RangeExp.cmp a1 a2 in
+        if cmp_a = 0 then
+          let cmp_b = RangeExp.cmp b1 b2 in
+          if cmp_b = 0 then RangeExp.cmp c1 c2
+          else cmp_b
+        else cmp_a
+      else cmp_pc
+    | SolCond _, _ -> 1
+
   let to_string (e: t) : string =
     match e with
     | SolNone -> "SolNone"
@@ -697,6 +716,12 @@ module SingleSubtype = struct
   let subsititue_one_exp_single_sol_list
       (idx_sol_list: (var_pc_t * SingleSol.t) list)
       (exp_pc: type_pc_list_t) : type_pc_list_t =
+    let e_vars = SingleExp.get_vars (fst exp_pc) in
+    let idx_sol_list =
+      List.filter (
+        fun ((var_idx, _), _) -> SingleExp.SingleVarSet.mem var_idx e_vars
+      ) idx_sol_list
+    in
     List.fold_left subsititue_one_exp_single_sol exp_pc idx_sol_list
 
   let subsititue_one_exp_subtype_list
@@ -714,16 +739,44 @@ module SingleSubtype = struct
     let exp, _ = subsititue_one_exp_single_sol_list idx_sol_list (exp, [pc]) in
     exp
 
-  let update_subtype_single_sol
+  type sol_list_t = (var_pc_t * SingleSol.t) list
+  [@@deriving sexp]
+
+  let rec update_subtype_single_sol
       (tv_rel_list: t) (idx_sol_list: (var_pc_t * SingleSol.t) list) : t =
-    List.map (
-      fun (tv_rel: type_rel) ->
-        if tv_rel.sol <> SolNone then tv_rel
-        else
-          (* let v_idx, _ = tv_rel.var_idx in
-          Printf.printf "Sub for %d sol list len %d\n" v_idx (List.length idx_sol_list); *)
-          { tv_rel with subtype_list = List.map (subsititue_one_exp_single_sol_list idx_sol_list) tv_rel.subtype_list }
-    ) tv_rel_list      
+    let remain_id_sol_list, tv_rel_list =
+      List.fold_left_map (
+        fun (acc: (var_pc_t * SingleSol.t) list) (tv_rel: type_rel) ->
+          let tv_rel_pc = snd tv_rel.var_idx in
+          let sub_exp_helper (e: SingleExp.t) : SingleExp.t =
+            subsititue_one_exp_single_sol_list idx_sol_list (e, [tv_rel_pc]) |> fst
+          in
+          let sub_range_helper = RangeExp.eval_helper sub_exp_helper in 
+          match tv_rel.sol with
+          | SolNone ->
+            (* let v_idx, _ = tv_rel.var_idx in
+            Printf.printf "Sub for %d sol list len %d\n" v_idx (List.length idx_sol_list); *)
+            acc, (* Solution is not updated, do not need add to remain id_sol_list *)
+            { tv_rel with subtype_list = List.map (subsititue_one_exp_single_sol_list idx_sol_list) tv_rel.subtype_list }
+          | SolSimple s -> 
+            let new_s = sub_range_helper s in
+            if RangeExp.cmp new_s s = 0 then acc, tv_rel
+            else begin
+              (tv_rel.var_idx, SolSimple new_s) :: acc,
+              { tv_rel with sol = SolSimple (sub_range_helper s)}
+            end
+          | SolCond (br_pc, s1, s2, s3) ->
+            let new_sol: SingleSol.t = SolCond (br_pc, sub_range_helper s1, sub_range_helper s2, sub_range_helper s3) in
+            if SingleSol.cmp new_sol tv_rel.sol = 0 then acc, tv_rel
+            else begin
+              (tv_rel.var_idx, new_sol) :: acc,
+              { tv_rel with sol = SolCond (br_pc, sub_range_helper s1, sub_range_helper s2, sub_range_helper s3)}
+            end
+      ) [] tv_rel_list
+    in
+    match remain_id_sol_list with
+    | [] -> tv_rel_list
+    | _ -> update_subtype_single_sol tv_rel_list remain_id_sol_list
 
   let sub_sol_single_var
       (eval_helper: SingleExp.t -> SingleExp.t)
@@ -880,7 +933,9 @@ module SingleSubtype = struct
       | SingleUExp _ -> Top
       | SingleITE _ -> Top
       in
-      RangeExp.canonicalize result
+      (* NOTE: We only need canonicalize when generate a new range solution. *)
+      (* RangeExp.canonicalize result *)
+      result
     in
     helper e
 
@@ -1438,10 +1493,10 @@ module SingleSubtype = struct
           (* NOTE: We return original l or r as the bound, since we need to simplify bound in a different way later 
               (with different pc and sub_sol function sub_sol_single_to_range_opt) *)
           let find_cond_var_step = (* on_left, bound, add step before cmp *)
-            if SingleEntryType.cmp new_l var_step = 0 then Some (true, r, true)
-            else if SingleEntryType.cmp new_r var_step = 0 then Some (false, l, true)
-            else if SingleEntryType.cmp new_l (SingleVar var_idx) = 0 then Some (true, r, false)
-            else if SingleEntryType.cmp new_r (SingleVar var_idx) = 0 then Some (false, l, false)
+            if SingleEntryType.cmp new_l var_step = 0 then Some (true, new_r, true)
+            else if SingleEntryType.cmp new_r var_step = 0 then Some (false, new_l, true)
+            else if SingleEntryType.cmp new_l (SingleVar var_idx) = 0 then Some (true, new_r, false)
+            else if SingleEntryType.cmp new_r (SingleVar var_idx) = 0 then Some (false, new_l, false)
             else None
           in
           Printf.printf "Find var %d var step %s cond %s\n" target_idx (SingleExp.to_string var_step) (ArchType.CondType.to_string (cond, l, r));
@@ -1451,14 +1506,14 @@ module SingleSubtype = struct
             let resume_loop_on_taken = cond_pc = List.hd branch_pc in
             let target_idx_branch_pc_same_block = target_idx = var_idx in
             (* TODO: Need to repl bound here!!! *)
-            let bound = (
+            (* let bound = (
               (* Very imporant: here bound comes from the branch condition, which should be evaluated in the context of branch_pc - 1!!! *)
               begin match sub_sol_single_to_range_opt (fun x -> x) tv_rel_list input_var_set (bound, (List.hd branch_pc) - 1) with
               | Some (Single e) -> e
               | Some _ -> bound
               | None -> SingleTop
               end
-            ) in
+            ) in *)
             if bound <> SingleTop && SingleEntryType.is_val input_var_set bound then begin
               Printf.printf "Bound is val %s\n" (SingleExp.to_string bound);
               let sol = gen_self_loop_sol base bound step step_before_cmp cond_pc resume_loop_on_taken cond on_left target_idx_branch_pc_same_block in

@@ -17,6 +17,26 @@ module RangeExp = struct
     | Top
   [@@deriving sexp]
 
+  let cmp (r1: t) (r2: t) : int =
+    match r1, r2 with
+    | Single e1, Single e2 -> SingleExp.cmp e1 e2
+    | Single _, _ -> -1
+    | Range _, Single _ -> 1
+    | Range (l1, r1, step1), Range (l2, r2, step2) ->
+      let c_l = SingleExp.cmp l1 l2 in
+      if c_l = 0 then
+        let c_r = SingleExp.cmp r1 r2 in
+        if c_r = 0 then compare step1 step2
+        else c_r
+      else c_l
+    | Range _, _ -> -1
+    | SingleSet _, Single _ | SingleSet _, Range _ -> 1
+    | SingleSet el1, SingleSet el2 ->
+      List.compare SingleExp.cmp el1 el2
+    | SingleSet _, Top -> -1
+    | Top, Top -> 0
+    | Top, _ -> 1
+
   let get_var (r: t) : SingleExp.SingleVarSet.t =
     match r with
     | Single s -> SingleExp.get_vars s
@@ -147,7 +167,8 @@ module RangeExp = struct
   let eval_helper (single_eval_helper: SingleExp.t -> SingleExp.t) (r: t) : t =
     match r with
     | Single e -> Single (single_eval_helper e)
-    | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step) |> canonicalize
+    | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step) (* |> canonicalize *)
+      (* NOTE: We only need canonicalize when generate a new range solution. *)
     | SingleSet e_list -> SingleSet (List.map single_eval_helper e_list)
     | Top -> Top
 
