@@ -1283,8 +1283,8 @@ module SingleSubtype = struct
           fun (x_pc: type_pc_list_t) ->
             let orig_x, pc_list = x_pc in
             let x = SingleIteEval.eval single_ite_eval (orig_x, List.hd pc_list) in
-            if SingleExp.cmp orig_x x <> 0 then
-              Printf.printf "SingleIteEval simplify (%d) %s to %s\n" (List.hd pc_list) (SingleExp.to_string orig_x) (SingleExp.to_string x);
+            (* if SingleExp.cmp orig_x x <> 0 then
+              Printf.printf "SingleIteEval simplify (%d) %s to %s\n" (List.hd pc_list) (SingleExp.to_string orig_x) (SingleExp.to_string x); *)
             match x with
             | SingleBExp (SingleAdd, SingleVar v, SingleConst s)
             | SingleBExp (SingleAdd, SingleConst s, SingleVar v) ->
@@ -1561,9 +1561,9 @@ module SingleSubtype = struct
                     | Some (_, (other_step, other_branch_pc), other_cmp_var_idx, v_step) ->
                       (* NOTE: Must ensure the other_var is indeed in the cond!!! *)
                       (* IMPORTANT: We need to use v_step from find_base_step instead of the solution*)
-                      if SingleEntryType.cmp l other_step = 0 || SingleEntryType.cmp r other_step = 0
-                        || SingleEntryType.cmp l (SingleVar other_cmp_var_idx) = 0
-                        || SingleEntryType.cmp r (SingleVar other_cmp_var_idx) = 0 then begin
+                      if SingleEntryType.cmp new_l other_step = 0 || SingleEntryType.cmp new_r other_step = 0
+                        || SingleEntryType.cmp new_l (SingleVar other_cmp_var_idx) = 0
+                        || SingleEntryType.cmp new_r (SingleVar other_cmp_var_idx) = 0 then begin
                         match tv.sol with
                         | SolCond (_, Range (v_l, v_r, _), _, _)
                         | SolSimple (Range (v_l, v_r, _)) ->
