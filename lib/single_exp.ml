@@ -440,11 +440,14 @@ include SingleExpBasic
     let rec helper (e: t) : int64 =
       match e with
       | SingleConst num ->
+        List.find (
+          fun x -> Int64.rem num x = 0L
+        ) [256L; 128L; 64L; 32L; 16L; 8L; 4L; 2L; 1L]
         (* if Int64.rem num 16L = 0L then 16L *)
-        if Int64.rem num 8L = 0L then 8L
+        (* if Int64.rem num 8L = 0L then 8L
         else if Int64.rem num 4L = 0L then 4L
         else if Int64.rem num 2L = 0L then 2L
-        else 1L
+        else 1L *)
       | SingleVar v ->
         begin match List.find_map (fun (idx, idx_align) -> if idx = v then Some idx_align else None) align_map with
         | Some v_align -> v_align
@@ -456,7 +459,9 @@ include SingleExpBasic
         Int64.mul (helper e1) (helper e2)
       | SingleBExp (SingleAnd, _, SingleConst c) | SingleBExp (SingleAnd, SingleConst c, _) ->
         helper (SingleConst (Int64.neg c))
-      | SingleTop | SingleBExp _ | SingleUExp _ | SingleITE _ -> 1L
+      | SingleITE (_, l, r) ->
+        Int64.min (helper l) (helper r)
+      | SingleTop | SingleBExp _ | SingleUExp _ -> 1L
     in
     helper e  
 
