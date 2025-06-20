@@ -883,10 +883,10 @@ module SingleSubtype = struct
         if SingleEntryType.SingleVarSet.mem v input_var_set then Single e
         else begin match find_var_sol tv_rel_list v e_pc with
         | Single e_sub -> helper e_sub
-        | Range (l, r, step) ->
-          if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
+        | Range (l, r, step) -> Range (l, r, step)
+          (* if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
             Range (l, r, step)
-          else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step))))
+          else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step)))) *)
         | SingleSet e_list ->
           if List.find_opt (fun x -> not (SingleExp.is_val input_var_set x)) e_list = None then
             if List.length e_list = 1 then Single (List.hd e_list)
@@ -902,9 +902,12 @@ module SingleSubtype = struct
         | SingleAdd, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleAdd, e, e1)), SingleEntryType.eval (SingleBExp (SingleAdd, e, e2)), s)
         | SingleAdd, Range (e11, e12, s1), Range (e21, e22, s2) -> begin
-            if (Int64.to_int s1) < 0 || (Int64.to_int s2) < 0 then
-              single_subtype_error "expecting left aligned now";
-
+            if (Int64.to_int s1) < 0 || (Int64.to_int s2) < 0 then begin
+              Printf.printf "e1 %s\n%s\ne2 %s\n%s\n" 
+                (SingleExp.to_string e1) (RangeExp.to_string (Range (e11, e12, s1)))
+                (SingleExp.to_string e2) (RangeExp.to_string (Range (e21, e22, s2)));
+              single_subtype_error "expecting left aligned now"
+            end else
             let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
             Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
           end
@@ -915,6 +918,20 @@ module SingleSubtype = struct
           Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), s)
         | SingleSub, Range (e1, e2, s), Single e ->
           Range (SingleEntryType.eval (SingleBExp (SingleSub, e, e1)), SingleEntryType.eval (SingleBExp (SingleSub, e, e2)), s)
+        | SingleSub, Range (e11, e12, s1), Range (sub_e21, sub_e22, s2) -> begin
+          (* - Range (sub_e21, sub_e22, s2) = Range (- sub_e22, - sub_e21, s2) = Range (e21, e22, s2) *)
+          let e21 = SingleEntryType.eval (SingleBExp (SingleMul, SingleConst (-1L), sub_e22)) in
+          let e22 = SingleEntryType.eval (SingleBExp (SingleMul, SingleConst (-1L), sub_e21)) in
+          (* The below part is the same as adding two ranges. *)
+          if (Int64.to_int s1) < 0 || (Int64.to_int s2) < 0 then begin
+            Printf.printf "e1 %s\n%s\ne2 %s\n%s\n" 
+              (SingleExp.to_string e1) (RangeExp.to_string (Range (e11, e12, s1)))
+              (SingleExp.to_string e2) (RangeExp.to_string (Range (e21, e22, s2)));
+            single_subtype_error "expecting left aligned now"
+          end else
+          let new_s = Z.to_int64 (Z.gcd (Z.of_int64 s1) (Z.of_int64 s2)) in
+          Range (SingleEntryType.eval (SingleBExp (SingleAdd, e11, e21)), SingleEntryType.eval (SingleBExp (SingleAdd, e12, e22)), new_s)
+        end
         (* | SingleSub, Single e, SingleSet e_list ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleSub, e, x))) e_list)
         | SingleSub, SingleSet e_list, Single e ->
@@ -929,9 +946,10 @@ module SingleSubtype = struct
             SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
             Int64.mul c s)
           else
+            (* NOTE: We need to guarantee that all ranges we are operating on aligned ranges *)
             Range (SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e2)),
             SingleEntryType.eval (SingleBExp (SingleMul, SingleConst c, e1)),
-            Int64.mul c s)
+            Int64.mul c s |> Int64.neg)
         (* | SingleMul, Single e, SingleSet e_list
         | SingleMul, SingleSet e_list, Single e ->
           SingleSet (List.map (fun x -> SingleEntryType.eval (SingleBExp (SingleMul, e, x))) e_list) *)
@@ -941,7 +959,7 @@ module SingleSubtype = struct
           if Int64.shift_left s_sar (Int64.to_int c) = s then
             Range (SingleEntryType.eval (SingleBExp (SingleSar, e1, SingleConst c)),
               SingleEntryType.eval (SingleBExp (SingleSar, e2, SingleConst c)),
-              Int64.shift_right s (Int64.to_int c))
+              s_sar)
           else 
             Range (SingleEntryType.eval (SingleBExp (SingleSar, e1, SingleConst c)),
               SingleEntryType.eval (SingleBExp (SingleSar, e2, SingleConst c)),

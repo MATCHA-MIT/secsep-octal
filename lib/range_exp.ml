@@ -168,7 +168,7 @@ module RangeExp = struct
     match r with
     | Single e -> Single (single_eval_helper e)
     | Range (l, r, step) -> Range (single_eval_helper l, single_eval_helper r, step) (* |> canonicalize *)
-      (* NOTE: We only need canonicalize when generate a new range solution. *)
+      (* NOTE: We assume r is canonicalized, so do not need to call canonicalize here!!! eval does not change the fact that r is canonicalized. *)
     | SingleSet e_list -> SingleSet (List.map single_eval_helper e_list)
     | Top -> Top
 
