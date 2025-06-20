@@ -207,6 +207,66 @@ include SingleExpBasic
   let find_top_double (x: t list list) : bool =
     List.find_opt (fun a -> find_top a) x <> None
 
+  let get_align (align_map: (int * int64) list) (e: t) : int64 = 
+    let rec helper (e: t) : int64 =
+      match e with
+      | SingleConst num ->
+        List.find (
+          fun x -> Int64.rem num x = 0L
+        ) [256L; 128L; 64L; 32L; 16L; 8L; 4L; 2L; 1L]
+        (* if Int64.rem num 16L = 0L then 16L *)
+        (* if Int64.rem num 8L = 0L then 8L
+        else if Int64.rem num 4L = 0L then 4L
+        else if Int64.rem num 2L = 0L then 2L
+        else 1L *)
+      | SingleVar v ->
+        begin match List.find_map (fun (idx, idx_align) -> if idx = v then Some idx_align else None) align_map with
+        | Some v_align -> v_align
+        | None -> 1L
+        end
+      | SingleBExp (SingleAdd, e1, e2) | SingleBExp (SingleSub, e1, e2) ->
+        Int64.min (helper e1) (helper e2)
+      | SingleBExp (SingleMul, e1, e2) ->
+        Int64.mul (helper e1) (helper e2)
+      | SingleBExp (SingleAnd, _, SingleConst c) | SingleBExp (SingleAnd, SingleConst c, _) ->
+        helper (SingleConst (Int64.neg c))
+      | SingleITE (_, l, r) ->
+        Int64.min (helper l) (helper r)
+      | SingleTop | SingleBExp _ | SingleUExp _ -> 1L
+    in
+    helper e
+
+  let rec try_eval_div (e: t) (div: int64) : t option =
+    if div = 1L then Some e else
+    match e with
+    | SingleConst c -> 
+      if Int64.rem c div = 0L then 
+        Some (SingleConst (Int64.div c div))
+      else None
+    | SingleBExp (SingleMul, e', SingleConst c)
+    | SingleBExp (SingleMul, SingleConst c, e') ->
+      if Int64.rem c div = 0L then 
+        Some (SingleBExp (SingleMul, e', SingleConst (Int64.div c div)))
+      else None
+    | SingleBExp (bop, e1, e2) ->
+      if bop = SingleAdd || bop = SingleSub then begin
+        match try_eval_div e1 div, try_eval_div e2 div with
+        | Some e1', Some e2' -> Some (SingleBExp (bop, e1', e2'))
+        | _ -> None
+      end else None
+    | SingleITE ((cond, cond_l, cond_r), l, r) -> begin
+        match try_eval_div l div, try_eval_div r div with
+        | Some l', Some r' ->
+          Some (SingleITE ((cond, cond_l, cond_r), l', r'))
+        | _ -> None
+      end
+    | SingleTop | SingleVar _ | SingleUExp _ -> None
+
+  let is_div (e: t) (div: int64) : bool =
+    if div = 1L then true
+    else if Int64.rem (get_align [] e) div = 0L then true
+    else try_eval_div e div <> None  
+
   let convert_t (e: t list list) : t =
     let rec helper_mul (x: t list) =
       if find_top x then SingleTop
@@ -366,6 +426,16 @@ include SingleExpBasic
       | SingleConst c -> List.map (mul_const (Int64.shift_left 1L (Int64.to_int c))) ul
       | merged_r -> [ [SingleBExp (SingleSal, convert_t ul, merged_r)] ]
       end
+    | SingleBExp (SingleMod, l, r) ->
+      let l = convert_t (eval_t l) in
+      let r = convert_t (eval_t r) in
+      begin match l, r with
+      | SingleConst v1, SingleConst v2 -> [ [SingleConst (Int64.rem v1 v2)] ]
+      | _, SingleConst c ->
+        if is_div l c then [ [SingleConst 0L] ]
+        else [ [SingleBExp (SingleMod, l, r)] ]
+      | _ -> [ [SingleBExp (SingleMod, l, r)] ]
+      end
     | SingleBExp (bop, l, r) ->
       let eval_l = convert_t (eval_t l) in
       let eval_r = convert_t (eval_t r) in
@@ -436,35 +506,6 @@ include SingleExpBasic
     (* convert_t (eval_t (e)) *)
     e |> reorder_ite |> eval_t |> convert_t
 
-  let get_align (align_map: (int * int64) list) (e: t) : int64 = 
-    let rec helper (e: t) : int64 =
-      match e with
-      | SingleConst num ->
-        List.find (
-          fun x -> Int64.rem num x = 0L
-        ) [256L; 128L; 64L; 32L; 16L; 8L; 4L; 2L; 1L]
-        (* if Int64.rem num 16L = 0L then 16L *)
-        (* if Int64.rem num 8L = 0L then 8L
-        else if Int64.rem num 4L = 0L then 4L
-        else if Int64.rem num 2L = 0L then 2L
-        else 1L *)
-      | SingleVar v ->
-        begin match List.find_map (fun (idx, idx_align) -> if idx = v then Some idx_align else None) align_map with
-        | Some v_align -> v_align
-        | None -> 1L
-        end
-      | SingleBExp (SingleAdd, e1, e2) | SingleBExp (SingleSub, e1, e2) ->
-        Int64.min (helper e1) (helper e2)
-      | SingleBExp (SingleMul, e1, e2) ->
-        Int64.mul (helper e1) (helper e2)
-      | SingleBExp (SingleAnd, _, SingleConst c) | SingleBExp (SingleAnd, SingleConst c, _) ->
-        helper (SingleConst (Int64.neg c))
-      | SingleITE (_, l, r) ->
-        Int64.min (helper l) (helper r)
-      | SingleTop | SingleBExp _ | SingleUExp _ -> 1L
-    in
-    helper e  
-
   let eval_align (align_map: (int * int64) list) (e: t) : t =
     let is_and_num_align (c: int64) : bool =
       c = -2L || c = -4L || c = -8L || c = -16L
@@ -499,37 +540,6 @@ include SingleExpBasic
       | SingleTop | SingleConst _ | SingleVar _ -> e
     in
     eval (helper e)
-
-  let rec try_eval_div (e: t) (div: int64) : t option =
-    if div = 1L then Some e else
-    match e with
-    | SingleConst c -> 
-      if Int64.rem c div = 0L then 
-        Some (SingleConst (Int64.div c div))
-      else None
-    | SingleBExp (SingleMul, e', SingleConst c)
-    | SingleBExp (SingleMul, SingleConst c, e') ->
-      if Int64.rem c div = 0L then 
-        Some (SingleBExp (SingleMul, e', SingleConst (Int64.div c div)))
-      else None
-    | SingleBExp (bop, e1, e2) ->
-      if bop = SingleAdd || bop = SingleSub then begin
-        match try_eval_div e1 div, try_eval_div e2 div with
-        | Some e1', Some e2' -> Some (SingleBExp (bop, e1', e2'))
-        | _ -> None
-      end else None
-    | SingleITE ((cond, cond_l, cond_r), l, r) -> begin
-        match try_eval_div l div, try_eval_div r div with
-        | Some l', Some r' ->
-          Some (SingleITE ((cond, cond_l, cond_r), l', r'))
-        | _ -> None
-      end
-    | SingleTop | SingleVar _ | SingleUExp _ -> None
-
-  let is_div (e: t) (div: int64) : bool =
-    if div = 1L then true
-    else if Int64.rem (get_align [] e) div = 0L then true
-    else try_eval_div e div <> None
 
   let update_local_var (map: local_var_map_t) (e: t) (pc: int) : (local_var_map_t * t) =
     match e with
