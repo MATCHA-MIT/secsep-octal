@@ -48,33 +48,6 @@ module RangeExp = struct
       List.fold_left (fun acc e -> SingleExp.SingleVarSet.union acc (SingleExp.get_vars e)) SingleExp.SingleVarSet.empty e_list
     | Top -> SingleExp.SingleVarSet.empty
 
-  let canonicalize_range
-      (l: SingleExp.t) (r: SingleExp.t) (step: int64)
-      : SingleExp.t * SingleExp.t * int64 =
-    if step = 0L then
-      range_exp_error "RangeExp: step = 0";
-
-    if step > 0L then (* left aligned *)
-      (* r - (r - l) % s *)
-      let r' = SingleBExp (SingleSub, r, SingleBExp (SingleMod, SingleBExp (SingleSub, r, l), SingleConst step))
-        |> SingleExp.eval
-      in
-      (l, r', step)
-    else (* step < 0L, right aligned *)
-      let step = Int64.neg step in
-      (* l + (r - l) % s *)
-      let l' = SingleBExp (SingleAdd, l, SingleBExp (SingleMod, SingleBExp (SingleSub, r, l), SingleConst step))
-        |> SingleExp.eval
-      in
-      (l', r, step)
-  
-  let canonicalize (r: t) : t =
-    match r with
-    | Range (l, r, step) ->
-      let l, r, step = canonicalize_range l r step in
-      Range (l, r, step)
-    | _ -> r
-
   let to_string (e: t) : string =
     match e with
     | Single e -> Printf.sprintf "{%s}" (SingleExp.to_string e)
