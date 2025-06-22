@@ -1733,7 +1733,7 @@ module SingleSubtype = struct
         (smt_ctx: SmtEmitter.t) (branch_block: ArchType.t) : unit =
         update_block_smt_ctx smt_ctx tv_rel_list branch_block.useful_var;
         ArchType.add_assertions smt_ctx branch_block;
-        SingleContext.add_assertions smt_ctx (List.map (fun (x, _) -> SingleContext.Cond x) branch_block.branch_hist)
+        SingleCondType.add_assertions smt_ctx (List.map (fun (x, _) -> x) branch_block.branch_hist)
     in
     let single_subtype_list =
       List.map (
