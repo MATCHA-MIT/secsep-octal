@@ -1622,7 +1622,7 @@ module SingleSubtype = struct
                 3. Build a map, from counter block var to bound block var, where the mapping relation is found by checking supertype. *)
             let unify_bound_block_var
                 (bound: SingleExp.t) (target_pc: int) (same_block: bool) : SingleExp.t =
-              if not (is_sol_resolved tv_rel_list input_var_set bound) then SingleTop else
+              (* if not (is_sol_resolved tv_rel_list input_var_set bound) then SingleTop else *)
               if same_block || bound = SingleTop then bound else
               let bound_var_set = SingleExp.get_vars bound in
               let bound_block_var_set = IntSet.inter bound_var_set input_var_set in
