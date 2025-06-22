@@ -1340,7 +1340,7 @@ module SingleSubtype = struct
       (* <TODO> Later we need to think about whether this pattern matching is strong enough to resolve for nested loops. *)
       let find_base = 
         List.find_opt (
-          fun (x, _) -> SingleEntryType.is_val input_var_set x
+          fun (x, _) -> SingleEntryType.is_val input_var_set x && x <> SingleTop
         ) subtype_list
       in
       let find_step =
