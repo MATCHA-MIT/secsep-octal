@@ -108,7 +108,14 @@ module SingleContext = struct
       Z3.Boolean.mk_and z3_ctx (List.map (to_smt_expr ~get_var_size:get_var_size smt_ctx) c_list)
 
   let add_assertions (smt_ctx: SmtEmitter.t) (cond_list: t list) : unit =
-    SmtEmitter.add_assertions smt_ctx (List.map (to_smt_expr smt_ctx) cond_list)
+    let assert_list =
+      List.filter_map (
+        fun x ->
+          if has_top x then None
+          else Some (to_smt_expr smt_ctx x)
+      ) cond_list
+    in
+    SmtEmitter.add_assertions smt_ctx assert_list
 
   let check (is_quick: bool) (smt_ctx: SmtEmitter.t) (cond_list: t list) : SmtEmitter.sat_result_t =
 

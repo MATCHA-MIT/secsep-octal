@@ -39,7 +39,10 @@ module SingleIteEval = struct
       | SingleITE (cond, e1, e2) ->
         let s1 = collect_ite_cond e1 in
         let s2 = collect_ite_cond e2 in
-        SingleCondSet.add cond (SingleCondSet.union s1 s2)
+        let s = SingleCondSet.union s1 s2 in
+        if SingleCondType.has_top cond then s
+        else SingleCondSet.add cond s
+        (* SingleCondSet.add cond (SingleCondSet.union s1 s2) *)
       | _ -> SingleCondSet.empty
     in
     let collect_subtype_helper
