@@ -68,15 +68,15 @@ module ArchType (Entry: EntryType) = struct
   type block_subtype_t = t * (t list)
   [@@deriving sexp]
 
-  type block_subtype_label_t = Isa.label * (Isa.label list)
+  type block_subtype_label_t = (Isa.label * int) * ((Isa.label * int) list)
   [@@deriving sexp]
 
   let get_block_subtype_label (block_subtype_list: block_subtype_t list) : block_subtype_label_t list =
     List.map (
       fun (entry: block_subtype_t) ->
         let target, br_list = entry in
-        target.label,
-        List.map (fun (entry: t) -> entry.label) br_list
+        (target.label, target.pc),
+        List.map (fun (entry: t) -> entry.label, entry.pc) br_list
     ) block_subtype_list
 
   let prop_mode_to_ocaml_string (prop_mode: prop_mode_t) : string =

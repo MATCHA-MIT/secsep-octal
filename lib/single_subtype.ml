@@ -682,7 +682,7 @@ module SingleSubtype = struct
       (* (is_val_helper: SingleExp.SingleVarSet.t -> 'a -> bool) *)
       (tv_rel_list: t)
       (input_var_set: SingleExp.SingleVarSet.t)
-      (e: 'a) : bool =
+      (e: SingleExp.t) : bool =
     (* New logic: if any block var in e has any unresolved dependency, then e is not resolved. *)
     let e_block_vars = IntSet.diff (SingleExp.get_vars e) input_var_set in
     if IntSet.is_empty e_block_vars then true else
@@ -1291,11 +1291,6 @@ module SingleSubtype = struct
         (* To handle the case where exp contains resolved block vars *)
         let sub_range_opt_list = List.map (fun (x, pc_list) -> sub_sol_single_to_range_opt (fun x -> x) tv_rel_list input_var_set (x, List.hd pc_list)) subtype_list in
         let sub_range_list = List.filter_map (fun x -> x) sub_range_opt_list in
-        (* (
-          let var_idx, _ = tv_rel.var_idx in
-          if var_idx = 114 then
-            Printf.printf "sub_range_list: \n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list RangeExp.sexp_of_t sub_range_list));
-        ); *)
         if List.length sub_range_opt_list <> List.length sub_range_list then tv_rel
         else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then { tv_rel with sol = SolSimple (Top) }
         else begin
@@ -1814,7 +1809,18 @@ module SingleSubtype = struct
         let single_ite_eval = get_single_ite_eval smt_ctx tv_rel_list block_subtype in
         let new_subtype, found_new_sol = try_solve_vars tv_rel_list block_subtype single_br_inverse_map single_ite_eval input_var_set in
         if found_new_sol then helper new_subtype (num_iter - 1)
-        else update_sol_set_correlation new_subtype input_var_set
+        else begin
+          let resolved_vars = 
+            List.filter_map (
+              fun (tv_rel: type_rel) -> 
+                if is_sol_resolved new_subtype input_var_set (SingleVar (fst tv_rel.var_idx)) then
+                  Some (fst tv_rel.var_idx)
+                else None
+            ) new_subtype 
+          in
+          Printf.printf "SingleSubtype resolved vars:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int resolved_vars));
+          update_sol_set_correlation new_subtype input_var_set
+        end
       end
     in
     helper tv_rel_list num_iter

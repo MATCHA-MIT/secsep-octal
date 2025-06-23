@@ -625,6 +625,11 @@ module SingleTypeInfer = struct
         (* 1. Prop *)
         Printf.printf "\n\nInfer iter %d type_prop_all_blocks%!\n\n" curr_iter;
         let state, block_subtype = type_prop_all_blocks func_interface_list state iter_left in
+        Printf.printf "Control flow\n%s\n" (
+          block_subtype |> ArchType.get_block_subtype_label 
+          |> sexp_of_list ArchType.sexp_of_block_subtype_label_t 
+          |> Sexplib.Sexp.to_string_hum
+        );
         Printf.printf "Useful vars\n";
         ArchType.pp_arch_type_useful_var_list 0 state.func_type;
 
