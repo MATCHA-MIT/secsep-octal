@@ -373,7 +373,6 @@ module RangeSubtype = struct
         end else []
       | RangeExp _ -> []
     in
-    let sup_pc = snd tv_rel.var_idx in
     let filter_sat_sol_template 
         (acc_sol_template_list: (int * MemOffset.t) list)
         (sub_exp_pc: type_exp_t) : (int * MemOffset.t) list =
@@ -393,7 +392,7 @@ module RangeSubtype = struct
           false
       in
       SmtEmitter.push smt_ctx;
-      update_br_context_helper smt_ctx block_subtype_list sup_pc sub_pc;
+      update_br_context_helper smt_ctx block_subtype_list (snd tv_rel.var_idx) sub_pc;
       let result = List.filter test_one_sol_template acc_sol_template_list in
       SmtEmitter.pop smt_ctx 1;
       result

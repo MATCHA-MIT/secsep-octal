@@ -1266,7 +1266,6 @@ module SingleSubtype = struct
           | _ -> Some (br_pc, sol_exp)
         else None
       in
-      let sup_pc = snd tv_rel.var_idx in
       let filter_sat_sol_template
           (acc_sol_template_list: (int * SingleExp.t) list)
           (sub_exp_pc: type_pc_t) : (int * SingleExp.t) list =
@@ -1283,7 +1282,7 @@ module SingleSubtype = struct
           | _ -> false
         in
         SmtEmitter.push smt_ctx;
-        update_br_context_helper smt_ctx tv_rel_list block_subtype sup_pc sub_pc;
+        update_br_context_helper smt_ctx tv_rel_list block_subtype (snd tv_rel.var_idx) sub_pc;
         let result = List.filter test_one_sol_template acc_sol_template_list in
         SmtEmitter.pop smt_ctx 1;
         result
