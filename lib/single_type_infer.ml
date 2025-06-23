@@ -11,7 +11,6 @@ open Single_context
 open Constraint
 (* open Constraint *)
 open Func_interface
-open Single_br_inverse_map
 open Single_subtype
 open Single_input_var_cond_subtype
 open Single_block_invariance
@@ -787,9 +786,8 @@ module SingleTypeInfer = struct
         Printf.printf "\n\n%s: Infer iter %d after init single_subtype len %d %!\n\n" func_name curr_iter (List.length single_subtype);
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
-        let single_br_inverse_map = SingleBrInverseMap.init block_subtype state.input_var_set in
         let single_subtype = 
-          SingleSubtype.solve_vars state.smt_ctx single_subtype block_subtype single_br_inverse_map state.input_var_set solver_iter
+          SingleSubtype.solve_vars state.smt_ctx single_subtype block_subtype state.input_var_set solver_iter
           (* |> SingleSubtype.remove_top_subtype  *)
           (* Optimization to speedup sub_sol *)
         in

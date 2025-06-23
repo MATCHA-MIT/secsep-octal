@@ -324,15 +324,7 @@ module RangeSubtype = struct
       (smt_ctx: SmtEmitter.t)
       (block_subtype_list: ArchType.block_subtype_t list)
       (sup_pc: int) (sub_pc: int) : unit =
-    let sub_block_list = 
-      List.find_map (
-        fun (entry: ArchType.block_subtype_t) -> 
-          let sup_block, sub_list = entry in
-          if sup_block.pc = sup_pc then Some sub_list else None
-      ) block_subtype_list
-      |> Option.get
-    in
-    let sub_block = List.find (fun (block: ArchType.t) -> block.pc = sub_pc) sub_block_list in
+    let sub_block = ArchType.get_block_subtype_block block_subtype_list sup_pc sub_pc in
     SingleContext.add_assertions smt_ctx sub_block.context;
     SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
 

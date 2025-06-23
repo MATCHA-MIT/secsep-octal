@@ -6,7 +6,7 @@ open Range_exp
 open Cond_type_new
 open Single_context
 open Arch_type
-open Single_br_inverse_map
+open Arch_context_map
 open Single_ite_eval
 open Set_sexp
 open Smt_emitter
@@ -1211,12 +1211,28 @@ module SingleSubtype = struct
     in
     helper_outer tv_rel_list
 
+  let update_block_context_helper
+      (tv_rel_list: t)
+      (smt_ctx: SmtEmitter.t)
+      (branch_block: ArchType.t) : unit =
+    update_block_smt_ctx smt_ctx tv_rel_list branch_block.useful_var;
+    ArchType.add_assertions smt_ctx branch_block;
+    SingleCondType.add_assertions smt_ctx (List.map (fun (x, _) -> x) branch_block.branch_hist)
+
+  let update_br_context_helper
+      (smt_ctx: SmtEmitter.t)
+      (tv_rel_list: t)
+      (block_subtype: ArchType.block_subtype_t list)
+      (sup_pc: int) (sub_pc: int) : unit =
+    let sub_block = ArchType.get_block_subtype_block block_subtype sup_pc sub_pc in
+    update_block_context_helper tv_rel_list smt_ctx sub_block
+
   let try_solve_one_var
-      (* (smt_ctx: SmtEmitter.t) *) (* Maybe I need add_no_overflow later *)
+      (smt_ctx: SmtEmitter.t) (* Maybe I need add_no_overflow later *)
       (tv_rel: type_rel)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
-      (single_br_inverse_map: SingleBrInverseMap.t)
+      (ctx_map_map: ArchContextMap.t)
       (single_ite_eval: SingleIteEval.t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : 
       type_rel =
@@ -1227,7 +1243,67 @@ module SingleSubtype = struct
       | None -> tv_rel
     in *)
     let try_solve_single_corr (tv_rel: type_rel) : type_rel =
-      let subtype_list = (* Only keep direct subtype and repl them with inverse context var map *)
+      (* This is similar to try_solve_extra_slot in RangeSubtype *)
+      let get_context_map = ArchContextMap.get_context_map ctx_map_map in
+      let get_reverse_map = ArchContextMap.get_reverse_map ctx_map_map in
+      let guess_sol_template
+          (sub_exp_pc: type_pc_t) : (int * SingleExp.t) option =
+        let sub_exp, br_pc = sub_exp_pc in
+        let reverse_map = get_reverse_map br_pc in
+        (* Several requirements to get sol_template:
+          1. all block var in sub_exp must be mapped by reverse_map
+          2. sol template should not be top
+          3. sol template should not contain the target var (otherwise we are using the var itself to represent its sol)
+            (optimization: this will only happen when sol_exp is SingleVar var (as long as my reverse_map is built correctly)) *)
+        let known_var_set = SingleExp.get_mapped_var_set reverse_map |> IntSet.union input_var_set in
+        if SingleExp.is_val known_var_set sub_exp then
+          let sol_exp = SingleExp.repl_var reverse_map sub_exp in
+          match sol_exp with
+          | SingleTop -> None
+          | SingleVar v ->
+            if v = fst tv_rel.var_idx then None
+            else Some (br_pc, sol_exp)
+          | _ -> Some (br_pc, sol_exp)
+        else None
+      in
+      let sup_pc = snd tv_rel.var_idx in
+      let filter_sat_sol_template
+          (acc_sol_template_list: (int * SingleExp.t) list)
+          (sub_exp_pc: type_pc_t) : (int * SingleExp.t) list =
+        let sub_exp, sub_pc = sub_exp_pc in
+        let test_one_sol_template (br_sol_template: int * SingleExp.t) : bool =
+          (* if test success, return true!!! *)
+          let br_pc, sol_template = br_sol_template in (* br_pc is used to skip unnecessary tests on the same source. *)
+          if sub_pc = br_pc then true else
+          let sub_context_map = get_context_map sub_pc in
+          let sub_sol = SingleExp.repl_var sub_context_map sol_template in
+          if sub_exp = SingleTop || sub_sol = SingleTop then false else
+          match SingleCondType.check true smt_ctx [Eq, sub_sol, sub_exp] with
+          | SatYes -> true
+          | _ -> false
+        in
+        SmtEmitter.push smt_ctx;
+        update_br_context_helper smt_ctx tv_rel_list block_subtype sup_pc sub_pc;
+        let result = List.filter test_one_sol_template acc_sol_template_list in
+        SmtEmitter.pop smt_ctx 1;
+        result
+      in
+      let direct_subtype_list =
+        List.filter_map (
+          fun (e, pc_list) ->
+            match pc_list with
+            | [] -> single_subtype_error "try_solve_single_corr: get empty pc list"
+            | hd_pc :: [] -> Some (e, hd_pc)
+            | _ -> None
+        ) tv_rel.subtype_list
+      in
+      let possible_sol_template_list = List.filter_map guess_sol_template direct_subtype_list in
+      let possible_sol_template_list = List.fold_left filter_sat_sol_template possible_sol_template_list direct_subtype_list in
+      match possible_sol_template_list with
+      | [] -> tv_rel
+      | (_, hd) :: _ -> { tv_rel with sol = SolSimple (Single hd) }
+
+      (* let subtype_list = (* Only keep direct subtype and repl them with inverse context var map *)
         List.filter_map (
           fun (e, pc_list) ->
             match pc_list with
@@ -1252,7 +1328,7 @@ module SingleSubtype = struct
       in
       match sol_exp_opt with
       | None -> tv_rel
-      | Some sol_exp -> { tv_rel with sol = SolSimple (Single sol_exp)}
+      | Some sol_exp -> { tv_rel with sol = SolSimple (Single sol_exp)} *)
     in
     let try_solve_single_sub_val (tv_rel: type_rel) : type_rel =
       let subtype_list = (* remove non-input SingleVar *)
@@ -1724,12 +1800,6 @@ module SingleSubtype = struct
       (smt_ctx: SmtEmitter.t)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list) : SingleIteEval.t =
-    let update_block_smt_ctx
-        (smt_ctx: SmtEmitter.t) (branch_block: ArchType.t) : unit =
-        update_block_smt_ctx smt_ctx tv_rel_list branch_block.useful_var;
-        ArchType.add_assertions smt_ctx branch_block;
-        SingleCondType.add_assertions smt_ctx (List.map (fun (x, _) -> x) branch_block.branch_hist)
-    in
     let single_subtype_list =
       List.map (
         fun (x: type_rel) ->
@@ -1742,15 +1812,15 @@ module SingleSubtype = struct
           ) x.subtype_list
       ) tv_rel_list
     in
-    let single_ite_eval = SingleIteEval.init smt_ctx update_block_smt_ctx single_subtype_list block_subtype in
+    let single_ite_eval = SingleIteEval.init smt_ctx (update_block_context_helper tv_rel_list) single_subtype_list block_subtype in
     single_ite_eval
     (* Printf.printf "@@@ SingleIteEval Map \n%s\n" (Sexplib.Sexp.to_string_hum (SingleIteEval.sexp_of_t single_ite_eval)); *)
 
   let try_solve_vars
-      (* (smt_ctx: SmtEmitter.t) *)
+      (smt_ctx: SmtEmitter.t)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
-      (single_br_inverse_map: SingleBrInverseMap.t)
+      (ctx_map_map: ArchContextMap.t)
       (single_ite_eval: SingleIteEval.t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : t * bool =
     let new_sol_list, new_subtype = List.fold_left_map (
@@ -1781,7 +1851,7 @@ module SingleSubtype = struct
             ) tv_rel.subtype_list)
           in
           let tv_rel = { tv_rel with subtype_list = subtype_list } in
-          let tv_rel = try_solve_one_var tv_rel tv_rel_list block_subtype single_br_inverse_map single_ite_eval input_var_set in
+          let tv_rel = try_solve_one_var smt_ctx tv_rel tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set in
           if tv_rel.sol = SolNone then acc, tv_rel
           else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel
     ) [] tv_rel_list
@@ -1798,16 +1868,18 @@ module SingleSubtype = struct
       (smt_ctx: SmtEmitter.t)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t list)
-      (single_br_inverse_map: SingleBrInverseMap.t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (num_iter: int) : t =
+    Printf.printf "Before ArchContextMap.init\n%!";
+    let ctx_map_map = ArchContextMap.init input_var_set block_subtype in
+    Printf.printf "After ArchContextMap.init\n%!";
     let rec helper
         (tv_rel_list: t)
         (num_iter: int) : t =
       if num_iter = 0 then update_sol_set_correlation tv_rel_list input_var_set
       else begin
         let single_ite_eval = get_single_ite_eval smt_ctx tv_rel_list block_subtype in
-        let new_subtype, found_new_sol = try_solve_vars tv_rel_list block_subtype single_br_inverse_map single_ite_eval input_var_set in
+        let new_subtype, found_new_sol = try_solve_vars smt_ctx tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set in
         if found_new_sol then helper new_subtype (num_iter - 1)
         else begin
           let resolved_vars = 

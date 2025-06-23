@@ -79,6 +79,24 @@ module ArchType (Entry: EntryType) = struct
         List.map (fun (entry: t) -> entry.label, entry.pc) br_list
     ) block_subtype_list
 
+  let get_block_subtype_block 
+      (block_subtype_list: block_subtype_t list)
+      (sup_pc: int) (sub_pc: int) : t =
+    let sub_block_list_opt = 
+      List.find_map (
+        fun (entry: block_subtype_t) -> 
+          let sup_block, sub_list = entry in
+          if sup_block.pc = sup_pc then Some sub_list else None
+      ) block_subtype_list
+    in
+    match sub_block_list_opt with
+    | None -> arch_type_error (Printf.sprintf "cannot find target block pc %d" sup_pc)
+    | Some sub_block_list ->
+      begin match List.find_opt (fun (block: t) -> block.pc = sub_pc) sub_block_list with
+      | None -> arch_type_error (Printf.sprintf "cannot find target-sub block pc %d %d" sub_pc sup_pc)
+      | Some block -> block
+      end
+
   let prop_mode_to_ocaml_string (prop_mode: prop_mode_t) : string =
     match prop_mode with
     | TypeInferDep -> "TypeInferDep"
