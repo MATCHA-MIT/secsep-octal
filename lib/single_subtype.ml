@@ -823,14 +823,14 @@ module SingleSubtype = struct
             if RangeExp.cmp new_s s = 0 then acc, tv_rel
             else begin
               (tv_rel.var_idx, SolSimple new_s) :: acc,
-              { tv_rel with sol = SolSimple (sub_range_helper s)}
+              { tv_rel with sol = SolSimple new_s}
             end
           | SolCond (br_pc, s1, s2, s3) ->
             let new_sol: SingleSol.t = SolCond (br_pc, sub_range_helper s1, sub_range_helper s2, sub_range_helper s3) in
             if SingleSol.cmp new_sol tv_rel.sol = 0 then acc, tv_rel
             else begin
               (tv_rel.var_idx, new_sol) :: acc,
-              { tv_rel with sol = SolCond (br_pc, sub_range_helper s1, sub_range_helper s2, sub_range_helper s3)}
+              { tv_rel with sol = new_sol}
             end
       ) [] tv_rel_list
     in
@@ -1361,26 +1361,26 @@ module SingleSubtype = struct
             else (acc_checked_var_set, acc_checked_exp_set), sat_list
           | _ -> (acc_checked_var_set, acc_checked_exp_set), sat_list
         in
-        let filter_direct_subtype (exp_pc: type_pc_t) : bool =
+        let filter_todo_subtype (exp_pc: type_pc_t) : bool =
           match exp_pc with
           | SingleVar v, _ ->
             not (IntSet.mem v (fst checked_subtype_set) || SingleExpPcSet.mem exp_pc (snd checked_subtype_set))
           | _ -> not (SingleExpPcSet.mem exp_pc (snd checked_subtype_set))
           (* we only check exp_pc not in checked_subtype_set *)
         in
-        let direct_subtype_list = 
+        let todo_subtype_list = 
           get_direct_subtype_list tv_rel 
-          |> (List.filter filter_direct_subtype)
+          |> (List.filter filter_todo_subtype)
         in
-        Printf.printf "@@@var %d\nacc_checked_var_set\n%s\nacc_checked_exp_set\n%s\nsol_template_list\n%s\ndirect_subtype_list\n%s\n"
+        Printf.printf "@@@var %d\nacc_checked_var_set\n%s\nacc_checked_exp_set\n%s\nsol_template_list\n%s\ntodo_subtype_list\n%s\n"
         (fst tv_rel.var_idx)
         (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (IntSet.to_list (fst checked_subtype_set))))
         (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t (SingleExpPcSet.to_list (snd checked_subtype_set))))
         (Sexplib.Sexp.to_string_hum (sexp_of_list SingleExp.sexp_of_t sol_template_list))
-        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t direct_subtype_list));
+        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t todo_subtype_list));
         List.fold_left filter_sub_sat_sol_template 
           (checked_subtype_set, (List.mapi (fun i x -> i, x) sol_template_list)) 
-          direct_subtype_list
+          todo_subtype_list
         |> snd
       in
       let direct_subtype_list = get_direct_subtype_list tv_rel in
