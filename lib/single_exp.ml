@@ -2,6 +2,7 @@ open Isa_basic
 open Single_exp_basic
 open Smt_emitter
 open Pretty_print
+open Set_sexp
 open Sexplib.Std
 open Sexplib
 
@@ -888,3 +889,6 @@ module SingleExpSet = struct
     sexp_of_list SingleExp.sexp_of_t (elements s)
 
 end
+
+module IntSingleMap = IntMapSexp (SingleExp)
+module IntIntSingleMap = IntMapSexp (IntSingleMap)

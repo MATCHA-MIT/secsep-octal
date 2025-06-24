@@ -1321,23 +1321,26 @@ module SingleSubtype = struct
         ) tv_rel.subtype_list
       in
       let rec filter_tv_rel_sat_sol_template
-          (checked_subtype_set: IntSet.t * SingleExpPcSet.t)
-          (sol_template_list: SingleExp.t list) 
+          (checked_var_sol_map: IntIntSingleMap.t) (* this records pre-assumed var sol, similar to tmp context in in SingleBlockInvariance *)
+          (sol_template_list: IntSingleMap.t) (* sol id -> sol *)
           (tv_rel: type_rel) : 
-          (* return sol idx and sol in sol_template_list that sat by tv_rel *)
-          (* idx is always revelant to the sol_template_list and the corresponding tv_rel *)
-          (int * SingleExp.t) list =
+          (IntIntSingleMap.t) * (IntSingleMap.t) =
         let sup_var_set = List.map fst tv_rel.supertype_list |> IntSet.of_list in
         let partition_sub_sat_sol_template
-            (acc_sol_template_list: (int * SingleExp.t) list)
-            (sub_exp_pc: type_pc_t) : 
-            ((int * SingleExp.t) list) * ((int * SingleExp.t) list) =
-          let sub_exp, sub_pc = sub_exp_pc in
+            (get_sub_exp: int -> SingleExp.t) 
+            (* Two cases: 
+                (1) return sub_exp_pc; 
+                (2) when sub_exp_pc is a var with asserted solution, 
+                return its asserted solution according to the tested sol template's id *)
+            (sub_pc: int)
+            (acc_sol_template_list: IntSingleMap.t) : 
+            (IntSingleMap.t) * (IntSingleMap.t) =
           let test_one_sol_template 
               (idx_sol_template: int * SingleExp.t) : 
               (int * SingleExp.t, (int * SingleExp.t) option) Either.t =
             (* if test success, return Left sol_sempate, otherwise, return Right sub_sol !!! *)
             let sol_idx, sol_template = idx_sol_template in
+            let sub_exp = get_sub_exp sol_idx in
             let sub_context_map = get_context_map sub_pc in
             let sub_sol = SingleExp.repl_var sub_context_map sol_template in
             if sub_exp = SingleTop || sub_sol = SingleTop then 
@@ -1350,77 +1353,78 @@ module SingleSubtype = struct
           in
           SmtEmitter.push smt_ctx;
           update_br_context_helper smt_ctx tv_rel_list block_subtype (snd tv_rel.var_idx) sub_pc;
-          let sat_list, unknown_opt_list = List.partition_map test_one_sol_template acc_sol_template_list in
+          let sat_list, unknown_opt_list = List.partition_map test_one_sol_template (IntMap.to_list acc_sol_template_list) in
           SmtEmitter.pop smt_ctx 1;
-          sat_list, List.filter_map (fun x ->  x) unknown_opt_list
+          IntMap.of_list sat_list, List.filter_map (fun x ->  x) unknown_opt_list |> IntMap.of_list
         in
         let filter_sub_sat_sol_template
-            (acc: (IntSet.t * SingleExpPcSet.t) * ((int * SingleExp.t) list))
+            (acc: (IntIntSingleMap.t) * (IntSingleMap.t))
             (sub_exp_pc: type_pc_t) : 
-            ((IntSet.t * SingleExpPcSet.t)) * ((int * SingleExp.t) list) =
-          let (acc_checked_var_set, acc_checked_exp_set), acc_sol_template_list = acc in
-          if List.is_empty acc_sol_template_list then acc else
-          let acc_checked_exp_set = SingleExpPcSet.add sub_exp_pc acc_checked_exp_set in
-          (* sat_unknown_list: fst is in acc_sol_template_list's idx, snd is already in sub_exp_pc's block context *)
-          let sat_list, sat_unknown_list = partition_sub_sat_sol_template acc_sol_template_list sub_exp_pc in
-          (* if fst tv_rel.var_idx = 338 then
-            Printf.printf "@@@var 338\nacc_checked_var_set\n%s\nacc_checked_exp_set\n%s\nacc_sol_template_list\n%s\nsat_list\n%s\n"
-            (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (IntSet.to_list acc_checked_var_set)))
-            (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t (SingleExpPcSet.to_list acc_checked_exp_set)))
-            (Sexplib.Sexp.to_string_hum (sexp_of_list SingleExp.sexp_of_t (List.split acc_sol_template_list |> snd)))
-            (Sexplib.Sexp.to_string_hum (sexp_of_list SingleExp.sexp_of_t (List.split sat_list |> snd))); *)
+            (IntIntSingleMap.t) * (IntSingleMap.t) =
+          let acc_checked_var_sol_map, acc_sol_template_list = acc in
+          if IntMap.is_empty acc_sol_template_list then acc else
+          let sub_exp, sub_pc = sub_exp_pc in
+          let get_self = fun _ -> sub_exp in
           match sub_exp_pc with
           | SingleVar v, _ -> 
-            if IntSet.mem v sup_var_set then
-              let sat_unknown_list = List.filter (fun (_, x) -> x <> SingleExp.SingleTop) sat_unknown_list in
-              if List.is_empty sat_unknown_list then (acc_checked_var_set, acc_checked_exp_set), sat_list else
-              let acc_checked_var_set = IntSet.add v acc_checked_var_set in (* TODO: we may need to check all subtype??? *)
-              let sub_tv_rel = List.find (fun (tv_rel: type_rel) -> fst tv_rel.var_idx = v) tv_rel_list in
-              let sat_sub_list = 
-                filter_tv_rel_sat_sol_template 
-                  (acc_checked_var_set, acc_checked_exp_set) 
-                  (List.split sat_unknown_list |> snd) 
-                  sub_tv_rel 
-              in
-              (* sat_sub_list uses idx of sat_unknown_list *)
-              let sat_sub_idx_set = List.split sat_sub_list |> fst |> IntSet.of_list in
-              let extra_sat_idx_set = 
-                List.filteri (fun i _ -> IntSet.mem i sat_sub_idx_set) sat_unknown_list
-                |> List.split |> fst |> IntSet.of_list
-              in
-              let extra_sat_list = List.filter (fun (idx, _) -> IntSet.mem idx extra_sat_idx_set) acc_sol_template_list in
-              (acc_checked_var_set, acc_checked_exp_set), sat_list @ extra_sat_list
-            else (acc_checked_var_set, acc_checked_exp_set), sat_list
-          | _ -> (acc_checked_var_set, acc_checked_exp_set), sat_list
+            if v = fst tv_rel.var_idx || IntSet.mem v sup_var_set then begin 
+              (* We only need to break loop for var on the circular dependency chain *)
+              match IntMap.find_opt v acc_checked_var_sol_map with
+              | None -> (* Never checked v before *)
+                (* sat_unknown_list: val is already in sub_exp_pc's block context *)
+                let sat_list, sat_unknown_list = partition_sub_sat_sol_template get_self sub_pc acc_sol_template_list in
+                if IntMap.is_empty sat_unknown_list then
+                  IntMap.add v IntMap.empty acc_checked_var_sol_map, (* add v to checked list, but do not need to add any asserted sol *)
+                  sat_list
+                else
+                  let acc_checked_var_sol_map = IntMap.add v sat_unknown_list acc_checked_var_sol_map in
+                  let sub_tv_rel = List.find (fun (tv_rel: type_rel) -> fst tv_rel.var_idx = v) tv_rel_list in
+                  let acc_checked_var_sol_map, sat_sub_list = filter_tv_rel_sat_sol_template acc_checked_var_sol_map sat_unknown_list sub_tv_rel in
+                  let acc_sol_template_list =
+                    IntMap.filter (
+                      fun v _ -> IntMap.mem v sat_list || IntMap.mem v sat_sub_list
+                    ) acc_sol_template_list
+                  in
+                  acc_checked_var_sol_map, acc_sol_template_list
+              | Some sol_map -> (* Have checked/asserted v's sol before *)
+                let get_sol_or_self (sol_idx: int) : SingleExp.t =
+                  match IntMap.find_opt sol_idx sol_map with
+                  | Some sol -> sol
+                  | None -> SingleVar v
+                in
+                let sat_list, _ = partition_sub_sat_sol_template get_sol_or_self sub_pc acc_sol_template_list in
+                acc_checked_var_sol_map, sat_list
+            end else
+              let sat_list, _ = partition_sub_sat_sol_template get_self sub_pc acc_sol_template_list in
+              acc_checked_var_sol_map, sat_list
+          | _ ->
+              let sat_list, _ = partition_sub_sat_sol_template get_self sub_pc acc_sol_template_list in
+              acc_checked_var_sol_map, sat_list
         in
-        let filter_todo_subtype (exp_pc: type_pc_t) : bool = not (SingleExpPcSet.mem exp_pc (snd checked_subtype_set))
-          (* match exp_pc with
-          | SingleVar v, _ ->
-            not (IntSet.mem v (fst checked_subtype_set) || SingleExpPcSet.mem exp_pc (snd checked_subtype_set))
-          | _ -> not (SingleExpPcSet.mem exp_pc (snd checked_subtype_set)) *)
-          (* we only check exp_pc not in checked_subtype_set *)
-        in
-        let todo_subtype_list = 
-          get_direct_subtype_list tv_rel 
-          |> (List.filter filter_todo_subtype)
-        in
-        Printf.printf "@@@var %d\nacc_checked_var_set\n%s\nacc_checked_exp_set\n%s\nsol_template_list\n%s\ntodo_subtype_list\n%s\n"
+        let todo_subtype_list = get_direct_subtype_list tv_rel in
+        (* Printf.printf "@@@var %d\nacc_checked_var_sol_map\n%s\nsol_template_list\n%s\ntodo_subtype_list\n%s\n"
         (fst tv_rel.var_idx)
-        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_int (IntSet.to_list (fst checked_subtype_set))))
-        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t (SingleExpPcSet.to_list (snd checked_subtype_set))))
-        (Sexplib.Sexp.to_string_hum (sexp_of_list SingleExp.sexp_of_t sol_template_list))
-        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t todo_subtype_list));
-        List.fold_left filter_sub_sat_sol_template 
-          (checked_subtype_set, (List.mapi (fun i x -> i, x) sol_template_list)) 
-          todo_subtype_list
-        |> snd
+        (Sexplib.Sexp.to_string_hum (IntIntSingleMap.sexp_of_t checked_var_sol_map))
+        (Sexplib.Sexp.to_string_hum (IntSingleMap.sexp_of_t sol_template_list))
+        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t todo_subtype_list)); *)
+        List.fold_left filter_sub_sat_sol_template (checked_var_sol_map, sol_template_list) todo_subtype_list
       in
       let direct_subtype_list = get_direct_subtype_list tv_rel in
-      let possible_sol_template_list = List.filter_map guess_sol_template direct_subtype_list in
-      Printf.printf "###%d\n" (fst tv_rel.var_idx);
-      match filter_tv_rel_sat_sol_template (IntSet.singleton (fst tv_rel.var_idx), SingleExpPcSet.empty) possible_sol_template_list tv_rel with
-      | [] -> tv_rel
-      | (_, hd) :: _ -> 
+      let possible_sol_template_list = 
+        List.filter_map guess_sol_template direct_subtype_list
+        |> List.mapi (fun i x -> i, x)
+        |> IntMap.of_list
+      in
+      let checked_var_sol_map = IntMap.singleton (fst tv_rel.var_idx) possible_sol_template_list in
+      (* Printf.printf "###var %d\nacc_checked_var_sol_map\n%s\nsol_template_list\n%s\ntodo_subtype_list\n%s\n"
+        (fst tv_rel.var_idx)
+        (Sexplib.Sexp.to_string_hum (IntIntSingleMap.sexp_of_t checked_var_sol_map))
+        (Sexplib.Sexp.to_string_hum (IntSingleMap.sexp_of_t possible_sol_template_list))
+        (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_t direct_subtype_list)); *)
+      let _, sat_list = filter_tv_rel_sat_sol_template checked_var_sol_map possible_sol_template_list tv_rel in
+      match IntMap.choose_opt sat_list with
+      | None -> tv_rel
+      | Some (_, hd) ->
         let simp_hd = substitute_one_exp_subtype_list tv_rel_list (hd, snd tv_rel.var_idx) in
         { tv_rel with sol = SolSimple (Single simp_hd) }
 
