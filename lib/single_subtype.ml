@@ -804,20 +804,51 @@ module SingleSubtype = struct
 
   let rec update_subtype_single_sol
       (tv_rel_list: t) (idx_sol_list: (var_pc_t * SingleSol.t) list) : t =
+    let idx_sol_exp_list =
+      List.filter_map (
+        fun ((idx, _), sol) ->
+          match sol with
+          | SingleSol.SolSimple (Single e) -> Some (idx, e)
+          | _ -> None
+      ) idx_sol_list
+    in
+    let sub_exp_helper = SingleExp.repl_local_var idx_sol_exp_list in
+    let sub_range_helper = RangeExp.eval_helper sub_exp_helper in 
+    let get_sol_helper (var_pc: int * int) : SingleExp.t option =
+      let v, v_pc = var_pc in
+      match List.find_opt (fun ((x, _), _) -> x = v) idx_sol_list with
+      | None -> None
+      | Some (_, sol) -> 
+        begin match sol with
+        | SolSimple (Single e) -> Some e
+        | SolCond (pc, r_before_branch, r_taken, r_not_taken) ->
+          (* TODO: Double check this!!! *)
+          let r = if v_pc < pc then r_before_branch else if v_pc = pc then r_taken else r_not_taken in
+          begin match r with
+          | Single e -> Some e
+          | _ -> None
+          end
+        | _ -> None
+        end
+    in
+    let sub_subtype_helper (subtype: type_pc_list_t) : type_pc_list_t =
+      let exp, pc_list = subtype in
+      SingleExp.repl_local_var_general get_sol_helper (exp, List.hd pc_list),
+      pc_list
+    in
     let remain_id_sol_list, tv_rel_list =
       List.fold_left_map (
         fun (acc: (var_pc_t * SingleSol.t) list) (tv_rel: type_rel) ->
-          let tv_rel_pc = snd tv_rel.var_idx in
+          (* let tv_rel_pc = snd tv_rel.var_idx in
           let sub_exp_helper (e: SingleExp.t) : SingleExp.t =
             substitute_one_exp_single_sol_list idx_sol_list (e, [tv_rel_pc]) |> fst
-          in
-          let sub_range_helper = RangeExp.eval_helper sub_exp_helper in 
+          in *) 
           match tv_rel.sol with
           | SolNone ->
             (* let v_idx, _ = tv_rel.var_idx in
             Printf.printf "Sub for %d sol list len %d\n" v_idx (List.length idx_sol_list); *)
             acc, (* Solution is not updated, do not need add to remain id_sol_list *)
-            { tv_rel with subtype_list = List.map (substitute_one_exp_single_sol_list idx_sol_list) tv_rel.subtype_list }
+            { tv_rel with subtype_list = List.map sub_subtype_helper tv_rel.subtype_list }
           | SolSimple s -> 
             let new_s = sub_range_helper s in
             if RangeExp.cmp new_s s = 0 then acc, tv_rel

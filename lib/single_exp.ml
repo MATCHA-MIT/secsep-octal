@@ -590,6 +590,40 @@ include SingleExpBasic
   let find_local_var_map (map: local_var_map_t) (idx: int) : t option =
     List.find_map (fun (i, e) -> if i = idx then Some e else None) map
 
+  let repl_local_var_general (get_var_exp: (int * int) -> t option) (e_pc: t * int) : t =
+    (* Only applied to repl local var with block vars *)
+    (* Recursive repl; if not found, leave the var there *)
+    let e, pc = e_pc in
+    let rec repl_helper (e: t) : t =
+      match e with
+      | SingleTop | SingleConst _ -> e
+      | SingleVar v ->
+        (* if only_repl_local && v > 0 then (* input/block var *)
+           e (* Here is dirty since it will also lookup global var *)
+        else  *)
+        begin (* TODO: Double check this change!!! *)
+          match get_var_exp (v, pc) with
+          | Some (SingleVar v') -> (* Prevent infinite rec call *)
+            if v = v' then SingleVar v' else repl_helper (SingleVar v')
+          | Some e -> repl_helper e
+          | None -> e
+        end
+      | SingleBExp (bop, e1, e2) ->
+        let e1 = repl_helper e1 in
+        let e2 = repl_helper e2 in
+        eval (SingleBExp (bop, e1, e2))
+      | SingleUExp (uop, e) ->
+        let e = repl_helper e in
+        eval (SingleUExp (uop, e))
+      | SingleITE ((cond, cond_l, cond_r), then_exp, else_exp) ->
+        let cond_l = repl_helper cond_l in
+        let cond_r = repl_helper cond_r in
+        let then_exp = repl_helper then_exp in
+        let else_exp = repl_helper else_exp in
+        eval (SingleITE ((cond, cond_l, cond_r), then_exp, else_exp))
+    in
+    repl_helper e
+
   let repl_local_var (map: local_var_map_t) (e: t) : t =
     (* Only applied to repl local var with block vars *)
     (* Recursive repl; if not found, leave the var there *)
