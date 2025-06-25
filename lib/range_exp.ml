@@ -17,6 +17,13 @@ module RangeExp = struct
     | Top
   [@@deriving sexp]
 
+  let has_top (r: t) : bool =
+    match r with
+    | Single e -> e = SingleTop
+    | Range (l, r, _) -> l = SingleTop || r = SingleTop
+    | SingleSet e_list -> List.find_opt (fun e -> e = SingleExp.SingleTop) e_list <> None
+    | Top -> true
+
   let cmp (r1: t) (r2: t) : int =
     match r1, r2 with
     | Single e1, Single e2 -> SingleExp.cmp e1 e2
