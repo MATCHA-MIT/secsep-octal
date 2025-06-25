@@ -162,7 +162,7 @@ module SingleSubtype = struct
     PP.print_lvl (lvl + 1) "Supertype: [%s]\n" 
       (String.concat "; " (List.map (fun (v, pc) -> Printf.sprintf "%d,(%s)" v (Sexplib.Sexp.to_string (sexp_of_list sexp_of_int pc))) x.supertype_list));
     PP.print_lvl (lvl + 1) "Sol set: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list sexp_of_type_pc_list_t x.set_sol));
-    PP.print_lvl (lvl + 1) "Loop step pc -> base: %s\n" 
+    PP.print_lvl (lvl + 1) "Loop info: %s\n" 
       (Sexplib.Sexp.to_string_hum (sexp_of_option sexp_of_loop_info_t x.loop_info))
 
   let pp_single_subtype (lvl: int) (tv_rels: t) =
@@ -1594,10 +1594,9 @@ module SingleSubtype = struct
         ) subtype_list
       in *)
       let v_idx, v_pc = v_idx_pc in
-      let find_step_helper (sub_list: type_pc_list_t list) =
-        List.find_map (
-          fun (x_pc: type_pc_list_t) ->
-            let orig_x, pc_list = x_pc in
+      let find_step_helper (is_header_direct: bool) (sub_list: type_pc_list_t list) =
+        let get_candidate_helper (x_pc: type_pc_list_t) =
+          let orig_x, pc_list = x_pc in
           let x = SingleIteEval.eval single_ite_eval (orig_x, List.hd pc_list) in
           (* if SingleExp.cmp orig_x x <> 0 then
             Printf.printf "SingleIteEval simplify (%d) %s to %s\n" (List.hd pc_list) (SingleExp.to_string orig_x) (SingleExp.to_string x); *)
@@ -1612,7 +1611,35 @@ module SingleSubtype = struct
               else Some ((x, pc_list), v, s)
             else None
           | _ -> None
-        ) sub_list
+        in
+        if is_header_direct then
+          (List.filter_map get_candidate_helper sub_list 
+          |> List.sort (
+                fun ((_, pc_list1), _, _) ((_, pc_list2), _, _) ->
+                  Int.compare (List.hd pc_list1) (List.hd pc_list2)
+              ) 
+          |> List.nth_opt) 0
+        else
+          let direct_br_pc_step_map =
+            List.filter_map (
+              fun (tv_rel: type_rel) ->
+                Option.map (
+                  fun (loop_info: loop_info_t) -> List.hd loop_info.step_pc_list, loop_info.step_exp
+                ) tv_rel.loop_info
+            ) tv_rel_list |> IntMap.of_list
+          in
+          let find_candidate_helper ((x, pc_list), v, s) =
+            let other_step_exp = IntMap.find_opt (List.hd pc_list) direct_br_pc_step_map in
+            Option.bind other_step_exp (
+              fun other_step_exp -> 
+                if SingleExp.cmp other_step_exp x = 0 then Some ((x, pc_list), v, s)
+                else None
+            )
+          in
+          let get_indirect_candidate_helper (x_pc: type_pc_list_t) =
+            Option.bind (get_candidate_helper x_pc) find_candidate_helper
+          in
+          List.find_map get_indirect_candidate_helper sub_list
       in
       let unify_header_base_block_var
         (base: SingleExp.t) (target_pc: int) (loop_step_br_pc: int) : SingleExp.t =
@@ -1734,7 +1761,7 @@ module SingleSubtype = struct
             | _  -> false
         ) subtype_list
       in
-      match find_step_helper direct_subtype_list with
+      match find_step_helper true direct_subtype_list with
       | Some ((var_step, step_br_pc), var_idx, step) ->
         Some {
           base = find_header_base_helper direct_subtype_list (List.hd step_br_pc);
@@ -1744,7 +1771,7 @@ module SingleSubtype = struct
           step_val = step;
         }
       | None ->
-        begin match find_step_helper other_subtype_list with
+        begin match find_step_helper false other_subtype_list with
         | Some ((var_step, step_br_pc), var_idx, step) ->
           Some {
             base = find_other_base_helper (List.hd step_br_pc);
