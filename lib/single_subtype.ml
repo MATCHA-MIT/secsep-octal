@@ -1849,7 +1849,7 @@ module SingleSubtype = struct
               (* if not (is_sol_resolved tv_rel_list input_var_set bound) then SingleTop else *)
               if same_block || bound = SingleTop then bound else
               let bound_var_set = SingleExp.get_vars bound in
-              let bound_block_var_set = IntSet.inter bound_var_set input_var_set in
+              let bound_block_var_set = IntSet.diff bound_var_set input_var_set in
               if IntSet.is_empty bound_block_var_set then bound else
               let remain_bound_block_var_set, bound_context_map =
                 List.fold_left (
@@ -1858,8 +1858,8 @@ module SingleSubtype = struct
                     if v_pc = target_pc then
                       let acc_remain_var, acc_map = acc in
                       let v_super_idx_set = List.map (fun (x, _) -> x) tv_rel.supertype_list |> IntSet.of_list in
+                      let new_mapped_var = IntSet.inter acc_remain_var v_super_idx_set in (* orzzz this must be done before acc_remain_var is changed*)
                       let acc_remain_var = IntSet.diff acc_remain_var v_super_idx_set in
-                      let new_mapped_var = IntSet.inter acc_remain_var v_super_idx_set in
                       let acc_map = List.map (fun x -> (x, SingleExp.SingleVar v_idx)) (IntSet.to_list new_mapped_var) @ acc_map in
                       acc_remain_var, acc_map
                     else acc
@@ -1872,7 +1872,7 @@ module SingleSubtype = struct
             in
             let bound = unify_bound_block_var bound target_pc target_idx_branch_pc_same_block in
             if bound <> SingleTop (* && SingleEntryType.is_val input_var_set bound *) then begin
-              Printf.printf "Bound is val %s\n" (SingleExp.to_string bound);
+              Printf.printf "@@@ Var %d Bound is val %s same_block=%b\n" target_idx (SingleExp.to_string bound) target_idx_branch_pc_same_block;
               let sol = gen_self_loop_sol base bound step step_before_cmp cond_pc resume_loop_on_taken cond on_left target_idx_branch_pc_same_block in
               { tv_rel with sol = sol }
             end else begin
