@@ -3,7 +3,6 @@
 import click
 from functools import wraps
 from enum import Enum
-import argparse
 import subprocess
 from pathlib import Path
 import time
@@ -40,6 +39,7 @@ CheckPhaseDescription = """Run checker on the infer result:
     1: Check
 """
 
+
 @click.group()
 def cli():
     pass
@@ -56,10 +56,6 @@ def cli_command():
         @click.option(
             "--name",
             type=click.STRING,
-        )
-        @click.option(
-            "--input-dir",
-            type=Path,
         )
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -89,8 +85,12 @@ def run(cmd, log_file, msg):
 
 @cli_command()
 @click.option(
+    "--input-dir",
+    type=Path,
+)
+@click.option(
     "--phase",
-    nargs=2, 
+    nargs=2,
     type=click.Tuple([int, int]),
     default=(0, 3),
 )
@@ -149,7 +149,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
 @cli_command()
 @click.option(
     "--phase",
-    nargs=2, 
+    nargs=2,
     type=click.Tuple([int, int]),
     default=(0, 1),
 )
@@ -168,7 +168,7 @@ def check(name: str, phase):
             )
         elif i == CheckPhase.Check.value:
             run(
-                ["dune", "exec", "check", "--", "-name", name],\
+                ["dune", "exec", "check", "--", "-name", name],
                 output_dir / f"{name}.check.log",
                 "Running Check",
             )
@@ -186,7 +186,7 @@ def transform_helper(
         out = output_dir / f"{name}.tf{tf_suffix}.asm"
 
     arg_list = ["dune", "exec", "prog_transform", "--", "-name", name, "-out", out]
-    msg = f"Transforming program"
+    msg = "Transforming program"
     if delta is not None:
         arg_list += ["--delta", delta]
         delta_int = int(delta, 16)
@@ -203,46 +203,53 @@ def transform_helper(
 
 @cli_command()
 @click.option(
-    "--delta", # hex format
+    "--delta",  # hex format
     type=click.STRING,
 )
 @click.option(
-    "--tf-option", 
+    "--tf-option",
     is_flag=True,
 )
 @click.option(
-    "--no-push-pop", 
+    "--no-push-pop",
     is_flag=True,
 )
 @click.option(
-    "--no-call", 
+    "--no-call",
     is_flag=True,
 )
 def transform(
-    name: str, delta: str, 
+    name: str,
+    delta: str,
     tf_option: bool,
     no_push_pop: bool,
     no_call: bool,
 ):
-    delta=int(delta, 16)
-
     if tf_option is None:
-        transform_helper(name, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3")
+        transform_helper(
+            name, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3"
+        )
         transform_helper(name, delta=delta, no_call=True, tf_suffix="2")
         transform_helper(name, delta=delta, no_push_pop=True, tf_suffix="1")
         transform_helper(name, delta=delta)
     else:
         if no_push_pop:
             if no_call:
-                tf_suffix="3"
+                tf_suffix = "3"
             else:
-                tf_suffix="1"
+                tf_suffix = "1"
         else:
             if no_call:
-                tf_suffix="2"
+                tf_suffix = "2"
             else:
-                tf_suffix=""
-        transform_helper(name, delta=delta, no_push_pop=no_push_pop, no_call=no_call, tf_suffix=tf_suffix)
+                tf_suffix = ""
+        transform_helper(
+            name,
+            delta=delta,
+            no_push_pop=no_push_pop,
+            no_call=no_call,
+            tf_suffix=tf_suffix,
+        )
 
 
 if __name__ == "__main__":

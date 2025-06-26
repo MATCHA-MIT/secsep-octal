@@ -24,6 +24,8 @@ module Constraint = struct
     | CalleeUnknownContext
   [@@deriving sexp]
 
+  let string_of_t (c: t) : string = c |> sexp_of_t |> Sexplib.Sexp.to_string_hum
+
   let get_unknown (constraint_list: (t * int) list) : (MemOffset.t * int) list =
     List.filter_map (
       fun (x, pc) ->

@@ -1031,7 +1031,7 @@ module ArchType (Entry: EntryType) = struct
       (target_func_name: Isa.label)
       (orig_call_anno: CallAnno.t) : t * CallAnno.t =
     Printf.printf "type_prop_call %s pc %d%!\n" target_func_name curr_type.pc;
-    SmtEmitter.pp_smt_ctx 1 smt_ctx;
+    (* SmtEmitter.pp_smt_ctx 1 smt_ctx; *)
     (* Entry.pp_local_var 0 curr_type.local_var_map; *)
     pp_arch_type 0 curr_type;
     match FuncInterface.find_fi func_interface_list target_func_name with
@@ -1084,6 +1084,8 @@ module ArchType (Entry: EntryType) = struct
         }
       in
       let curr_type = add_offset_rsp smt_ctx sub_sol_func sub_sol_list_func is_spill_func curr_type 8L in
+      (* Printf.printf "arch type after call:\n";
+      pp_arch_type 0 curr_type; *)
       curr_type,
       call_anno
     | _ -> arch_type_error (Printf.sprintf "[type_prop_call] Func %s interface not resolved yet" target_func_name)

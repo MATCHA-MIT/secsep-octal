@@ -68,6 +68,7 @@ module TaintSubtype = struct
         (sup_block: ArchType.t)
         (subtype_list: sub_t list)
         (sub_block: ArchType.t) : sub_t list =
+      (* Printf.printf "sup block: %s(%d), sub block: %s(%d)\n" sup_block.label sup_block.pc sub_block.label sub_block.pc; *)
       let subtype_list = List.fold_left2 reg_helper_entry subtype_list sub_block.reg_type sup_block.reg_type in
       ArchType.MemType.fold_left2 mem_helper_entry subtype_list sub_block.mem_type sup_block.mem_type
     in
@@ -520,11 +521,15 @@ module TaintSubtype = struct
       taint_set, VarSet.add v untaint_set, other_set
     | TaintExp exp, TaintConst false ->
       taint_set, VarSet.union exp untaint_set, other_set
-    | _ -> taint_subtype_error "update_taint_untaint: unexpected subtype relation"
+    | _ ->
+      taint_subtype_error (
+        Printf.sprintf "update_taint_untaint: unexpected subtype relation: %s"
+        (Sexplib.Sexp.to_string_hum (TaintExp.sexp_of_sub_t sub_sup)))
 
   let combine_taint_untaint_subtype
       (taint_untaint_set: VarSet.t * VarSet.t)
       (tv_rel: type_rel_t) : VarSet.t * VarSet.t =
+    (* Printf.printf "combine_taint_untaint_subtype: %d\n" tv_rel.var_idx; *)
     let taint_set, untaint_set = taint_untaint_set in
     if VarSet.mem tv_rel.var_idx taint_set then
       (* var_idx is tainted, its sup vars are also tainted *)
@@ -548,12 +553,17 @@ module TaintSubtype = struct
       (taint_untaint_set: VarSet.t * VarSet.t)
       (tv_rel: type_rel_t) : (idx_t * TaintExp.t) * (sub_t option) =
     let taint_set, untaint_set = taint_untaint_set in
+    (* Printf.printf "taint_set: %s\n" (Sexplib.Sexp.to_string_hum (VarSet.sexp_of_t taint_set));
+    Printf.printf "untaint_set: %s\n" (Sexplib.Sexp.to_string_hum (VarSet.sexp_of_t untaint_set)); *)
     let var_idx = tv_rel.var_idx in
+    (* Printf.printf "solve_one_var: %d\n" var_idx; *)
     let is_input_var = VarSet.mem var_idx input_var in
     if VarSet.mem var_idx taint_set then
+      (* let _ = Printf.printf "var_idx %d is tainted\n" var_idx in *)
       (* (var_idx, TaintConst true),  *)
       (var_idx, TaintConst true), None
     else if VarSet.mem var_idx untaint_set then
+      (* let _ = Printf.printf "var_idx %d is untainted\n" var_idx in *)
       (* (var_idx, TaintConst false),  *)
       (var_idx, TaintConst false), None
     else

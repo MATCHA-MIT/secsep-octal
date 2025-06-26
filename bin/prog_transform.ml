@@ -31,10 +31,10 @@ let () =
   } in
 
   let taint_infer_result_fi =
-    Taint_type_infer.TaintTypeInfer.FuncInterface.fi_list_from_file (get_related_filename !program_name "out" "instantiate_interface")
+    Taint_type_infer.TaintTypeInfer.FuncInterface.fi_list_from_file (get_related_filename !program_name "out" "interface")
   in
   let taint_infer_result_states =
-    Taint_type_infer.TaintTypeInfer.state_list_from_file (get_related_filename !program_name "out" "instantiate_taint_infer")
+    Taint_type_infer.TaintTypeInfer.state_list_from_file (get_related_filename !program_name "out" "taint_infer")
   in
   let prog = Parser.Parser.prog_from_file (get_related_filename !program_name "out" "prog") in
   let tf_func_states = List.filter_map (fun (ti: Taint_type_infer.TaintTypeInfer.t) ->

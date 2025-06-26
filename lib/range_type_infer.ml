@@ -244,6 +244,7 @@ module RangeTypeInfer = struct
     let helper
         (acc: FuncInterface.t list) (entry: SingleTypeInfer.t) :
         (FuncInterface.t list) * t =
+      Printf.printf "Inferring func %s\n" entry.func_name;
       let infer_state = infer_one_func acc entry in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" infer_state.func_name;
