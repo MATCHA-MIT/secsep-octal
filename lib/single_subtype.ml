@@ -2178,7 +2178,7 @@ module SingleSubtype = struct
       List.find_map (
         fun rule ->
           let tv_rel = rule tv_rel in
-          if tv_rel.sol = SingleSol.SolNone then None
+          if SingleSol.has_top tv_rel.sol then None
           else Some tv_rel
       ) solve_rules
     in
