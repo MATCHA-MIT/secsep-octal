@@ -1613,6 +1613,9 @@ module SingleSubtype = struct
           | _ -> None
         in
         if is_header_direct then
+          (* Heuristic: when there are two x+1 directly jump back to the header, one is loop resume, the other is loop out,
+              it's likely that the one with smaller pc is the loop in and the other is loop out (for some outer loop).
+              In this case, loop out one is actually equal to the loop out value, i.e., x+n where n is #repeats of the inner loop. *)
           (List.filter_map get_candidate_helper sub_list 
           |> List.sort (
                 fun ((_, pc_list1), _, _) ((_, pc_list2), _, _) ->
@@ -2074,7 +2077,7 @@ module SingleSubtype = struct
                 gen_self_loop_sol loop_info.base bound loop_info.step_val step_before_cmp 
                   cond_pc resume_loop_on_taken cond on_left target_idx_branch_pc_same_block 
               in
-              { tv_rel with sol = sol }
+              { tv_rel with sol = sol; loop_info = Some loop_info }
             end else begin
               Printf.printf "Bound is not val %s bound %s\n" (ArchType.CondType.to_string (cond, l, r)) (SingleExp.to_string bound);
               tv_rel
@@ -2191,8 +2194,10 @@ module SingleSubtype = struct
       fun acc tv_rel ->
         if not (SingleSol.has_top tv_rel.sol) then acc, tv_rel
         else
+          (* NOTE: I eventually decide to not merge since this may get rid of some useful branch information by removing subtype with some pc history,
+              which may prevent us from find correct loop solution. *)
           (* Merge same subtype exp, keep the smaller pc which means fewer constraints from cond branch *)
-          let rec merge (last_entry: type_pc_list_t option) (sub_list: type_pc_list_t list) : type_pc_list_t list =
+          (* let rec merge (last_entry: type_pc_list_t option) (sub_list: type_pc_list_t list) : type_pc_list_t list =
             match last_entry, sub_list with
             | None, [] -> []
             | Some last, [] -> [ last ]
@@ -2216,11 +2221,12 @@ module SingleSubtype = struct
             merge None (List.sort (
               fun (e1, pc1) (e2, pc2) ->
                 let cmp_e = SingleEntryType.cmp e1 e2 in
-                if cmp_e = 0 then compare pc1 pc2
+                if cmp_e = 0 then compare (List.rev pc1) (List.rev pc2) 
+                (* if we compare tl, then we need to sort rev pc to make sure exp_pc with same exp and tl pc are next to each other *)
                 else cmp_e
             ) tv_rel.subtype_list)
           in
-          let tv_rel = { tv_rel with subtype_list = subtype_list } in
+          let tv_rel = { tv_rel with subtype_list = subtype_list } in *)
           let tv_rel = try_solve_one_var smt_ctx tv_rel tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set in
           if tv_rel.sol = SolNone then acc, tv_rel
           else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel
