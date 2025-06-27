@@ -980,7 +980,9 @@ module SingleSubtype = struct
       | SingleVar v ->
         if SingleEntryType.SingleVarSet.mem v input_var_set then Single e
         else begin match find_var_sol tv_rel_list v e_pc with
-        | Single e_sub -> helper e_sub
+        | Single e_sub -> 
+          if SingleEntryType.cmp e e_sub = 0 then Single e (* if solution is the var itself, then keep it there *)
+          else helper e_sub
         | Range (l, r, step) -> Range (l, r, step)
           (* if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
             Range (l, r, step)
