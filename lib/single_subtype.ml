@@ -983,7 +983,9 @@ module SingleSubtype = struct
         | Single e_sub -> 
           if SingleEntryType.cmp e e_sub = 0 then Single e (* if solution is the var itself, then keep it there *)
           else helper e_sub
-        | Range (l, r, step) -> Range (l, r, step)
+        | Range (l, r, step) -> 
+          if l = SingleTop || r = SingleTop then Top
+          else Range (l, r, step)
           (* if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
             Range (l, r, step)
           else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step)))) *)
@@ -1360,10 +1362,10 @@ module SingleSubtype = struct
           let sol_exp = SingleExp.repl_var reverse_map sub_exp in
           match sol_exp with
           | SingleTop -> None
-          | SingleVar v ->
-            if v = fst tv_rel.var_idx then None
+          | _ -> (* Prevent solution exp contain self, otherwise there would be circular dependency in solution repl *)
+            let sol_exp_var_set = SingleExp.get_vars sol_exp in
+            if IntSet.mem (fst tv_rel.var_idx) sol_exp_var_set then None
             else Some sol_exp
-          | _ -> Some sol_exp
         else None
       in
       let get_direct_subtype_list (tv_rel: type_rel) : type_pc_t list =
@@ -2273,6 +2275,7 @@ module SingleSubtype = struct
       (num_iter: int) : t =
     Printf.printf "Before ArchContextMap.init\n%!";
     let ctx_map_map = ArchContextMap.init input_var_set block_subtype in
+    (* Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map)); *)
     Printf.printf "After ArchContextMap.init\n%!";
     let rec helper
         (tv_rel_list: t)
