@@ -788,7 +788,11 @@ include SingleExpBasic
       let left_ptr = filter_single_var l in
       let right_ptr = filter_single_var r in
       SingleVarSet.union left_ptr right_ptr
-    | SingleTop | SingleConst _ | SingleBExp _ | SingleUExp _ | SingleITE _ -> SingleVarSet.empty
+    | SingleITE (_, l, r) ->
+      let left_ptr = filter_single_var l in
+      let right_ptr = filter_single_var r in
+      SingleVarSet.inter left_ptr right_ptr 
+    | SingleTop | SingleConst _ | SingleBExp _ | SingleUExp _ -> SingleVarSet.empty
 
   let find_base (e: t) (ptr_set: SingleVarSet.t) : IsaBasic.imm_var_id option =
     let p_set = filter_single_var e in
