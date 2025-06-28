@@ -1097,7 +1097,23 @@ module SingleSubtype = struct
           Top (* TODO: maybe need to handle more cases here *)
         end
       | SingleUExp _ -> Top
-      | SingleITE _ -> Top
+      | SingleITE (cond, e1, e2) ->
+        begin match helper e1, helper e2 with
+        | Single e1, Single e2 -> Single (SingleITE (cond, e1, e2))
+        | Single e, Range (e1, e2, s) ->
+          Range (SingleITE (cond, e, e1), SingleITE (cond, e, e2), s)
+        | Range (e1, e2, s), Single e ->
+          Range (SingleITE (cond, e1, e), SingleITE (cond, e2, e), s)
+        | Range (l1, r1, s1), Range (l2, r2, s2) ->
+          if s1 = s2 then
+            Range (SingleITE (cond, l1, l2), SingleITE (cond, r1, r2), s1)
+          else Top
+        | Single e, SingleSet e_list ->
+          SingleSet (List.map (fun x -> SingleExp.SingleITE (cond, e, x)) e_list)
+        | SingleSet e_list, Single e ->
+          SingleSet (List.map (fun x -> SingleExp.SingleITE (cond, x, e)) e_list)
+        | _ -> Top
+        end
       in
       (* NOTE: We only need canonicalize when generate a new range solution. *)
       (* RangeExp.canonicalize result *)
