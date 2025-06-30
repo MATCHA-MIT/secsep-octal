@@ -58,6 +58,18 @@ loop2:
 ```
 In this example, we need to first solve `i`, and then solve `k`. However, our current rule does not allow us to solve `i` in the inner loop before its boundary `k` is resolved.
 
+### Scale: Default Taint
+* taint annotation: `@taint[0/1/?]`
+* For memory slots:
+  * stack slots: always `? (i.e. taint var)`; no way to specify
+  * others: default is `tainted`; specify with `@taint`
+* For registers:
+  * `rsp`: always `untainted`; no way to specify
+  * `rdi, rsi, rdx, rcx, r8, r9`:
+    * as data: default is `tainted`; specify with `@taint`
+    * as pointer: always `untainted`; no way to specify
+  * Other registers: default is `?`; specify with `@taint`
+
 
 ### NOTE
 1. We assume no block start with conditional branches (which will make some pc-dependent substitution incorrect in single_subtype)
