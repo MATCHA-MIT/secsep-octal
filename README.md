@@ -2,6 +2,49 @@
 
 # Type Inference
 
+## Benchmarks
+We list benchmarks and how we adjusted them for our experiments.
+We need to annotate two things:
+
+1. Function interface
+2. Special structs on the stack that needs to be splitted.
+
+### salsa20
+1.Call with variable length to prevent the compiler from doing some length-dependent optimization.
+
+### sha512
+1. Additionally initialize `sha512_state_st.p` to make range infer easier (should eventually revert this change).
+
+### ed25519
+1. Currently we only have sign, no verify (due to declassification)
+2. Added noinline to specific functions to make infer and check work.
+
+### chacha20
+
+### poly1305
+1. Original bench has goto -> we replaced it with loops and function calls
+2. It passes a pointer to an array and later cast the array pointer to a struct with secret and public data.
+3. Current main function only call with specific length, which is not good.
+4. Need to fix the main function.
+
+### x25519
+
+### djbsort
+1. Still need extra data structures: introduce extra block variables to represent variables passed from previous blocks that cannot be represented as single exp
+2. Still need to handle shift right and left (multiply by 2) on loop counter.
+
+### kyber
+
+### rsa
+
+### p256
+
+
+### TODO
+1. We need to improve mem_type and scale's annotation to specify may-overlap relation between array and specific fields of struct.
+2. We need to check whether each benchmark function is called in a proper way to make sure that the performance numbers make sense.
+3. Structs on stack is not annotated properly, which causes the main function of poly1305 to fail.
+
 ## Dep Type Infer
 
 Technique details worth documenting:
@@ -71,8 +114,15 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
   * Other registers: default is `?`; specify with `@taint`
 
 
+### Why do we want to sub sol even though we already have smt solver?
+1. The goal is to enable easy pattern matching.
+2. For SingleITE, we somehow do not directly do pattern matching with its condition, so we rely on SMT solver to evaluate the condition and only simplify its left and right expression.
+
+
 ### NOTE
-1. We assume no block start with conditional branches (which will make some pc-dependent substitution incorrect in single_subtype)
+1. We assume no block start witH branches 
+    1. When we cannot find sub block with sub/sup pc, and sub_pc=sup_pc, we know it is the case that single subtype generate subtype in the same block context after call
+    2. If block starts with conditional branches, it will make some pc-dependent substitution incorrect in single_subtype
 2. We do not merge subtype with different pc_list
 3. Since we substitute subtype solution, when finding var map across blocks, it is better to use supertype (e.g., when unifying base and bound).
 4. Solution contains SingleTop (tmp solution to break circular dependency) should be considered as unresolved as SolNone.
@@ -93,9 +143,12 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
 12. Replace many loop structure with map for faster lookup (e.g., type_rel list).
 13. Subtype exp might be eventually simplified to block var, which make try_solve_single_sub_val ignore this subtype -> FIX this!!!
 14. We need to clean up subsitute in SingleSubtype to add recursive replacement!
-15. Consider to remove merge_set_sol
+15. Consider to remove merge_set_sol (no, we cannot remove unless we finish the next todo: apply try_solve_single_corr for var with set sol)
 16. We should probably still apply try_solve_single_corr for var with set sol (otherwise if set sol rule is applied first, there might be problems for us to find loop base)
 17. Find step -> can skip if step already found
+18. SingleInvarianceInfer: find loop/non loop can use information extracted from loop info of new tv_rel!
+19. Single infer does not need to generate range/taint constraints.
+20. Need to be careful about check for top before any call to smt solver! Need to clean up code. Sometimes we may need the check, sometimes we may not.
 
 
 
@@ -108,3 +161,11 @@ loop:
     i+=4
     jmp to loop if i < n
 ```
+
+
+# Daily Task
+
+## June 30
+1. Fix memory layout of structures on stack - split them when needed
+2. Finish updating memory overlappings structure for poly1305
+3. Analyze problems of current range infer for chacha20, make a plan
