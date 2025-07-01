@@ -82,20 +82,22 @@ module ArchType (Entry: EntryType) = struct
   let get_block_subtype_block 
       (block_subtype_list: block_subtype_t list)
       (sup_pc: int) (sub_pc: int) : t =
-    let sub_block_list_opt = 
+    let sup_block_sub_block_list_opt = 
       List.find_map (
         fun (entry: block_subtype_t) -> 
           let sup_block, sub_list = entry in
-          if sup_block.pc = sup_pc then Some sub_list else None
+          if sup_block.pc = sup_pc then Some (sup_block, sub_list) else None
       ) block_subtype_list
     in
-    match sub_block_list_opt with
+    match sup_block_sub_block_list_opt with
     | None -> arch_type_error (Printf.sprintf "cannot find target block pc %d" sup_pc)
-    | Some sub_block_list ->
-      begin match List.find_opt (fun (block: t) -> block.pc = sub_pc) sub_block_list with
-      | None -> arch_type_error (Printf.sprintf "cannot find target-sub block pc %d %d" sub_pc sup_pc)
-      | Some block -> block
-      end
+    | Some (sup_block, sub_block_list) ->
+      if sub_pc = sup_pc then sup_block (* We may also need to find sup block (for single infer, when sub and sup are from the same block)! *)
+      else
+        begin match List.find_opt (fun (block: t) -> block.pc = sub_pc) sub_block_list with
+        | None -> arch_type_error (Printf.sprintf "cannot find target-sub block pc %d %d" sub_pc sup_pc)
+        | Some block -> block
+        end
 
   let prop_mode_to_ocaml_string (prop_mode: prop_mode_t) : string =
     match prop_mode with
@@ -1181,7 +1183,9 @@ module ArchType (Entry: EntryType) = struct
       List.find_map (
         fun (sup, sub_list) ->
           if sup.pc = target_pc then
-            List.find_opt (fun sub -> sub.pc = br_pc) sub_list
+            (* We may also need to find sup block (for single infer, when sub and sup are from the same block)! *)
+            if target_pc = br_pc then Some sup
+            else List.find_opt (fun sub -> sub.pc = br_pc) sub_list
           else None
       ) block_subtype_list
     in
