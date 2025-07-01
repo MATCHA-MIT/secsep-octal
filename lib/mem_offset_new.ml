@@ -57,6 +57,9 @@ module MemOffset = struct
     let l, r = e in
     Printf.sprintf "(%s, %s)" (SingleExp.to_ocaml_string l) (SingleExp.to_ocaml_string r)
 
+  let has_top (e: t) : bool =
+    fst e = SingleTop || snd e = SingleTop
+
   (* Syntatically cmp *)
   let cmp (o1: t) (o2: t) : int =
     let l1, r1 = o1 in
@@ -240,7 +243,7 @@ module MemOffset = struct
               (to_string new_o) (to_string hd_o);
           let full_cmp_result = offset_quick_cmp smt_ctx new_o hd_o CmpAll in 
           Printf.printf "full cmp result %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_off_rel_t full_cmp_result));
-          SmtEmitter.pp_smt_ctx 0 smt_ctx;
+          (* SmtEmitter.pp_smt_ctx 0 smt_ctx; *)
           (hd_o, hd_updated) :: tl, false
           (* mem_offset_error 
             (Printf.sprintf "insert_one_offset fail compare new offset %s with known offset %s" 
@@ -290,6 +293,7 @@ module MemOffset = struct
 
   let diff (smt_ctx: SmtEmitter.t) (o: t) (ro_list: t list) : t list =
     (* o - ro_list *)
+    if List.find_opt (fun (x: t) -> has_top x) (o :: ro_list) <> None then [ o ] else
     if is_empty smt_ctx o then [] else
     let remain_list, remain_off =
       List.fold_left (
