@@ -205,9 +205,12 @@ let get_model (smt_ctx: t) : Model.model option =
           | SingleNot -> BitVector.mk_not z3_ctx e
         end
       | SingleITE ((cond, cond_l_se, cond_r_se), then_se, else_se) ->
-        let cond_l = helper cond_l_se in
-        let cond_r = helper cond_r_se in
-        let ite_cond = expr_of_ite_cond z3_ctx cond cond_l cond_r in
+        let ite_cond = 
+          if cond_l_se = SingleTop || cond_r_se = SingleTop then 
+            Expr.mk_fresh_const z3_ctx "itetop" (Boolean.mk_sort z3_ctx)
+          else
+            expr_of_ite_cond z3_ctx cond (helper cond_l_se) (helper cond_r_se) 
+        in
         let then_exp = helper then_se in
         let else_exp = helper else_se in
         Boolean.mk_ite z3_ctx ite_cond then_exp else_exp
