@@ -23,6 +23,6 @@ let () =
   in
 
   (* 3. Infer *)
-  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p func_input_list general_interface_list 6 10 in
+  let single_infer_result = Single_type_infer.SingleTypeInfer.infer p func_input_list general_interface_list 6 20 in
   Single_type_infer.SingleTypeInfer.state_list_to_file (get_related_filename !program_name "out" "single_infer") single_infer_result
   (* Main functionality here *)
