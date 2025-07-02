@@ -149,7 +149,8 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
 18. SingleInvarianceInfer: find loop/non loop can use information extracted from loop info of new tv_rel!
 19. Single infer does not need to generate range/taint constraints.
 20. Need to be careful about check for top before any call to smt solver! Need to clean up code. Sometimes we may need the check, sometimes we may not.
-
+21. get_branch_cond also only need for the header var (an optimization in single infer)
+22. Infer invariance from bwd prop needs to improve how we decide whether to exclude a cond from the assertion or not (loop or not judgement).
 
 
 16. Add test bench:
