@@ -94,7 +94,11 @@ def run(cmd, log_file, msg):
     type=click.Tuple([int, int]),
     default=(0, 3),
 )
-def infer(name: str, input_dir: Path, phase):
+@click.option(
+    "--use-cache",
+    is_flag=True
+)
+def infer(name: str, input_dir: Path, phase, use_cache):
     output_dir = proj_dir / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
@@ -117,8 +121,11 @@ def infer(name: str, input_dir: Path, phase):
                 "Running Preprocess Input",
             )
         elif i == InferPhase.SingleTypeInfer.value:
+            command = ["dune", "exec", "infer_single", "--", "-name", name]
+            if use_cache:
+                command.append("-use-cache")
             run(
-                ["dune", "exec", "infer_single", "--", "-name", name],
+                command,
                 output_dir / f"{name}.single_infer.log",
                 "Running Single Type Infer",
             )

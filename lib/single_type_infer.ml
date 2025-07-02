@@ -923,8 +923,9 @@ module SingleTypeInfer = struct
       (prog: Isa.prog)
       (func_input_list: FuncInput.entry_t list) (* this should already contain global symbols *)
       (general_func_interface_list: FuncInterfaceConverter.TaintFuncInterface.t list)
+      (cached_func_interface_list: FuncInterface.t list)
       (iter: int)
-      (solver_iter: int) : t list =
+      (solver_iter: int) : (FuncInterface.t list) * (t list) =
     let helper 
         (acc: FuncInterface.t list) (entry: FuncInput.entry_t) :
         (FuncInterface.t list) * t =
@@ -972,11 +973,17 @@ module SingleTypeInfer = struct
     Printf.printf "%d\n" (List.length func_input_list);
     Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list FuncInput.MemType.sexp_of_t (List.map (fun (x: FuncInput.entry_t) -> x.mem_type) func_input_list)));
 
-    let _, infer_result = List.fold_left_map helper general_func_interface_list func_input_list in
+    let infer_func_name_set =
+      List.map (fun (x: FuncInput.entry_t) -> x.func_name) func_input_list |> StringSet.of_list
+    in
+    let cached_func_interface_list =
+      List.filter (fun (x: FuncInterface.t) -> not (StringSet.mem x.func_name infer_func_name_set)) cached_func_interface_list
+    in
+
+    List.fold_left_map helper (cached_func_interface_list @ general_func_interface_list) func_input_list
     (* let buf = Buffer.create 1000 in
     pp_ocaml_infer_result 0 buf infer_result;
     Printf.printf "let %s_single_infer_state : SingleTypeInfer.t list =\n" prog_name;
     Printf.printf "%s" (String.of_bytes (Buffer.to_bytes buf)); *)
-    infer_result
 
 end
