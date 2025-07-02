@@ -57,7 +57,7 @@ module RangeExp = struct
 
   let to_string (e: t) : string =
     match e with
-    | Single e -> Printf.sprintf "{%s}" (SingleExp.to_string e)
+    | Single e -> Printf.sprintf "%s" (SingleExp.to_string e)
     | Range (a, b, step) -> Printf.sprintf "[%s, %s] step=%Ld" (SingleExp.to_string a) (SingleExp.to_string b) step
     | SingleSet e_list ->
       let str_list = List.map SingleExp.to_string e_list in

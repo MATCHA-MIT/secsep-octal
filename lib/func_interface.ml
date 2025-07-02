@@ -552,6 +552,7 @@ module FuncInterface (Entry: EntryType) = struct
           else [Constraint.CalleeContext simp_context], context_useful_var
         | Right unsat_cond ->
           let unsat_cond_expr = SingleContext.to_smt_expr smt_ctx unsat_cond in
+          Printf.printf "c_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (child_context)));
           Printf.printf "p_context\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t (List.map fst p_context)));
           Printf.printf "unsat cond\n%s\n%s\n" (Sexplib.Sexp.to_string_hum (SingleContext.sexp_of_t unsat_cond)) (Z3.Expr.to_string unsat_cond_expr);
           (* (

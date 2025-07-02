@@ -176,7 +176,7 @@ module SingleBlockInvariance = struct
     let target_label, br_block_list = block_input in
     let target_block = ArchType.get_arch_type func_type target_label in
     Printf.printf "Solve Block %s%!\n" target_label;
-    if List.length target_block.tmp_context = 0 then begin
+    if List.is_empty target_block.tmp_context then begin
       Printf.printf "Block %s resolved, skip\n" target_label;
       func_type
     (* end else if IsaBasic.is_label_function_entry target_block.label then begin
@@ -184,7 +184,7 @@ module SingleBlockInvariance = struct
       func_type *)
     end else begin
       if IsaBasic.is_label_function_entry target_block.label then begin
-        (if List.length br_block_list > 0 then
+        (if not (List.is_empty br_block_list) then
           single_block_invariance_error "Function input block has other input\n"
         else
           Printf.printf "Func entry %s, add tmp_context to context tmp_context\n%s\n" target_label (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t target_block.tmp_context)));

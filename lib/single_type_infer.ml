@@ -629,7 +629,7 @@ module SingleTypeInfer = struct
           |> sexp_of_list ArchType.sexp_of_block_subtype_label_t 
           |> Sexplib.Sexp.to_string_hum
         );
-        Printf.printf "Useful vars\n";
+        Printf.printf "Useful vars\n%!";
         ArchType.pp_arch_type_useful_var_list 0 state.func_type;
 
         (* Get alive blocks *)
@@ -958,11 +958,14 @@ module SingleTypeInfer = struct
         "x25519_ge_p1p1_to_p3";
         "x25519_ge_p1p1_to_p2";
         "x25519_ge_scalarmult_base"; *)
-        "SHA512_Init";
+        (* "SHA512_Init";
         "sha512_block_data_order";
         "SHA512_Final";
         "SHA512_Update";
-        "SHA512";
+        "SHA512"; *)
+        "poly1305_donna_mul";
+        "poly1305_update";
+        "CRYPTO_poly1305_update";
       ] 
     in *)
 

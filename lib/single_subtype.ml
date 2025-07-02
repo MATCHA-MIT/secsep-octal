@@ -906,6 +906,13 @@ module SingleSubtype = struct
             let new_s = sub_range_helper s in
             if RangeExp.cmp new_s s = 0 then acc, tv_rel
             else begin
+              (* Why I simplify here instead of in sub_range_helper: it seems that simplify in sub_range_helper will cause some infinite loop... Need to look into this later. *)
+              (* Also we do not rely on this to find set sol corr, so it is fine to merge. *)
+              let new_s =
+                match new_s with
+                | SingleSet e_list ->  RangeExp.SingleSet (SingleExpSet.of_list e_list |> SingleExpSet.to_list)
+                | _ -> new_s
+              in
               (tv_rel.var_idx, SolSimple new_s) :: acc,
               { tv_rel with sol = SolSimple new_s}
             end

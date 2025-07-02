@@ -149,10 +149,10 @@ include SingleExpBasic
     | SingleTop, _ -> -1
     | SingleConst _, SingleTop -> 1
     | SingleConst c1, SingleConst c2 ->
-      if c1 = c2 then 0 else if c1 > c2 then 1 else -1
+      Int64.compare c1 c2
     | SingleConst _, _ -> -1
     | SingleVar v1, SingleVar v2 -> 
-      if v1 = v2 then 0 else if v1 > v2 then 1 else -1
+      Int.compare v1 v2
     | SingleVar _, SingleConst _ -> 1
     | SingleVar _, _ -> -1
     | SingleBExp (bop1, l1, r1), SingleBExp (bop2, l2, r2) -> 
@@ -388,6 +388,20 @@ include SingleExpBasic
       in *)
       List.fold_left helper e1 e2
 
+  let try_eval_cond (cond: CondTypeBase.t) (l: t) (r: t) : bool option =
+    match l, r with
+    | SingleConst l, SingleConst r ->
+      begin match cond with
+      | Eq -> l = r
+      | Ne -> l <> r
+      | Le -> l <= r
+      | Lt -> l < r
+      | Be -> l <= r
+      | Bt -> l < r
+      end
+      |> Option.some
+    | _ -> None
+
   let rec eval_t (e: t) : t list list =
     match e with
     | SingleBExp (_, SingleTop, _)
@@ -469,7 +483,17 @@ include SingleExpBasic
     | SingleUExp (uop, l) ->
       [ [SingleUExp (uop, convert_t (eval_t l))] ]
     | SingleITE ((cond, cl, cr), l, r) ->
-      [ [SingleITE ((cond, cl |> eval_t |> convert_t, cr |> eval_t |> convert_t), l |> eval_t |> convert_t, r |> eval_t |> convert_t)] ]
+      let cl = cl |> eval_t |> convert_t in
+      let cr = cr |> eval_t |> convert_t in
+      let l = l |> eval_t |> convert_t in
+      let r = r |> eval_t |> convert_t in
+      begin match try_eval_cond cond cl cr with
+      | Some b ->
+        [[ if b then l else r ]]
+      | None ->
+        [[ SingleITE ((cond, cl, cr), l, r) ]]
+      end
+      (* [ [SingleITE ((cond, cl |> eval_t |> convert_t, cr |> eval_t |> convert_t), l |> eval_t |> convert_t, r |> eval_t |> convert_t)] ] *)
     | SingleTop | SingleConst _ | SingleVar _ -> [ [e] ]
 
   let rec reorder_ite (e: t) : t =
