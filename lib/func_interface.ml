@@ -1,4 +1,5 @@
 open Isa_basic
+open Set_sexp
 open Ptr_info
 open Single_exp
 open Taint_exp
@@ -283,50 +284,59 @@ module FuncInterface (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (* (local_var_map: SingleExp.local_var_map_t) *)
       (var_map_set: var_map_set_t)
-      (parent_entry: (MemOffset.t * MemRange.t * entry_t) list)
+      (parent_entry: (int * (entry_t MemType.mem_slot)) list) (* parent mem: idx, mem slot*)
       (read_hint: read_hint_t list)
-      (write_mem_can_write: bool)
-      (write_mem: (MemOffset.t * MemRange.t * entry_t) list) :
-      ((MemOffset.t * MemRange.t * entry_t) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
+      (* (write_mem_can_write: bool) *)
+      (write_mem: (bool * (entry_t MemType.mem_slot)) list) (* callee out mem: permission, mem slot *) :
+      IntSet.t * ((entry_t MemType.mem_slot) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
     let rec helper
-        (finished_parent_entry: (MemOffset.t * MemRange.t * entry_t) list)
+        (write_parent_slot_idx_set: IntSet.t)
+        (finished_parent_entry: (entry_t MemType.mem_slot) list)
         (constraint_list: Constraint.t list)
         (useful_vars: SingleExp.SingleVarSet.t)
-        (parent_entry: (MemOffset.t * MemRange.t * entry_t) list)
+        (parent_entry: (int * (entry_t MemType.mem_slot)) list)
         (read_hint: read_hint_t list)
-        (write_mem: (MemOffset.t * MemRange.t * entry_t) list) :
-        ((MemOffset.t * MemRange.t * entry_t) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
+        (write_mem: (bool * (entry_t MemType.mem_slot)) list) :
+        IntSet.t * ((entry_t MemType.mem_slot) list) * (Constraint.t list) * SingleExp.SingleVarSet.t =
+        (* write_parent_slot_idx_set, parent slots after call, constraints, useful_vars *)
       match parent_entry, read_hint, write_mem with
-      | _, [], [] -> (List.rev parent_entry) @ finished_parent_entry, constraint_list, useful_vars
+      | _, [], [] -> write_parent_slot_idx_set, (List.split parent_entry |> snd |> List.rev) @ finished_parent_entry, constraint_list, useful_vars
       | _, (Untrans _) :: read_hint, _ :: write_mem ->
-        helper finished_parent_entry ((Unknown (SingleTop, SingleTop)) :: constraint_list) useful_vars parent_entry read_hint write_mem
+        helper write_parent_slot_idx_set finished_parent_entry ((Unknown (SingleTop, SingleTop)) :: constraint_list) useful_vars parent_entry read_hint write_mem
       | _, (Unmapped off) :: read_hint, _ :: write_mem ->
-        helper finished_parent_entry ((Unknown off) :: constraint_list) useful_vars parent_entry read_hint write_mem
-      | (p_off, p_range, p_entry) :: parent_entry_tl,
+        helper write_parent_slot_idx_set finished_parent_entry ((Unknown off) :: constraint_list) useful_vars parent_entry read_hint write_mem
+      | (p_idx, (p_off, p_range, p_entry)) :: parent_entry_tl,
         (Mapped (_, mp_off, is_full, m_in_range, c_in_entry)) :: read_hint_tl,
-        write_entry :: write_mem_tl ->
+        (write_mem_can_write, write_entry) :: write_mem_tl ->
         if MemOffset.cmp p_off mp_off = 0 then
           let new_entry, new_constraints, new_useful_vars = 
             set_one_entry smt_ctx var_map_set (p_off, p_range, p_entry) (is_full, m_in_range, c_in_entry) write_mem_can_write write_entry 
           in
+          let write_parent_slot_idx_set =
+            if write_mem_can_write then IntSet.add p_idx write_parent_slot_idx_set else write_parent_slot_idx_set
+          in
           if is_full then
             helper 
+              write_parent_slot_idx_set
               (new_entry :: finished_parent_entry) 
               (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) 
               parent_entry_tl 
               read_hint_tl write_mem_tl
           else
             helper 
+              write_parent_slot_idx_set
               finished_parent_entry 
               (new_constraints @ constraint_list) (SingleExp.SingleVarSet.union useful_vars new_useful_vars) 
-              (new_entry :: parent_entry_tl) 
+              ((p_idx, new_entry) :: parent_entry_tl) 
               read_hint_tl write_mem_tl
         else
-          helper ((p_off, p_range, p_entry) :: finished_parent_entry) constraint_list useful_vars parent_entry_tl read_hint write_mem
+          helper write_parent_slot_idx_set ((p_off, p_range, p_entry) :: finished_parent_entry) constraint_list useful_vars parent_entry_tl read_hint write_mem
       | _ -> func_interface_error "write_one_ptr_entries: unexpected case"
     in
-    let rev_parent_entry, constraints, useful_vars = helper [] [] SingleExp.SingleVarSet.empty parent_entry read_hint write_mem in
-    List.rev rev_parent_entry, constraints, useful_vars
+    let write_parent_slot_idx_set, rev_parent_entry, constraints, useful_vars = 
+      helper IntSet.empty [] [] SingleExp.SingleVarSet.empty parent_entry read_hint write_mem 
+    in
+    write_parent_slot_idx_set, List.rev rev_parent_entry, constraints, useful_vars
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -347,7 +357,7 @@ module FuncInterface (Entry: EntryType) = struct
       let p_mem, constraint_list, acc_useful_vars = acc in
       let (ptr, _), read_hint = read_hint_entry in
       let (ptr2, write_ptr_info), write_mem = write_mem_entry in
-      let callee_write_mem_can_write = PtrInfo.can_write_info write_ptr_info in
+      (* let callee_write_mem_can_write = PtrInfo.can_write_info write_ptr_info in *)
       if ptr = ptr2 then (* both ptr and ptr2 refer to ptr under child context *)
         if SingleExp.SingleVarSet.mem ptr single_var_set then
           let p_base = SingleExp.repl_context_var single_var_map (SingleVar ptr) in
@@ -357,25 +367,33 @@ module FuncInterface (Entry: EntryType) = struct
             | Some p_ptr ->
               let find_result =
                 List.find_map (
-                  fun ((x, p_ptr_info), part_mem) ->
+                  fun ((x, _), part_mem) ->
                     if x = p_ptr then
-                      if callee_write_mem_can_write && not (PtrInfo.can_write_info p_ptr_info) then
+                      (* if callee_write_mem_can_write && not (PtrInfo.can_write_info p_ptr_info) then
                         func_interface_error (Printf.sprintf "Child want to write not writable parent mem with ptr %d" p_ptr)
-                      else
-                        Some (set_part_mem smt_ctx var_map_set part_mem read_hint callee_write_mem_can_write write_mem)
+                      else *)
+                      let idx_part_mem = List.mapi (fun i x -> i, x) part_mem in
+                      let permission_write_mem = PtrInfo.assoc_write_permission_info write_ptr_info write_mem in
+                      Some (set_part_mem smt_ctx var_map_set idx_part_mem read_hint permission_write_mem)
                     else None
                 ) p_mem
               in
               begin match find_result with
-              | Some (new_part_mem, new_constraints, new_useful_vars) ->
+              | Some (write_parent_slot_idx_set, new_part_mem, new_constraints, new_useful_vars) ->
+                (* (1) check write permission in parent context; (2) invalidate on write *)
                 List.map (
                   fun ((x, x_info), part_mem) -> 
-                    if x = p_ptr then (x, x_info), new_part_mem 
+                    if x = p_ptr then 
+                      if not (PtrInfo.can_write_slot_set_info write_parent_slot_idx_set x_info) then
+                        func_interface_error (Printf.sprintf "Child want to write not writable parent mem with ptr %d slot set %s" p_ptr (Sexplib.Sexp.to_string_hum (IntSet.sexp_of_t write_parent_slot_idx_set)))
+                      else
+                        (x, x_info), new_part_mem 
                     else
-                      if callee_write_mem_can_write then
+                      PtrInfo.invalidate_on_write_slot_set p_ptr write_parent_slot_idx_set (x, x_info), part_mem
+                      (* if callee_write_mem_can_write then
                         PtrInfo.invalidate_on_write p_ptr (x, x_info), part_mem
                       else
-                        (x, x_info), part_mem
+                        (x, x_info), part_mem *)
                 ) p_mem, 
                 new_constraints @ constraint_list,
                 SingleExp.SingleVarSet.union acc_useful_vars new_useful_vars

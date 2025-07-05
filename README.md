@@ -38,6 +38,8 @@ We need to annotate two things:
 ### rsa
 
 ### p256
+1. It seems that we might be able to infer this one without being worreid about group?
+2. We still need to correctly annotate memory for `group->order.N.d` (it's a dynamically allocated memory).
 
 
 ### TODO
@@ -151,6 +153,9 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
 20. Need to be careful about check for top before any call to smt solver! Need to clean up code. Sometimes we may need the check, sometimes we may not.
 21. get_branch_cond also only need for the header var (an optimization in single infer)
 22. Infer invariance from bwd prop needs to improve how we decide whether to exclude a cond from the assertion or not (loop or not judgement).
+23. Consider add slot idx to FullMemAnno
+24. How to handle declassification?
+25. How to handle pointer in branch condition (used in proof)?
 
 
 16. Add test bench:
@@ -164,9 +169,37 @@ loop:
 ```
 
 
+# Type Check
+
+## Dep Type Check
+
+### Func call
+What do we need to do to update mem content + permission?
+
+
 # Daily Task
 
 ## June 30
-1. Fix memory layout of structures on stack - split them when needed
-2. Finish updating memory overlappings structure for poly1305
+1. Fix memory layout of structures on stack - split them when needed (done)
+
+
+## July 2
+1. Finish updating memory overlappings structure for poly1305 
+    1. Update memory type read/write, check whether I cover all cases
+    2. Update memory type read/write in checker
+2. Single infer, buf_used has some problem
+
+## July 3
+1. Continue updating memory overlappings structure for poly1305 (infer part is done)
+
+
+## July 4
+1. Continue updating memory overlappings structure for poly1305 (check) 
+    1. Copy non overlap logic (2:00 - 2:40)
+    2. Mem read write permission check and invalidate 
+    2. PtrInfo subtype check
+
+## July 5
+1. Test new non-overlap impl! 
+2. Error when call with `poly1305_update(state, in - todo, todo);` -> need debug!
 3. Analyze problems of current range infer for chacha20, make a plan

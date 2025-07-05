@@ -376,46 +376,96 @@ module MemType = struct
     let ptr_info, (off, forget_type, range, entry) = get_single_slot mem slot_info in
     ptr_info, (off, forget_type, range, entry)
 
-  let get_mem_boundary_list 
-      (mem_type: t) : (PtrInfo.t * MemOffset.t) list =
-    let helper 
-        (part_mem: 'a mem_part) :
-        (PtrInfo.t * MemOffset.t) option =
-      let ptr_info, offset_list = part_mem in
-      match offset_list with
-      | [] -> None
-      | ((l, r), _, _, _) :: [] ->
-        Some (ptr_info, (l, r))
-      | ((l, _), _, _, _) :: tl ->
-        let (_, r), _, _, _ = List.nth tl ((List.length tl) - 1) in
-        Some (ptr_info, (l, r))
-    in
-    List.filter_map helper mem_type
-
   let check_non_overlap
       (smt_ctx: SmtEmitter.t)
       (mem: 'a mem_content) : bool =
+    (* The following logic is copied from infer's get_mem_non_overlap_constraint *)
     let ctx, _ = smt_ctx in
-    let rec get_mem_non_overlap_constraint_helper
-        (acc: DepType.exp_t list)
-        (boundary_list: (PtrInfo.t * MemOffset.t) list) :
-        DepType.exp_t list =
-      match boundary_list with
-      | [] -> acc
-      | ((_, (hd_overlap_set, _, _)), (hd_l, hd_r)) :: tl ->
-        let acc = get_mem_non_overlap_constraint_helper acc tl in
-        List.fold_left (
-            fun (acc: DepType.exp_t list) ((ptr, _), (l, r)) ->
-              if IntSet.mem ptr hd_overlap_set then acc
-              else 
-                (Boolean.mk_or ctx [
-                  (BitVector.mk_sle ctx hd_r l);
-                  (BitVector.mk_sle ctx r hd_l);
-                ]) :: acc
-          ) acc tl
+    let get_off_list_begin_end (slot_list: 'a mem_slot list) : MemOffset.t =
+      match slot_list with
+      | [] -> mem_type_error "get empty slot list"
+      | (hd, _, _, _) :: [] -> hd
+      | ((l, _), _, _, _) :: tl ->
+        let (_, r), _, _, _ = List.nth tl ((List.length tl) - 1) in
+        l, r
     in
-    let boundary_list = get_mem_boundary_list mem in
-    let constraint_list = get_mem_non_overlap_constraint_helper [] boundary_list in
+    let get_two_off_non_overlap_constraint
+        (off1: MemOffset.t) (off2: MemOffset.t) :
+        DepType.exp_t =
+      let l1, r1 = off1 in
+      let l2, r2 = off2 in
+      Boolean.mk_or ctx [
+        (BitVector.mk_sle ctx r1 l2);
+        (BitVector.mk_sle ctx r2 l1);
+      ]
+    in
+    let get_part_mem_non_overlap_constraint_helper
+        (mem1: MemOffset.t)
+        (overlap_info_map: PtrInfo.InfoMap.t)
+        (ptr2: int)
+        (mem2: 'a mem_slot list) : DepType.exp_t list =
+      let add_to_list_if_not_none
+          (x: 'b option) (other: 'b list) : 'b list =
+        match x with
+        | None ->  other
+        | Some x -> x :: other
+      in
+      match PtrInfo.InfoMap.find_opt ptr2 overlap_info_map with
+      | None -> (* all slots in mem2 should not be overlapped with mem1 *)
+        [ get_two_off_non_overlap_constraint mem1 (get_off_list_begin_end mem2) ]
+      | Some All -> [] (* all slots in mem2 are overlapped with mem1 *)
+      | Some (SlotSet overlap_slot_set) ->
+        let _, curr_group_opt, mem2_non_overlap_list =
+          List.fold_left (
+            fun (acc: int * (MemOffset.t option) * (MemOffset.t list)) (slot: 'a mem_slot) ->
+              let idx, curr_group_opt, acc_list = acc in
+              let off, _, _, _ = slot in
+              if IntSet.mem idx overlap_slot_set then
+                (idx + 1, None, add_to_list_if_not_none curr_group_opt acc_list)
+              else
+                (idx + 1, Option.fold ~none:(Some off) ~some:(fun curr_group -> Some (fst curr_group, snd off)) curr_group_opt, acc_list)
+              (* match curr_group_opt with
+              | None -> 
+                if IntSet.mem idx overlap_slot_set then
+                  idx + 1, None, acc_list
+                else
+                  idx + 1, Some off, acc_list
+              | Some curr_group ->
+                if IntSet.mem idx overlap_slot_set then
+                  idx + 1, None, curr_group :: acc_list
+                else
+                  idx + 1, Some (fst curr_group, snd off), acc_list *)
+          ) (0, None, []) mem2
+      in
+      let mem2_non_overlap_list = add_to_list_if_not_none curr_group_opt mem2_non_overlap_list in
+      List.map (get_two_off_non_overlap_constraint mem1) mem2_non_overlap_list
+    in
+    let get_part_mem_non_overlap_constraint
+        (mem1: 'a mem_part) (mem2: 'a mem_part) : DepType.exp_t list =
+      let ((ptr1, info1), slot_list1) = mem1 in
+      let ((ptr2, info2), slot_list2) = mem2 in
+      match info1, info2 with
+      | Unified (overlap_info_map1, _, _), _ ->
+        get_part_mem_non_overlap_constraint_helper (get_off_list_begin_end slot_list1) overlap_info_map1 ptr2 slot_list2
+      | _, Unified (overlap_info_map2, _, _) ->
+        get_part_mem_non_overlap_constraint_helper (get_off_list_begin_end slot_list2) overlap_info_map2 ptr1 slot_list1
+      | Separate info_list1, _ ->
+        List.map2 (
+          fun (overlap_info_map1, _, _) (off, _, _, _) ->
+            get_part_mem_non_overlap_constraint_helper off overlap_info_map1 ptr2 slot_list2
+        ) info_list1 slot_list1 |> List.concat
+    in
+    let rec get_mem_non_overlap_constraint 
+        (mem_type: t) : DepType.exp_t list =
+      (* get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type) *)
+      match mem_type with
+      | [] -> []
+      | hd :: tl ->
+        get_mem_non_overlap_constraint tl @
+        (List.concat_map (get_part_mem_non_overlap_constraint hd) tl)
+    in
+
+    let constraint_list = get_mem_non_overlap_constraint mem in
 
     (* Printf.printf "check_non_overlap: constraint list:\n";
     List.iter (fun x -> Printf.printf "\t%s\n" (Expr.to_string x)) constraint_list;
@@ -500,13 +550,11 @@ module MemType = struct
     List.fold_left2 (
       fun (acc: bool) (sub: entry_t mem_part) (sup: entry_t mem_part) ->
         if not acc then acc else
-        let (sub_ptr, (sub_might_overlap, sub_read, sub_write)), sub_part_mem = sub in
-        let (sup_ptr, (sup_might_overlap, sup_read, sup_write)), sup_part_mem = sup in
+        let (sub_ptr, sub_info), sub_part_mem = sub in
+        let (sup_ptr, sup_info), sup_part_mem = sup in
         sub_ptr = sup_ptr &&
-        sub_might_overlap = sup_might_overlap &&
-        (* for permission: target (sup) is the subtype of current (sub) *)
-        imply_helper sup_read sub_read &&
-        imply_helper sup_write sub_write &&
+        PtrInfo.check_subtype_info false sub_info sup_info && 
+        (* (1) might overlap map is checked to be the same; (2) permission is checked to satisfy target (sup) => current (sup) *)
         List.fold_left2 (
           fun (acc: bool * int) (sub_slot: entry_t mem_slot) (sup_slot: entry_t mem_slot) ->
             let acc_check, slot_idx = acc in
@@ -522,20 +570,26 @@ module MemType = struct
       (mem_type: 'a mem_content)
       (mem_map: MemAnno.slot_t mem_content) :
       'a mem_content =
+    (* In this function, we only guarantee the returned info has correct read/write permission, but may have unreasonable might_overlap_map!!! *)
     List.map (
       fun (_, part_mem_map) ->
-        let ptr_info_opt, new_part_mem =
+        let ptr_info_opt, new_slot_info_part_mem =
           List.fold_left_map (
             fun (acc: PtrInfo.t option) (_, _, _, slot_info) ->
-              let curr_ptr_info, new_slot = get_single_slot_with_info mem_type slot_info in
+              let (curr_ptr, curr_ptr_info), new_slot = get_single_slot_with_info mem_type slot_info in
+              let _, slot_idx, _, _ = slot_info in
+              let slot_one_info = PtrInfo.get_nth_slot_one_info curr_ptr_info slot_idx in
               match acc with
-              | None -> Some curr_ptr_info, new_slot
+              | None -> Some (curr_ptr, curr_ptr_info), (slot_one_info, new_slot)
               | Some (acc_ptr, _) ->
-                if acc_ptr = fst curr_ptr_info then acc, new_slot
+                if acc_ptr = curr_ptr then acc, (slot_one_info, new_slot)
                 else mem_type_error "apply_mem_map corresponding ptr of slots in one part_mem do not match"
           ) None part_mem_map
         in
-        Option.get ptr_info_opt, new_part_mem
+        let slot_info_list, new_part_mem = List.split new_slot_info_part_mem in
+        let ptr, orig_ptr_info (* info before map, contain info for all slots *) = Option.get ptr_info_opt in
+        (ptr, PtrInfo.group_slot_one_info orig_ptr_info slot_info_list), new_part_mem
+        (* Option.get ptr_info_opt, new_part_mem *)
     ) mem_map
 
   let check_subtype_map
@@ -570,11 +624,10 @@ module MemType = struct
     List.fold_left2 (
       fun (acc: bool) (sub: entry_t mem_part) (sup: entry_t mem_part) ->
         if not acc then acc else
-        let (_, (_, sub_read, sub_write)), sub_part_mem = sub in
-        let (_, (_, sup_read, sup_write)), sup_part_mem = sup in
-        (* for permission: target (sup) is the subtype of current (sub) *)
-        let check_imp1 = imply_helper sup_read sub_read in
-        let check_imp2 = imply_helper sup_write sub_write in
+        let (_, sub_info), sub_part_mem = sub in
+        let (_, sup_info), sup_part_mem = sup in
+        (* We only check permission is checked to satisfy target (sup) => current (sup) *)
+        let check_imp = PtrInfo.check_subtype_info true sub_info sup_info in
         let check_mem = List.fold_left2 (
           fun (acc_check: bool) 
               (sub_slot: entry_t mem_slot)
@@ -587,7 +640,7 @@ module MemType = struct
         ) true sub_part_mem sup_part_mem
         in
         (* Printf.printf "check_subtype_map: ptr %d check_imp1 %b, check_imp2 %b, check_mem %b\n" (fst (fst sub)) check_imp1 check_imp2 check_mem; *)
-        check_imp1 && check_imp2 && check_mem
+        check_imp && check_mem
     ) true sub_map_m_type sup_m_type
 
   let check_subtype
@@ -731,7 +784,8 @@ module MemType = struct
        2. get entry with slot; 
        3. check add_off *)
     let ptr_info, part_mem = find_part_mem_helper mem_type slot_info in
-    if not (PtrInfo.can_read ptr_info) then begin
+    let _, slot_idx, _, slot_num = slot_info in (* ptr = slot_ptr *)
+    if not (PtrInfo.can_read_slot_range slot_idx slot_num ptr_info) then begin
       Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
         (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
       None
@@ -883,7 +937,8 @@ module MemType = struct
        2. update entry and all read/write permission; 
        3. check slot_info, taint constraint *)
     let (ptr, ptr_info), part_mem = find_part_mem_helper mem_type slot_info in
-    if not (PtrInfo.can_write_info ptr_info) then begin
+    let _, slot_idx, _, slot_num = slot_info in (* ptr = slot_ptr *)
+    if not (PtrInfo.can_write_slot_range_info slot_idx slot_num ptr_info) then begin
       Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
         (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
       None
@@ -895,7 +950,7 @@ module MemType = struct
         let new_mem_type = List.map (
           fun ((p, p_info), p_part_mem) ->
             if p = ptr then (p, p_info), new_part_mem
-            else PtrInfo.invalidate_on_write ptr (p, p_info), p_part_mem
+            else PtrInfo.invalidate_on_write_slot_range ptr slot_idx slot_num (p, p_info), p_part_mem
         ) mem_type in
         (* Printf.printf "mem before:\n%s\nmem_after:\n%s\n"
           (Sexplib.Sexp.to_string_hum (sexp_of_t mem_type))
@@ -961,9 +1016,14 @@ module MemType = struct
       | None -> None
       | Some _ ->
         let update_ptr_info, update_slot_list = update_part_mem in
-        if PtrInfo.can_write update_ptr_info then begin
+        let _, slot_map_list = part_mem_map in
+        (* Filter write entries *) 
+        let update_slot_list = PtrInfo.filter_write_permission update_ptr_info update_slot_list in
+        let slot_map_list = PtrInfo.filter_write_permission update_ptr_info slot_map_list in
+        List.fold_left2 inner_helper acc update_slot_list slot_map_list
+        (* if PtrInfo.can_write update_ptr_info then begin
           List.fold_left2 inner_helper acc update_slot_list (snd part_mem_map)
-        end else acc
+        end else acc *)
     in
     (*
     Printf.printf "parent_mem_type: %s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t mem_type));

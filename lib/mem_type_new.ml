@@ -410,20 +410,21 @@ module MemType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (s_off: MemOffset.t)
       (part_mem: entry_t mem_slot list) :
-      (MemOffset.t * MemRange.t * entry_t) option  * int * (Constraint.t list) =
+      (MemOffset.t * MemRange.t * entry_t) option  * (int * int) * (Constraint.t list) =
     let s_left, s_right = s_off in
-    let rec get_slot_helper (slot_list: entry_t mem_slot list) (left: SingleExp.t) : entry_t mem_slot list =
+    let rec get_slot_helper (slot_list: entry_t mem_slot list) (left: SingleExp.t) : int * (entry_t mem_slot list) =
       match slot_list with
-      | [] -> []
+      | [] -> 0, []
       | ((hd_l, hd_r), hd_range, hd_entry) :: tl ->
         (* let hd_entry = if is_full then hd_entry else Entry.mem_partial_read_val hd_entry in *)
         if SingleExp.cmp left hd_l = 0 then
           if SingleExp.cmp s_right hd_r = 0 then
-            [ ((hd_l, hd_r), hd_range, hd_entry) ]
+            0, [ ((hd_l, hd_r), hd_range, hd_entry) ]
           else
-            ((hd_l, hd_r), hd_range, hd_entry) :: (get_slot_helper tl hd_r)
+            0, ((hd_l, hd_r), hd_range, hd_entry) :: (snd (get_slot_helper tl hd_r))
         else 
-          get_slot_helper tl left
+          let start_idx, slots = get_slot_helper tl left in
+          start_idx + 1, slots
     in
     let check_slots (slot_list: entry_t mem_slot list) : bool =
       match slot_list with
@@ -451,11 +452,11 @@ module MemType (Entry: EntryType) = struct
         in
         (s_off, merged_range, merged_entry), slot_taint_same_cons
     in
-    let slots = get_slot_helper part_mem s_left in
-    if not (check_slots slots) then None, 0, [] (* No slots found, so use 0 for placeholder *)
+    let start_idx, slots = get_slot_helper part_mem s_left in
+    if not (check_slots slots) then None, (0, 0), [] (* No slots found, so use 0 for placeholder *)
     else
     let slot, cons = merge_slot_helper slots in
-    Some slot, List.length slots, cons
+    Some slot, (start_idx, List.length slots), cons
 
   let get_part_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -463,20 +464,20 @@ module MemType (Entry: EntryType) = struct
       (part_mem: (MemOffset.t * MemRange.t * entry_t) list)
       (orig_addr_off: MemOffset.t)
       (simp_addr_off: MemOffset.t) :
-      (bool * (MemOffset.t * MemRange.t * entry_t)) option =
-    List.find_map (
-      fun (off, range, entry) ->
+      (int * bool * (MemOffset.t * MemRange.t * entry_t)) option =
+    List.find_mapi (
+      fun i (off, range, entry) ->
         match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpSubset with
         | Subset ->
           (* Note: here we compare read range with s-alloc since s-valid (init range) is not ready in single infer.
              The typing rule actually consider reading full s-valid as full read. *)
           begin match MemOffset.offset_full_cmp smt_ctx orig_addr_off off CmpEqSubset with
-          | Eq -> Some (true, (off, range, entry)) (* full read *)
+          | Eq -> Some (i, true, (off, range, entry)) (* full read *)
           | Subset -> 
-            if is_spill_func off then Some (false, (off, range, entry)) (* although not equal to s-alloc, but spill should be equal to s-valid *)
+            if is_spill_func off then Some (i, false, (off, range, entry)) (* although not equal to s-alloc, but spill should be equal to s-valid *)
             else
             (* Printf.printf "get_part_mem_type access off %s and convert off %s type %s to top\n" (MemOffset.to_string addr_offset) (MemOffset.to_string off) (Entry.to_string entry); *)
-            Some (false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
+            Some (i, false, (off, range, Entry.mem_partial_read_val entry)) (* not full read *)
           | _ -> 
             SmtEmitter.pp_smt_ctx 1 smt_ctx;
             Printf.printf "orig_addr_off\n%s\n" (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t orig_addr_off));
@@ -531,15 +532,22 @@ module MemType (Entry: EntryType) = struct
       if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
       else 
         let ptr_info, part_mem = get_part_mem mem b_l in
-        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
-        else
+        (* if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
+        else *)
         begin match get_part_mem_type smt_ctx (is_spill_func b_l) part_mem orig_addr_off simp_addr_off with
-        | Some (is_full, find_entry) -> Some (is_full, b_l, find_entry, 1, [])
+        | Some (entry_idx, is_full, find_entry) -> 
+          if not (PtrInfo.can_read entry_idx ptr_info) then 
+            mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d" b_l entry_idx)
+          else
+            Some (is_full, b_l, find_entry, 1, [])
         | None -> (* Decide whether we want to try get_mult_slot_part_mem_type *)
           if try_mult_slot_lookup && enable_mult_slot_lookup smt_ctx b_l orig_addr_off simp_addr_off then begin
             match get_mult_slot_part_mem_type smt_ctx simp_addr_off part_mem with
-            | Some slot, find_num_slot, cons_list ->
-              Some (true, b_l, slot, find_num_slot, cons_list)
+            | Some slot, (fst_slot_idx, find_num_slot), cons_list ->
+              if not (PtrInfo.can_read_slot_range fst_slot_idx find_num_slot ptr_info) then
+                mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d slot_num %d" b_l fst_slot_idx find_num_slot)
+              else
+                Some (true, b_l, slot, find_num_slot, cons_list)
             | _ -> None
           end else None
         end
@@ -562,10 +570,15 @@ module MemType (Entry: EntryType) = struct
         len_cmp
       ) reformed_mem |> List.map (fun (x, y, _, _) -> (x, y))
       in
+      (* TODO: Also check permission here!!! *)
       List.find_map (
-        fun ((ptr, _), part_mem) -> 
+        fun ((ptr, ptr_info), part_mem) -> 
           match get_part_mem_type smt_ctx (is_spill_func ptr) part_mem orig_addr_off simp_addr_off with
-          | Some (is_full, find_entry) -> Some (is_full, ptr, find_entry, 1, [])
+          | Some (entry_idx, is_full, find_entry) -> 
+            if not (PtrInfo.can_read_info entry_idx ptr_info) then 
+              mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d" ptr entry_idx)
+            else
+              Some (is_full, ptr, find_entry, 1, [])
           | None -> None
       ) sorted_mem
     in
@@ -591,14 +604,16 @@ module MemType (Entry: EntryType) = struct
       match List.find_opt (fun ((ptr, _), _) -> ptr = s_ptr) mem with
       | None -> mem_type_error (Printf.sprintf "Cannot get slot at %s" (MemAnno.slot_to_string (Some slot_info)))
       | Some (ptr_info, part_mem) ->
-        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
-        else
+        (* if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
+        else *)
         if num_slot = 1 then
           let lookup =
-            List.find_map (
-              fun (off, range, entry) ->
+            List.find_mapi (
+              fun slot_idx (off, range, entry) ->
                 if MemOffset.cmp off s_off = 0 then
-                  if is_full then Some ((off, range, entry), [])
+                  if not (PtrInfo.can_read slot_idx ptr_info) then
+                    mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d" s_ptr slot_idx)
+                  else if is_full then Some ((off, range, entry), [])
                   else if is_spill_func s_ptr off then Some ((off, range, entry), [Constraint.RangeEq (orig_addr_off, range)])
                   else Some ((off, range, Entry.mem_partial_read_val entry), [])
                 else None
@@ -611,8 +626,10 @@ module MemType (Entry: EntryType) = struct
         else if not is_full then mem_type_error "get_slot_mem_type: get multiple slot is not full" 
         else
           match get_mult_slot_part_mem_type smt_ctx s_off part_mem with
-          | Some slot, find_num_slot, cons_list ->
-            if num_slot = find_num_slot then slot, cons_list, true
+          | Some slot, (fst_slot_idx, find_num_slot), cons_list ->
+            if not (PtrInfo.can_read_slot_range fst_slot_idx find_num_slot ptr_info) then
+              mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d slot_num %d" s_ptr fst_slot_idx find_num_slot)
+            else if num_slot = find_num_slot then slot, cons_list, true
             else mem_type_error "get_slot_mem_type: get multiple slot has invalid number of slots"
           | None, _, _ -> mem_type_error "get_slot_mem_type: get multiple slot cannot find match slots"
 
@@ -624,14 +641,14 @@ module MemType (Entry: EntryType) = struct
       MemOffset.t option =
     let get_heuristic_part_mem_with_addr
         (part_mem: (MemOffset.t * 'a * 'b) list) 
-        (addr: SingleExp.t) (is_addr_left: bool) : MemOffset.t option =
+        (addr: SingleExp.t) (is_addr_left: bool) : (int * MemOffset.t) option =
       let cmp_op = if is_addr_left then CondTypeBase.Lt else CondTypeBase.Le in
-      List.find_map (
-        fun (entry: MemOffset.t * 'a * 'b) ->
+      List.find_mapi (
+        fun idx (entry: MemOffset.t * 'a * 'b) ->
           let off, _, _ = entry in
           let _, off_r = off in
           if SingleCondType.check true smt_ctx [ cmp_op, addr, off_r ] = SatYes then
-            Some off
+            Some (idx, off)
           else None
       ) part_mem
     in
@@ -680,14 +697,21 @@ module MemType (Entry: EntryType) = struct
       if b_l <> b_r (* || b_l = IsaBasic.rsp_idx *) then None
       else
         let ptr_info, part_mem = get_part_mem mem b_l in
-        if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
-        else
+        (* if not (PtrInfo.can_read ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" b_l)
+        else *)
         begin match part_mem with
-        | [ target_offset, _, _] -> Some target_offset
+        | [ target_offset, _, _] -> 
+          if not (PtrInfo.can_read 0 ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d" b_l 0)
+          else Some target_offset
         | _ -> 
           let is_left, chosen_addr_var_set = choose_left_right addr_off in
           let other_zero_chosen_addr = get_heuristic_addr b_l addr_off is_left chosen_addr_var_set in
-          get_heuristic_part_mem_with_addr part_mem other_zero_chosen_addr is_left
+          begin match get_heuristic_part_mem_with_addr part_mem other_zero_chosen_addr is_left with
+          | Some (slot_idx, off) ->
+            if not (PtrInfo.can_read slot_idx ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d" b_l slot_idx)
+            else Some off
+          | None -> None
+          end
         end
     | _ -> None
 
@@ -835,7 +859,7 @@ module MemType (Entry: EntryType) = struct
       (* (orig_addr_off: MemOffset.t) *) (* We check the slot correctness outside, so orig_addr_off is useless here *)
       (* (slot_info: MemAnno.slot_t) *)
       (new_val: entry_t) :
-      (entry_t mem_slot list * (Constraint.t list) * FullMemAnno.slot_t) option =
+      (entry_t mem_slot list * (Constraint.t list) * (int * int) * FullMemAnno.slot_t) option =
     let s_left, s_right = s_off in
     (* let s_ptr, (s_left, s_right), is_full, num_slot = slot_info in *)
     (* let is_shared_mem = is_shared_mem_full_cmp smt_ctx s_ptr (s_left, s_right) in *)
@@ -891,7 +915,10 @@ module MemType (Entry: EntryType) = struct
       let part_mem, constraint_list_list =
         List.map2 update_helper part_mem update_idx_list |> List.split
       in
-      Some (part_mem, List.concat constraint_list_list, (s_ptr, s_off, true, num_slot))
+      (* update_idx_list has the following format: None, None, ..., Some 0, Some 1, ... Some num_slot - 1, None, None, ...
+          We can derive idx of the first slot to be updated from it *)
+      let fst_slot_idx = List.find_index Option.is_some update_idx_list |> Option.get in
+      Some (part_mem, List.concat constraint_list_list, (fst_slot_idx, num_slot), (s_ptr, s_off, true, num_slot))
 
   let set_part_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -902,14 +929,14 @@ module MemType (Entry: EntryType) = struct
       (orig_addr_off: MemOffset.t)
       (simp_addr_off: MemOffset.t)
       (new_val: entry_t) :
-      ((MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) * FullMemAnno.slot_t) option =
+      ((MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) * int * FullMemAnno.slot_t) option =
     let helper
-        (acc: (FullMemAnno.slot_t option) * (Constraint.t list)) 
+        (acc: int * (FullMemAnno.slot_t option) * (Constraint.t list)) 
         (entry: MemOffset.t * MemRange.t * entry_t) :
-        ((FullMemAnno.slot_t option) * (Constraint.t list)) * (MemOffset.t * MemRange.t * entry_t) =
+        (int * (FullMemAnno.slot_t option) * (Constraint.t list)) * (MemOffset.t * MemRange.t * entry_t) =
       match acc with
-      | Some _, _ -> acc, entry
-      | None, cons ->
+      | _, Some _, _ -> acc, entry (* we do not update idx after we already found the entry*)
+      | idx, None, cons ->
         let off, range, entry_val = entry in
         begin match MemOffset.offset_quick_cmp smt_ctx simp_addr_off off CmpSubset with
         | Subset ->
@@ -917,27 +944,27 @@ module MemType (Entry: EntryType) = struct
           | Eq -> 
             let new_range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if not (is_spill_func ptr off) then
-              (Some (ptr, off, true, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, new_val)
+              (idx, Some (ptr, off, true, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, new_val)
             else
-              (Some (ptr, off, true, 1), cons), (off, new_range, new_val)
+              (idx, Some (ptr, off, true, 1), cons), (off, new_range, new_val)
           | Subset -> 
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
             if is_spill_func ptr off then begin
               let new_range: MemRange.t = RangeConst [orig_addr_off] in
-              (Some (ptr, off, false, 1), cons), (off, new_range, new_val)
+              (idx, Some (ptr, off, false, 1), cons), (off, new_range, new_val)
             end else begin
               (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
               let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range |> fst else range in
-              (Some (ptr, off, false, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, Entry.mem_partial_write_val entry_val new_val)
+              (idx, Some (ptr, off, false, 1), (Entry.get_eq_taint_constraint entry_val new_val) @ cons), (off, new_range, Entry.mem_partial_write_val entry_val new_val)
             end
-          | _ -> acc, entry
+          | _ -> (idx + 1, None, cons), entry
           end
-        | _ -> acc, entry
+        | _ -> (idx + 1, None, cons), entry
         end
     in
-    let (slot_anno, cons), part_mem = List.fold_left_map helper (None, []) part_mem in
+    let (slot_idx, slot_anno, cons), part_mem = List.fold_left_map helper (0, None, []) part_mem in
     match slot_anno with
-    | Some anno -> Some (part_mem, cons, anno)
+    | Some anno -> Some (part_mem, cons, slot_idx, anno)
     | None -> None
     (* if found then Some (part_mem, cons)
     else None  *)
@@ -965,25 +992,30 @@ module MemType (Entry: EntryType) = struct
       | Some b_l, Some b_r ->
         if b_l <> b_r then mem_type_error (Printf.sprintf "get_mem_type offset base does not match %s" (MemOffset.to_string simp_addr_off))
         else let ptr_info, part_mem = get_part_mem mem b_l in
-        if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot write to ptr %d" b_l)
-        else
+        (* if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot write to ptr %d" b_l)
+        else *)
         begin match set_part_mem_type smt_ctx is_spill_func update_init_range b_l part_mem orig_addr_off simp_addr_off new_type with
-        | Some (new_part_mem, new_cons, slot_anno) ->
+        | Some (new_part_mem, new_cons, slot_idx, slot_anno) ->
+          if not (PtrInfo.can_write slot_idx ptr_info) then mem_type_error (Printf.sprintf "Cannot write to ptr %d slot %d" b_l slot_idx) 
+          else
           Some (
             List.map (fun ((p, p_info), entry) -> 
               if p = b_l then ((p, p_info), new_part_mem) 
-              else (PtrInfo.invalidate_on_write b_l (p, p_info), entry)) mem,
+              else (PtrInfo.invalid_one_write_slot b_l slot_idx (p, p_info), entry)) mem,
             new_cons, slot_anno
           )
         | None ->
           if try_mult_slot_lookup && enable_mult_slot_lookup smt_ctx b_l orig_addr_off simp_addr_off then begin
             match set_mult_slot_part_mem_type_helper is_spill_func update_init_range b_l part_mem simp_addr_off (simp_entry_func new_type) with
-            | Some (new_part_mem, new_cons, slot_anno) ->
+            | Some (new_part_mem, new_cons, (fst_slot_idx, slot_num), slot_anno) ->
+              if not (PtrInfo.can_write_slot_range fst_slot_idx slot_num ptr_info) then 
+                mem_type_error (Printf.sprintf "Cannot write to ptr %d slot %d num %d" b_l fst_slot_idx slot_num) 
+              else
               Some (
                 List.map (
                   fun ((p, p_info), entry) -> 
                     if p = b_l then ((p, p_info), new_part_mem) 
-                    else (PtrInfo.invalidate_on_write b_l (p, p_info), entry)
+                    else (PtrInfo.invalidate_on_write_slot_range b_l fst_slot_idx slot_num (p, p_info), entry)
                 ) mem,
                 new_cons, slot_anno
               )
@@ -1018,7 +1050,10 @@ module MemType (Entry: EntryType) = struct
             let (ptr, ptr_info), part_mem, orig_order = entry in 
             begin match set_part_mem_type smt_ctx is_spill_func update_init_range ptr part_mem orig_addr_off simp_addr_off new_type with
             | None -> acc, entry
-            | Some (new_part_mem, new_cons, slot_anno) -> (Some slot_anno, cons @ new_cons), ((ptr, ptr_info), new_part_mem, orig_order)
+            | Some (new_part_mem, new_cons, slot_idx, slot_anno) -> 
+              if not (PtrInfo.can_write_info slot_idx ptr_info) then mem_type_error (Printf.sprintf "Cannot write to ptr %d slot %d" ptr slot_idx) 
+              else
+              (Some slot_anno, cons @ new_cons), ((ptr, ptr_info), new_part_mem, orig_order)
             end
           end
         in
@@ -1048,49 +1083,51 @@ module MemType (Entry: EntryType) = struct
       (orig_addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
       (new_val: entry_t) :
-      (MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) =
+      int * (MemOffset.t * MemRange.t * entry_t) list * (Constraint.t list) =
     let s_ptr, s_off, is_full, num_slot = slot_info in
     if num_slot <> 1 then mem_type_error "set_slot_part_mem_type get incorrect num slot"
     else
     let helper
-        (acc: (Constraint.t list) option)
+        (acc: int * ((Constraint.t list) option))
         (entry: MemOffset.t * MemRange.t * entry_t) :
-        (Constraint.t list) option * (MemOffset.t * MemRange.t * entry_t) =
+        (int * (Constraint.t list) option) * (MemOffset.t * MemRange.t * entry_t) =
       match acc with
-      | Some _ -> acc, entry
-      | None ->
+      | _, Some _ -> acc, entry
+      | slot_idx, None ->
         let off, range, entry_val = entry in
         if MemOffset.cmp off s_off = 0 then
           if is_full then
             let new_range: MemRange.t = if update_init_range then RangeConst [ off ] else range in
             if not (is_spill_func s_ptr s_off) then
+              (slot_idx,
               Some (
                 (* I do not add range must known here, since it is not spill (will not be overwritten in current version) *)
                 (Entry.get_must_known_taint_constraint entry_val) @ 
-                (Entry.get_eq_taint_constraint entry_val new_val)), 
+                (Entry.get_eq_taint_constraint entry_val new_val))), 
               (off, new_range, Entry.set_taint_with_other new_val entry_val)
             else
-              Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val)), 
+              (slot_idx, Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val))), 
               (off, new_range, new_val)
           else if is_spill_func s_ptr s_off then
             let new_range: MemRange.t = RangeConst [orig_addr_off] in
-            Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val)), 
+            (slot_idx, Some (Constraint.RangeOverwritten range :: (Entry.get_overwritten_taint_constraint entry_val))), 
             (off, new_range, new_val) 
           else
             (* TODO: Think about whether we need to subsitute off when adding it to init_mem_range *)
             (* <TODO> The merge may fail here, and may fail the range infer (checker also has the similar issue). *)
             let new_range: MemRange.t = if update_init_range then MemRange.merge smt_ctx (RangeConst [orig_addr_off]) range |> fst else range in
+            (slot_idx,
             Some (
               (* I do not add range must known here, since it is not spill (will not be overwritten in current version) *)
               (Entry.get_must_known_taint_constraint entry_val) @ 
-              (Entry.get_eq_taint_constraint entry_val new_val)), 
+              (Entry.get_eq_taint_constraint entry_val new_val))), 
             (off, new_range, Entry.set_taint_with_other (Entry.mem_partial_write_val entry_val new_val) entry_val)
         else
-          None, entry
+          (slot_idx + 1, None), entry
     in
-    match List.fold_left_map helper None part_mem with
-    | None, _ -> mem_type_error (Printf.sprintf "set_slot_part_mem_type cannot find slot %s" (MemAnno.slot_to_string (Some slot_info)))
-    | Some constaints, part_mem -> part_mem, constaints
+    match List.fold_left_map helper (0, None) part_mem with
+    | (_, None), _ -> mem_type_error (Printf.sprintf "set_slot_part_mem_type cannot find slot %s" (MemAnno.slot_to_string (Some slot_info)))
+    | (slot_idx, Some constaints), part_mem -> slot_idx, part_mem, constaints
 
   let set_mult_slot_part_mem_type
       (* (smt_ctx: SmtEmitter.t) *)
@@ -1100,15 +1137,15 @@ module MemType (Entry: EntryType) = struct
       (* (orig_addr_off: MemOffset.t) *) (* We check the slot correctness outside, so orig_addr_off is useless here *)
       (slot_info: MemAnno.slot_t)
       (new_val: entry_t) :
-      entry_t mem_slot list * (Constraint.t list) =
+      int * entry_t mem_slot list * (Constraint.t list) =
     let s_ptr, s_off, is_full, num_slot = slot_info in
     if num_slot <= 1 then mem_type_error "set_mult_slot_part_mem_type get incorrect num slot"
     else if not is_full then mem_type_error "set_mult_slot_part_mem_type: set multiple slot is not full"
     else
       match set_mult_slot_part_mem_type_helper is_spill_func update_init_range s_ptr part_mem s_off new_val with
-      | Some (new_part_mem, new_cons_list, (new_s_ptr, new_s_off, new_is_full, new_num_slot)) ->
+      | Some (new_part_mem, new_cons_list, (fst_slot_idx, _ (* this val is equal to new_num_slot*)), (new_s_ptr, new_s_off, new_is_full, new_num_slot)) ->
         if s_ptr = new_s_ptr && MemOffset.cmp new_s_off s_off = 0 && new_is_full = is_full && new_num_slot = num_slot then
-          new_part_mem, new_cons_list
+          fst_slot_idx, new_part_mem, new_cons_list
         else
           mem_type_error "set_mult_slot_part_mem_type: get incorrect mem anno"
       | None -> mem_type_error "set_mult_slot_part_mem_type: cannot find match slots"
@@ -1133,18 +1170,26 @@ module MemType (Entry: EntryType) = struct
       match List.find_opt (fun ((ptr, _), _) -> ptr = s_ptr) mem with
       | None -> mem_type_error (Printf.sprintf "set_slot_mem_type cannot find slot %s" (MemAnno.slot_to_string (Some slot_info)))
       | Some (ptr_info, part_mem) ->
-        if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
-        else
-        let part_mem, constraints = 
+        (* if not (PtrInfo.can_write ptr_info) then mem_type_error (Printf.sprintf "Cannot read from ptr %d" s_ptr)
+        else *)
+        let slot_idx, part_mem, constraints = 
           if num_slot = 1 then
             set_slot_part_mem_type smt_ctx is_spill_func update_init_range part_mem orig_addr_off slot_info new_type
           else
             set_mult_slot_part_mem_type is_spill_func update_init_range part_mem slot_info (simp_entry_func new_type)
         in
+        let can_write =
+          if num_slot = 1 then
+            PtrInfo.can_write slot_idx ptr_info
+          else
+            PtrInfo.can_write_slot_range slot_idx num_slot ptr_info
+        in
+        if not can_write then mem_type_error (Printf.sprintf "Cannot read from ptr %d slot %d num %d" s_ptr slot_idx num_slot)
+        else
         List.map (
           fun ((ptr, ptr_info), p_mem) -> 
             if ptr = s_ptr then ((ptr, ptr_info), part_mem) 
-            else (PtrInfo.invalidate_on_write s_ptr (ptr, ptr_info), p_mem)
+            else (PtrInfo.invalidate_on_write_slot_range s_ptr slot_idx num_slot (ptr, ptr_info), p_mem)
         ) mem,
         constraints,
         true
@@ -1338,7 +1383,7 @@ module MemType (Entry: EntryType) = struct
           ]
       ) boundary_list
 
-  let rec get_mem_non_overlap_constraint_helper
+  (* let rec get_mem_non_overlap_constraint_helper
       (acc: SingleContext.t list)
       (boundary_list: (PtrInfo.t * MemOffset.t) list) :
       SingleContext.t list =
@@ -1354,21 +1399,102 @@ module MemType (Entry: EntryType) = struct
                 Cond (Le, hd_r, l);
                 Cond (Le, r, hd_l);
               ]) :: acc
-        ) acc tl
+        ) acc tl *)
 
   let get_mem_boundary_constraint (mem_type: t) : SingleContext.t list =
     (get_mem_align_constraint mem_type) @
     (get_mem_boundary_constraint_helper (get_mem_boundary_list mem_type))
 
-  let get_mem_non_overlap_constraint (mem_type: t) : SingleContext.t list =
-    get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type)
+  let get_off_list_begin_end (slot_list: 'a mem_slot list) : MemOffset.t =
+    match slot_list with
+    | [] -> mem_type_error "get empty slot list"
+    | (hd, _, _) :: [] -> hd
+    | ((l, _), _, _) :: tl ->
+      let (_, r), _, _ = List.nth tl ((List.length tl) - 1) in
+      l, r
+
+  let get_two_off_non_overlap_constraint
+      (off1: MemOffset.t) (off2: MemOffset.t) :
+      SingleContext.t =
+    let l1, r1 = off1 in
+    let l2, r2 = off2 in
+    SingleContext.Or [
+      Cond (Le, r1, l2);
+      Cond (Le, r2, l1);
+    ]
+
+  let get_part_mem_non_overlap_constraint_helper
+      (mem1: MemOffset.t)
+      (overlap_info_map: PtrInfo.InfoMap.t)
+      (ptr2: int)
+      (mem2: 'a mem_slot list) : SingleContext.t list =
+    let add_to_list_if_not_none
+        (x: 'b option) (other: 'b list) : 'b list =
+      match x with
+      | None ->  other
+      | Some x -> x :: other
+    in
+    match PtrInfo.InfoMap.find_opt ptr2 overlap_info_map with
+    | None -> (* all slots in mem2 should not be overlapped with mem1 *)
+      [ get_two_off_non_overlap_constraint mem1 (get_off_list_begin_end mem2) ]
+    | Some All -> [] (* all slots in mem2 are overlapped with mem1 *)
+    | Some (SlotSet overlap_slot_set) ->
+      let _, curr_group_opt, mem2_non_overlap_list =
+        List.fold_left (
+          fun (acc: int * (MemOffset.t option) * (MemOffset.t list)) (slot: 'a mem_slot) ->
+            let idx, curr_group_opt, acc_list = acc in
+            let off, _, _ = slot in
+            if IntSet.mem idx overlap_slot_set then
+              (idx + 1, None, add_to_list_if_not_none curr_group_opt acc_list)
+            else
+              (idx + 1, Option.fold ~none:(Some off) ~some:(fun curr_group -> Some (fst curr_group, snd off)) curr_group_opt, acc_list)
+            (* match curr_group_opt with
+            | None -> 
+              if IntSet.mem idx overlap_slot_set then
+                idx + 1, None, acc_list
+              else
+                idx + 1, Some off, acc_list
+            | Some curr_group ->
+              if IntSet.mem idx overlap_slot_set then
+                idx + 1, None, curr_group :: acc_list
+              else
+                idx + 1, Some (fst curr_group, snd off), acc_list *)
+        ) (0, None, []) mem2
+    in
+    let mem2_non_overlap_list = add_to_list_if_not_none curr_group_opt mem2_non_overlap_list in
+    List.map (get_two_off_non_overlap_constraint mem1) mem2_non_overlap_list
+
+  let get_part_mem_non_overlap_constraint
+      (mem1: 'a mem_part) (mem2: 'a mem_part) : SingleContext.t list =
+    let ((ptr1, info1), slot_list1) = mem1 in
+    let ((ptr2, info2), slot_list2) = mem2 in
+    match info1, info2 with
+    | Unified (overlap_info_map1, _, _), _ ->
+      get_part_mem_non_overlap_constraint_helper (get_off_list_begin_end slot_list1) overlap_info_map1 ptr2 slot_list2
+    | _, Unified (overlap_info_map2, _, _) ->
+      get_part_mem_non_overlap_constraint_helper (get_off_list_begin_end slot_list2) overlap_info_map2 ptr1 slot_list1
+    | Separate info_list1, _ ->
+      List.map2 (
+        fun (overlap_info_map1, _, _) (off, _, _) ->
+          get_part_mem_non_overlap_constraint_helper off overlap_info_map1 ptr2 slot_list2
+      ) info_list1 slot_list1 |> List.concat
+
+  let rec get_mem_non_overlap_constraint (mem_type: t) : SingleContext.t list =
+    (* get_mem_non_overlap_constraint_helper [] (get_mem_boundary_list mem_type) *)
+    match mem_type with
+    | [] -> []
+    | hd :: tl ->
+      get_mem_non_overlap_constraint tl @
+      (List.concat_map (get_part_mem_non_overlap_constraint hd) tl)
 
   let get_all_mem_constraint (mem_type: t) : SingleContext.t list =
     let boundary_list = get_mem_boundary_list mem_type in
     let align_constraint = get_mem_align_constraint mem_type in
     let boundary_constraint = get_mem_boundary_constraint_helper boundary_list in
-    let result = get_mem_non_overlap_constraint_helper (align_constraint @ boundary_constraint) boundary_list in
+    let non_overlap_constraint = get_mem_non_overlap_constraint mem_type in
+    align_constraint @ boundary_constraint @ non_overlap_constraint
+    (* let result = get_mem_non_overlap_constraint_helper (align_constraint @ boundary_constraint) boundary_list in
     (* Printf.printf "get_all_mem_constraint\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t result)); *)
-    result
+    result *)
 
 end
