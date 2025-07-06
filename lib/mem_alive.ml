@@ -20,7 +20,7 @@ module MemAlive (Entry: EntryType) = struct
     type t = IntSet.t option
     [@@deriving sexp]
     (* 
-       Some int_set: dead slots for ptr with separate info\
+       Some int_set: dead slots for ptr with separate info
        None: if a ptr with unified info has dead slots, then all slots are dead and we do not need to record idx set
     *)
 
@@ -51,7 +51,7 @@ module MemAlive (Entry: EntryType) = struct
         | None -> true
         | Some map2_dead_info -> not (DeadSlotInfo.subset map1_dead_info map2_dead_info)
       in
-      exists helper map1
+      not (exists helper map1)
 
   end
 

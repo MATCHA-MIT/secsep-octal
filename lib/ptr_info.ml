@@ -64,7 +64,7 @@ module PtrInfo = struct
     let ptr_write_overlap (overlap_set: IntSet.t) : bool =
       IntSet.mem slot_idx overlap_set
     in
-  invalid_one_write_helper ptr ptr_write_overlap info
+    invalid_one_write_helper ptr ptr_write_overlap info
 
   let invalidate_on_write_slot_range (ptr: IsaBasic.imm_var_id) (slot_idx: int) (slot_num: int) (info: t) : t =
     let ptr_write_overlap (overlap_set: IntSet.t) : bool =
@@ -156,6 +156,7 @@ module PtrInfo = struct
     let slot_filter =
       fun i _ -> i >= slot_idx && i < slot_idx + slot_num
     in
+    if slot_num = 0 then ptr_info_error "check_slot_range_permission_info slot_num = 0";
     check_mult_slot_permission_info check_helper slot_filter slot_num info
 
   let check_slot_set_permission_info
@@ -164,6 +165,7 @@ module PtrInfo = struct
     let slot_filter =
       fun i _ -> IntSet.mem i slot_idx_set
     in
+    if IntSet.is_empty slot_idx_set then true else
     check_mult_slot_permission_info check_helper slot_filter (IntSet.cardinal slot_idx_set) info
 
   let check_slot_permission
