@@ -10,7 +10,6 @@
   infer_block_invariance
   infer_range
   infer_taint
-  instantiate_taint
   prog_transform
   gen_csvt_taint_api
   convert
@@ -28,7 +27,6 @@
   infer_block_invariance
   infer_range
   infer_taint
-  instantiate_taint
   prog_transform
   gen_csvt_taint_api
   convert

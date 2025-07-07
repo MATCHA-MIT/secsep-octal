@@ -25,6 +25,7 @@ module IsaBasic = struct
 
   let sentry_func_label = "__sentry_func__"
   let ret_label = ".Ret"
+  let entry_label = "main"
 
   type imm_var_id = int
   [@@deriving sexp]

@@ -246,4 +246,68 @@ module FuncInput = struct
     in
     List.map helper func_interface_list
 
+  type node_t = {
+    in_degree: int;
+    out_nodes: IsaBasic.label list;
+    entry: entry_t;
+  }
+
+  type graph_t = (IsaBasic.label, node_t) Hashtbl.t
+
+  let topological_sort
+      (prog: Isa.prog)
+      (entry_list: entry_t list)
+      : entry_t list =
+    let graph: graph_t = Hashtbl.create (List.length entry_list) in
+    let find_func (name: IsaBasic.label) : Isa.func =
+      List.find (fun (f: Isa.func) -> String.equal f.name name) prog.funcs
+    in
+    List.iter (
+      fun entry ->
+        Hashtbl.add graph entry.func_name {
+          in_degree = 0;
+          out_nodes = (find_func entry.func_name).subfunctions;
+          entry = entry;
+        }
+    ) entry_list;
+    Hashtbl.iter (
+      fun _ node ->
+        List.iter (
+          fun out_node ->
+            match Hashtbl.find_opt graph out_node with
+            | Some out_node_info ->
+              Hashtbl.replace graph out_node { out_node_info with in_degree = out_node_info.in_degree + 1 }
+            | _ -> ()
+        ) node.out_nodes
+    ) graph;
+
+    let queue = Queue.create () in
+    Hashtbl.iter (
+      fun name node ->
+        if node.in_degree = 0 then
+          Queue.add name queue
+    ) graph;
+
+    let topo_order = ref [] in
+    while not (Queue.is_empty queue) do
+      let func_name = Queue.pop queue in
+      let node = Hashtbl.find graph func_name in
+      topo_order := node.entry :: !topo_order;
+      if node.in_degree <> 0 then
+        func_input_error (Printf.sprintf "topological_sort: node %s has in_degree %d\n" func_name node.in_degree);
+      List.iter (
+        fun out_node ->
+          match Hashtbl.find_opt graph out_node with
+          | Some out_node_info ->
+            let new_in_degree = out_node_info.in_degree - 1 in
+            Hashtbl.replace graph out_node { out_node_info with in_degree = new_in_degree };
+            if new_in_degree = 0 then
+              Queue.add out_node queue
+          | _ -> ()
+      ) node.out_nodes;
+    done;
+    
+    Printf.printf "Topological sort by call dependency:\n";
+    List.iter (fun entry -> Printf.printf "\t%s\n" entry.func_name) !topo_order;
+    !topo_order
 end

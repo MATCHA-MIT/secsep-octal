@@ -36,6 +36,7 @@ module InstTransform = struct
     use_orig_mne: bool; (* when output, whether to use t.mnemonic as mnemonic or let t.inst to decide *)
     failed: bool;
   }
+  [@@deriving sexp]
 
   let init (orig: Isa.instruction) (mnemonic: string) (orig_asm: string option) : t =
     {
@@ -249,12 +250,18 @@ module Transform = struct
       List.map (fun x -> (x, TaintExp.TaintConst true)) taint_list
     in
     let first_bb_type = List.hd ti.func_type in
+    let ittt_regs = if String.equal ti.func_name Isa.entry_label then
+      (* for some reason, main may push rax but not using it at all, so we need to instantiate rax's taint *)
+      (Isa.get_reg_idx Isa.RAX) :: Isa.callee_saved_reg_idx
+    else
+      Isa.callee_saved_reg_idx
+    in
     let taint_tv_list = List.filter_map (fun idx ->
       let reg_type = List.nth first_bb_type.reg_type idx in
       match snd reg_type with
       | TaintVar tv -> Some tv
       | _ -> None
-    ) Isa.callee_saved_reg_idx in
+    ) ittt_regs in
     helper [] taint_tv_list
 
   let taint_var_ittt (ittt_map: TaintExp.local_var_map_t) (taint_exp: TaintExp.t) : TaintExp.t =
@@ -494,6 +501,7 @@ module Transform = struct
     | RepMovs _ -> transform_error "RepMovs unimplemented"
     | RepLods _ -> transform_error "RepLods unimplemented"
     | RepStos _ -> transform_error "RepStos unimplemented"
+    | Unsupported raw -> transform_error (Printf.sprintf "Unsupported instruction %s encountered" raw)
     in
     (InstTransform.assign tf inst inst_pre inst_post use_orig_mnemonic), css, sf
 
@@ -918,6 +926,8 @@ module Transform = struct
       (ti_state: TaintTypeInfer.t)
       (init_mem_unity: mem_unity_t)
       : func_state * (tv_fault_t list) =
+    Printf.printf "Transforming function %s\n" (ti_state.func_name);
+
     (* apply config *)
     Printf.printf "setting tf_config to\n%s\n" (sexp_of_tf_config_t set_tf_config |> Sexp.to_string_hum);
     tf_config := set_tf_config;

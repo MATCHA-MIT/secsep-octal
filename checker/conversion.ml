@@ -17,6 +17,9 @@ open Branch_anno
 open Call_anno
 open Sexplib.Std
 
+exception ConvertError of string
+let convert_error msg = raise (ConvertError ("[Convert Error] " ^ msg))
+
 (* map variables in each function to their size *)
 type func_var_size_map = (string * ((int * int) list)) list
 [@@deriving sexp]
@@ -831,6 +834,7 @@ let convert_taint_type_infers
           | Syscall -> ArchType.Isa.Syscall
           | Hlt -> ArchType.Isa.Hlt
           | Directive s -> ArchType.Isa.Directive s
+          | Unsupported raw -> convert_error (Printf.sprintf "Unsupported instruction found during conversion: %s" raw)
           in
           (pc + 1, inst')
         ) bb_type.pc bb.insts in

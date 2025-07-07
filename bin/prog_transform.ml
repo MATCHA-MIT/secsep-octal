@@ -37,13 +37,10 @@ let () =
     Taint_type_infer.TaintTypeInfer.state_list_from_file (get_related_filename !program_name "out" "taint_infer")
   in
   let prog = Parser.Parser.prog_from_file (get_related_filename !program_name "out" "prog") in
-  let tf_func_states = List.filter_map (fun (ti: Taint_type_infer.TaintTypeInfer.t) ->
+  let tf_func_states = List.map (fun (ti: Taint_type_infer.TaintTypeInfer.t) ->
     (* if ti.func_name <> "salsa20_words" && ti.func_name <> "salsa20_block" then None else *)
-    if Option.get ti.alive then begin
-      let init_mem_unity = Transform.Transform.get_func_init_mem_unity ti in
-      Some (Transform.Transform.transform_one_function tf_config taint_infer_result_fi ti init_mem_unity)
-    end else
-      None
+    let init_mem_unity = Transform.Transform.get_func_init_mem_unity ti in
+    Transform.Transform.transform_one_function tf_config taint_infer_result_fi ti init_mem_unity
   ) taint_infer_result_states in
 
   let soft_faults, tf_func_states = List.fold_left_map (fun acc data ->

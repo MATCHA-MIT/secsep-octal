@@ -23,6 +23,7 @@ module Parser = struct
     | Comma
     | LParen
     | RParen
+    | InvalidTok
     | Raw of string
 
   let rec string_of_imm_token (i: IsaBasic.immediate) (name_list: (string option) list) : string =
@@ -42,6 +43,7 @@ module Parser = struct
     | Comma -> "Comma"
     | LParen -> "LParen"
     | RParen -> "RParen"
+    | InvalidTok -> "InvalidTok"
     | Raw s -> "Raw " ^ s
   
   let is_char_of_name_start (c: char) : bool =
@@ -140,6 +142,9 @@ module Parser = struct
             go cs (RegTok (name |> IsaBasic.string_to_reg |> Option.get) :: acc)
       | '$' :: cs ->
           go cs acc
+      | '*' :: cs ->
+          (* indirect call, should not existed in focused functions *)
+          go cs (InvalidTok :: acc)
       | _ ->
           let (imm, name, cs) = consume_immediate cs in
           go cs (ImmTok (imm, name) :: acc)
@@ -217,7 +222,7 @@ module Parser = struct
   let split_opcode_size
       (opcode_list: string list) (* list of valid mnemonics *)
       (mnemonic: string)
-      : string * Isa.data_size =
+      : (string * Isa.data_size) option =
     let helper (opcode: string) : (string * Isa.data_size) option =
       if String.starts_with mnemonic ~prefix:opcode then
         let suffix = String.sub mnemonic (String.length opcode) (String.length mnemonic - String.length opcode) in
@@ -238,9 +243,7 @@ module Parser = struct
       else
         None
     in
-    match List.find_map helper opcode_list with
-    | Some result -> result
-    | None -> parse_error ("split_opcode_size cannot parse " ^ mnemonic)
+    List.find_map helper opcode_list
 
   let fill_os_for_opr (suggested: Isa.data_off_size) (opr: Isa.operand) : Isa.operand =
     let complain () =
@@ -307,7 +310,7 @@ module Parser = struct
   let decode_operand_size 
       (mnemonic: string) 
       (operands: Isa.operand list)
-      : string * (Isa.operand list) =
+      : (string * (Isa.operand list)) option =
     (*
     Printf.printf "decode_operand_size:\n\t%s: %s\n"
       mnemonic
@@ -333,52 +336,54 @@ module Parser = struct
     match mnemonic with
     (* Handle cases where suffix is not single-letter *)
     (* move with sign-extension *)
-    | "movsbq" -> "movs", (fill [1L; 8L])
-    | "movswq" -> "movs", (fill [2L; 8L])
-    | "movslq" -> "movs", (fill [4L; 8L])
-    | "movsbl" -> "movs", (fill [1L; 4L])
-    | "movswl" -> "movs", (fill [2L; 4L])
-    | "movsbw" -> "movs", (fill [1L; 2L])
-    | "movsd"  -> "movs", (fill [8L; 16L])
+    | "movsbq" -> Some ("movs", (fill [1L; 8L]))
+    | "movswq" -> Some ("movs", (fill [2L; 8L]))
+    | "movslq" -> Some ("movs", (fill [4L; 8L]))
+    | "movsbl" -> Some ("movs", (fill [1L; 4L]))
+    | "movswl" -> Some ("movs", (fill [2L; 4L]))
+    | "movsbw" -> Some ("movs", (fill [1L; 2L]))
+    | "movsd"  -> Some ("movs", (fill [8L; 16L]))
     (* move with zero-extension *)
-    | "movzbq" -> "movz", (fill [1L; 8L])
-    | "movzwq" -> "movz", (fill [2L; 8L])
-    | "movzlq" -> "movz", (fill [4L; 8L])
-    | "movzbl" -> "movz", (fill [1L; 4L])
-    | "movzwl" -> "movz", (fill [2L; 4L])
-    | "movzbw" -> "movz", (fill [1L; 2L])
+    | "movzbq" -> Some ("movz", (fill [1L; 8L]))
+    | "movzwq" -> Some ("movz", (fill [2L; 8L]))
+    | "movzlq" -> Some ("movz", (fill [4L; 8L]))
+    | "movzbl" -> Some ("movz", (fill [1L; 4L]))
+    | "movzwl" -> Some ("movz", (fill [2L; 4L]))
+    | "movzbw" -> Some ("movz", (fill [1L; 2L]))
     (* size conversions *)
-    | "cbtw" -> "movs", (fill' [Isa.RegOp AL; Isa.RegOp AX] [1L; 2L])
-    | "cwtl" -> "movs", (fill' [Isa.RegOp AX; Isa.RegOp EAX] [2L; 4L])
-    | "cltq" -> "movs", (fill' [Isa.RegOp EAX; Isa.RegOp RAX] [4L; 8L])
+    | "cbtw" -> Some ("movs", (fill' [Isa.RegOp AL; Isa.RegOp AX] [1L; 2L]))
+    | "cwtl" -> Some ("movs", (fill' [Isa.RegOp AX; Isa.RegOp EAX] [2L; 4L]))
+    | "cltq" -> Some ("movs", (fill' [Isa.RegOp EAX; Isa.RegOp RAX] [4L; 8L]))
     (* SIMDs *)
-    | "xorps" | "xorpd" -> "xorp", (fill [16L; 16L])
-    | "pxor" | "pandn" | "pand" | "por" -> mnemonic, (fill [16L; 16L])
-    | "pshufb" -> "pshuf", (fill [16L; 16L])
-    | "pshufw" | "pshufd" | "pshuflw" | "pshufhw" -> "pshuf", (fill [1L; 16L; 16L])
-    | "shufps" | "shufpd" -> "shufp", (fill [1L; 16L; 16L])
+    | "xorps" | "xorpd" -> Some ("xorp", (fill [16L; 16L]))
+    | "pxor" | "pandn" | "pand" | "por" -> Some (mnemonic, (fill [16L; 16L]))
+    | "pshufb" -> Some ("pshuf", (fill [16L; 16L]))
+    | "pshufw" | "pshufd" | "pshuflw" | "pshufhw" -> Some ("pshuf", (fill [1L; 16L; 16L]))
+    | "shufps" | "shufpd" -> Some ("shufp", (fill [1L; 16L; 16L]))
     | "punpcklbw" | "punpcklwd" | "punpckldq" | "punpcklqdq" -> begin
         if List.length operands != 2 then
           parse_error "punpckl: expecting two xmm operands";
         let opr1 = List.hd operands in
         let opr2 = List.hd (List.tl operands) in
-        "punpckl", (fill_opr_os [opr1; opr2; opr2] [(0L, 8L); (0L, 8L); (0L, 16L)])
+        Some ("punpckl", (fill_opr_os [opr1; opr2; opr2] [(0L, 8L); (0L, 8L); (0L, 16L)]))
       end
     | "punpckhbw" | "punpckhwd" | "punpckhdq" | "punpckhqdq" -> begin
         if List.length operands != 2 then
           parse_error "punpckh: expecting two xmm operands";
         let opr1 = List.hd operands in
         let opr2 = List.hd (List.tl operands) in
-        "punpckh", (fill_opr_os [opr1; opr2; opr2] [(8L, 8L); (8L, 8L); (0L, 16L)])
+        Some ("punpckh", (fill_opr_os [opr1; opr2; opr2] [(8L, 8L); (8L, 8L); (0L, 16L)]))
       end
-    | "packusdw" | "packuswb" -> "packus", (fill [16L; 16L])
-    | "packssdw" | "packsswb" -> "packss", (fill [16L; 16L])
-    | "movaps" | "movapd" | "movups" | "movupd" -> "mov", (fill [16L; 16L])
-    | "movdqu" | "movdqa" -> "mov", (fill [16L; 16L])
+    | "packusdw" | "packuswb" -> Some ("packus", (fill [16L; 16L]))
+    | "packssdw" | "packsswb" -> Some ("packss", (fill [16L; 16L]))
+    | "movaps" | "movapd" | "movups" | "movupd" -> Some ("mov", (fill [16L; 16L]))
+    | "movdqu" | "movdqa" -> Some ("mov", (fill [16L; 16L]))
     (* instructions with single-letter suffix indicating size: [bwldq] *)
     (* special size *)
     | _ ->
-      let opcode, op_size = split_opcode_size Isa.common_opcode_list mnemonic in
+      let split_result = split_opcode_size Isa.common_opcode_list mnemonic in
+      if Option.is_none split_result then None else
+      let opcode, op_size = Option.get split_result in
       let op_os: Isa.data_off_size = (0L, op_size) in
       let oprs_with_size = match opcode with
       | "sal" | "sar" | "shl" | "shr" when (List.length operands = 2) -> begin
@@ -394,7 +399,7 @@ module Parser = struct
           ) operands
         end
       in
-      opcode, oprs_with_size
+      Some (opcode, oprs_with_size)
   
   let src (opr: Isa.operand) : Isa.operand =
     match opr with
@@ -456,6 +461,7 @@ module Parser = struct
   let parse_tokens
       (imm_var_map: Isa.imm_var_map)
       (ts: token list)
+      (raw_line: string)
       : (Isa.imm_var_map * (IsaBasic.imm_var_id list)) * (Isa.instruction * string (* mnemonic *)) =
     (* handle directives specially *)
     let directive_opt = match ts with
@@ -466,6 +472,11 @@ module Parser = struct
     if Option.is_some directive_opt then begin
       let imm_var_map, (inst, mnemonic) = Option.get directive_opt in
       (imm_var_map, []), (inst, mnemonic)
+    end else
+
+    let invalid_tok = List.find_opt (fun t -> t = InvalidTok) ts in
+    if Option.is_some invalid_tok then begin
+      (imm_var_map, []), (Isa.Unsupported raw_line, raw_line)
     end else
 
     (* handle instructions *)
@@ -527,11 +538,11 @@ module Parser = struct
       (* rep instructions *)
       | ("rep", [LabelOp label]) ->
         begin match split_opcode_size IsaBasic.rep_opcode_list label with
-        | "movs", size ->
+        | Some ("movs", size) ->
           RepMovs (size, MemAnno.make_empty (), MemAnno.make_empty ())
-        | "lods", size ->
+        | Some ("lods", size) ->
           RepLods (size, MemAnno.make_empty ())
-        | "stos", size ->
+        | Some ("stos", size) ->
           RepStos (size, MemAnno.make_empty ())
         | _ -> parse_error (Printf.sprintf "Cannot parse rep op for %s" label)
         end
@@ -548,21 +559,27 @@ module Parser = struct
         end
       (* common instructions with operands *)
       | _ ->
-        let opcode, oprs_with_size = decode_operand_size mnemonic operands in
-        begin match Isa.op_of_binst opcode, Isa.op_of_uinst opcode, Isa.op_of_tinst opcode with
-        | Some op, None, None -> get_binst op oprs_with_size
-        | None, Some op, None -> get_uinst op oprs_with_size
-        | None, None, Some op -> get_tinst op oprs_with_size
-        | None, None, None ->
-          begin match opcode, oprs_with_size with
-          | "xchg", [opr1; opr2] -> Xchg (dst opr2, dst opr1, src opr2, src opr1)
-          | "push", [opr] -> Push ((src opr), (MemAnno.make_empty ()))
-          | "pop", [opr] -> Pop ((dst opr), (MemAnno.make_empty ()))
-          | "cmp", [opr1; opr2] -> Cmp (src opr2, src opr1)
-          | "test", [opr1; opr2] -> Test (src opr2, src opr1)
-          | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+        let decode_result = decode_operand_size mnemonic operands in
+        if Option.is_none decode_result then
+          let _ = Printf.printf "Unsupported instruction encountered: %s\n" raw_line in
+          Unsupported raw_line
+        else begin
+          let opcode, oprs_with_size = Option.get decode_result in
+          begin match Isa.op_of_binst opcode, Isa.op_of_uinst opcode, Isa.op_of_tinst opcode with
+          | Some op, None, None -> get_binst op oprs_with_size
+          | None, Some op, None -> get_uinst op oprs_with_size
+          | None, None, Some op -> get_tinst op oprs_with_size
+          | None, None, None ->
+            begin match opcode, oprs_with_size with
+            | "xchg", [opr1; opr2] -> Xchg (dst opr2, dst opr1, src opr2, src opr1)
+            | "push", [opr] -> Push ((src opr), (MemAnno.make_empty ()))
+            | "pop", [opr] -> Pop ((dst opr), (MemAnno.make_empty ()))
+            | "cmp", [opr1; opr2] -> Cmp (src opr2, src opr1)
+            | "test", [opr1; opr2] -> Test (src opr2, src opr1)
+            | _ -> parse_error ("parse_tokens: invalid instruction " ^ mnemonic)
+            end
+          | _ -> parse_error "unexpected opcode"
           end
-        | _ -> parse_error "unexpected opcode"
         end
     in
     (imm_var_map, referred_imm_vars), (inst, mnemonic)
@@ -574,7 +591,7 @@ module Parser = struct
     (* print_endline ("Parsing " ^ line); *)
     let tokens = tokenize_line line in
     (* print_endline (String.concat ", " (List.map string_of_token tokens)); *)
-    parse_tokens imm_var_map tokens
+    parse_tokens imm_var_map tokens line
 
   let parse_basic_block
       (info: Isa.imm_var_map * (Isa.label option) * (IsaBasic.imm_var_id list))
@@ -671,66 +688,12 @@ module Parser = struct
       |> String.split_on_char '\n'
       |> List.concat_map (fun line -> line_processor line)
 
-  let parse_program (source: string) : Isa.prog =
-    (* divide lines into groups based on BB and global symbols *)
-    let lines_of_bbs_of_gsyms =
-      preprocess source |>
-      (* split by global symbols *)
-      split_helper Isa.line_is_global_label |>
-      (* within each global symbol, split by labels to get BBs *)
-      List.map (fun lines_of_gs ->
-        split_helper Isa.line_is_label lines_of_gs
-      )
-    in
-
-    (* parse each BB in each global symbol *)
-    let imm_var_map, func_list =
-      let gsym_helper 
-          (imm_var_map: Isa.imm_var_map) (lines_of_bbs: string list list)
-          : Isa.imm_var_map * Isa.func =
-        let (imm_var_map, gsym_name, referred_gsyms), bbs =
-          List.fold_left_map parse_basic_block (imm_var_map, None, []) lines_of_bbs
-        in
-
-        (* debug print *)
-        let rev_imm_var_map = Isa.get_rev_imm_var_map imm_var_map in
-        let referred_gsyms = referred_gsyms
-          |> List.sort_uniq (fun (x: IsaBasic.imm_var_id) (y: IsaBasic.imm_var_id) -> Int.compare x y)
-          |> List.map (fun var_id -> Isa.IntM.find var_id rev_imm_var_map)
-        in
-        Printf.printf "symbols in %s\n\t" (Option.get gsym_name);
-        List.iter (fun symbol -> Printf.printf "%s " symbol) referred_gsyms;
-        Printf.printf "\n%!";
-
-        (* subfunctions extraction *)
-        let callees = List.fold_left (fun acc (bb: Isa.basic_block) ->
-          let callees = List.filter_map (fun (inst: Isa.instruction) ->
-            match inst with
-            | Call (subfunc, _) -> Some subfunc
-            | _ -> None
-          ) bb.insts
-          in
-          callees @ acc
-        ) [] bbs
-        in
-        let callees = List.sort_uniq (fun x y -> String.compare x y) callees in
-        List.iter (fun subfunc -> Printf.printf "%s calls to %s\n" (Option.get gsym_name) subfunc) callees;
-
-        imm_var_map, {
-          name = Option.get gsym_name;
-          body = bbs;
-          related_gsyms = referred_gsyms; (* initialization; propagate later *)
-          subfunctions = callees; (* initialization; propagate later *)
-        }
-      in
-      List.fold_left_map gsym_helper Isa.StrM.empty lines_of_bbs_of_gsyms
-    in
-
+  let propagate_global_symbol (func_list: Isa.func list) : Isa.func list =
     (* related gsymbols propagation *)
     let same_func_list (l1: Isa.func list) (l2: Isa.func list) =
       List.fold_left2 (fun acc (f1: Isa.func) (f2: Isa.func) ->
         if not (String.equal f1.name f2.name) then
-          parse_error "func list invalid";
+          parse_error "func list mismatched";
         let cmp = (0 = List.compare (fun a b -> String.compare a b) f1.related_gsyms f2.related_gsyms) in
         if cmp = false then false else acc
       ) true l1 l2
@@ -770,6 +733,118 @@ module Parser = struct
       Printf.printf "global symbol of %s:\n" func.name;
       List.iter (fun symbol -> Printf.printf "\t%s\n" symbol) func.related_gsyms;
     ) func_list;
+    func_list
+  
+  let propagate_aliveness (func_list: Isa.func list) : Isa.func list =
+    let queue = Queue.create () in
+    Queue.add IsaBasic.entry_label queue;
+
+    let rec bfs (map: (Isa.func * bool) IsaBasic.StrM.t) : ((Isa.func * bool) IsaBasic.StrM.t) =
+      if Queue.is_empty queue then map else
+      let func_name = Queue.pop queue in
+      let (func, alive) = IsaBasic.StrM.find func_name map in
+      if not alive then
+        parse_error (Printf.sprintf "propagate_aliveness: %s in the queue should be alive" func_name);
+      let map = List.fold_left (fun (map: (Isa.func * bool) IsaBasic.StrM.t) subfunc_name ->
+        match IsaBasic.StrM.find_opt subfunc_name map with
+        | None -> map
+        | Some (_, subfunc_alive) ->
+          if subfunc_alive then map else begin
+            Queue.add subfunc_name queue;
+            IsaBasic.StrM.update subfunc_name (fun (f: (Isa.func * bool) option) ->
+              match f with
+              | Some (f, false) -> Some (f, true)
+              | _ -> parse_error "unexpected"
+            ) map
+        end
+      ) map func.subfunctions in
+      bfs map
+    in
+
+    let alive_gsyms = List.find_map (fun (func: Isa.func) ->
+      if String.equal Isa.entry_label func.name then
+        Some func.related_gsyms
+      else
+        None
+    ) func_list |> Option.get in
+    let map = List.fold_left (fun (map: (Isa.func * bool) IsaBasic.StrM.t) (func: Isa.func) ->
+      IsaBasic.StrM.add func.name (
+        func,
+        String.equal (Isa.entry_label) func.name
+          || String.equal (IsaBasic.sentry_func_label) func.name
+          || List.mem func.name alive_gsyms
+      ) map
+    ) IsaBasic.StrM.empty func_list
+    in
+    let map = bfs map in
+
+    Printf.printf "Alive functions:\n";
+    List.filter (fun (func: Isa.func) ->
+      let alive = IsaBasic.StrM.find func.name map |> (fun (f: Isa.func * bool) -> snd f) in
+      if alive then Printf.printf "\t%s\n" func.name;
+      alive
+    ) func_list
+
+  let parse_program (source: string) : Isa.prog =
+    (* divide lines into groups based on BB and global symbols *)
+    let lines_of_bbs_of_gsyms =
+      preprocess source |>
+      (* split by global symbols *)
+      split_helper Isa.line_is_global_label |>
+      (* within each global symbol, split by labels to get BBs *)
+      List.map (fun lines_of_gs ->
+        split_helper Isa.line_is_label lines_of_gs
+      )
+    in
+
+    (* parse each BB in each global symbol *)
+    let imm_var_map, func_list =
+      let gsym_helper 
+          (imm_var_map: Isa.imm_var_map) (lines_of_bbs: string list list)
+          : Isa.imm_var_map * Isa.func =
+        let (imm_var_map, gsym_name, referred_gsyms), bbs =
+          List.fold_left_map parse_basic_block (imm_var_map, None, []) lines_of_bbs
+        in
+        let gsym_name = Option.get gsym_name in
+
+        (* debug print *)
+        let rev_imm_var_map = Isa.get_rev_imm_var_map imm_var_map in
+        let referred_gsyms = referred_gsyms
+          |> List.sort_uniq (fun (x: IsaBasic.imm_var_id) (y: IsaBasic.imm_var_id) -> Int.compare x y)
+          |> List.map (fun var_id -> Isa.IntM.find var_id rev_imm_var_map)
+        in
+        Printf.printf "symbols in %s\n\t" gsym_name;
+        List.iter (fun symbol -> Printf.printf "%s " symbol) referred_gsyms;
+        Printf.printf "\n%!";
+
+        (* subfunctions extraction *)
+        let callees = List.fold_left (fun acc (bb: Isa.basic_block) ->
+          let callees = List.filter_map (fun (inst: Isa.instruction) ->
+            match inst with
+            | Call (subfunc, _) -> Some subfunc
+            | _ -> None
+          ) bb.insts
+          in
+          callees @ acc
+        ) [] bbs
+        in
+        let callees = List.sort_uniq (fun x y -> String.compare x y) callees in
+        List.iter (fun subfunc -> Printf.printf "%s calls to %s\n" gsym_name subfunc) callees;
+
+        imm_var_map, {
+          name = gsym_name;
+          body = bbs;
+          related_gsyms = referred_gsyms; (* initialization; propagate later *)
+          subfunctions = callees; (* initialization; propagate later *)
+        }
+      in
+      List.fold_left_map gsym_helper Isa.StrM.empty lines_of_bbs_of_gsyms
+    in
+
+    let func_list = func_list
+      |> propagate_global_symbol
+      |> propagate_aliveness
+    in
 
     (* add jmp for two adjacent basic blocks if the previous one does not end with ret *)
     let rec add_jmp_for_adj_bb (bbs: Isa.basic_block list) (acc: Isa.basic_block list) =

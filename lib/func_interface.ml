@@ -580,7 +580,7 @@ module FuncInterface (Entry: EntryType) = struct
             | SatUnknown -> Printf.printf "Should be unknown\n"
           ); *)
           SmtEmitter.pp_smt_ctx 0 smt_ctx;
-          func_interface_error "func_call_helper: get unstat constraint"
+          func_interface_error "func_call_helper: get unsat constraint"
         end else begin
           Printf.printf "CalleeUntransContext\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t untrans_context));
           Printf.printf "CalleeUnknownContext\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_list SingleContext.sexp_of_t unknown_context));

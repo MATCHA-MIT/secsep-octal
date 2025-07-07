@@ -42,7 +42,6 @@ module TaintTypeInfer = struct
     ret_subtype_list: (Isa.imm_var_id * (SingleEntryType.t list)) list;
     has_callee: bool;
     smt_ctx: SmtEmitter.t;
-    alive: bool option;
   }
   [@@deriving sexp]
 
@@ -181,7 +180,6 @@ module TaintTypeInfer = struct
       ret_subtype_list = range_infer_state.ret_subtype_list;
       has_callee = false;
       smt_ctx = SmtEmitter.init_smt_ctx ();
-      alive = None;
     }
 
   let type_prop_all_blocks

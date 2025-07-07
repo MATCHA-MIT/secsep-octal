@@ -160,6 +160,7 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
     | Syscall
     | Hlt
     | Directive of string
+    | Unsupported of string
   [@@deriving sexp]
 
   type basic_block = {
@@ -325,6 +326,7 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
     | Syscall -> "syscall"
     | Hlt -> "hlt"
     | Directive content -> content
+    | Unsupported raw -> "unsupported: " ^ raw
 
   let string_of_instruction (inst: instruction) : string =
     let get_tab (opcode: string): string =
@@ -380,6 +382,7 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
     | Syscall -> "syscall"
     | Hlt -> "hlt"
     | Directive content -> content
+    | Unsupported raw -> "unsupported: " ^ raw
 
   let ocaml_string_of_instruction (inst: instruction) : string =
     match inst with
@@ -442,6 +445,7 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
     | Syscall -> "Syscall"
     | Hlt -> "Hlt"
     | Directive content -> Printf.sprintf "Directive \"%s\"" content
+    | Unsupported raw -> "Unsupported (\"" ^ raw ^ "\")"
       
   let pp_block (lvl: int) (bb: basic_block) =
     PP.print_lvl lvl "%s\n" bb.label;

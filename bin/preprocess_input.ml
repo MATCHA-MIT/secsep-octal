@@ -19,5 +19,8 @@ let () =  Arg.parse speclist (fun _ -> ()) usage_msg;
 
   (* 2. Parse func input*)
   let func_input = Func_input.FuncInput.parse (read_file (get_path "final.sexp")) in
-  let func_input_list = Func_input.FuncInput.update_func_input p func_input in
+  let func_input_list = func_input
+    |> Func_input.FuncInput.update_func_input p
+    |> Func_input.FuncInput.topological_sort p
+  in
   Func_input.FuncInput.input_to_file (get_related_filename !program_name "out" "input") func_input_list

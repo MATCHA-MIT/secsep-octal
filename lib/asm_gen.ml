@@ -123,6 +123,7 @@ module AsmGen = struct
     | RepStos _ -> asm_gen_error "not implemented"
 
     | Directive _ -> "" (* directive content is in mnemonic *)
+    | Unsupported raw -> asm_gen_error (Printf.sprintf "Unsupported instruction encountered: %s" raw)
 
     in
 

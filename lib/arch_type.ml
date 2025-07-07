@@ -895,7 +895,8 @@ module ArchType (Entry: EntryType) = struct
       (* next_type, src_constraint @ dest_constraint *)
     | Syscall -> { curr_type with flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ()) }, inst
     | Nop | Hlt | Directive _ -> curr_type, inst
-    | _ -> arch_type_error (Printf.sprintf "inst %s not implemented" (Sexplib.Sexp.to_string (Isa.sexp_of_instruction inst)))
+    | Unsupported raw -> arch_type_error (Printf.sprintf "inst %s not implemented" raw)
+    | Jmp _ | Jcond _ | Call _ -> arch_type_error "type_prop_non_branch: should not deal with branch instructions"
 
   let add_block_subtype
       (label: Isa.label)

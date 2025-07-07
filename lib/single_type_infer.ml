@@ -93,11 +93,7 @@ module SingleTypeInfer = struct
         (next_var: int)
         (call_info: int * Isa.label) : int * (int * SingleExp.local_var_map_t) =
       let call_pc, callee_name = call_info in
-      let func_interface_opt =
-        List.find_opt (
-          fun (x: FuncInterface.t) -> x.func_name = callee_name
-        ) func_interface_list
-      in
+      let func_interface_opt = FuncInterface.find_fi func_interface_list callee_name in
       match func_interface_opt with
       | None -> single_type_infer_error (Printf.sprintf "Func %s not found\n" callee_name)
       | Some func_interface ->
