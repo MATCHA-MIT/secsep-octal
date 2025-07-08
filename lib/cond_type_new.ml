@@ -4,8 +4,6 @@ open Single_exp_basic
 open Single_exp
 open Smt_emitter
 open Isa_basic
-open Sexplib
-open Sexplib.Std
 
 module CondType (Entry: EntryTypeBasic) = struct
   exception CondTypeError of string
@@ -268,19 +266,4 @@ include (CondType (SingleExp))
     let _, l, r = e in
     SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
 
-end
-
-module SingleCondSet = struct
-  include Set.Make (
-    struct
-      let compare = SingleCondType.cmp
-      type t = SingleCondType.t
-    end
-  )
-
-  let t_of_sexp (s_exp: Sexp.t) : t = 
-    of_list (list_of_sexp SingleCondType.t_of_sexp s_exp)
-
-  let sexp_of_t (s: t) : Sexp.t = 
-    sexp_of_list SingleCondType.sexp_of_t (elements s)
 end
