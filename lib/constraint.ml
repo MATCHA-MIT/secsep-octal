@@ -81,6 +81,8 @@ module Constraint = struct
     IntSet.diff overwritten_var_set must_known_var_set
 
   let gen_off_subset (smt_ctx: SmtEmitter.t) (sub_off: MemOffset.t) (range: MemRange.t) (off: MemOffset.t) : t list =
+    (* check whether sub_off (solution) is the subset of range (subtype) *)
+    if MemOffset.is_empty smt_ctx sub_off then [] else
     match range with
     | RangeConst ro_list ->
       begin match MemOffset.diff smt_ctx sub_off ro_list with

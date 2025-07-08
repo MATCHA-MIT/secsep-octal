@@ -10,7 +10,8 @@ We need to annotate two things:
 2. Special structs on the stack that needs to be splitted.
 
 ### salsa20
-1.Call with variable length to prevent the compiler from doing some length-dependent optimization.
+1. Call with variable length to prevent the compiler from doing some length-dependent optimization.
+2. In `salsa20`, we modified the code by initializing `uint8_t block[64]` with zero, to solve the incapability of type system in range infer.
 
 ### sha512
 1. Additionally initialize `sha512_state_st.p` to make range infer easier (should eventually revert this change).

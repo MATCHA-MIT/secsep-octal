@@ -62,6 +62,7 @@ module RangeSubtype = struct
     PP.print_lvl (lvl + 1) "]\n";
     PP.print_lvl (lvl + 1) "EqualSet: %s\n" (Sexplib.Sexp.to_string (IntSet.sexp_of_t x.equal_var_set));
     PP.print_lvl (lvl + 1) "ReadConstraintList: %s\n" (Sexplib.Sexp.to_string (sexp_of_list MemOffset.sexp_of_t x.read_constraint_list));
+    PP.print_lvl (lvl + 1) "EqualSubtypeList: %s\n" (Sexplib.Sexp.to_string (sexp_of_list sexp_of_var_idx_t x.equal_subtype_list));
     PP.print_lvl (lvl + 1) "other_equal_var_has_empty_subtype: %b\n" (x.other_equal_var_has_empty_subtype);
     PP.print_lvl (lvl + 1) "equal_var_has_read_constraint: %b\n" (x.equal_var_has_read_constraint)
 
