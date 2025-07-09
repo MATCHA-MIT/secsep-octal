@@ -315,7 +315,7 @@ include SingleExpBasic
     match e with
     | SingleBExp (_, SingleTop, _)
     | SingleBExp (_, _, SingleTop)
-    | SingleUExp (_, SingleTop) -> [[ SingleTop ]]
+    | SingleUExp (_, SingleTop) -> [[ SingleTop ]] (* fast fwd top judgement for bexp and uexp, does not work for ite *)
     | SingleBExp (SingleMul, SingleBExp (SingleSar, e0, SingleConst shift), SingleConst mul) ->
       if shift >= 0L && shift < 64L && Int64.shift_left 1L (Int64.to_int shift) = mul then
         eval_t (SingleBExp (SingleAnd, e0, SingleConst (Int64.neg mul)))
@@ -401,13 +401,28 @@ include SingleExpBasic
       | Some b ->
         [[ if b then l else r ]]
       | None ->
-        [[ SingleITE ((cond, cl, cr), l, r) ]]
+        if l = SingleTop || r = SingleTop then [[ SingleTop ]]
+        else [[ SingleITE ((cond, cl, cr), l, r) ]]
       end
       (* [ [SingleITE ((cond, cl |> eval_t |> convert_t, cr |> eval_t |> convert_t), l |> eval_t |> convert_t, r |> eval_t |> convert_t)] ] *)
     | SingleTop | SingleConst _ | SingleVar _ -> [ [e] ]
 
   let reorder_ite (e: t) : t =
     (* NOTE: this is a simple but inefficient implementation. If the exp to be eval is too complex, consider to improve it!!! *)
+    let rec has_top_helper (e: t) : bool = 
+      (* this is a very conservative helper to judge whether a exp has top or not 
+        note: has top does not mean the expression is top, 
+        e.g., SingleITE ((cond, SingleTop, SingleTop), l, r)) means the exp is either l or r *)
+      match e with
+      | SingleTop -> true
+      | SingleConst _ | SingleVar _ -> false
+      | SingleBExp (_, e1, e2) -> has_top_helper e1 || has_top_helper e2
+      | SingleUExp (_, e0) -> has_top_helper e0
+      | SingleITE ((_, cl, cr), l, r) -> has_top_helper l || has_top_helper r || has_top_helper cl || has_top_helper cr
+    in
+    let cond_has_top_helper (_, l, r) : bool =
+      has_top_helper l || has_top_helper r
+    in
     let simp_cond (cond_e: CondTypeBase.t * t * t) : CondTypeBase.t * t * t =
       let cond, l, r = cond_e in
       cond, l |> eval_t |> convert_t, r |> eval_t |> convert_t
@@ -436,7 +451,10 @@ include SingleExpBasic
         end
       | SingleITE (cond, cl, cr) ->
         let cond = simp_cond cond in
-        if SingleCondSet.mem cond true_cond_set then 
+        (* VERY IMPORTANT!!! We should not try to match/remove cond with top since two cond with top are not the same!!! *)
+        if cond_has_top_helper cond then
+          SingleITE (cond, helper true_cond_set false_cond_set cl, helper true_cond_set false_cond_set cr)
+        else if SingleCondSet.mem cond true_cond_set then 
           helper true_cond_set false_cond_set cl
         else if SingleCondSet.mem cond false_cond_set then 
           helper true_cond_set false_cond_set cr
@@ -458,6 +476,7 @@ include SingleExpBasic
     pp_single_exp 0 (convert_t (eval_t e));
     Printf.printf "\n====================\n"; *)
     (* convert_t (eval_t (e)) *)
+    (* NOTE: eval needs to guarantee that e cannot be converted to smt expr implies e = SingleTop!!! *)
     e |> reorder_ite |> eval_t |> convert_t
 
   let eval_align (align_map: (int * int64) list) (e: t) : t =
