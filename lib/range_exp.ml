@@ -90,7 +90,7 @@ module RangeExp = struct
       let v_le_b = Z3.BitVector.mk_sle ctx v_exp b_exp in
       let mod_step_eq_0 = 
         Z3.Boolean.mk_eq ctx 
-          (Z3.BitVector.mk_smod ctx diff_align step) 
+          (Z3.BitVector.mk_srem ctx diff_align step) 
           (SingleExp.to_smt_expr smt_ctx (SingleConst 0L)) 
       in
       Z3.Boolean.mk_and ctx [a_le_v; v_le_b; mod_step_eq_0]

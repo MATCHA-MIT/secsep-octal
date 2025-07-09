@@ -128,7 +128,7 @@ let rec convert_dep_type_inner
           | SingleXor -> Z3.BitVector.mk_xor ctx e1' e2'
           | SingleAnd -> Z3.BitVector.mk_and ctx e1' e2'
           | SingleOr ->  Z3.BitVector.mk_or ctx e1' e2'
-          | SingleMod -> Z3.BitVector.mk_smod ctx e1' e2'
+          | SingleMod -> Z3.BitVector.mk_srem ctx e1' e2'
           in
           DepType.Exp e
         end

@@ -196,7 +196,7 @@ let get_model (smt_ctx: t) : Model.model option =
           | SingleXor -> BitVector.mk_xor z3_ctx e1 e2
           | SingleAnd -> BitVector.mk_and z3_ctx e1 e2
           | SingleOr -> BitVector.mk_or z3_ctx e1 e2
-          | SingleMod ->BitVector.mk_smod z3_ctx e1 e2
+          | SingleMod ->BitVector.mk_srem z3_ctx e1 e2
         end
       | SingleUExp (op, se) ->
         let e = helper se in
@@ -259,7 +259,7 @@ let get_model (smt_ctx: t) : Model.model option =
           | SingleXor -> BitVector.mk_xor z3_ctx e1 e2, constraint_list
           | SingleAnd -> BitVector.mk_and z3_ctx e1 e2, constraint_list
           | SingleOr -> BitVector.mk_or z3_ctx e1 e2, constraint_list
-          | SingleMod ->BitVector.mk_smod z3_ctx e1 e2, constraint_list
+          | SingleMod ->BitVector.mk_srem z3_ctx e1 e2, constraint_list
         end
       | SingleUExp (op, se) ->
         let e, constraint_list = helper se constraint_list in
