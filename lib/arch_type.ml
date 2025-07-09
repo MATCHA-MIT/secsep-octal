@@ -501,7 +501,7 @@ module ArchType (Entry: EntryType) = struct
           anno_opt
         | _ -> (* Annotation not pass check or no annotation *)
         (* TODO: Still need to check with SMT solver after resolving range with opt_offset!!! *)
-          begin match MemType.set_mem_type smt_ctx sub_sol_list_func (Entry.repl_local_var curr_type.local_var_map) is_spill_func true true curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
+          begin match MemType.set_mem_type smt_ctx sub_sol_list_func (Entry.repl_local_var curr_type.local_var_map) is_spill_func true false curr_type.mem_type orig_addr_offset simp_addr_offset new_type with
           | Some (new_mem, write_constraints, slot_anno) -> 
             { curr_type with mem_type = new_mem }, 
             write_constraints @ addr_untaint_cons, 
