@@ -878,7 +878,7 @@ module RangeSubtype = struct
       (block_subtype_list: ArchType.block_subtype_t list)
       (tv_rel_list: t) (iter: int) : t =
     (* let single_sol_repl_helper = SingleSubtype.substitute_one_exp_subtype_list single_sol in *)
-    let sub_sol_single_to_range_helper = SingleSubtype.sub_sol_single_to_range (fun x -> x) single_sol input_var_set in
+    let sub_sol_single_to_range_helper = SingleSubtype.sub_sol_single_to_range ~repl_range_sol:true (fun x -> x) single_sol input_var_set in
     let ctx_map_map = ArchContextMap.init input_var_set block_subtype_list in
     Printf.printf "ctx_map_map\n%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map));
     let get_block_var = fun r -> SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) input_var_set in

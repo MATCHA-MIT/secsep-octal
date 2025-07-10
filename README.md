@@ -26,7 +26,7 @@ We need to annotate two things:
 1. Original bench has goto -> we replaced it with loops and function calls
 2. It passes a pointer to an array and later cast the array pointer to a struct with secret and public data.
 3. Current main function only call with specific length, which is not good.
-4. Need to fix the main function.
+4. Need to fix the main function - need to test with different input lengths to prevent us from generating too general constraints!!!
 
 ### x25519
 
@@ -69,6 +69,8 @@ Technique details worth documenting:
     2. End val is cannot be simply represented as a single exp (e.g., each loop do shift right to the counter), then we still have to reresent the loop out sol as a range.
     3. Old dirty fix for gen_other_loop_sol is deprecated since (1) it is not correct; (2) we do not need it after we calculating accurate bound with mod in 1.
     4. We need to resolve some inner loop counter even when its base is not resolved since the base cannot be represented in a nice formula before the outer loop is resolved, while the outer loop need the end_val of the inner loop counter to be resolved. However, in this case we cannot determine alignment, so for now we can only apply this technique when inner loop solution has step = 1.
+8. We should first canonicalize bound val and then try to find end val and resume val. Otherwise there might be issues such as "mod number with unexpected sign" (e.g., I think I am mod a positive length, but it can be negative after minus step. As a result, the expression does not work as expection.)
+9. In the current version single set sol is still only used for sol exp with input var only (during single infer)
 
 
 ### When do I represent solution to one block var with other block vars (from the same basic block)?
@@ -122,13 +124,87 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
 2. For SingleITE, we somehow do not directly do pattern matching with its condition, so we rely on SMT solver to evaluate the condition and only simplify its left and right expression.
 
 
+### Summary of different options to sub sol
+1. sub_sol_single_var
+   1. Only consider SolSimple (Single sol)
+   2. Used for SingleInputVarCondSubtype
+2. sub_sol_single_to_range_naive_repl
+   1. Sub to range if repl_range_sol
+   2. Sub to set if repl_set_sol (naive version)
+   3. Used in single_block_invariance
+3. sub_sol_single_to_offset_opt
+   1. Used as sub_sol_func in ArchType.type_prop_block
+   2. Specifically used for memory look up
+   3. No sub range in these use cases (to avoid making the range too loose, which might leads to unknown addresses)
+4. sub_sol_single_to_offset_list
+   1. Used as sub_sol_list_func in ArchType.type_prop_block, specifically used for SingleExp.find_base_adv (find base ptr) in mem lookup
+   2. Sub to range + sub to set: we want to repl as much as possible to help us get the base pointer
+   3. Since we do not rely on this to check memory access, it is fine if this one leads to memory address with wild ranges that does not fit in any mem slot.
+5. sub_sol_offset_to_offset
+   1. Used in get_heuristic_mem_type to get addresses used for generating extra invariants (added to tmp_context)
+   2. Sub to range (no sub to set)
+   3. We want to get rid of loop var, but keep loop boundaries in unified formula (instead of each term in set sol) to find invariants shared by all branches jump to the current block
+6. sub_sol_offset_to_offset_list
+   1. Used in get_heuristic_mem_type to heuristically find the accessed memory slot
+   2. Sub to range + sub to set
+   3. We want to get rid of loop var (we want to constrain loop boundary), and we only need to use one instance to loop up for the accessed slot
+7. sub_sol_single_to_range
+   1. range_subtype (repl_range_sol=true):
+      1. We rely on whether the var is a loop var to decide which rule to apply. 
+      2. I am quite surprised that infer is success even when we do not repl_range_sol here (which should not be the case orzzzzz)
+   2. update_mem (repl_range_sol=false): insert new stack slots (likely for the purpose of reserving space for callees), so it should not matter
+   3. add_var_bound_constraint
+      1. Goal is to find non-ptr, useful input vars and constrain their value to [0, 1<<31)
+      2. Why sub to range but not just check sol??? TODO!!!
+   4. SingleRetInvariance.gen_ret_invariance (repl_range_sol=false): whether sub to range does not matter since I care about infer invariants from set sol
+8. sub_sol_single_to_range_opt
+   1. Not used in other places
+   2. Used in try_solve_single_sub_val to simplify sub type that contains var with set sol -> no need to consider about range here
+9. sub_sol_single_to_single_func_interface
+   1. sub for func interface return val
+
+Helper functions:
+1. sub_sol_single_set_var
+   1. Sub all single set sol, and return list of all possible combinations
+2. sub_sol_to_offset_list
+   1. Pure helper func
+
+Other sub (used duing infer):
+1. substitute_one_exp_single_sol (helper): sub to single (consider pc assoc to the exp, so that loop var on loop out side can take a single value)
+2. substitute_one_exp_single_sol_list
+3. substitute_one_exp_subtype_list
+4. update_subtype_single_sol (TODO: check later!!!)
+
+### Dilemma of sub to range (about boundary invariants infer)
+If sub to range, it may make the expression too conservative and lead to unknown address (in nested loop, when there are sth like counter1 - counter2).
+If not, then in get_heuristic_mem_type, when we try to generate tmp context, we will use loop counter to generate the constraint. However, tmp_conext infer (invariance infer) does not work with counter. It should be converted to bound.
+
+Here is the current strategy:
+1. Most places we do not sub to range
+2. In tmp context invariance infer and update_mem we sub to range.
+
+Note: we want to use get_heuristic_mem_type to constrain bound, instead of the counter itself.
+If we cannot constrain bound through get_heuristic_mem_type, we can only expect we can find a nice bound expression that already satisfy/carry this constraint.
+
+Tricky case: bound comes from two branches, one has constraint by conditional branch, the other constrained by mod operation. We have to unify this to carry this constraint (prop br cond does not work here since it only constrain the orignal var in the branch block, not the var to be unified in the target block.)
+
+Another decision choice:
+1. When find heuristic mem slot, we sub both range and set sol
+2. When generate tmp context, we only sub range sol, but not set sol. This is because for var with set sol, we want to directly constrain its range instead of each of its subtype (which may not consistently satisfy the constraint) (actually we only want to constrain its subtype's val in the corresponding branch block's context).
+
+TODO: Potential improvement: 
+1. Replace counter vars following their dependency order may solve this problem.
+2. Propagagte the branch conditions more smartly so that even the format of the bound is not unified, we can still infer the condition - NOT EASY!
+
+
 ### NOTE
-1. We assume no block start witH branches 
+1. We assume no block start with branches 
     1. When we cannot find sub block with sub/sup pc, and sub_pc=sup_pc, we know it is the case that single subtype generate subtype in the same block context after call
     2. If block starts with conditional branches, it will make some pc-dependent substitution incorrect in single_subtype
 2. We do not merge subtype with different pc_list
 3. Since we substitute subtype solution, when finding var map across blocks, it is better to use supertype (e.g., when unifying base and bound).
 4. Solution contains SingleTop (tmp solution to break circular dependency) should be considered as unresolved as SolNone.
+5. Use smt solver to judge alignment is very useful (even with naive context setup) (do not need to think about how to simplify mod or judge alignment using my own heuristics)
 
 
 ### TODO
@@ -157,6 +233,10 @@ In this example, we need to first solve `i`, and then solve `k`. However, our cu
 23. Consider add slot idx to FullMemAnno
 24. How to handle declassification?
 25. How to handle pointer in branch condition (used in proof)?
+26. Improve sub to range for exp with counters in nested loops
+
+Bug in scale:
+1. When generating valid region for state->buf of CRYPTO_poly1305_update, scale generates [0, 16 * state->buf_used], but there should not be a 16* since the size of each entry is 1 (uint8_t) -> fixed, but another bug arise
 
 
 16. Add test bench:
@@ -200,7 +280,20 @@ What do we need to do to update mem content + permission?
     2. Mem read write permission check and invalidate 
     2. PtrInfo subtype check
 
-## July 5
-1. Test new non-overlap impl! 
+## July 6
+1. Test new non-overlap impl! (done)
+
+
+## July 7
+
+
+1. Debug single infer for chacha20
+    1. Sub to range may cause single infer fail
+    2. Find sol other fail?
+
+
+1. Document read/write at func call
+2. Debug range infer for chacha20
+
 2. Error when call with `poly1305_update(state, in - todo, todo);` -> need debug!
 3. Analyze problems of current range infer for chacha20, make a plan

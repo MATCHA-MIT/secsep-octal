@@ -49,13 +49,13 @@ module SingleBlockInvariance = struct
         (Sexplib.Sexp.to_string_hum (ArchType.sexp_of_t target_block));
       Printf.printf "br_var_map\n%s\n" (Sexplib.Sexp.to_string_hum (SingleExp.sexp_of_local_var_map_t br_var_map));
       let br_var_map = SingleExp.add_local_global_var br_var_map input_var_set in
-      (* The following code replace loop counter with there solution (the bound) on exiting the loop.
+      (* The following code replace loop counter with their solution (the bound) on exiting the loop.
          The key insight here is that the extra invariance is always about constraining the bound
          instead of the counter itself. *)
       let br_var_map =
         List.map (
           fun (var_idx, exp) ->
-            match SingleSubtype.sub_sol_single_to_range_naive_repl false single_subtype input_var_set branch_block.pc exp with
+            match SingleSubtype.sub_sol_single_to_range_naive_repl false false single_subtype input_var_set branch_block.pc exp with
             | Single simp_exp -> var_idx, simp_exp
             | _ -> var_idx, exp
         ) br_var_map
@@ -68,7 +68,7 @@ module SingleBlockInvariance = struct
         let counter_var_list =
           List.filter_map (
             fun (x: IsaBasic.imm_var_id) ->
-              match SingleSubtype.sub_sol_single_to_range_naive_repl false single_subtype input_var_set cond_pc (SingleVar x) with
+              match SingleSubtype.sub_sol_single_to_range_naive_repl true false single_subtype input_var_set cond_pc (SingleVar x) with
               | Range _ -> Some x
               | _ -> None
           ) (SingleExp.SingleVarSet.to_list vars)

@@ -309,6 +309,9 @@ module SingleTypeInfer = struct
         let result =
           ArchType.MemType.get_heuristic_mem_type 
             infer_state.smt_ctx 
+            (SingleSubtype.sub_sol_offset_to_offset 
+            (SingleExp.eval_align ptr_align_list)
+              infer_state.single_subtype infer_state.input_var_set)
             (SingleSubtype.sub_sol_offset_to_offset_list 
             (SingleExp.eval_align ptr_align_list)
               infer_state.single_subtype infer_state.input_var_set)

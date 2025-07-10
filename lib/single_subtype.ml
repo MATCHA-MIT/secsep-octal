@@ -71,6 +71,16 @@ module SingleSol = struct
     | SolSimple r -> RangeExp.has_top r
     | SolCond (_, r1, r2, r3) -> RangeExp.has_top r1 || RangeExp.has_top r2 || RangeExp.has_top r3
 
+  let is_single_set_sol (s: t) : bool =
+    match s with
+    | SolSimple (SingleSet e_list) -> List.length e_list > 1
+    | _ -> false
+
+  let is_single_sol (s: t) : bool =
+    match s with
+    | SolSimple (Single _) -> true
+    | _ -> false
+
   let to_smt_expr (smt_ctx: SmtEmitter.t) (v_idx: int) (s: t) : SmtEmitter.exp_t =
     if has_top s then SmtEmitter.mk_true smt_ctx else
     match s with
@@ -890,9 +900,10 @@ module SingleSubtype = struct
           let sub_exp_helper (e: SingleExp.t) : SingleExp.t =
             substitute_one_exp_single_sol_list idx_sol_list (e, [tv_rel_pc]) |> fst
           in *) 
-          (* We update subtype_list whenever solution containts Top. *)
+          (* We update subtype_list whenever we still want to apply any rules to solve for solution of improve current solution format, 
+            i.e., when solution contains Top or is set sol. *)
           let tv_rel =
-            if SingleSol.has_top tv_rel.sol then
+            if SingleSol.has_top tv_rel.sol || SingleSol.is_single_set_sol tv_rel.sol then
               { tv_rel with subtype_list = List.map sub_subtype_helper tv_rel.subtype_list }
             else tv_rel
           in
@@ -975,6 +986,7 @@ module SingleSubtype = struct
   let sub_sol_single_to_range_naive_repl
       (* NOTE: this is a internal sub helper func, and eval_helper would be called by its caller,
         so we do not have eval_helper for it *)
+      (repl_range_sol: bool)
       (repl_set_sol: bool)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
@@ -992,7 +1004,11 @@ module SingleSubtype = struct
           else helper e_sub
         | Range (l, r, step) -> 
           if l = SingleTop || r = SingleTop then Top
-          else Range (l, r, step)
+          else 
+            (* NOTE: sub to range will make the result expression too conservative, so we only apply it when necesssary. *)
+            (* TODO: think about whether we need to sub block var in l and r if repl_range_sol *)
+            if repl_range_sol then Range (l, r, step)
+            else Single (SingleVar v)
           (* if SingleExp.is_val input_var_set l && SingleExp.is_val input_var_set r then
             Range (l, r, step)
           else single_subtype_error (Printf.sprintf "sub_sol_single_to_range range %s contain local var\n" (RangeExp.to_string (Range (l, r, step)))) *)
@@ -1129,6 +1145,7 @@ module SingleSubtype = struct
     helper e
 
   let sub_sol_single_to_offset_opt
+      ?(repl_range_sol: bool = false)
       (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
@@ -1139,7 +1156,7 @@ module SingleSubtype = struct
     in
     if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) e then *)
     if is_sol_resolved tv_rel_list input_var_set e then
-      match sub_sol_single_to_range_naive_repl false tv_rel_list input_var_set e_pc e with
+      match sub_sol_single_to_range_naive_repl repl_range_sol false tv_rel_list input_var_set e_pc e with
       | Single e -> let e = eval_helper e in Some (e, e)
       | Range (l, r, _) -> Some (eval_helper l, eval_helper r)
       | _ -> let e = eval_helper e in Some (e, e)
@@ -1181,24 +1198,50 @@ module SingleSubtype = struct
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : (MemOffset.t list) option =
+    (* sub to range + sub to set*)
     let sub_to_list_helper = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp in
-    let sub_to_off_opt_helper = sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set in
+    let sub_to_off_opt_helper = sub_sol_single_to_offset_opt ~repl_range_sol:true eval_helper tv_rel_list input_var_set in
     sub_sol_to_offset_list sub_to_list_helper sub_to_off_opt_helper e
 
+  let sub_sol_offset_to_offset
+      (eval_helper: SingleExp.t -> SingleExp.t)
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (off_and_pc: MemOffset.t * int) : MemOffset.t option =
+    (* sub to range *)
+    let (l, r), off_pc = off_and_pc in
+    MemOffset.from_off_opt (
+      sub_sol_single_to_offset_opt ~repl_range_sol:true eval_helper tv_rel_list input_var_set (l, off_pc),
+      sub_sol_single_to_offset_opt ~repl_range_sol:true eval_helper tv_rel_list input_var_set (r, off_pc)
+    )
+
+  let sub_sol_offset_to_offset_list
+      (* eval_helper and check sol resolved are all done by calling sub_sol_single_to_offset_opt *)
+      (eval_helper: SingleExp.t -> SingleExp.t)
+      (tv_rel_list: t)
+      (input_var_set: SingleEntryType.SingleVarSet.t)
+      (off_and_pc: MemOffset.t * int) : (MemOffset.t list) option =
+    (* sub to range + sub to set *)
+    let sub_to_list_helper = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp in
+    let sub_to_off_opt_helper = sub_sol_offset_to_offset eval_helper tv_rel_list input_var_set in
+    sub_sol_to_offset_list sub_to_list_helper sub_to_off_opt_helper off_and_pc
+
   let sub_sol_single_to_range
+      ?(repl_range_sol: bool = false)
       (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t =
+    (* sub to range (if repl_range_sol) + sub to set; if both range and set, keep range, skip sub to set *)
     let e, e_pc = e in
     let e_list = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp e in
     match e_list with
     | [] -> single_subtype_error "sub_sol_single_to_range: get empty list"
     | e :: [] -> 
-      sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
+      sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc e
       |> (RangeExp.eval_helper eval_helper)
     | _ ->
-      let simp_e_list = List.map (sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc) e_list in
+      let simp_e_list = List.map (sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc) e_list in
       let single_e_list = List.filter_map (
         fun (x: RangeExp.t) ->
           match x with
@@ -1210,65 +1253,19 @@ module SingleSubtype = struct
         SingleSet single_e_list
         |> (RangeExp.eval_helper eval_helper)
       else
-        sub_sol_single_to_range_naive_repl true tv_rel_list input_var_set e_pc e
+        sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc e
         |> (RangeExp.eval_helper eval_helper)
 
-  let sub_sol_offset_to_offset_list
-      (* eval_helper and check sol resolved are all done by calling sub_sol_single_to_offset_opt *)
-      (eval_helper: SingleExp.t -> SingleExp.t)
-      (tv_rel_list: t)
-      (input_var_set: SingleEntryType.SingleVarSet.t)
-      (off_and_pc: MemOffset.t * int) : (MemOffset.t list) option =
-    let sub_to_list_helper = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp in
-    let sub_to_off_opt_helper (off_and_pc: MemOffset.t * int) : MemOffset.t option =
-      let (l, r), off_pc = off_and_pc in
-      MemOffset.from_off_opt (
-        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (l, off_pc),
-        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (r, off_pc)
-      ) 
-    in
-    (* = sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set in *)
-    sub_sol_to_offset_list sub_to_list_helper sub_to_off_opt_helper off_and_pc
-    (* let off, off_pc = off_and_pc in
-    let off_list = sub_sol_single_set_var tv_rel_list MemOffset.get_vars MemOffset.repl_var_exp off in
-    let simp_off_helper (off: MemOffset.t) : MemOffset.t option =
-      let l, r = off in
-      MemOffset.from_off_opt (
-        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (l, off_pc),
-        sub_sol_single_to_offset_opt eval_helper tv_rel_list input_var_set (r, off_pc)
-      ) 
-    in
-    match off_list with
-    | [] -> single_subtype_error "sub_sol_offset_to_offset_list: get empty list"
-    | off :: [] ->
-      let off_opt = simp_off_helper off in
-      begin match off_opt with
-      | Some out_off -> Some [out_off]
-      | None -> None
-      end
-    | _ ->
-      let simp_off_list = List.filter_map simp_off_helper off_list in
-      if List.length simp_off_list = List.length off_list then
-        Some simp_off_list
-      else
-        let off_opt = simp_off_helper off in
-        begin match off_opt with
-        | Some out_off -> Some [out_off]
-        | None -> None
-        end *)
-
   let sub_sol_single_to_range_opt
+      ?(repl_range_sol: bool = false)
       (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t option =
+    (* sub to range (if repl_range_sol) + sub to set; if both range and set, keep range, skip sub to set *)
     let exp, _ = e in
-    (* let resolved_vars = 
-      List.filter_map (fun (x: type_rel) -> if x.sol <> SolNone then let idx, _ = x.var_idx in Some idx else None) tv_rel_list
-    in
-    if SingleExp.is_val (SingleExp.SingleVarSet.union (SingleExp.SingleVarSet.of_list resolved_vars) input_var_set) exp then *)
     if is_sol_resolved tv_rel_list input_var_set exp then
-      Some (sub_sol_single_to_range eval_helper tv_rel_list input_var_set e)
+      Some (sub_sol_single_to_range ~repl_range_sol:repl_range_sol eval_helper tv_rel_list input_var_set e)
     else None
 
   let sub_sol_single_to_single_func_interface
@@ -1276,6 +1273,7 @@ module SingleSubtype = struct
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (pc: int) (e: SingleEntryType.t) : SingleEntryType.t =
+    (* only sub to single *)
     let r = 
       sub_sol_single_to_range eval_helper tv_rel_list input_var_set (e, pc) 
     in
@@ -1360,7 +1358,7 @@ module SingleSubtype = struct
       (ctx_map_map: ArchContextMap.t)
       (single_ite_eval: SingleIteEval.t)
       (input_var_set: SingleEntryType.SingleVarSet.t) : 
-      type_rel =
+      type_rel option =
     (* let target_idx, target_pc = tv_rel.var_idx in *)
     (* let try_solve_top (tv_rel: type_rel) : type_rel =
       match List.find_opt (fun (x, _) -> x = SingleEntryType.SingleTop) tv_rel.subtype_list with
@@ -1611,7 +1609,22 @@ module SingleSubtype = struct
         if List.length sub_range_opt_list <> List.length sub_range_list then tv_rel
         else if List.find_opt (fun x -> x = RangeExp.Top) sub_range_list <> None then { tv_rel with sol = SolSimple (Top) }
         else begin
-          let rec helper 
+          (* Example handled by this case: x <- y + 1, y <- { v1, v2 } where v1 v2 are input var *)
+          let filter_input_sol (r: RangeExp.t) : (SingleExp.t list) option =
+            match r with
+            | Single e -> if SingleExp.is_val input_var_set e then Some [ e ] else None
+            | Range _ -> None
+            | SingleSet set ->
+              if List.find_opt (fun x -> not (SingleExp.is_val input_var_set x)) set <> None then None else Some set
+            | _ -> None
+          in
+          let single_set_list = List.filter_map filter_input_sol sub_range_list in
+          if List.length sub_range_list <> List.length single_set_list then tv_rel
+          else
+            { tv_rel with sol = SolSimple (SingleSet (List.concat single_set_list |> SingleExpSet.of_list |> SingleExpSet.to_list)) }
+
+          (* NOTE: Since we remove sub to range in sub_sol_single_to_range_opt, we remove this too. *)
+          (* let rec helper 
               (range_list: RangeExp.t list) : 
               (SingleEntryType.t list) * 
               ((SingleEntryType.t * SingleEntryType.t * int64) list) =
@@ -1643,6 +1656,7 @@ module SingleSubtype = struct
               { tv_rel with sol = SolSimple (Range (s, r, step)) (* |> RangeExp.canonicalize) *) }
             else tv_rel
           | _ -> tv_rel (* TODO: Maybe need to improve this!!! *)
+          *)
         end
       end
     in
@@ -1851,22 +1865,92 @@ module SingleSubtype = struct
         end
     in
     let bound_match 
+        (step_before_cmp: bool)
         (on_left: bool) (cond: ArchType.CondType.cond)
-        (begin_val: SingleEntryType.t) (end_val: SingleEntryType.t) (step: int64) : (RangeExp.t * RangeExp.t * RangeExp.t) option =
+        (begin_val: SingleEntryType.t) (bound_val: SingleEntryType.t) (step: int64) : (RangeExp.t * RangeExp.t * RangeExp.t) option =
+
+      (* 1. canonicalize bound val
+         2. get end val from step_before_cmp
+         3. get resume val
+         4. sanity check on bound
+         5. get final solution *)
+
+      (* 1. canonicalize bound val *)
+      let canonicalize_helper (* e1, step, e2 *)
+          (e1: SingleExp.t) (step: int64) (e2: SingleExp.t) : SingleExp.t =
+        let inclusive_bound =
+          match cond with
+          | Ne | Lt | Bt -> false
+          | Le | Be -> true
+          | Eq -> single_subtype_error "this should not be reachable"
+        in
+        let step_sign_op, step_abs =
+          if step > 0L then
+            SingleExp.SingleSub, SingleExp.SingleConst step
+          else if step < 0L then
+            SingleExp.SingleAdd, SingleConst (Int64.neg step)
+          else single_subtype_error "step is 0" 
+        in
+        let step_exp = SingleExp.SingleConst step in
+        let len = SingleExp.eval (SingleBExp (SingleSub, e2, e1)) in
+        let len_div_step = 
+          if SingleExp.is_div len step then true
+          else 
+            len <> SingleTop &&
+            SingleCondType.check true smt_ctx [ (Eq, SingleBExp (SingleMod, len, SingleConst step), SingleConst 0L) ] = SatYes    
+        in
+        if len_div_step then
+          if inclusive_bound then
+            SingleBExp (SingleAdd, e2, step_exp)
+          else
+            e2
+        else 
+          if inclusive_bound then
+            SingleBExp (
+              SingleSub, 
+              SingleBExp (SingleAdd, e2, step_exp), 
+              SingleBExp (SingleMod, len, step_abs)
+            )
+          else
+            SingleBExp (
+              SingleSub,
+              SingleBExp (SingleAdd, e2, SingleBExp (step_sign_op, step_exp, SingleConst 1L)),
+              SingleBExp (SingleMod, SingleBExp (SingleAdd, len, SingleBExp (step_sign_op, step_exp, SingleConst 1L)), step_abs)
+            )
+      in
+      let bound_val = canonicalize_helper begin_val step bound_val |> SingleExp.eval in
+
+      (* 2. get end val from step_before_cmp *)
+      let end_val_in = (* end_val of the counter reg in the beginning of the block! *)
+        if step_before_cmp then 
+          (* Pattern: counter += step; cmp counter bound; conditional jmp *)
+          SingleEntryType.eval (SingleBExp (SingleSub, bound_val, SingleConst step))
+        else 
+          (* Pattern: cmp counter bound; conditional jmp *)
+          bound_val
+      in
+
+
+      (* 3. get resume val *)
+      let end_val_resume = SingleEntryType.eval (SingleBExp (SingleSub, end_val_in, SingleConst step)) in
+
+
+      (* 4. sanity check on bound *)
       let inc = step > 0L in
-      let len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val, begin_val)) in
-      let len_div_step = SingleEntryType.is_div len_val step in
+      (* let len_val = SingleEntryType.eval (SingleBExp (SingleSub, end_val_in, begin_val)) in
+      let len_div_step = SingleEntryType.is_div len_val step in *)
       (* Check whether cmp opcode, operand, and step value are compatible *)
       let match_success =
         match on_left, inc, cond with
         | _, _, Ne ->
-          if not len_div_step then Printf.printf "Warning: for jne, step %Ld does not div len %s\n" step (SingleEntryType.to_string len_val);
+          (* if not len_div_step then Printf.printf "Warning: for jne, step %Ld does not div len %s\n" step (SingleEntryType.to_string len_val); *)
           true
         | _, _, Eq -> false
         | _ -> on_left = inc
       in
       if not match_success then None else
-      let add_const (e: SingleExp.t) (v: int64) =
+
+      (* let add_const (e: SingleExp.t) (v: int64) =
         SingleExp.eval (SingleBExp (SingleAdd, e, SingleConst v))
       in
       let canonicalize_end_val (* e1, step, e2 *)
@@ -1879,9 +1963,10 @@ module SingleSubtype = struct
           SingleBExp (SingleAdd, end_val, SingleBExp (SingleMod, SingleBExp (SingleSub, begin_val, end_val), SingleConst (Int64.neg step)))
         |> SingleExp.eval
       in
+      Printf.printf "begin %s\nend %s\nlen %s\n" (SingleExp.to_string begin_val) (SingleExp.to_string end_val) (SingleExp.to_string len_val);
       let end_val_resume = (* boundary value of the counter (in the beginning of the loop) when the loop will resume after finish the current one *)
         match cond with
-        | Ne -> add_const end_val (Int64.neg step)
+        | Ne (* -> add_const end_val (Int64.neg step) *)
         | Lt | Bt ->
           if len_div_step then add_const end_val (Int64.neg step) (* equal to value on the else branch when len_div_step *)
           else add_const end_val (if inc then -1L else 1L) |> canonicalize_end_val begin_val step
@@ -1890,7 +1975,9 @@ module SingleSubtype = struct
           else end_val |> canonicalize_end_val begin_val step
         | Eq -> single_subtype_error "this should not be reachable"
       in
-      let end_val_in = add_const end_val_resume step in
+      let end_val_in = add_const end_val_resume step in *)
+
+      (* 5. get final solution *)
       let get_range_helper l r (s: int64) =
         if s > 0L then RangeExp.Range (l, r, s)
         else if s < 0L then RangeExp.Range (r, l, Int64.neg s)
@@ -1950,15 +2037,8 @@ module SingleSubtype = struct
         (resume_on_taken: bool)
         (cmp_operand: ArchType.CondType.cond) (cmp_var_on_left: bool)
         (var_cmp_in_same_block: bool) : SingleSol.t =
-      let end_val = (* end_val of the counter reg in the beginning of the block! *)
-        if step_before_cmp then 
-          (* Pattern: counter += step; cmp counter bound; conditional jmp *)
-          SingleEntryType.eval (SingleBExp (SingleSub, bound_val, SingleConst step))
-        else 
-          (* Pattern: cmp counter bound; conditional jmp *)
-          bound_val
-      in
-      match bound_match cmp_var_on_left cmp_operand begin_val end_val step with
+      (* TODO: the actual step exp might be something like min(counter, step_val), which is different from step_val, so we should not calculate end_val in this way!!! *)
+      match bound_match step_before_cmp cmp_var_on_left cmp_operand begin_val bound_val step with
       | Some (range_in, range_resume, range_out) ->
         if var_cmp_in_same_block then
           if resume_on_taken then
@@ -1966,7 +2046,7 @@ module SingleSubtype = struct
           else SolCond (cmp_pc, range_in, range_out, range_resume)
         else SolSimple range_in
       | None -> 
-        Printf.printf "Bound match cannot find sol begin %s end %s\n" (SingleEntryType.to_string begin_val) (SingleEntryType.to_string end_val);
+        Printf.printf "Bound match cannot find sol begin %s end %s\n" (SingleEntryType.to_string begin_val) (SingleEntryType.to_string bound_val);
         SolNone
     in
     let gen_other_loop_sol
@@ -2148,6 +2228,7 @@ module SingleSubtype = struct
             end
           | None ->
             (* Represent sol with the actual loop counter *)
+            Printf.printf "Try find other for var %d loop info\n%s\n" (fst tv_rel.var_idx) (Sexplib.Sexp.to_string_hum (sexp_of_loop_info_t loop_info));
             if loop_info.base = SingleTop then tv_rel else
             let find_other : (SingleSol.t * (SingleContext.t list)) option =
               List.find_map (
@@ -2171,6 +2252,7 @@ module SingleSubtype = struct
                       if SingleEntryType.cmp new_l other_loop_info.step_exp = 0 || SingleEntryType.cmp new_r other_loop_info.step_exp = 0
                         || SingleEntryType.cmp new_l (SingleVar other_loop_info.step_var_idx) = 0
                         || SingleEntryType.cmp new_r (SingleVar other_loop_info.step_var_idx) = 0 then begin
+                        Printf.printf "find other var %d loop info\n%s\n" (fst tv.var_idx) (Sexplib.Sexp.to_string_hum (sexp_of_loop_info_t other_loop_info));
                         match tv.sol with
                         | SolCond (_, Range (v_l, v_r, _), _, _)
                         | SolSimple (Range (v_l, v_r, _)) ->
@@ -2215,7 +2297,25 @@ module SingleSubtype = struct
       try_solve_loop_cond;
       try_solve_single_sub_val;
     ] in
-    let tv_rel_opt = 
+
+    (* If find new sol or upgrade current solution to a better version, return some new_tv_rel *)
+    if List.is_empty tv_rel.subtype_list then None
+    else if SingleSol.has_top tv_rel.sol then
+      List.find_map (
+        fun rule ->
+          let tv_rel = rule tv_rel in
+          if SingleSol.has_top tv_rel.sol then None
+          else Some tv_rel
+      ) solve_rules
+    else if SingleSol.is_single_set_sol tv_rel.sol then
+      let new_tv_rel = try_solve_single_corr tv_rel in
+      if SingleSol.is_single_sol new_tv_rel.sol then
+        Some new_tv_rel
+      else None
+    else
+      None
+
+    (* let tv_rel_opt = 
       if List.is_empty tv_rel.subtype_list then None else
       List.find_map (
         fun rule ->
@@ -2226,7 +2326,7 @@ module SingleSubtype = struct
     in
     match tv_rel_opt with
     | Some tv_rel -> tv_rel
-    | None -> tv_rel
+    | None -> tv_rel *)
 
   let get_single_ite_eval
       (smt_ctx: SmtEmitter.t)
@@ -2257,8 +2357,12 @@ module SingleSubtype = struct
       (input_var_set: SingleEntryType.SingleVarSet.t) : t * bool =
     let new_sol_list, new_subtype = List.fold_left_map (
       fun acc tv_rel ->
-        if not (SingleSol.has_top tv_rel.sol) then acc, tv_rel
-        else
+        (* We judge whether we want to apply rules in try_solve_one_var *)
+        match try_solve_one_var smt_ctx tv_rel tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set with
+        | Some new_tv_rel -> (new_tv_rel.var_idx, new_tv_rel.sol) :: acc, new_tv_rel
+        | None -> acc, tv_rel
+        (* if not (SingleSol.has_top tv_rel.sol) then acc, tv_rel
+        else *)
           (* NOTE: I eventually decide to not merge since this may get rid of some useful branch information by removing subtype with some pc history,
               which may prevent us from find correct loop solution. *)
           (* Merge same subtype exp, keep the smaller pc which means fewer constraints from cond branch *)
@@ -2292,9 +2396,9 @@ module SingleSubtype = struct
             ) tv_rel.subtype_list)
           in
           let tv_rel = { tv_rel with subtype_list = subtype_list } in *)
-          let tv_rel = try_solve_one_var smt_ctx tv_rel tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set in
+          (* let tv_rel = try_solve_one_var smt_ctx tv_rel tv_rel_list block_subtype ctx_map_map single_ite_eval input_var_set in
           if tv_rel.sol = SolNone then acc, tv_rel
-          else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel
+          else (tv_rel.var_idx, tv_rel.sol) :: acc, tv_rel *)
     ) [] tv_rel_list
     in
     (* Printf.printf "Update subtype_single_sol with new sol\n";

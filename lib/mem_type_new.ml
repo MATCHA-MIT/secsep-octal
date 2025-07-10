@@ -717,6 +717,7 @@ module MemType (Entry: EntryType) = struct
 
   let get_heuristic_mem_type
       (smt_ctx: SmtEmitter.t)
+      (sub_sol_to_off_func: MemOffset.t * int -> MemOffset.t option)
       (sub_sol_to_list_func: MemOffset.t * int -> (MemOffset.t list) option)
       (input_var_set: SingleExp.SingleVarSet.t)
       (var_type_map: SingleExp.var_type_map_t)
@@ -729,7 +730,11 @@ module MemType (Entry: EntryType) = struct
       else
         match sub_sol_to_list_func addr_off_pc with
         | Some [ simp_off ] -> Some (simp_off, simp_off)
-        | Some simp_off_list -> Some (List.hd simp_off_list, orig_off)
+        | Some simp_off_list -> 
+          begin match sub_sol_to_off_func addr_off_pc with
+          | Some simp_range_off -> Some (List.hd simp_off_list, simp_range_off)
+          | None -> Some (List.hd simp_off_list, orig_off)
+          end
         | None -> None
     in
     match try_simp_off_opt with
