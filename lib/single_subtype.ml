@@ -2412,13 +2412,10 @@ module SingleSubtype = struct
   let solve_vars
       (smt_ctx: SmtEmitter.t)
       (tv_rel_list: t)
+      (ctx_map_map: ArchContextMap.t)
       (block_subtype: ArchType.block_subtype_t list)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (num_iter: int) : t =
-    Printf.printf "Before ArchContextMap.init\n%!";
-    let ctx_map_map = ArchContextMap.init input_var_set block_subtype in
-    (* Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map)); *)
-    Printf.printf "After ArchContextMap.init\n%!";
     let rec helper
         (tv_rel_list: t)
         (num_iter: int) : t =

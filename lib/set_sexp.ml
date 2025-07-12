@@ -66,3 +66,22 @@ include IntMap
     sexp_of_list sexp_of_key_val_t (IntMap.to_list map)
 
 end
+
+module StrMapSexp (Entry: MapEntryType) = struct
+include StrMap
+
+  type val_t = Entry.t
+  [@@deriving sexp]
+
+  type key_val_t = string * val_t
+  [@@deriving sexp]
+
+  type t = val_t StrMap.t
+
+  let t_of_sexp (sexp: Sexp.t) : t =
+    list_of_sexp key_val_t_of_sexp sexp |> StrMap.of_list
+
+  let sexp_of_t (map: t) : Sexp.t =
+    sexp_of_list sexp_of_key_val_t (StrMap.to_list map)
+
+end

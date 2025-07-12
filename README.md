@@ -15,6 +15,7 @@ We need to annotate two things:
 
 ### sha512
 1. Additionally initialize `sha512_state_st.p` to make range infer easier (should eventually revert this change).
+2. It suddenly works without the above countermeasure. Need double check!!! (Maybe test with different input lengths and check checker's correctness!)
 
 ### ed25519
 1. Currently we only have sign, no verify (due to declassification)
@@ -71,6 +72,10 @@ Technique details worth documenting:
     4. We need to resolve some inner loop counter even when its base is not resolved since the base cannot be represented in a nice formula before the outer loop is resolved, while the outer loop need the end_val of the inner loop counter to be resolved. However, in this case we cannot determine alignment, so for now we can only apply this technique when inner loop solution has step = 1.
 8. We should first canonicalize bound val and then try to find end val and resume val. Otherwise there might be issues such as "mod number with unexpected sign" (e.g., I think I am mod a positive length, but it can be negative after minus step. As a result, the expression does not work as expection.)
 9. In the current version single set sol is still only used for sol exp with input var only (during single infer)
+10. Propagate br cond:
+    1.  SingleInputVarCondSubtype: works well with loop, but can only deal with branch cond that can be converted to input var
+    2.  SingleBrCondProp: works with block var, but so far it cannot propagate cond outside a loop body to blocks in the loop body (the propagate logic is relative simple)
+    3.  TODO: improve SingleBrCondProp so that it may evetually replace SingleInputVarCondSubtype
 
 
 ### When do I represent solution to one block var with other block vars (from the same basic block)?
@@ -234,12 +239,10 @@ TODO: Potential improvement:
 24. How to handle declassification?
 25. How to handle pointer in branch condition (used in proof)?
 26. Improve sub to range for exp with counters in nested loops
-
-Bug in scale:
-1. When generating valid region for state->buf of CRYPTO_poly1305_update, scale generates [0, 16 * state->buf_used], but there should not be a 16* since the size of each entry is 1 (uint8_t) -> fixed, but another bug arise
+27. add_var_bound_constraint???
 
 
-16. Add test bench:
+28. Add test bench:
 ```
     i = 4, j = 0
 loop:

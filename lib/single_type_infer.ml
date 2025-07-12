@@ -11,8 +11,10 @@ open Single_context
 open Constraint
 (* open Constraint *)
 open Func_interface
+open Arch_context_map
 open Single_subtype
 open Single_input_var_cond_subtype
+open Single_br_cond_prop
 open Single_block_invariance
 open Single_ret_invariance
 open Mem_alive
@@ -180,8 +182,9 @@ module SingleTypeInfer = struct
           end
       ) (start_pc, start_var) func_body
     in
-    let next_var, arch_type_list = init_extra_call_var_map func_body arch_type_list func_interface_list next_var in
+    let next_var, arch_type_list = init_extra_call_var_map func_body arch_type_list func_interface_list next_var in 
     let var_type_map = ArchType.MemType.get_var_type_map func_mem_interface in
+
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
       func_name = func_name;
@@ -736,6 +739,17 @@ module SingleTypeInfer = struct
         in
         Printf.printf "\n\n%s: Infer iter %d after SingleInputVarCondSubtype%!\n\n" func_name curr_iter;
 
+        Printf.printf "Before ArchContextMap.init\n%!";
+        let ctx_map_map = ArchContextMap.init state.input_var_set block_subtype in
+        (* Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map)); *)
+        Printf.printf "After ArchContextMap.init\n%!";
+        let func_type = 
+          SingleBrCondProp.solve
+          (SingleSubtype.sub_sol_single_to_range_opt (SingleExp.eval_align ptr_align_list) state.single_subtype state.input_var_set)
+          state.input_var_set ctx_map_map block_subtype func_type
+        in
+        Printf.printf "\n\n%s: Infer iter %d after SingleBrCondProp%!\n\n" func_name curr_iter;
+
         (* 5. Extra block invariance infer (resolve tmp_context) *)
         let func_type, tmp_context_resolved = 
           if unknown_resolved && callee_context_resolved then
@@ -786,7 +800,7 @@ module SingleTypeInfer = struct
         (* Printf.printf "Block_subtype\n";
         pp_graph block_subtype; *)
         let single_subtype = 
-          SingleSubtype.solve_vars state.smt_ctx single_subtype block_subtype state.input_var_set solver_iter
+          SingleSubtype.solve_vars state.smt_ctx single_subtype ctx_map_map block_subtype state.input_var_set solver_iter
           (* |> SingleSubtype.remove_top_subtype  *)
           (* Optimization to speedup sub_sol *)
         in
