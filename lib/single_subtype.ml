@@ -98,6 +98,8 @@ module SingleSol = struct
 
 end
 
+module SolMap = IntMapSexp (SingleSol)
+
 module SingleSubtype = struct
   exception SingleSubtypeError of string
 
@@ -1228,44 +1230,50 @@ module SingleSubtype = struct
 
   let sub_sol_single_to_range
       ?(repl_range_sol: bool = false)
+      ?(repl_set_sol: bool = true)
       (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t =
-    (* sub to range (if repl_range_sol) + sub to set; if both range and set, keep range, skip sub to set *)
+    (* sub to range (if repl_range_sol) + sub to set (if repl_set_sol); if both range and set, keep range, skip sub to set *)
     let e, e_pc = e in
-    let e_list = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp e in
-    match e_list with
-    | [] -> single_subtype_error "sub_sol_single_to_range: get empty list"
-    | e :: [] -> 
-      sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc e
+    if repl_set_sol then
+      let e_list = sub_sol_single_set_var tv_rel_list SingleExp.get_vars SingleExp.repl_var_exp e in
+      match e_list with
+      | [] -> single_subtype_error "sub_sol_single_to_range: get empty list"
+      | e :: [] -> 
+        sub_sol_single_to_range_naive_repl repl_range_sol repl_set_sol tv_rel_list input_var_set e_pc e
+        |> (RangeExp.eval_helper eval_helper)
+      | _ ->
+        let simp_e_list = List.map (sub_sol_single_to_range_naive_repl repl_range_sol repl_set_sol tv_rel_list input_var_set e_pc) e_list in
+        let single_e_list = List.filter_map (
+          fun (x: RangeExp.t) ->
+            match x with
+            | Single e -> Some e
+            | _ -> None
+        ) simp_e_list
+        in
+        if List.length simp_e_list = List.length single_e_list then
+          SingleSet single_e_list
+          |> (RangeExp.eval_helper eval_helper)
+        else
+          sub_sol_single_to_range_naive_repl repl_range_sol repl_set_sol tv_rel_list input_var_set e_pc e
+          |> (RangeExp.eval_helper eval_helper)
+    else 
+      sub_sol_single_to_range_naive_repl repl_range_sol repl_set_sol tv_rel_list input_var_set e_pc e
       |> (RangeExp.eval_helper eval_helper)
-    | _ ->
-      let simp_e_list = List.map (sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc) e_list in
-      let single_e_list = List.filter_map (
-        fun (x: RangeExp.t) ->
-          match x with
-          | Single e -> Some e
-          | _ -> None
-      ) simp_e_list
-      in
-      if List.length simp_e_list = List.length single_e_list then
-        SingleSet single_e_list
-        |> (RangeExp.eval_helper eval_helper)
-      else
-        sub_sol_single_to_range_naive_repl repl_range_sol true tv_rel_list input_var_set e_pc e
-        |> (RangeExp.eval_helper eval_helper)
 
   let sub_sol_single_to_range_opt
       ?(repl_range_sol: bool = false)
+      ?(repl_set_sol: bool = true)
       (eval_helper: SingleExp.t -> SingleExp.t)
       (tv_rel_list: t)
       (input_var_set: SingleEntryType.SingleVarSet.t)
       (e: type_pc_t) : RangeExp.t option =
-    (* sub to range (if repl_range_sol) + sub to set; if both range and set, keep range, skip sub to set *)
+    (* sub to range (if repl_range_sol) + sub to set (if repl_set_sol); if both range and set, keep range, skip sub to set *)
     let exp, _ = e in
     if is_sol_resolved tv_rel_list input_var_set exp then
-      Some (sub_sol_single_to_range ~repl_range_sol:repl_range_sol eval_helper tv_rel_list input_var_set e)
+      Some (sub_sol_single_to_range ~repl_range_sol:repl_range_sol ~repl_set_sol:repl_set_sol eval_helper tv_rel_list input_var_set e)
     else None
 
   let sub_sol_single_to_single_func_interface
@@ -1422,7 +1430,7 @@ module SingleSubtype = struct
           let test_one_sol_template 
               (idx_sol_template: int * SingleExp.t) : 
               (int * SingleExp.t, (int * SingleExp.t) option) Either.t =
-            (* if test success, return Left sol_tempate, otherwise, return Right sub_sol !!! *)
+            (* if test success, return Left sol_template, otherwise, return Right sub_sol !!! *)
             let sol_idx, sol_template = idx_sol_template in
             let sub_exp = get_sub_exp sol_idx in
             let sub_sol =
@@ -2572,5 +2580,48 @@ module SingleSubtype = struct
   let remove_top_subtype
       (tv_rel_list: t) : t =
     List.filter (fun (x: type_rel) -> SingleSol.has_top x.sol |> not) tv_rel_list
+
+  let combine_loop_cond_sol_map
+      (old_tv_rel_list: t)
+      (tv_rel_list: t) : t =
+    (* Case: for loop counters of loops that can only be executed once, 
+      we will first solve the counter as SolCond (range in, range resume, val out).
+      Then, we will notice that the loop jump back branch can never be taken,
+      and the sol will be downgraded to SolSimple (Single begin_val).
+      The problem is that the solution does not reveal the relation between the counter
+      and the bound val, which is not helpful for us to infer a good fomula of valid region 
+      after the loop, which is better to be represented by loop bound.
+      Hence, we use the old Sol to generated SolCond for loop counter (one side of the SolCond will be useless). *)
+
+    (* Potential issue of this implementation:
+        1. Sol is staled or wrong (since it comes from the old iter)
+        2. Sol is not fully simplified by current solution to other var (the new iter may resolve more var) *)
+
+    let orig_loop_cond_sol_map =
+      List.filter_map (
+        fun (tv_rel: type_rel) ->
+          match tv_rel.sol with
+          | SolCond _ -> Some (fst (tv_rel.var_idx), tv_rel.sol)
+          | _ -> None
+      ) old_tv_rel_list
+      |> SolMap.of_list
+    in
+
+    (* TODO: This is too naive!!! Improve this after quick test!!! *)
+    let helper (tv_rel: type_rel) : type_rel =
+      match tv_rel.sol, SolMap.find_opt (fst tv_rel.var_idx) orig_loop_cond_sol_map with
+      | SolSimple (Single curr_sol), Some (SolCond (pc, r1, r2, r3)) ->
+        let self = RangeExp.Single (SingleVar (fst tv_rel.var_idx)) in
+        let sol : SingleSol.t = 
+          match r1, r2, r3 with
+          | Range _, Range _, Single end_val -> SolCond (pc, Single curr_sol, self, Single end_val)
+          | Range _, Single end_val, Range _ -> SolCond (pc, Single curr_sol, Single end_val, self)
+          | _, Single taken, Single not_taken -> SolCond (pc, Single curr_sol, Single taken, Single not_taken)
+          | _ -> tv_rel.sol
+        in
+        { tv_rel with sol = sol }
+      | _ -> tv_rel
+    in
+    List.map helper tv_rel_list
 
 end

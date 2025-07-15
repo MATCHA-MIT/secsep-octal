@@ -22,12 +22,14 @@ We need to annotate two things:
 2. Added noinline to specific functions to make infer and check work.
 
 ### chacha20
+1. The benchmark itself allows `in` and `out` array are the same array, but our type system can only work if we assume they are non-overlapped.
+2. We also add an extra assumption to indicate that `in - out >= 32`.
 
 ### poly1305
 1. Original bench has goto -> we replaced it with loops and function calls
 2. It passes a pointer to an array and later cast the array pointer to a struct with secret and public data.
 3. Current main function only call with specific length, which is not good.
-4. Need to fix the main function - need to test with different input lengths to prevent us from generating too general constraints!!!
+4. Need to fix the main function - need to test with different input lengths to prevent us from generating too general constraints!!! (done)
 
 ### x25519
 
@@ -76,6 +78,17 @@ Technique details worth documenting:
     1.  SingleInputVarCondSubtype: works well with loop, but can only deal with branch cond that can be converted to input var
     2.  SingleBrCondProp: works with block var, but so far it cannot propagate cond outside a loop body to blocks in the loop body (the propagate logic is relative simple)
     3.  TODO: improve SingleBrCondProp so that it may evetually replace SingleInputVarCondSubtype
+11. Problem of downgraded solution to loop counter:
+    1. For loop counters of loops that can only be executed once, we will first solve the counter as SolCond (range in, range resume, val out).
+    2. Then, we will notice that the loop jump back branch can never be taken, and the sol will be downgraded to SolSimple (Single begin_val). 
+    3. The problem is that the solution does not reveal the relation between the counter and the bound val, which is not helpful for us to infer a good fomula of valid region after the loop, which is better to be represented by loop bound.
+    4. Hence, we use the old Sol to generated SolCond for loop counter (one side of the SolCond will be useless). (`SingleSubtype.combine_loop_cond_sol_map`)
+    5. Benifit:
+       1. SingleInfer: help to unify counter's out value with other branches where the counter register's value is directly generated.
+       2. RangeInfer: represent the valid region after loop with bound value, which help to unify the valid region formula.
+    6. Potential issue of this implementation:
+       1. Sol is staled or wrong (since it comes from the old iter)
+       2. Sol is not fully simplified by current solution to other var (the new iter may resolve more var)
 
 
 ### When do I represent solution to one block var with other block vars (from the same basic block)?
@@ -295,8 +308,8 @@ What do we need to do to update mem content + permission?
     2. Find sol other fail?
 
 
-1. Document read/write at func call
-2. Debug range infer for chacha20
+2. Document read/write at func call
+3. Debug range infer for chacha20
 
-2. Error when call with `poly1305_update(state, in - todo, todo);` -> need debug!
-3. Analyze problems of current range infer for chacha20, make a plan
+4. Error when call with `poly1305_update(state, in - todo, todo);` -> need debug!
+5. Analyze problems of current range infer for chacha20, make a plan

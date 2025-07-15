@@ -804,6 +804,7 @@ module SingleTypeInfer = struct
           (* |> SingleSubtype.remove_top_subtype  *)
           (* Optimization to speedup sub_sol *)
         in
+        let single_subtype = SingleSubtype.combine_loop_cond_sol_map state.single_subtype single_subtype in
         Printf.printf "After infer, single subtype len %d%!\n" (List.length single_subtype);
         SingleSubtype.pp_single_subtype 0 single_subtype;
         let single_subtype = SingleSubtype.remove_top_subtype single_subtype in
