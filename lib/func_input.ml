@@ -1,4 +1,5 @@
 open Single_entry_type
+open Single_context
 open Taint_exp
 open Constraint
 open Isa_basic
@@ -132,6 +133,14 @@ module GlobalSymbolLayout = struct
 
 end
 
+module ConstrInfo = struct
+  type t =
+    { constr_in: SingleContext.t list
+    ; constr_out: SingleContext.t list
+    }
+  [@@deriving sexp, fields]
+end
+
 module FuncInput = struct
   exception FuncInputError of string
   let func_input_error msg = raise (FuncInputError ("[Func Input Error] " ^ msg))
@@ -145,6 +154,7 @@ module FuncInput = struct
     reg_type: RegType.t;
     mem_type: MemType.t;
     stack_spill_info: StackSpillInfo.t;
+    constr_info: ConstrInfo.t;
   }
   [@@deriving sexp]
 
