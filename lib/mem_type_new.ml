@@ -170,6 +170,17 @@ module MemTypeBasic = struct
     in
     List.fold_left helper_outer acc mem
 
+  let fold_left_ptr_full
+      (func: 'acc -> PtrInfo.t -> MemOffset.t * MemRange.t * 'a -> 'acc)
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc =
+    let helper_outer
+        (acc: 'acc) (entry: 'a mem_part) : 'acc =
+      let ptr_info, l = entry in
+      List.fold_left (fun acc slot -> func acc ptr_info slot) acc l
+    in
+    List.fold_left helper_outer acc mem
+
   let fold_left_map
       (func: 'acc -> 'a -> ('acc * 'b))
       (acc: 'acc)

@@ -661,7 +661,8 @@ module SingleSubtype = struct
     let tv_rel_list, block_subtype_list = 
       add_all_useful_var_block_subtype input_var_set all_var_map_list block_subtype_list useful_var_list [] 200
     in
-    add_all_useful_var_forward_prop input_var_set all_var_map_list tv_rel_list block_subtype_list
+    (* add_all_useful_var_forward_prop input_var_set all_var_map_list tv_rel_list block_subtype_list *)
+    tv_rel_list, block_subtype_list
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in

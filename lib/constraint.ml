@@ -61,6 +61,19 @@ module Constraint = struct
           invalid_pc_list
         | _ -> acc
     ) (TaintExp.TaintVarSet.empty, []) constraint_list
+  
+  let get_range_must_known (constraint_list: (t * int) list) : IntSet.t =
+    let add_range_var_helper (r: MemRange.t) (s: IntSet.t) : IntSet.t =
+      match MemRange.get_range_var r with
+      | Some v -> IntSet.add v s
+      | None -> s
+    in
+    List.fold_left (
+      fun (acc: IntSet.t) (c, _) ->
+        match c with
+        | RangeMustKnown r -> add_range_var_helper r acc
+        | _ -> acc
+    ) IntSet.empty constraint_list
 
   let get_range_can_be_empty (constraint_list: (t * int) list) : IntSet.t =
     let add_range_var_helper (r: MemRange.t) (s: IntSet.t) : IntSet.t =

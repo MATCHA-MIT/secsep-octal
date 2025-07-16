@@ -268,6 +268,9 @@ module IsaBasic = struct
     5; (* RBP *)
     12; 13; 14; 15
   ]
+  let is_reg_idx_return_value (r_idx: int) : bool =
+    (* we don't consider rdx which is used when returning data of size [64, 128) *)
+    r_idx = (get_reg_idx RAX)
 
   let is_reg_idx_callee_saved (r_idx: int) : bool =
     List.mem r_idx callee_saved_reg_idx

@@ -624,7 +624,7 @@ let convert_single_var_map
   List.filter_map (
     fun (targ_var, from_exp) ->
       (* targ_var --> from_exp *)
-      let targ_var_size = targ_get_var_size targ_var |> Option.get in
+      let targ_var_size = targ_get_var_size targ_var |> Option.value ~default:(-1) in
       if targ_var_size = -1 then
         (* this var at target context has been replaced by Top; this map entry is skipped *)
         None

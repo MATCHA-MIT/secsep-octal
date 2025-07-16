@@ -202,7 +202,7 @@ module RangeSubtype = struct
       equal_subtype_list = equal_subtype_list;
     }
 
-  let apply_empty_list (tv_rel_list: t) (empty_var_set: IntSet.t) : t =
+  let apply_empty_sol (tv_rel_list: t) (empty_var_set: IntSet.t) : t =
     List.map (
       fun (tv_rel: type_rel) ->
         let var_idx, _ = tv_rel.var_idx in
@@ -985,11 +985,14 @@ module RangeSubtype = struct
 
   let repl_sol_arch_type
       (tv_rel_list: t)
+      (useless_vars: IntSet.t)
       (a_type: ArchType.t) : ArchType.t =
     let helper (entry: MemOffset.t * MemRange.t * 'a) : MemOffset.t * MemRange.t * 'a =
       let off, range, e_type = entry in
       match range with
       | RangeConst _ -> entry
+      | RangeVar v when IntSet.mem v useless_vars ->
+        off, RangeConst [], SingleEntryType.SingleTop
       | RangeVar v ->
         let sol_opt =
           List.find_map (
@@ -1000,6 +1003,8 @@ module RangeSubtype = struct
           ) tv_rel_list
         in
         begin match sol_opt with
+        (* Instead of replacing every empty range with SingleTop, we only do so for spill slots (useless_vars are only from spill slots) *)
+        (* | Some (RangeConst []) -> off, RangeConst [], SingleEntryType.SingleTop *)
         | Some sol -> off, sol, e_type
         | _ -> entry
         end

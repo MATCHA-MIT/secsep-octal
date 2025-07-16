@@ -81,7 +81,7 @@ module RegType (Entry: EntryType) = struct
     let useful_var, _ = List.fold_left (
       fun (acc: SingleExp.SingleVarSet.t * int) (entry: entry_t) ->
         let acc_useful_var, acc_id = acc in
-        if IsaBasic.is_reg_idx_callee_saved acc_id then
+        if IsaBasic.is_reg_idx_callee_saved acc_id || IsaBasic.is_reg_idx_return_value acc_id then
           SingleExp.SingleVarSet.union acc_useful_var 
             (SingleExp.get_vars (Entry.get_single_exp entry)),
           acc_id + 1
