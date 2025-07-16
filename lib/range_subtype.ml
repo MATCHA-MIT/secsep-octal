@@ -211,8 +211,78 @@ module RangeSubtype = struct
         else tv_rel
     ) tv_rel_list
 
-  let try_solve_full (tv_rel: type_rel) : MemRange.t option =
+  let get_subtype_without_step_back_pc
+      (step_back_pc_set: IntSet.t)
+      (keep_non_eq_subtype: bool)
+      (tv_rel: type_rel) : type_exp_t list =
+    let is_eq_subtype (sub: MemRange.t) : bool =
+      match sub with
+      | RangeVar v ->
+        v = fst tv_rel.var_idx || IntSet.mem v tv_rel.equal_var_set
+      | _ -> false
+    in
+    List.filter (
+      fun (sub, pc) -> (not (IntSet.mem pc step_back_pc_set)) || (keep_non_eq_subtype && (not (is_eq_subtype sub)))
+    ) tv_rel.subtype_list
+
+  let update_br_context_helper
+      (smt_ctx: SmtEmitter.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (sup_pc: int) (sub_pc: int) : unit =
+    let sub_block = ArchType.get_block_subtype_block block_subtype_list sup_pc sub_pc in
+    SingleContext.add_assertions smt_ctx sub_block.context;
+    SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
+
+  let try_solve_full 
+      (smt_ctx: SmtEmitter.t)
+      (sub_sol_single_to_range_helper: SingleEntryType.t * int -> RangeExp.t)
+      (block_subtype_list: ArchType.block_subtype_t list)
+      (ctx_map_map: ArchContextMap.t)
+      (step_back_pc_set: IntSet.t)
+      (tv_rel: type_rel) : MemRange.t option =
+    let simp_offset_helper
+        (off: MemOffset.t) (pc: int) : MemOffset.t =
+      let l, r = off in
+      match sub_sol_single_to_range_helper (l, pc) with
+      | Single sl ->
+        begin match sub_sol_single_to_range_helper (r, pc) with
+        | Single sr -> (sl, sr)
+        | _ -> off
+        end
+      | _ -> off
+    in
+    let check_full_helper
+        (off: MemOffset.t) (sub_pc: int) : bool =
+      let sub_context_map = ArchContextMap.get_context_map ctx_map_map sub_pc in
+      let sub_off = MemOffset.repl_var sub_context_map off in
+      SmtEmitter.push smt_ctx;
+      update_br_context_helper smt_ctx block_subtype_list (snd tv_rel.var_idx) sub_pc;
+      let result = MemOffset.offset_quick_cmp smt_ctx sub_off tv_rel.off MemOffset.CmpEq in
+      SmtEmitter.pop smt_ctx 1;
+      result = Eq
+    in
+    (* Remove *)
+    let no_step_back_subtype_list = get_subtype_without_step_back_pc step_back_pc_set false tv_rel in
+    if List.is_empty no_step_back_subtype_list then None else
     let find_not_full =
+      List.find_opt (
+        fun (x, pc) ->
+          match x with
+          | MemRange.RangeConst [ off ]
+          | MemRange.RangeExp (_, [ off ]) -> 
+            let off = simp_offset_helper off pc in
+            MemOffset.cmp off tv_rel.off <> 0
+            && not (check_full_helper off pc)
+            (* && sub_v <> (fst tv_rel.var_idx) *)
+          | _ -> true
+      ) no_step_back_subtype_list
+    in
+    if find_not_full <> None 
+      (* || tv_rel.other_equal_var_has_empty_subtype *) 
+      (* Remove this filter since we do only remove subtype that is from the loop back br, and should have considered all necessary constraints to derive this sol *)
+    then None
+    else Some (RangeConst [ tv_rel.off ])
+    (* let find_not_full =
       List.find_opt (
         fun (x, _) ->
           match x with
@@ -223,7 +293,7 @@ module RangeSubtype = struct
       ) tv_rel.subtype_list
     in
     if List.length tv_rel.subtype_list = 0 || find_not_full <> None || tv_rel.other_equal_var_has_empty_subtype then None
-    else Some (RangeConst [ tv_rel.off ])
+    else Some (RangeConst [ tv_rel.off ]) *)
 
   let try_solve_empty 
       (input_var_set: SingleEntryType.SingleVarSet.t)
@@ -322,14 +392,6 @@ module RangeSubtype = struct
       end else None
     | _ -> None
 
-  let update_br_context_helper
-      (smt_ctx: SmtEmitter.t)
-      (block_subtype_list: ArchType.block_subtype_t list)
-      (sup_pc: int) (sub_pc: int) : unit =
-    let sub_block = ArchType.get_block_subtype_block block_subtype_list sup_pc sub_pc in
-    SingleContext.add_assertions smt_ctx sub_block.context;
-    SingleCondType.add_assertions smt_ctx (List.split sub_block.branch_hist |> fst)
-
   let try_solve_extra_slot
       (smt_ctx: SmtEmitter.t)
       (sub_sol_single_to_range_helper: SingleEntryType.t * int -> RangeExp.t)
@@ -379,11 +441,17 @@ module RangeSubtype = struct
         (acc_sol_template_list: (int * MemOffset.t) list)
         (sub_exp_pc: type_exp_t) : (int * MemOffset.t) list =
       let sub_exp, sub_pc = sub_exp_pc in
+      let sub_context_map = get_context_map sub_pc in
       let test_one_sol_template (br_sol_template: int * MemOffset.t) : bool =
         (* if test success, return true!!! *)
         let br_pc, sol_template = br_sol_template in (* br_pc is used to skip unnecessary tests on the same source. *)
+        (* Why this work for range infer on loop:
+            For range var of a slot that is filled step-by-step during loop, there are usually two subtypes: base and step-back.
+            The useful sol template is (likely) generated from the step-back subtype, so it is only checked against the base, 
+            while the check against the step-back subtype is skipped here. 
+            That's how I avoid handling the unresolved block var in step-back subtype.
+        *)
         if sub_pc = br_pc then true else
-        let sub_context_map = get_context_map sub_pc in
         let sub_sol = MemOffset.repl_var sub_context_map sol_template in
         Printf.printf "sub_sol %s\nsub_exp %s%!\n" (MemOffset.to_string sub_sol) (MemRange.to_string sub_exp);
         (* Check sub_sol is subset of sub_exp *)
@@ -562,7 +630,10 @@ module RangeSubtype = struct
       (input_var_set: IntSet.t)
       (ctx_map_map: ArchContextMap.t)
       (sol_template_map: RangeSolTemplate.t)
+      (step_back_pc_set: IntSet.t)
       (tv_rel: type_rel) : MemRange.t option =
+    let no_step_back_subtype_list = get_subtype_without_step_back_pc step_back_pc_set true tv_rel in
+    if List.is_empty no_step_back_subtype_list then None else
     let naive_sub_list =
       List.filter_map (
         fun (sub, sub_pc) ->
@@ -574,9 +645,9 @@ module RangeSubtype = struct
             | _ -> None
             end
           | _ -> None
-      ) tv_rel.subtype_list
+      ) no_step_back_subtype_list (* tv_rel.subtype_list *)
     in
-    if List.length tv_rel.subtype_list > List.length naive_sub_list then None else
+    if List.length no_step_back_subtype_list (* tv_rel.subtype_list *) > List.length naive_sub_list then None else
     (* Replace single solution *)
     let single_naive_sub_list =
       List.filter_map (filter_single_off_opt_pc_helper sub_sol_single_to_range_helper) naive_sub_list
@@ -597,11 +668,12 @@ module RangeSubtype = struct
       List.fold_left get_sat_off_set (init_sol_candidate_counter_list sol_off_candidate) single_naive_sub_list
     in
     let sol = get_sol_helper sol_off_candidate in
-    (* Use other_equal_var_has_empty_subtype and equal_var_has_read_constraint to avoid generating too aggressive solution without checking equal var's constraints. *)
+    (* Use equal_var_has_read_constraint to avoid generating too aggressive solution without checking equal var's constraints. *)
     match sol with
     | None -> sol
     | Some (RangeConst []) -> if tv_rel.equal_var_has_read_constraint then None else sol
-    | Some (RangeConst _) -> if tv_rel.other_equal_var_has_empty_subtype then None else sol
+    (* | Some (RangeConst _) -> if tv_rel.other_equal_var_has_empty_subtype then None else sol *)
+    (* Remove this filter since we do only remove eq var that is from the loop back br *)
     | _ -> sol
 
   let try_solve_hybrid_slot
@@ -611,14 +683,17 @@ module RangeSubtype = struct
       (input_var_set: IntSet.t)
       (ctx_map_map: ArchContextMap.t)
       (sol_template_map: RangeSolTemplate.t)
+      (step_back_pc_set: IntSet.t)
       (tv_rel: type_rel) : MemRange.t option =
+    let no_step_back_subtype_list = get_subtype_without_step_back_pc step_back_pc_set true tv_rel in
+    if List.is_empty no_step_back_subtype_list then None else
     let sub_var_opt =
       List.find_opt (
         fun (sub, _) ->
           match sub with
           | MemRange.RangeVar _ -> true
           | _ -> false
-      ) tv_rel.subtype_list
+      ) no_step_back_subtype_list (* tv_rel.subtype_list *)
     in
     match sub_var_opt with
     | Some _ -> None (* TODO: Think about whether we need to handle this case later *)
@@ -637,14 +712,14 @@ module RangeSubtype = struct
             | MemRange.RangeConst c_list -> Left (helper c_list)
             | MemRange.RangeExp (_, c_list) -> Right (helper c_list)
             | _ -> range_subtype_error "should not have RangeVar here"
-        ) tv_rel.subtype_list
+        ) no_step_back_subtype_list (* tv_rel.subtype_list *)
       in
       let const_sub_list = List.filter_map (fun x -> x) const_sub_list in
       let exp_sub_list = List.filter_map (fun x -> x) exp_sub_list in
-      if List.length tv_rel.subtype_list > (List.length const_sub_list) + (List.length exp_sub_list) then None else
+      if List.length no_step_back_subtype_list (* tv_rel.subtype_list *) > (List.length const_sub_list) + (List.length exp_sub_list) then None else
       let single_const_sub_list = List.filter_map (filter_single_off_opt_pc_helper sub_sol_single_to_range_helper) const_sub_list in
       let single_exp_sub_list = List.filter_map (filter_single_off_opt_pc_helper sub_sol_single_to_range_helper) exp_sub_list in
-      if List.length tv_rel.subtype_list > (List.length single_const_sub_list) + (List.length single_exp_sub_list) then None else
+      if List.length no_step_back_subtype_list (* tv_rel.subtype_list *) > (List.length single_const_sub_list) + (List.length single_exp_sub_list) then None else
       let sup_pc = snd tv_rel.var_idx in
       (* Get sol template *)
       let get_sat_off_set = get_sat_off_set_helper smt_ctx block_subtype_list ctx_map_map sup_pc tv_rel.off in
@@ -698,8 +773,12 @@ module RangeSubtype = struct
           | RangeConst [ sol_off ] -> MemOffset.cmp sol_off tv_rel.off = 0
           | _ -> false
         in
-        (* Use other_equal_var_has_empty_subtype to avoid generating too aggressive solution without checking equal var's constraints. *)
-        if (is_full || no_exp_sol_candidate ()) && (not tv_rel.other_equal_var_has_empty_subtype) then Some sol else None
+        if (is_full || no_exp_sol_candidate ()) 
+          (* We used to use other_equal_var_has_empty_subtype to avoid generating too aggressive solution without checking equal var's constraints. *)
+          (* && (not tv_rel.other_equal_var_has_empty_subtype) *) (* Remove this filter since we do only remove eq var that is from the loop back br *)
+        then 
+          Some sol 
+        else None
         (* if is_full then Some sol else
         if no_exp_sol_candidate () then Some sol else None *)
 
@@ -710,15 +789,16 @@ module RangeSubtype = struct
       (input_var_set: IntSet.t)
       (ctx_map_map: ArchContextMap.t)
       (sol_template_map: RangeSolTemplate.t)
+      (step_back_pc_set: IntSet.t)
       (* (get_block_var: MemRange.t -> SingleEntryType.SingleVarSet.t) *)
       (block_subtype_list: ArchType.block_subtype_t list)
       (new_sol_list: (var_idx_t * MemRange.t) list) (tv_rel: type_rel) : 
       ((var_idx_t * MemRange.t) list) * type_rel =
     let rule_list = [
-      try_solve_full;
+      try_solve_full smt_ctx sub_sol_single_to_range_helper block_subtype_list ctx_map_map step_back_pc_set;
       try_solve_extra_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map;
-      try_solve_const_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map sol_template_map;
-      try_solve_hybrid_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map sol_template_map;
+      try_solve_const_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map sol_template_map step_back_pc_set;
+      try_solve_hybrid_slot smt_ctx sub_sol_single_to_range_helper block_subtype_list input_var_set ctx_map_map sol_template_map step_back_pc_set;
       try_solve_empty input_var_set;
       (* try_solve_non_val smt_ctx get_block_var block_subtype_list; *)
     ] in
@@ -954,6 +1034,8 @@ module RangeSubtype = struct
     Printf.printf "ctx_map_map\n%s\n" (Sexplib.Sexp.to_string_hum (ArchContextMap.sexp_of_t ctx_map_map));
     let sol_template = RangeSolTemplate.init (List.split block_subtype_list |> fst) in
     Printf.printf "sol_template\n%s\n" (Sexplib.Sexp.to_string_hum (RangeSolTemplate.sexp_of_t sol_template));
+    let step_back_pc_set = SingleSubtype.get_loop_step_back_pc single_sol in
+    Printf.printf "step_back_pc_set\n%s\n" (Sexplib.Sexp.to_string_hum (IntSet.sexp_of_t step_back_pc_set));
     let get_block_var = fun r -> SingleEntryType.SingleVarSet.diff (MemRange.get_vars r) input_var_set in
     let tv_rel_list = get_equal_var_constraint tv_rel_list in
     let rec helper (tv_rel_list: t) (iter: int) : t =
@@ -966,7 +1048,7 @@ module RangeSubtype = struct
         in *)
         let new_sol, tv_rel_list =
           List.fold_left_map 
-            (solve_one_var smt_ctx sub_sol_single_to_range_helper input_var_set ctx_map_map sol_template block_subtype_list) 
+            (solve_one_var smt_ctx sub_sol_single_to_range_helper input_var_set ctx_map_map sol_template step_back_pc_set block_subtype_list) 
             [] tv_rel_list
         in
         if List.length new_sol = 0 then tv_rel_list

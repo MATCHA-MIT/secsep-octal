@@ -82,7 +82,7 @@ module RangeSubset = struct
     Printf.printf "Range subset\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t sub_sup_list));
     List.map2 (
       fun (tv_rel: RangeSubtype.type_rel) (entry: sub_sup_t) ->
-        RangeSubtype.filter_self_subtype 
+        (* RangeSubtype.filter_self_subtype  *)
         { tv_rel with equal_var_set = IntSet.inter entry.supset_list entry.subset_list }
     ) subtype_list sub_sup_list
 

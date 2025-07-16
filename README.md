@@ -24,6 +24,7 @@ We need to annotate two things:
 ### chacha20
 1. The benchmark itself allows `in` and `out` array are the same array, but our type system can only work if we assume they are non-overlapped.
 2. We also add an extra assumption to indicate that `in - out >= 32`.
+3. Our range infer cannot infer valid region of array that is gradually filled in a nested loop. Hence, our tool only works if we mark out array as initialized (valid).
 
 ### poly1305
 1. Original bench has goto -> we replaced it with loops and function calls
@@ -32,6 +33,8 @@ We need to annotate two things:
 4. Need to fix the main function - need to test with different input lengths to prevent us from generating too general constraints!!! (done)
 
 ### x25519
+1. setb inst is not implemented in infer or checker
+2. Need to add X25519_public_from_private to test bench
 
 ### djbsort
 1. Still need extra data structures: introduce extra block variables to represent variables passed from previous blocks that cannot be represented as single exp
@@ -253,9 +256,10 @@ TODO: Potential improvement:
 25. How to handle pointer in branch condition (used in proof)?
 26. Improve sub to range for exp with counters in nested loops
 27. add_var_bound_constraint???
+28. combine_loop_cond_sol_map need to improve this to avoid generating wrong solution
 
 
-28. Add test bench:
+29. Add test bench:
 ```
     i = 4, j = 0
 loop:
@@ -264,6 +268,51 @@ loop:
     i+=4
     jmp to loop if i < n
 ```
+
+## Range Type Infer
+
+### Summary of rules and use cases
+
+1. Not in a loop
+   1. try_solve_full, try_solve_const_slot, try_solve_hybrid_slot
+   2. No circular dependency, no subtype removed/ignored, do not need to worried about solution being too strong or weak
+2. At loop head
+   1. Write to the slot in the loop
+      1. Slot is already full before entering the loop:
+         1. Derive solution by find subset of the base br's valid region do not make the solution too weak (valid region too large), but may make the solution too strong (valid region too small)
+         2. We apply try_solve_full and ignore the subtype corresponding to step back pc. (`get_subtype_without_step_back_pc step_back_pc_set false tv_rel`)
+         3. We either get no solution or get full slot solution, so the solution will not be too strong (too small).
+      2. Slot is not full before entering the loop:
+         1. try_solve_extra_slot is applied to solve valid region for slots that is gradually filled in the loop.
+         2. **Limitations**:
+            1. Can only handle short loop: if the slot is not written in the same block with step back pc, it does not work
+            2. Can not handle nested loop: so far we cannot deal with circular dependency between valid region of outer loop body and inner loop body.
+         3. There might be some corner cases that other rules will work...
+   2. No write to the slot in the loop
+      1. The subtype corresponding to step back pc is a equal var, can be ignored when applying the following three rules. (`get_subtype_without_step_back_pc step_back_pc_set true tv_rel`)
+      2. try_solve_full, try_solve_const_slot, try_solve_hybrid_slot
+      3. Intuitively, we only need to figure out valid region when entering the loop to get the solution.
+3. In loop body
+   1. If resolved at loop head, then infer is similar to case 1 (Not in a loop).
+
+try_solve_empty is a special one (we may be able to remove it)
+
+TODO: Double check whether `get_subtype_without_step_back_pc` will make solution too weak...
+
+### Update valid region after func call
+Two options:
+1. New valid region = valid region before call U valid region derived from callee's out valid region
+2. New valid region = valid region before call \ mem region accessed by callee U valid region derived from callee's out valid region
+
+TODO: which one should I use? Need to think about this with type check of taint?
+Currently I think I am using 1, but it seems that poly1305's main's range infer only works if I use 2 (otherwise we cannot represent the return block's valid region). This is not a problem since it is return state for stack region, but it is better to fix this to avoid potential problems.
+
+### TODO
+1. Equal var and equal var constraints: this is very messy, we keep part of it as a double check (but we do not use it to filter subtypes any more, i.e, `RangeSubtype.filter_self_subtype` is deprecated)
+2. Double check whether `get_subtype_without_step_back_pc` will make solution too weak...
+3. Clean up RangeSubtype's sub solution to use ArchContextMap
+4. Which option of update valid region after func call should I use? Change to the cleaner one
+5. Allow marking range var that we failed to infer as empty.
 
 
 # Type Check
@@ -309,7 +358,13 @@ What do we need to do to update mem content + permission?
 
 
 2. Document read/write at func call
-3. Debug range infer for chacha20
+3. Debug range infer for chacha20 (done)
 
 4. Error when call with `poly1305_update(state, in - todo, todo);` -> need debug!
-5. Analyze problems of current range infer for chacha20, make a plan
+5. Analyze problems of current range infer for chacha20, make a plan (done)
+
+
+## July 16
+1. Check current changes and commit (done)
+2. Add missing instructions for X25519 + test
+3. Writing!

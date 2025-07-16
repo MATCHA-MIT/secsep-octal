@@ -2608,7 +2608,7 @@ module SingleSubtype = struct
       |> SolMap.of_list
     in
 
-    (* TODO: This is too naive!!! Improve this after quick test!!! *)
+    (* TODO: This is too naive!!! Think about whether we need to use smt to check the correctness of the combined solution. *)
     let helper (tv_rel: type_rel) : type_rel =
       match tv_rel.sol, SolMap.find_opt (fst tv_rel.var_idx) orig_loop_cond_sol_map with
       | SolSimple (Single curr_sol), Some (SolCond (pc, r1, r2, r3)) ->
@@ -2624,5 +2624,15 @@ module SingleSubtype = struct
       | _ -> tv_rel
     in
     List.map helper tv_rel_list
+
+  let get_loop_step_back_pc
+      (tv_rel_list: t) : IntSet.t =
+    List.fold_left (
+      fun (acc: IntSet.t) (tv_rel: type_rel) ->
+        match tv_rel.loop_info with
+        | None -> acc
+        | Some loop_info ->
+          IntSet.add (List.hd loop_info.step_pc_list) acc
+    ) IntSet.empty tv_rel_list
 
 end
