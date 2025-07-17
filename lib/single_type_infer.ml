@@ -135,6 +135,7 @@ module SingleTypeInfer = struct
       (func_name: string)
       (func_mem_interface: ArchType.MemType.t)
       (stack_spill_info: StackSpillInfo.t)
+      (constr_info: ConstrInfo.t)
       (func_interface_list: FuncInterface.t list) : t =
     let func_body = (Isa.get_func_of_prog prog func_name).body in
     let global_var_list = List.map (fun (_, x) -> x) (Isa.StrM.to_list prog.imm_var_map) in
@@ -184,6 +185,18 @@ module SingleTypeInfer = struct
     in
     let next_var, arch_type_list = init_extra_call_var_map func_body arch_type_list func_interface_list next_var in 
     let var_type_map = ArchType.MemType.get_var_type_map func_mem_interface in
+
+    (* Add annotated input constraints to all blocks *)
+    (* TODO: add annotated output invariants to ret block's tmp_context.
+        Note that we need to change the context var to ret block's context var.
+        The plan is to keep ptr var, and replace non-ptr var to the corresponding ret block's var at the same reg/mem slot.
+        THe intuition is similar to how to replace context var in RangeSolTemplate.init. *)
+    let arch_type_list =
+      List.map (
+        fun (a_type: ArchType.t) ->
+          { a_type with context = constr_info.constr_in @ a_type.context }
+      ) arch_type_list
+    in
 
     (* ArchType.pp_arch_type_list 0 arch_type_list; *)
     {
@@ -591,9 +604,10 @@ module SingleTypeInfer = struct
       (func_name: Isa.label)
       (func_mem_interface: ArchType.MemType.t)
       (stack_spill_info: StackSpillInfo.t)
+      (constr_info: ConstrInfo.t)
       (iter: int)
       (solver_iter: int) : t =
-    let init_infer_state = init prog func_name func_mem_interface stack_spill_info func_interface_list in
+    let init_infer_state = init prog func_name func_mem_interface stack_spill_info constr_info func_interface_list in
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
@@ -946,7 +960,7 @@ module SingleTypeInfer = struct
       let func_name = entry.func_name in
       let func_mem_interface = MemTypeBasic.map (fun (x, _) -> x) entry.mem_type in
       Printf.printf "Inferring func %s\n" func_name;
-      let infer_state = infer_one_func prog acc func_name func_mem_interface entry.stack_spill_info iter solver_iter in
+      let infer_state = infer_one_func prog acc func_name func_mem_interface entry.stack_spill_info entry.constr_info iter solver_iter in
       let infer_state = add_var_bound_constraint infer_state in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;
