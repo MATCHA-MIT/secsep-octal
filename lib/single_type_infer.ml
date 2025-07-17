@@ -188,9 +188,9 @@ module SingleTypeInfer = struct
 
     (* Add annotated input constraints to all blocks *)
     (* TODO: add annotated output invariants to ret block's tmp_context.
-        Note that we need to change the context var to ret block's context var.
-        The plan is to keep ptr var, and replace non-ptr var to the corresponding ret block's var at the same reg/mem slot.
-        THe intuition is similar to how to replace context var in RangeSolTemplate.init. *)
+        Note that we need to change var in the output invariants in the annotation to ret block's context var.
+        However, we need to carefully decide which var should remained there, and which var should be replaced to the var in the corresponding reg/slot.
+        THe intuition might be different from or similar to how to replace context var in RangeSolTemplate.init. *)
     let arch_type_list =
       List.map (
         fun (a_type: ArchType.t) ->

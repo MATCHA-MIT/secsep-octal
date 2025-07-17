@@ -70,6 +70,7 @@ Technique details worth documenting:
 6. Allow base with block var: the challenge is to represent base with the corresponding block's block var. We need to choose it carefully (harder than bound).
     1. We first find base for header block (for now we find the direct subtype whose pc is not the loop step/resume pc)
     2. We then use header block's counter to find other block's base.
+    3. **Limitation**: our tool requires that there must exists a corresponding single exp in loop body blocks to represent the base (if the base is a var only in the block before loop, i.e., preheader, and has set solution, then we cannot find the solution).
 7. Tricky case in loop solution:
     1. Length is not aligned with step: we can solve this problem by calculating the accurate bound with mod during inference
     2. End val is cannot be simply represented as a single exp (e.g., each loop do shift right to the counter), then we still have to reresent the loop out sol as a range.
@@ -298,6 +299,17 @@ loop:
 try_solve_empty is a special one (we may be able to remove it)
 
 TODO: Double check whether `get_subtype_without_step_back_pc` will make solution too weak...
+
+### Solution template
+RangeSolTemplate:
+For slot whose input valid region is special (not full nor empty), we generate solution template from its input valid region's pattern.
+The intuiation is that this pattern might be some invariants that will be kept through the function (e.g., poly1305, sha512).
+Note that all var in the input valid region are input vars.
+Then, the key point of generating the solution template is to decide which vars should remained the same across the function, and which vars should be adjusted to corresponding reg/slot's var when generating template.
+
+Intuition:
+1. Keep var appeared in mem offset
+2. Replace var in mem valid region (range) but not in mem offset.
 
 ### Update valid region after func call
 Two options:
