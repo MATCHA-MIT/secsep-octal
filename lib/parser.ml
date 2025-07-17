@@ -378,6 +378,9 @@ module Parser = struct
     | "packssdw" | "packsswb" -> Some ("packss", (fill [16L; 16L]))
     | "movaps" | "movapd" | "movups" | "movupd" -> Some ("mov", (fill [16L; 16L]))
     | "movdqu" | "movdqa" -> Some ("mov", (fill [16L; 16L]))
+    | "setne" | "sete" | "setle" | "setl" 
+    | "setge" | "setg" | "setbe" | "setb" 
+    | "setae" | "seta" -> Some (mnemonic, (fill [1L]))
     (* instructions with single-letter suffix indicating size: [bwldq] *)
     (* special size *)
     | _ ->

@@ -116,6 +116,26 @@ include SingleExp
     in
     eval res |> set_flag_helper
 
+  let exe_set (isa_bop: IsaBasic.uop) (_) (flags: flag_t) : t * flag_t =
+    let fl, fr = flags in
+    let e2 = SingleExp.SingleConst 1L in
+    let e1 = SingleExp.SingleConst 0L in
+    let res = match isa_bop with
+    | SetNe -> SingleITE ((Ne, fl, fr), e2, e1)
+    | SetE -> SingleITE ((Eq, fl, fr), e2, e1)
+    | SetL -> SingleITE ((Lt, fl, fr), e2, e1)
+    | SetLe -> SingleITE ((Le, fl, fr), e2, e1)
+    | SetG -> SingleITE ((Lt, fr, fl), e2, e1)
+    | SetGe -> SingleITE ((Le, fr, fl), e2, e1)
+    | SetB -> SingleITE ((Bt, fl, fr), e2, e1)
+    | SetBe -> SingleITE ((Be, fl, fr), e2, e1)
+    | SetA -> SingleITE ((Bt, fr, fl), e2, e1)
+    | SetAe -> SingleITE ((Be, fr, fl), e2, e1)
+    | SetOther -> SingleTop
+    | _ -> single_exp_error "exe_set: expecting setxx"
+    in
+    eval res |> set_flag_helper
+
   let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
     match isa_bop with
     | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
@@ -154,6 +174,9 @@ include SingleExp
       eval (SingleBExp (SingleAdd, e, SingleConst 1L)) |> set_flag_helper
     | Dec ->
       eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) |> set_flag_helper
+    | SetNe | SetE | SetL | SetLe | SetG | SetGe
+    | SetB | SetBe | SetA | SetAe | SetOther ->
+      exe_set isa_uop e flags
 
   let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (flags: flag_t) : t * flag_t =
     match isa_top with

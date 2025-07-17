@@ -524,6 +524,8 @@ module IsaBasic = struct
     | Not | Bswap
     | Neg
     | Inc | Dec
+    | SetNe | SetE | SetL | SetLe | SetG | SetGe
+    | SetB | SetBe | SetA | SetAe | SetOther
   [@@deriving sexp]
 
   let uop_result_depends_on_flag (op: uop) : bool =
@@ -534,6 +536,8 @@ module IsaBasic = struct
     | Not | Bswap
     | Neg
     | Inc | Dec -> false
+    | SetNe | SetE | SetL | SetLe | SetG | SetGe
+    | SetB | SetBe | SetA | SetAe | SetOther -> true
 
   let uop_opcode_map = [
     ("mov", Mov); ("movabs", Mov);
@@ -542,6 +546,9 @@ module IsaBasic = struct
     ("not", Not); ("bswap", Bswap);
     ("neg", Neg);
     ("inc", Inc); ("dec", Dec);
+    ("setne", SetNe); ("sete", SetE); ("setle", SetLe); ("setl", SetL); 
+    ("setge", SetGe); ("setg", SetG); ("setbe", SetBe); ("setb", SetB);
+    ("setae", SetAe); ("seta", SetA);
   ]
 
   let uop_opcode_ocaml_str_map = [
@@ -551,6 +558,8 @@ module IsaBasic = struct
     ("Not", Not); ("Bswap", Bswap);
     ("Neg", Neg);
     ("Inc", Inc); ("Dec", Dec);
+    ("SetNe", SetNe); ("SetE", SetE); ("SetL", SetL); ("SetLe", SetLe); ("SetG", SetG); ("SetGe", SetGe);
+    ("SetB", SetB); ("SetBe", SetBe); ("SetA", SetA); ("SetAe", SetAe);
   ]
 
   type top =

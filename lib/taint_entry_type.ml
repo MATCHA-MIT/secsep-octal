@@ -186,10 +186,14 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     else
       taint
     in
-    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_uop with
-    | Mov | MovZ | MovS | Lea | Not | Bswap -> fl_taint, fr_taint
-    | Neg | Inc | Dec -> dest_taint_type, TaintConst false
-    in
+    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = 
+      match isa_uop with
+      | Mov | MovZ | MovS | Lea | Not | Bswap
+      (* set does not affect any flags *)
+      | SetNe | SetE | SetL | SetLe | SetG | SetGe
+      | SetB | SetBe | SetA | SetAe | SetOther -> fl_taint, fr_taint
+      | Neg | Inc | Dec -> dest_taint_type, TaintConst false
+      in
     (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
 
   let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flags: flag_t) : t * flag_t =
