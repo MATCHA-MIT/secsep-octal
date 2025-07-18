@@ -907,6 +907,7 @@ module DepType = struct
       | And,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_and dst src
       | Or,     [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_or  dst src
       | CmovE, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
+      | CmovB, [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf src dst), []
       | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
       | Punpck, [ _; _ ],     [ ]      -> Top 128, [ ]
       | Packxs, [ _; _ ],     [ ]      -> Top 128, [ ]
