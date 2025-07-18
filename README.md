@@ -315,9 +315,20 @@ Intuition:
 Two options:
 1. New valid region = valid region before call U valid region derived from callee's out valid region
 2. New valid region = valid region before call \ mem region accessed by callee U valid region derived from callee's out valid region
+3. New valid region = valid region derived from callee's out valid region
 
 TODO: which one should I use? Need to think about this with type check of taint?
 Currently I think I am using 1, but it seems that poly1305's main's range infer only works if I use 2 (otherwise we cannot represent the return block's valid region). This is not a problem since it is return state for stack region, but it is better to fix this to avoid potential problems.
+
+We experienced problem when using solely option 1:
+* multiple calls use the same region
+* some prior call initializes the largest region, where the boundary is represented using some variable `b`
+* all later calls initialize less than the largest region, therefore `b` is still used to represented the region
+* however context related to `b` has been lost due to later calls
+
+We now uses a mixture of 1 and 3 to update each memory slot in caller
+* when caller's slot is fully mapped into callee, then we use 3
+* otherwise (partially mapped), we use 1
 
 ### TODO
 1. Equal var and equal var constraints: this is very messy, we keep part of it as a double check (but we do not use it to filter subtypes any more, i.e, `RangeSubtype.filter_self_subtype` is deprecated)
@@ -333,6 +344,10 @@ Currently I think I am using 1, but it seems that poly1305's main's range infer 
 
 ### Func call
 What do we need to do to update mem content + permission?
+
+## Range check
+
+TODO: make sure call updates initialized region in the same way as range type infer (see above).
 
 
 # Daily Task
