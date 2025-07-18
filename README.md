@@ -16,6 +16,7 @@ We need to annotate two things:
 ### sha512
 1. Additionally initialize `sha512_state_st.p` to make range infer easier (should eventually revert this change).
 2. It suddenly works without the above countermeasure. Need double check!!! (Maybe test with different input lengths and check checker's correctness!)
+3. TODO: test without the manual memset we added.
 
 ### ed25519
 1. Currently we only have sign, no verify (due to declassification)
