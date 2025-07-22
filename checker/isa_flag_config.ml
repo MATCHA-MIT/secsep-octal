@@ -61,10 +61,10 @@ module IsaFlagConfig = struct
       [],
       [ CF, false; PF, false; ZF, false; SF, false; OF, false ]
     | CmovNe | CmovE -> [ ZF ], []
-    | CmovL | CmovG -> [ SF; OF ], []
-    | CmovLe | CmovGe -> [ ZF; SF; OF ], []
-    | CmovB | CmovA -> [ CF ], []
-    | CmovBe | CmovAe -> [ ZF; CF ], []
+    | CmovL | CmovGe -> [ SF; OF ], []
+    | CmovG | CmovLe -> [ ZF; SF; OF ], []
+    | CmovB | CmovAe -> [ CF ], []
+    | CmovBe | CmovA -> [ ZF; CF ], []
     | CmovOther -> [ CF; PF; AF; ZF; SF; OF ], []
     | Bt -> [], [ CF, false ]
     | Punpck | Packxs -> [], []
@@ -78,6 +78,11 @@ module IsaFlagConfig = struct
     | Neg -> [], [ CF, false; PF, false; AF, false; ZF, false; SF, false; OF, false ]
     | Inc -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
     | Dec -> [], [ PF, false; AF, false; ZF, false; SF, false; OF, false ]
+    | SetE  | SetNe -> [ ZF ], []
+    | SetL  | SetGe -> [ SF; OF ], []
+    | SetLe | SetG  -> [ ZF; SF; OF ], []
+    | SetB  | SetAe -> [ CF ], []
+    | SetBe | SetA  -> [ CF; ZF ], []
     | _ -> [], []
   
   let get_top_config (top: IsaBasic.top) : t =

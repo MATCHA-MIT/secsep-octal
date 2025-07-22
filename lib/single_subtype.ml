@@ -511,6 +511,7 @@ module SingleSubtype = struct
       (input_var_set: IntSet.t)
       (all_local_var_map: SingleExp.local_var_map_t StrMap.t)
       (var_pc_map: var_pc_t list) 
+      (is_spill: ArchType.Isa.imm_var_id -> MemOffset.t -> bool)
       (all_useful_var: IntSet.t)
       (tv_rel_list: t)
       (block_subtype: ArchType.block_subtype_t) :
@@ -539,7 +540,19 @@ module SingleSubtype = struct
         (acc: VarSubMap.t) (sub_block: ArchType.t) : VarSubMap.t =
       let helper = update_one_pair all_useful_var sub_block.label sub_block.pc in
       let acc = List.fold_left2 helper acc target_block.reg_type sub_block.reg_type in
-      ArchType.MemType.fold_left2 helper acc target_block.mem_type sub_block.mem_type
+      let spill_slot_filter acc sup_ptr sup_slot _sub_ptr sub_slot =
+        let sup_off, _, sup_entry = sup_slot in
+        let sub_off, _, sub_entry = sub_slot in
+        if MemOffset.cmp sub_off sup_off <> 0 then
+          single_subtype_error (Printf.sprintf "slot offset mismatch: %s vs %s" (MemOffset.to_string sub_off) (MemOffset.to_string sup_off));
+        if is_spill (fst sup_ptr) sup_off then
+          let _ = Printf.printf "skip propagating %s for being a spill slot\n" 
+            (SingleEntryType.to_string sup_entry) in
+          acc
+        else
+          helper acc sup_entry sub_entry
+      in
+      ArchType.MemType.fold_left2_ptr_full spill_slot_filter acc target_block.mem_type sub_block.mem_type
     in
     let var_sub_map = 
       List.fold_left (update_one_block_pair all_useful_var) VarSubMap.empty sub_block_list
@@ -583,6 +596,7 @@ module SingleSubtype = struct
   let add_all_useful_var_forward_prop
       (input_var_set: IntSet.t)
       (var_pc_map: var_pc_t list)
+      (is_spill: ArchType.Isa.imm_var_id -> MemOffset.t -> bool)
       (tv_rel_list: t)
       (block_subtype_list: ArchType.block_subtype_t list) :
       t * (ArchType.block_subtype_t list) =
@@ -610,7 +624,7 @@ module SingleSubtype = struct
         List.fold_left_map (
           fun (x, y) z -> 
             let x, y, z = 
-              update_var_sub_map_one_block_subtype input_var_set all_local_var_map var_pc_map x y z
+              update_var_sub_map_one_block_subtype input_var_set all_local_var_map var_pc_map is_spill x y z
             in
             (x, y), z
         ) (all_useful_var, tv_rel_list) block_subtype_list
@@ -633,7 +647,9 @@ module SingleSubtype = struct
   let init
       (func_name: string)
       (input_var_set: IntSet.t)
-      (block_subtype_list: ArchType.block_subtype_t list) : t * (ArchType.block_subtype_t list) =
+      (block_subtype_list: ArchType.block_subtype_t list) 
+      (is_spill: ArchType.Isa.imm_var_id -> MemOffset.t -> bool)
+      : t * (ArchType.block_subtype_t list) =
     (* Reverse local_var_map, which help to infer vars derived from useful vars and add them to useful_var_list *)
     let block_subtype_list =
       List.map (
@@ -661,8 +677,8 @@ module SingleSubtype = struct
     let tv_rel_list, block_subtype_list = 
       add_all_useful_var_block_subtype input_var_set all_var_map_list block_subtype_list useful_var_list [] 200
     in
-    (* add_all_useful_var_forward_prop input_var_set all_var_map_list tv_rel_list block_subtype_list *)
-    tv_rel_list, block_subtype_list
+    add_all_useful_var_forward_prop input_var_set all_var_map_list is_spill tv_rel_list block_subtype_list
+    (* tv_rel_list, block_subtype_list *)
 
   let to_smt_expr (smt_ctx: SmtEmitter.t) (sol: type_rel) : SmtEmitter.exp_t =
     let var_idx, _ = sol.var_idx in

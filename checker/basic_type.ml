@@ -906,8 +906,9 @@ module DepType = struct
       | Xor,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_xor dst src
       | And,    [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_and dst src
       | Or,     [ dst; src ], [ ]      -> exe_bitwise ctx BitVector.mk_or  dst src
-      | CmovE, [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
-      | CmovB, [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf src dst), []
+      | CmovE,  [ dst; src ], [ zf ]   -> Exp (Boolean.mk_ite ctx zf src dst), []
+      | CmovB,  [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf src dst), []
+      | CmovAe, [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf dst src), []
       | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
       | Punpck, [ _; _ ],     [ ]      -> Top 128, [ ]
       | Packxs, [ _; _ ],     [ ]      -> Top 128, [ ]
@@ -935,6 +936,8 @@ module DepType = struct
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_uop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+    let zero = BitVector.mk_numeral ctx "0" dest_size in
+    let one = BitVector.mk_numeral ctx "1" dest_size in
     match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
     | None, _ | _, None ->
       Top dest_size, top_flag_list
@@ -950,6 +953,10 @@ module DepType = struct
       | Neg,   [ src ],      [ ] -> exe_neg ctx src dest_size
       | Inc,   [ src ],      [ ] -> exe_inc ctx src dest_size
       | Dec,   [ src ],      [ ] -> exe_dec ctx src dest_size
+      | SetE,  [ _ ], [ zf ] -> Exp (Boolean.mk_ite ctx zf one zero), []
+      | SetNe, [ _ ], [ zf ] -> Exp (Boolean.mk_ite ctx zf zero one), []
+      | SetB,  [ _ ], [ cf ] -> Exp (Boolean.mk_ite ctx cf one zero), []
+      | SetAe, [ _ ], [ cf ] -> Exp (Boolean.mk_ite ctx cf zero one), []
       | _ -> dep_type_error "<TODO> not implemented yet"
       end
       in

@@ -808,7 +808,11 @@ module SingleTypeInfer = struct
         (* Put this as the last step so that prop always use the latest solution than other steps,
            This ensures prop rules out impossible branches before input var block cond infer *)
         Printf.printf "\n\n%s: Infer iter %d before init single_subtype%!\n\n" func_name curr_iter;
-        let single_subtype, block_subtype = SingleSubtype.init func_name state.input_var_set block_subtype in
+        let single_subtype, block_subtype =
+          SingleSubtype.init
+            func_name state.input_var_set block_subtype
+            (StackSpillInfo.is_spill state.stack_spill_info)
+        in
         SingleSubtype.pp_single_subtype 0 single_subtype;
         Printf.printf "\n\n%s: Infer iter %d after init single_subtype len %d %!\n\n" func_name curr_iter (List.length single_subtype);
         (* Printf.printf "Block_subtype\n";

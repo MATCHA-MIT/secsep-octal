@@ -61,7 +61,7 @@ module FuncInterface (Entry: EntryType) = struct
     PP.print_lvl lvl "Context\n";
     Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.in_context);
     (* SingleContext.pp_cond_list 0 interface.context; *)
-    PP.print_lvl lvl "Output\n";
+    PP.print_lvl lvl "\nOutput\n";
     RegType.pp_reg_type 0 interface.out_reg;
     MemType.pp_mem_type 0 interface.out_mem;
     Sexplib.Sexp.output_hum stdout (sexp_of_list SingleContext.sexp_of_t interface.out_context);
@@ -277,9 +277,9 @@ module FuncInterface (Entry: EntryType) = struct
         else Entry.get_top_type () (* Here we somehow assert during taint infer we always get full map so that we do not call this with TaintEntryType. *)
       in
       if is_full then 
-      (p_off, p_range, m_out_entry), 
-      read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
-      out_range_useful_var
+        (p_off, p_range, m_out_entry), 
+        read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),
+        out_range_useful_var
       else 
         (p_off, p_range, Entry.mem_partial_write_val p_entry m_out_entry), 
         read_range_constraint @ [ Constraint.RangeMustKnown p_range ] @ out_range_constraint @ taint_val_constraint @ (Entry.get_must_known_taint_constraint p_entry),

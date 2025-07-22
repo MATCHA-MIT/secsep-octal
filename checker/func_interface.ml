@@ -48,6 +48,24 @@ module FuncInterface = struct
     let channel = open_in filename in
     Std.list_of_sexp t_of_sexp (Sexp.input_sexp channel)
   
+  let add_in_mem_range_in_off_constr
+      (smt_ctx: SmtEmitter.t)
+      (fi: t) : unit =
+    let in_mem = fi.in_type.mem_type in
+    let constrs = MemType.fold_left_full (
+      fun acc (slot: MemType.entry_t MemType.mem_slot) ->
+        let (off_l, off_r), _, range, _ = slot in
+        if MemRange.is_empty range then acc else
+        let (range_l, range_r) = MemRange.get_boundary range in
+        [
+          Z3.BitVector.mk_sle (fst smt_ctx) off_l range_l;
+          Z3.BitVector.mk_sle (fst smt_ctx) range_l range_r;
+          Z3.BitVector.mk_sle (fst smt_ctx) range_r off_r;
+        ] @ acc
+    ) [] in_mem
+    in
+    SmtEmitter.add_assertions smt_ctx constrs
+  
   let prop_check_call
       (smt_ctx: SmtEmitter.t)
       (pr_type: ArchTypeBasic.t)

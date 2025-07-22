@@ -255,6 +255,22 @@ module MemTypeBasic = struct
     in
     List.fold_left2 helper_outer acc mem1 mem2
 
+  let fold_left2_ptr_full
+      (func: 'acc -> PtrInfo.t -> MemOffset.t * MemRange.t * 'a -> PtrInfo.t -> MemOffset.t * MemRange.t * 'b -> 'acc)
+      (acc: 'acc)
+      (mem1: 'a mem_content)
+      (mem2: 'b mem_content) : 'acc =
+    let helper_outer
+        (acc: 'acc)
+        (entry1: 'a mem_part)
+        (entry2: 'b mem_part) : 'acc =
+      let p1, l1 = entry1 in
+      let p2, l2 = entry2 in
+      if fst p1 = fst p2 then List.fold_left2 (fun acc slot1 slot2 -> func acc p1 slot1 p2 slot2) acc l1 l2
+      else mem_type_error "[fold_left2_ptr_full] ptr does not match"
+    in
+    List.fold_left2 helper_outer acc mem1 mem2
+
   let add_base_to_offset (mem_layout: 'a mem_content) : 'a mem_content =
     List.map (
       fun ((base, base_info), off_list) ->

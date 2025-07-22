@@ -280,4 +280,15 @@ module TaintExp = struct
     | TaintConst true -> true
     | _ -> false
 
+  let taint_sub_untaint (sub: t) (sup: t) : bool =
+    match sub, sup with
+    | TaintConst true, TaintConst false -> true
+    | _ -> false
+  
+  let taint_eq_invalid (t1: t) (t2: t) : bool =
+    match t1, t2 with
+    | TaintConst true, TaintConst false -> true
+    | TaintConst false, TaintConst true -> true
+    | _ -> false
+
 end

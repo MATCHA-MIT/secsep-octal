@@ -646,7 +646,7 @@ include ArchTypeBasic
              (otherwise we need to translate non-overlap info and do extra check on non-overlap at func call)
        2. Check func type matches its interface
        3. Check func type correctness (prop/symbolic execution) *)
-    let _ = func_name in (* <TODO> Remove this later *)
+    let fi = FuncInterface.get_func_interface func_interface_list func_name in
 
     (* temporarily add context of entry BB to do non-overlap check *)
     SmtEmitter.push smt_ctx;
@@ -654,6 +654,9 @@ include ArchTypeBasic
     add_block_context_to_solver smt_ctx entry_bb_type;
     let result_non_overlap = MemType.check_non_overlap smt_ctx entry_bb_type.mem_type in
     SmtEmitter.pop smt_ctx 1;
+
+    (* add constraint so that each slot's initialized range is the subset of the slot *)
+    FuncInterface.add_in_mem_range_in_off_constr smt_ctx fi;
 
     result_non_overlap &&
     (* <TODO> Check func type matches its interface *)

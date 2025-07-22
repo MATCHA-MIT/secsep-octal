@@ -250,18 +250,12 @@ module Transform = struct
       List.map (fun x -> (x, TaintExp.TaintConst true)) taint_list
     in
     let first_bb_type = List.hd ti.func_type in
-    let ittt_regs = if String.equal ti.func_name Isa.entry_label then
-      (* for some reason, main may push rax but not using it at all, so we need to instantiate rax's taint *)
-      (Isa.get_reg_idx Isa.RAX) :: Isa.callee_saved_reg_idx
-    else
-      Isa.callee_saved_reg_idx
-    in
     let taint_tv_list = List.filter_map (fun idx ->
       let reg_type = List.nth first_bb_type.reg_type idx in
       match snd reg_type with
       | TaintVar tv -> Some tv
       | _ -> None
-    ) ittt_regs in
+    ) Isa.callee_saved_reg_idx in
     helper [] taint_tv_list
 
   let taint_var_ittt (ittt_map: TaintExp.local_var_map_t) (taint_exp: TaintExp.t) : TaintExp.t =
@@ -459,6 +453,13 @@ module Transform = struct
           transform_error "Push/Pop not accessing full slot";
         let taint_anno = Option.get taint_anno in
         let taint_anno = tv_ittt taint_anno in (* mocking *)
+        let taint_anno =
+          (* for some reason, main may push rax but not using it at all, so we need to instantiate rax's taint *)
+          if o = InstTransform.Isa.RegOp InstTransform.Isa.RAX then
+            TaintExp.TaintConst true
+          else
+            taint_anno
+        in
         let offset_as_disp, sf1 = match taint_anno with
         | TaintConst true -> Some (Isa.ImmNum (!tf_config.delta, Some 8L)), []
         | TaintConst false -> None, []

@@ -264,6 +264,14 @@ module MemRange = struct
 
   let is_empty (r: t) : bool = r = []
 
+  let get_boundary (r: t) : MemOffset.t =
+    match r with
+    | [] -> mem_range_error "get_boundary on empty range"
+    | [x] -> x
+    | l :: rest ->
+      let r = List.nth rest ((List.length rest) - 1) in
+      fst l, snd r
+
   let check_subset
       (smt_ctx: SmtEmitter.t)
       (r1: t) (r2: t) : bool =
@@ -339,6 +347,18 @@ module MemType = struct
       ptr, List.map func part_mem
     in
     List.map helper_outer mem
+
+  let fold_left_full
+      (func: 'acc -> 'a mem_slot -> 'acc)
+      (acc: 'acc)
+      (mem: 'a mem_content) : 'acc =
+    let helper_outer
+        (acc: 'acc)
+        (entry: 'a mem_part) : 'acc =
+      let _, l = entry in
+      List.fold_left func acc l
+    in
+    List.fold_left helper_outer acc mem
 
   let fold_left2_full
       (func: 'acc -> 'a mem_slot -> 'b mem_slot -> 'acc)
