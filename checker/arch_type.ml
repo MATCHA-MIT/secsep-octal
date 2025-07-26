@@ -458,7 +458,7 @@ include ArchTypeBasic
     end else
 
     let result =
-      check_subtype smt_ctx curr_type targ_type br_anno None,
+      check_subtype smt_ctx curr_type targ_type br_anno None && BranchAnno.is_taint_map_empty br_anno,
       curr_type (* already at the end of block, no further update *)
     in
 
@@ -508,7 +508,9 @@ include ArchTypeBasic
         } in
         let valid = check_subtype smt_ctx next_type targ_type br_anno None in
         SmtEmitter.pop smt_ctx 1;
-        valid
+        valid && BranchAnno.is_taint_map_empty br_anno
+        (* Here I only check for taken side, and will not check if always not taken,
+          which is slightly different from the rule Typing-Jne in the paper. But both versions should be fine. *)
       end
     in
 

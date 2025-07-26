@@ -15,4 +15,7 @@ module BranchAnno = struct
 
   let get_empty () : t = ([], [])
 
+  let is_taint_map_empty (anno: t) : bool =
+    snd anno = []
+
 end
