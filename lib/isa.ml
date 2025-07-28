@@ -182,6 +182,7 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
   type prog = {
     funcs: func list;
     imm_var_map: imm_var_map;
+    orig_funcs: func list; (* function segments in original input assembly file *)
   }
   [@@deriving sexp]
 

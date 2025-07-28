@@ -166,7 +166,7 @@ module AsmGen = struct
   let gen_asm (prog: Isa.prog) (tf_func_states: Transform.func_state list) : string =
     let ctx = { global_var_map = Isa.get_rev_imm_var_map prog.imm_var_map } in
 
-    prog.funcs |>
+    prog.orig_funcs |>
     List.map (fun (func: Isa.func) ->
       let helper_bb_orig_lines (bb: Isa.basic_block) =
         List.filter_map (fun line ->

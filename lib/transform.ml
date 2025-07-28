@@ -454,11 +454,11 @@ module Transform = struct
         let taint_anno = Option.get taint_anno in
         let taint_anno = tv_ittt taint_anno in (* mocking *)
         let taint_anno =
-          (* for some reason, main may push rax but not using it at all, so we need to instantiate rax's taint *)
-          if o = InstTransform.Isa.RegOp InstTransform.Isa.RAX then
-            TaintExp.TaintConst true
-          else
-            taint_anno
+          (* for some reason (possibly stack alignment), main may push rax but not using it at all, so we need to instantiate rax's taint *)
+          match o with
+          | InstTransform.Isa.RegOp InstTransform.Isa.RAX
+          | InstTransform.Isa.RegOp InstTransform.Isa.RCX -> TaintExp.TaintConst true
+          | _ -> taint_anno
         in
         let offset_as_disp, sf1 = match taint_anno with
         | TaintConst true -> Some (Isa.ImmNum (!tf_config.delta, Some 8L)), []

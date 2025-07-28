@@ -850,6 +850,9 @@ module Parser = struct
       List.fold_left_map gsym_helper Isa.StrM.empty lines_of_bbs_of_gsyms
     in
 
+    (* save a copy before aliveness filtering, sorting, etc. *)
+    let orig_func_list = func_list in
+
     let func_list = func_list
       |> propagate_global_symbol
       |> propagate_aliveness
@@ -887,7 +890,7 @@ module Parser = struct
         { func with body = func.body @ [get_ret_bb] }
     ) func_list
     in
-    { funcs = func_list; imm_var_map = imm_var_map }
+    { funcs = func_list; imm_var_map = imm_var_map; orig_funcs = orig_func_list; }
 
   let prog_to_file (filename: string) (prog: Isa.prog) =
     let open Sexplib in

@@ -60,5 +60,8 @@ let () =
   let oc = open_out !output_name in
   Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
 
+  if List.length soft_faults > 0 then
+    exit 1;
+
   (* in
   Taint_type_infer.TaintTypeInfer.state_list_to_file (get_related_filename !program_name "out" "taint_infer") range_infer_result *)

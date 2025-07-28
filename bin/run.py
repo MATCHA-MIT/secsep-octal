@@ -187,7 +187,7 @@ def transform_helper(
     if out is None:
         output_dir = proj_dir / "out" / name
         output_dir.mkdir(exist_ok=True, parents=True)
-        out = output_dir / f"{name}.tf{tf_suffix}.asm"
+        out = output_dir / f"{name}.tf{tf_suffix}.s"
 
     arg_list = ["dune", "exec", "prog_transform", "--", "-name", name, "-out", out]
     msg = "Transforming program"
