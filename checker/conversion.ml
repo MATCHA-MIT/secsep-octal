@@ -91,30 +91,46 @@ let append_func_var_size_map
 let intermediate_sz = 64
 let () = assert (intermediate_sz mod 8 = 0)
 
+let unify_size
+    (ctx: Z3.context)
+    (e1: DepType.t) (sz1: int option)
+    (e2: DepType.t) (sz2: int option)
+    : DepType.t * DepType.t * int option =
+  let sz = match sz1, sz2 with
+  | None, None -> None
+  | Some sz, None | None, Some sz -> Some sz
+  | Some sz1, Some sz2 -> Some (Int.max sz1 sz2)
+  in
+  match e1, e2 with
+  | Top sz1, Top sz2 ->
+    let top_sz = Int.max sz1 sz2 in
+    Top top_sz, Top top_sz, sz
+  | Exp _, Exp _ ->
+    DepType.adjust_size ~zext:false ctx e1 sz,
+    DepType.adjust_size ~zext:false ctx e2 sz,
+    sz
+  | Exp _, Top _ -> e1, Top (Option.value sz ~default:intermediate_sz), sz
+  | Top _, Exp _ -> Top (Option.value sz ~default:intermediate_sz), e2, sz
+
 let rec convert_dep_type_inner
     (ctx: Z3.context)
     (se: SingleEntryType.t)
     (get_var_size: int -> int option)
-    : DepType.t =
-  let check_top_sz (e: DepType.t) = begin
-    match e with
-    | Top sz ->
-      if sz != intermediate_sz then failwith "Top size mismatched";
-    | Exp _ -> ()
-  end in
-  let raw_res = match se with
-  | SingleTop -> DepType.Top intermediate_sz
-  | SingleConst c -> DepType.Exp (Z3.BitVector.mk_numeral ctx (Int64.to_string c) intermediate_sz)
+    : DepType.t * int option (* converted type, size suggestion *) =
+  match se with
+  | SingleTop -> DepType.Top intermediate_sz, None
+  | SingleConst c -> DepType.Exp (Z3.BitVector.mk_numeral ctx (Int64.to_string c) intermediate_sz), None
   | SingleVar v ->
     let var_size = get_var_size v |> Option.get in
     if var_size = -1 then
       (* this var is designated to be replaced by Top after conversion *)
-      DepType.Top DepType.top_unknown_size
+      DepType.Top DepType.top_unknown_size, None
     else
-      DepType.Exp (Z3.Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8)))
+      DepType.Exp (Z3.Expr.mk_const_s ctx ("s" ^ (string_of_int v)) (Z3.BitVector.mk_sort ctx (var_size * 8))), Some (var_size * 8)
   | SingleBExp (bop, e1, e2) ->
-    let e1 = convert_dep_type_inner ctx e1 get_var_size in
-    let e2 = convert_dep_type_inner ctx e2 get_var_size in
+    let e1, sz1 = convert_dep_type_inner ctx e1 get_var_size in
+    let e2, sz2 = convert_dep_type_inner ctx e2 get_var_size in
+    let e1, e2, sz = unify_size ctx e1 sz1 e2 sz2 in
     (
       match bop, e1, e2 with
       | _, DepType.Exp e1', DepType.Exp e2' -> begin
@@ -130,65 +146,40 @@ let rec convert_dep_type_inner
           | SingleOr ->  Z3.BitVector.mk_or ctx e1' e2'
           | SingleMod -> Z3.BitVector.mk_srem ctx e1' e2'
           in
-          DepType.Exp e
+          DepType.Exp e, sz
         end
-      | _, _, _ -> begin
-          check_top_sz e1;
-          check_top_sz e2;
-          DepType.Top intermediate_sz
-        end
+      | _, _, _ ->
+        DepType.Top (Option.value sz ~default:intermediate_sz), sz
     )
   | SingleUExp (uop, e) -> begin
-      let e = convert_dep_type_inner ctx e get_var_size in
+      let e, sz = convert_dep_type_inner ctx e get_var_size in
       match uop, e with
       | _, DepType.Exp e' -> begin
           let out_e = match uop with
           | SingleNot -> Z3.BitVector.mk_not ctx e'
           in
-          DepType.Exp out_e
+          DepType.Exp out_e, sz
         end
-      | _, _ -> begin
-          check_top_sz e;
-          DepType.Top intermediate_sz
-        end
+      | _, DepType.Top _ -> e, sz
     end
   | SingleITE ((cond, cond_l, cond_r), then_exp, else_exp) -> begin
-      let cond_l = convert_dep_type_inner ctx cond_l get_var_size in
-      let cond_r = convert_dep_type_inner ctx cond_r get_var_size in
-      let then_exp = convert_dep_type_inner ctx then_exp get_var_size in
-      let else_exp = convert_dep_type_inner ctx else_exp get_var_size in
+      let cond_l, cond_l_sz = convert_dep_type_inner ctx cond_l get_var_size in
+      let cond_r, cond_r_sz = convert_dep_type_inner ctx cond_r get_var_size in
+      let cond_l, cond_r, _ = unify_size ctx cond_l cond_l_sz cond_r cond_r_sz in
+      let then_exp, then_exp_sz = convert_dep_type_inner ctx then_exp get_var_size in
+      let else_exp, else_exp_sz = convert_dep_type_inner ctx else_exp get_var_size in
+      let then_exp, else_exp, sz = unify_size ctx then_exp then_exp_sz else_exp else_exp_sz in
       match cond_l, cond_r, then_exp, else_exp with
       | DepType.Exp cond_l', DepType.Exp cond_r', DepType.Exp then_exp', DepType.Exp else_exp' ->
         let ite_cond = SmtEmitter.expr_of_ite_cond ctx cond cond_l' cond_r' in
         let ite = Z3.Boolean.mk_ite ctx ite_cond then_exp' else_exp' in
-        DepType.Exp ite
+        DepType.Exp ite, sz
       | _, _, _, _ ->
-        let check_match (e: DepType.t) = begin
-          match e with
-          | Top sz ->
-            if sz != intermediate_sz then failwith "Top size mismatched";
-          | Exp _ -> ()
-        end in
-        check_match cond_l;
-        check_match cond_r;
-        check_match then_exp;
-        check_match else_exp;
-        DepType.Top intermediate_sz
+        DepType.Top (Option.value sz ~default:intermediate_sz), sz
     end
-  in
-  match raw_res with
-  | DepType.Top sz ->
-    DepType.Top (max sz intermediate_sz)
-  | DepType.Exp e ->
-    let e_size = Z3.BitVector.get_size (Z3.Expr.get_sort e) in
-    if e_size = intermediate_sz then
-      DepType.Exp e
-    else if e_size < intermediate_sz then
-      DepType.Exp (Z3.BitVector.mk_sign_ext ctx (intermediate_sz - e_size) e)
-    else
-      DepType.Top e_size
 
 let convert_dep_type
+    ?(zext: bool = false)
     (ctx: Z3.context)
     (se: SingleEntryType.t)
     (get_var_size: int -> int option) (* in bytes *)
@@ -196,15 +187,18 @@ let convert_dep_type
     : DepType.t =
   let out_size = out_size * 8 in (* in bits *)
   match convert_dep_type_inner ctx se get_var_size with
-  | DepType.Top _ -> DepType.Top out_size
-  | DepType.Exp e ->
-    let e_size = Z3.BitVector.get_size (Z3.Expr.get_sort e) in
-    if e_size = out_size then
-      DepType.Exp e
-    else if e_size > out_size then
-      DepType.Exp (Z3.BitVector.mk_extract ctx (out_size - 1) 0 e)
+  | DepType.Top _, _ -> DepType.Top out_size
+  | DepType.Exp e, Some sz ->
+    (* Printf.printf "DepType.Exp e = %s, inferred size is %d-bit\n" (Z3.Expr.to_string e) sz; *)
+    if DepType.get_exp_bit_size e <> sz then
+      convert_error (Printf.sprintf "inferred size %d-bit does not match expected size for expression %s" sz (Z3.Expr.to_string e));
+    DepType.adjust_size ~zext ctx (DepType.Exp e) (Some out_size)
+  | DepType.Exp e, None ->
+    if Z3.Expr.is_numeral e then
+      (* assign size for pure constant expression *)
+      DepType.adjust_size ~zext ctx (DepType.Exp e) (Some out_size)
     else
-      DepType.Exp (Z3.BitVector.mk_sign_ext ctx (out_size - e_size) e)
+      convert_error (Printf.sprintf "cannot infer size of %s" (Z3.Expr.to_string e))
 
  
 let convert_taint_type
@@ -252,6 +246,8 @@ let convert_reg_type
         |> TaintTypeInfer.ArchType.Isa.get_reg_size
         |> Int64.to_int
       in
+      (* var for reg will have inferred size equal to reg size *)
+      (* no need to worry about sign/zero extension *)
       convert_basic_type ctx entry get_var_size size
     ) reg_type
 
@@ -270,8 +266,8 @@ let convert_mem_offset
     : MemOffset.t =
   let off_l, off_r = off in
   let size = TaintTypeInfer.Isa.get_gpr_full_size () |> Int64.to_int in
-  let off_l' = convert_dep_type ctx off_l get_var_size size in
-  let off_r' = convert_dep_type ctx off_r get_var_size size in
+  let off_l' = convert_dep_type ~zext:false ctx off_l get_var_size size in
+  let off_r' = convert_dep_type ~zext:false ctx off_r get_var_size size in
   match off_l', off_r' with
   | Exp e_l, Exp e_r -> (e_l, e_r)
   | _ -> failwith "unexpected Top found in input's MemOffset"
@@ -616,6 +612,7 @@ let convert_function_interface
   }
 
 let convert_single_var_map
+    ?(zext: bool = false)
     (ctx: Z3.context)
     (single_var_map: SingleEntryType.local_var_map_t)
     (from_get_var_size: int -> int option)
@@ -639,7 +636,7 @@ let convert_single_var_map
             Some targ_var_size
           | Some sz -> Some sz
         in
-        let from_exp' = convert_dep_type ctx from_exp from_get_var_size' targ_var_size in
+        let from_exp' = convert_dep_type ~zext ctx from_exp from_get_var_size' targ_var_size in
         Some (targ_var, from_exp')
   ) single_var_map
 
@@ -660,7 +657,8 @@ let convert_branch_anno
     (targ_get_var_size: int -> int option)
     : BranchAnno.t =
   let anno = Option.get anno in
-  let dep_map = convert_single_var_map ctx anno from_get_var_size targ_get_var_size in
+  (* we use zext so that if a register is partially used, the variable representing the same register at target block is correctly mapped *)
+  let dep_map = convert_single_var_map ~zext:true ctx anno from_get_var_size targ_get_var_size in
   dep_map, [(* taint_map: empty, since the same (input) taint vars are used in both from and targ *)]
 
 let convert_call_anno
@@ -693,10 +691,14 @@ let convert_call_anno
       let se = SingleEntryType.repl_local_var single_local_var_map se in
       (* if pr_reg is a single var, then we know an extra info of var's size *)
       let from_get_var_size = match se with
-      | SingleEntryType.SingleVar v -> fun var -> if var = v then Some reg_size else from_get_var_size var
+      | SingleEntryType.SingleVar v -> fun var ->
+          if var = v then begin
+            Option.value (from_get_var_size var) ~default:reg_size |> Some
+          end else
+            from_get_var_size var
       | _ -> from_get_var_size
       in
-      let se' = convert_dep_type ctx se (get_var_size from_get_var_size) reg_size in
+      let se' = convert_dep_type ~zext:true ctx se (get_var_size from_get_var_size) reg_size in
       let te' = convert_taint_type ctx te in
       (se', te')
   ) anno.pr_reg in
@@ -714,7 +716,8 @@ let convert_call_anno
   {
     pr_reg = pr_reg;
     ctx_map = (
-      convert_single_var_map ctx anno.single_var_map (get_var_size from_get_var_size) (get_var_size targ_get_var_size),
+      (* we use zext so that if a register is partially used, the variable representing the same register at target block is correctly mapped *)
+      convert_single_var_map ~zext:true ctx anno.single_var_map (get_var_size from_get_var_size) (get_var_size targ_get_var_size),
       convert_taint_var_map ctx anno.taint_var_map
     );
     mem_map = ch_mem_slot_info;
@@ -790,6 +793,7 @@ let convert_taint_type_infers
         let f = convert_isa_operand ctx bb_type.mem_type in
         let g = convert_mem_anno ctx bb_type.mem_type in
         let _, inst' = List.fold_left_map (fun pc (inst : TaintTypeInfer.Isa.instruction) ->
+          (* Printf.printf "converting instruction %s\n" (TaintTypeInfer.Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string_hum); *)
           let inst' = match inst with
           | BInst (bop, od, o1, o2) -> ArchType.Isa.BInst (bop, f od, f o1, f o2)
           | UInst (uop, od, o1) -> ArchType.Isa.UInst (uop, f od, f o1)

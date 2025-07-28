@@ -817,10 +817,15 @@ module MemType = struct
       (smt_ctx: SmtEmitter.t)
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t)
+      (is_slot_full_mapped: bool)
       (new_type: BasicType.t) : entry_t mem_slot option =
     (* 1. Update entry (valid region and type)
        2. Check slot_off, taint constraint *)
     let slot_off, slot_forget_type, slot_range, (_, slot_taint) = slot in
+    (* Printf.printf "set_one_slot_type:\n\tslot off: %s\n\tslot range: %s\n\taddr_off: %s\n"
+      (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t slot_off))
+      (Sexplib.Sexp.to_string_hum (MemRange.sexp_of_t slot_range))
+      (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)); *)
     if slot_forget_type then begin
       (* Check slot_off *)
       if MemOffset.offset_cmp smt_ctx CmpSubset addr_off slot_off = Subset then begin
@@ -847,7 +852,14 @@ module MemType = struct
         if cmp_off = Eq then begin
           Some (slot_off, slot_forget_type, [ slot_off ], new_type)
         end else if cmp_off = Subset then begin
-          Some (slot_off, slot_forget_type, MemRange.merge smt_ctx slot_range [addr_off], (Top DepType.top_unknown_size, new_taint))
+          let new_range = if is_slot_full_mapped then
+            let _ = Printf.printf "override range with %s\n"
+              (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) in
+            [addr_off]
+          else
+            MemRange.merge smt_ctx slot_range [addr_off]
+          in
+          Some (slot_off, slot_forget_type, new_range, (Top DepType.top_unknown_size, new_taint))
         end else begin
           Printf.printf "Warning: %s is not subset of %s\n" 
             (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
@@ -921,7 +933,7 @@ module MemType = struct
       (new_type: BasicType.t) : (entry_t mem_slot list) option =
     (* 1. Update entry
        2. Check slot_info, taint constraint *)
-    let _, slot_idx, _, num_slots = slot_info in
+    let _, slot_idx, is_slot_full_mapped, num_slots = slot_info in
     if List.length part_mem < slot_idx + num_slots then begin
       Printf.printf "Warning: set_part_mem cannot find %d slot(s) starting from idx %d\n" 
         num_slots slot_idx;
@@ -936,7 +948,7 @@ module MemType = struct
             | Some acc_idx ->
               if acc_idx <> slot_idx then Some (acc_idx + 1), slot
               else begin
-                match set_one_slot_type smt_ctx slot addr_off new_type with
+                match set_one_slot_type smt_ctx slot addr_off is_slot_full_mapped new_type with
                 | None -> None, slot
                 | Some new_slot -> Some (acc_idx + 1), new_slot
               end

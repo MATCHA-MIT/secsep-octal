@@ -533,7 +533,7 @@ include ArchTypeBasic
       check_not_taken ()
     | SmtEmitter.SatYes -> (* always taken *)
       if curr_type.pc + 1 < curr_type.dead_pc then begin
-        Printf.printf "Warning: instr after always-taken cond branch is not dead";
+        Printf.printf "Warning: instr after always-taken cond branch is not dead\n";
         false, curr_type
       end else
         check_taken (), { curr_type with pc = curr_type.pc + 1 } (* update pc so block check can terminate *)

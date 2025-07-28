@@ -1,4 +1,5 @@
 open Isa_basic
+open Single_exp_basic
 open Single_exp
 open Taint_exp
 open Constraint
@@ -15,11 +16,30 @@ module type EntryType = sig
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
 
-  type flag_t = t * t
+  type flag_src_t =
+  | FlagCmp of t * t
+  | FlagBInst of IsaBasic.bop * t * t
+  | FlagUInst of IsaBasic.uop * t
+  | FlagTInst of IsaBasic.top * t list
+  [@@deriving sexp]
+
+  (* flag_t is used to record the flag value and the source of the flag value *)
+  (* legacy: (left, right) is used to record the legacy left and right values *)
+  (* finstr: the instruction that generates the flag *)
+  type flag_t = {
+    legacy: (t * t) option;
+    finstr: flag_src_t option;
+  }
+  [@@deriving sexp]
 
   type local_var_map_t
   val local_var_map_t_of_sexp : Sexp.t -> local_var_map_t
   val sexp_of_local_var_map_t : local_var_map_t -> Sexp.t
+
+  val get_empty_flag : unit -> flag_t
+  val get_flag_taint : flag_t -> TaintExp.t option
+  val flag_repl_local_var : local_var_map_t -> flag_t -> flag_t
+  val flag_get_useful_vars : flag_t -> SingleExp.SingleVarSet.t
 
   val get_empty_var_map: local_var_map_t
   val get_empty_var_map_from_init_single_var_map: SingleExp.local_var_map_t -> local_var_map_t
@@ -47,6 +67,7 @@ module type EntryType = sig
   val update_ld_taint_constraint: t -> TaintExp.t option -> Constraint.t list
   val update_st_taint_constraint: t -> TaintExp.t option -> t * Constraint.t list
 
+  val compile_cond_j : IsaBasic.branch_cond -> flag_t -> CondTypeBase.t * t * t
   val exe_bop_inst: IsaBasic.bop -> t -> t -> flag_t -> bool -> t * flag_t
   val exe_uop_inst: IsaBasic.uop -> t -> flag_t -> t * flag_t
   val exe_top_inst: IsaBasic.top -> t list -> flag_t -> t * flag_t

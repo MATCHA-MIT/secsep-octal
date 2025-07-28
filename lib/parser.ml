@@ -383,26 +383,32 @@ module Parser = struct
     | "setae" | "seta" -> Some (mnemonic, (fill [1L]))
     (* instructions with single-letter suffix indicating size: [bwldq] *)
     (* special size *)
-    | _ ->
-      let split_result = split_opcode_size Isa.common_opcode_list mnemonic in
-      if Option.is_none split_result then None else
-      let opcode, op_size = Option.get split_result in
-      let op_os: Isa.data_off_size = (0L, op_size) in
-      let oprs_with_size = match opcode with
-      | "sal" | "sar" | "shl" | "shr" when (List.length operands = 2) -> begin
-          (* suggest size for dest only *)
-          List.map2 (fun (opr: Isa.operand) (sz: Isa.data_size) ->
-            fill_os_for_opr (0L, sz) opr
-          ) operands [1L; op_size] 
-        end
-      | _ -> begin
-          (* suggest size for each operand *)
-          List.map (
-            fun (opr: Isa.operand) : Isa.operand -> fill_os_for_opr op_os opr
-          ) operands
-        end
-      in
-      Some (opcode, oprs_with_size)
+    | _ -> begin
+        let split_result = split_opcode_size Isa.common_opcode_list mnemonic in
+        if Option.is_none split_result then None else
+        let opcode, op_size = Option.get split_result in
+        match opcode with
+        | "padd" | "psub" | "psll" | "psrl" ->
+          (* op_size only influences how 128-bit are grouped and calculated *)
+          Some (opcode, fill [16L; 16L])
+        | _ ->
+          let op_os: Isa.data_off_size = (0L, op_size) in
+          let oprs_with_size = match opcode with
+          | "sal" | "sar" | "shl" | "shr" when (List.length operands = 2) -> begin
+              (* suggest size for dest only *)
+              List.map2 (fun (opr: Isa.operand) (sz: Isa.data_size) ->
+                fill_os_for_opr (0L, sz) opr
+              ) operands [1L; op_size] 
+            end
+          | _ -> begin
+              (* suggest size for each operand *)
+              List.map (
+                fun (opr: Isa.operand) : Isa.operand -> fill_os_for_opr op_os opr
+              ) operands
+            end
+          in
+          Some (opcode, oprs_with_size)
+      end
   
   let src (opr: Isa.operand) : Isa.operand =
     match opr with

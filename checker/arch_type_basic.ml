@@ -46,7 +46,7 @@ module ArchTypeBasic = struct
       RegType.t * FlagType.t * MemType.t * BasicType.ctx_t =
     let ctx, _ = smt_ctx in
     let dep_ctx_map, taint_ctx_map = ctx_map in
-    (*     
+    (*
     Printf.printf "dep_ctx_map:\n%s\n" (DepType.sexp_of_map_t dep_ctx_map |> Sexplib.Sexp.to_string_hum);
     Printf.printf "taint_ctx_map:\n%s\n" (TaintType.sexp_of_map_t taint_ctx_map |> Sexplib.Sexp.to_string_hum);
     *)

@@ -48,7 +48,7 @@ module ArchType (Entry: EntryType) = struct
     context: SingleContext.t list;
     blk_br_context: SingleContext.t list;
     tmp_context: SingleContext.t list;
-    flag: entry_t * entry_t;
+    flag: Entry.flag_t;
     branch_hist: (CondType.t * int) list;
     full_not_taken_hist: (CondType.t * int) list;
     constraint_list: (Constraint.t * int) list;
@@ -117,7 +117,7 @@ module ArchType (Entry: EntryType) = struct
     PP.bprint_lvl (lvl + 1) buf "pc = %d;\n" curr_type.pc;
     PP.bprint_lvl (lvl + 1) buf "reg_type = \n"; RegType.pp_ocaml_reg_type (lvl + 2) buf curr_type.reg_type; PP.bprint_lvl (lvl + 1) buf ";\n";
     PP.bprint_lvl (lvl + 1) buf "mem_type = \n"; MemType.pp_ocaml_mem_type (lvl + 2) buf curr_type.mem_type; PP.bprint_lvl (lvl + 1) buf ";\n";
-    PP.bprint_lvl (lvl + 1) buf "flag = (%s, %s);\n" (Entry.to_ocaml_string (fst curr_type.flag)) (Entry.to_ocaml_string (snd curr_type.flag));
+    PP.bprint_lvl (lvl + 1) buf "flag = %s;\n" (curr_type.flag |> Entry.sexp_of_flag_t |> Sexplib.Sexp.to_string_hum);
     PP.bprint_lvl (lvl + 1) buf "branch_hist = [];\n"; (* We do not need branch hist, so I omit it *)
     PP.bprint_lvl (lvl + 1) buf "full_not_taken_hist = [];\n";
     PP.bprint_lvl (lvl + 1) buf "constraint_list = [];\n";
@@ -181,7 +181,7 @@ module ArchType (Entry: EntryType) = struct
       context = [];
       blk_br_context = [];
       tmp_context = [];
-      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
+      flag = Entry.get_empty_flag ();
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -214,7 +214,7 @@ module ArchType (Entry: EntryType) = struct
       context = [];
       blk_br_context = [];
       tmp_context = [];
-      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
+      flag = Entry.get_empty_flag ();
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -230,7 +230,7 @@ module ArchType (Entry: EntryType) = struct
 
   let clean_up (arch_type: t) : t =
     { arch_type with
-      flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
+      flag = Entry.get_empty_flag ();
       branch_hist = [];
       full_not_taken_hist = [];
       constraint_list = [];
@@ -846,7 +846,12 @@ module ArchType (Entry: EntryType) = struct
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src1 in
       let curr_type = add_constraints curr_type (src0_constraint @ src1_constraint) in
-      { curr_type with flag = (src0_type, src1_type); },
+      let new_flag = {
+        Entry.legacy = Some (src0_type, src1_type);
+        Entry.finstr = Some (Entry.FlagCmp (src0_type, src1_type));
+      }
+      in
+      { curr_type with flag = new_flag; },
       Cmp (src0, src1)
     | Test (src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in
@@ -893,7 +898,7 @@ module ArchType (Entry: EntryType) = struct
       | _ -> arch_type_error "Get different ldop after pop"
       end
       (* next_type, src_constraint @ dest_constraint *)
-    | Syscall -> { curr_type with flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ()) }, inst
+    | Syscall -> { curr_type with flag = Entry.get_empty_flag () }, inst
     | Nop | Hlt | Directive _ -> curr_type, inst
     | Unsupported raw -> arch_type_error (Printf.sprintf "inst %s not implemented" raw)
     | Jmp _ | Jcond _ | Call _ -> arch_type_error "type_prop_non_branch: should not deal with branch instructions"
@@ -933,10 +938,11 @@ module ArchType (Entry: EntryType) = struct
       (smt_ctx: SmtEmitter.t)
       (cond: Isa.branch_cond) (curr_type: t) :
       t * t * (SmtEmitter.exp_t list) =
-    let taken_type_option = CondType.get_taken_type cond curr_type.flag in
+    let taken_type_option = Entry.compile_cond_j cond curr_type.flag |> Some in
     match taken_type_option with
     | None -> curr_type, curr_type, []
     | Some taken_type -> 
+      (* Printf.printf "branch taken cond: %s\n" (CondType.to_string taken_type); *)
       let not_taken_type = CondType.not_cond_type taken_type in
       let not_taken_cond = 
         if CondType.has_top not_taken_type then [] 
@@ -965,14 +971,14 @@ module ArchType (Entry: EntryType) = struct
       curr_type, false, block_subtype
     | Jcond (cond, label, _) ->
       (* Simplify flag *)
-      let simp_flag =
-        Entry.repl_local_var curr_type.local_var_map (fst curr_type.flag),
-        Entry.repl_local_var curr_type.local_var_map (snd curr_type.flag)
-      in
+      let simp_flag = Entry.flag_repl_local_var curr_type.local_var_map curr_type.flag in
       let curr_type = { curr_type with flag = simp_flag } in
       (* Add constraint: branch cond is untainted!!! *)
-      let cond_l, cond_r = curr_type.flag in
-      let cond_untaint_constraint = (Entry.get_untaint_constraint cond_l) @ (Entry.get_untaint_constraint cond_r) in
+      let cond_untaint_constraint =
+        match Entry.get_flag_taint curr_type.flag with
+        | None -> []
+        | Some taint -> [ Constraint.TaintSub (taint, TaintConst false) ]
+      in
       let taken_type, not_taken_type, not_taken_cond = 
         update_branch_hist_get_not_taken_cond smt_ctx cond curr_type 
       in
@@ -992,12 +998,7 @@ module ArchType (Entry: EntryType) = struct
       SmtEmitter.add_assertions smt_ctx not_taken_cond;
       let not_taken_possible = SmtEmitter.check_context smt_ctx <> SatNo in
       (* 3. Update useful var and return curr_type + not taken *)
-      let l_flag, r_flag = not_taken_type.flag in
-      let useful_var = 
-        SingleExp.SingleVarSet.union 
-          (SingleExp.get_vars (Entry.get_single_exp l_flag))
-          (SingleExp.get_vars (Entry.get_single_exp r_flag))
-      in
+      let useful_var = Entry.flag_get_useful_vars not_taken_type.flag in
       let not_taken_type = add_constraints not_taken_type cond_untaint_constraint in
       let not_taken_type = {not_taken_type with useful_var = SingleExp.SingleVarSet.union not_taken_type.useful_var useful_var} in
       let not_taken_type, block_subtype =
@@ -1077,7 +1078,7 @@ module ArchType (Entry: EntryType) = struct
         { curr_type with
           reg_type = new_reg;
           mem_type = new_mem;
-          flag = (Entry.get_top_taint_type (), Entry.get_top_taint_type ());
+          flag = Entry.get_empty_flag ();
           constraint_list = new_constraints @ curr_type.constraint_list;
           useful_var = SingleExp.SingleVarSet.union new_useful_vars curr_type.useful_var;
           extra_call_subtype_list = extra_subtype_list @ curr_type.extra_call_subtype_list;
@@ -1137,6 +1138,7 @@ module ArchType (Entry: EntryType) = struct
         Call (target_func_name, call_anno)
       | _ ->
         let next_type, inst = type_prop_non_branch smt_ctx sub_sol_func sub_sol_list_func is_spill_func curr_type inst in
+        (* Printf.printf "[instr] %s; [flag] %s\n" (Isa.sexp_of_instruction inst |> Sexplib.Sexp.to_string) (Entry.sexp_of_flag_t next_type.flag |> Sexplib.Sexp.to_string); *)
         (next_type, true, block_subtype), inst
     in
     (* let unknown_after = List.length (Constraint.get_unknown next_type.constraint_list) in

@@ -341,6 +341,25 @@ We now uses a mixture of 1 and 3 to update each memory slot in caller
 
 # Type Check
 
+## Variable Size Maintainance
+
+Variable size map (vsm):
+* `infer_var_size_map`: infer var size by observing vars in registers and memory slot of no more than 8 bytes.
+   * called for each arch_type, and each function interface's in/out reg/mem
+   * for a variable representing a register at block start, size reflects the full register (8 bytes, 64 bits)
+
+Calculate variable size smartly:
+* Only sign-extend as needed when the arguments for an expression mismatch
+* If we over sign-extend, we mess up the heuristic guess of the width of meaningful value, and cannot perform zero-extend to place this value correctly into a register (e.g., caller initializes %ecx using 32-bit expression, and then call callee, where callee's %rcx should be the 4-byte expression zero-extended by 32 bits)
+
+Conversion of single variable map always uses zero extension:
+* Such map is used for mapping target arch_type variable into some expression in current context
+* Those variables are block variables at the beginning of target arch_type.
+  Their size represent the width of the GPR register (8-byte).
+  If the mapped expression has less then 8 byte, then it suggests that the same register is partially used in current context.
+  Therefore, we should use zero extension.
+
+
 ## Dep Type Check
 
 ### Func call
@@ -348,7 +367,7 @@ What do we need to do to update mem content + permission?
 
 ## Range check
 
-TODO: make sure call updates initialized region in the same way as range type infer (see above).
+DONE: make sure call updates initialized region in the same way as range type infer (see above).
 
 
 # Daily Task

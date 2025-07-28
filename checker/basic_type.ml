@@ -54,6 +54,26 @@ module DepType = struct
     | Exp e -> get_exp_bit_size e
     | Top size -> size
 
+  let adjust_size ?(zext: bool = false) (ctx: Z3.context) (e: t) (size: int option) : t =
+    match size with
+    | None -> e
+    | Some suggest -> begin
+        match e with
+        | Top _ -> Top suggest
+        | Exp e ->
+          let e_size = get_exp_bit_size e in
+          if e_size = suggest then
+            Exp e
+          else if e_size > suggest then
+            Exp (Z3.BitVector.mk_extract ctx (suggest - 1) 0 e)
+          else begin
+            if zext then
+              Exp (Z3.BitVector.mk_zero_ext ctx (suggest - e_size) e)
+            else
+              Exp (Z3.BitVector.mk_sign_ext ctx (suggest - e_size) e)
+          end
+      end
+
   let get_dep_var_string = SmtEmitter.expr_var_str_of_single_var
 
   let substitute_exp_t
@@ -134,7 +154,7 @@ module DepType = struct
     let eq_int (exp: exp_t) (i: int64) : bool =
       check_eq smt_ctx exp (BitVector.mk_numeral ctx (Int64.to_string i) (get_exp_bit_size exp))
     in
-    List.find_opt (eq_int exp) [0L; 1L; 2L; 4L; 8L; 16L]
+    List.find_opt (eq_int exp) [0L; 1L; 2L; 4L; 6L; 8L; 10L; 12L; 14L; 16L; 3L; 5L; 7L; 9L; 11L; 13L; 15L]
 
   let get_const_exp (ctx: context) (c: int64) (size: int) : exp_t =
     BitVector.mk_numeral ctx (Int64.to_string c) size
@@ -143,7 +163,7 @@ module DepType = struct
     Exp (get_const_exp ctx c size)
 
 
-  let get_imm_exp_size_expected (ctx: context) (imm: IsaBasic.immediate) (expected_size: int64 option): exp_t =
+  let rec get_imm_exp_size_expected (ctx: context) (imm: IsaBasic.immediate) (expected_size: int64 option): exp_t =
     let imm = IsaBasic.simplify_imm imm in
     (* these sizes are in bytes *)
     match imm with
@@ -161,6 +181,10 @@ module DepType = struct
         dep_type_error "get_imm_exp_size_expected: size is unexpected"
     | ImmLabel (label_var_id, None) ->
       BitVector.mk_const_s ctx (get_dep_var_string label_var_id) ((Option.get expected_size |> Int64.to_int) * 8)
+    | ImmBExp ((l, r), None) ->
+      let l' = get_imm_exp_size_expected ctx l expected_size in
+      let r' = get_imm_exp_size_expected ctx r expected_size in
+      BitVector.mk_add ctx l' r'
     | _ -> dep_type_error "unexpected ImmLabel / ImmBExp in get_imm_exp"
 
   let mk_extract_wrapper (ctx: context) (l: int) (r: int) (e: exp_t) : exp_t =

@@ -51,6 +51,7 @@ module TaintExp = struct
     | _ -> e
 
   let merge (e1: t) (e2: t) : t =
+    if cmp e1 e2 = 0 then e1 else
     match e1, e2 with
     | TaintConst true, _
     | _, TaintConst true -> TaintConst true

@@ -1,3 +1,5 @@
+open Single_exp_basic
+open Single_exp
 open Single_entry_type
 open Single_context
 open Taint_exp
@@ -23,7 +25,18 @@ module FuncInputEntry = struct
     | ZeroExt
     | OldExt of t (* Used for memory slot partial update *)
 
-  type flag_t = t * t
+  type flag_src_t =
+  | FlagCmp of t * t
+  | FlagBInst of IsaBasic.bop * t * t
+  | FlagUInst of IsaBasic.uop * t
+  | FlagTInst of IsaBasic.top * t list
+  [@@deriving sexp]
+
+  type flag_t = {
+    legacy: (t * t) option;   (* legacy left and right *)
+    finstr: flag_src_t option; (* extra info recording instr modifying the flag *)
+  }
+  [@@deriving sexp]
 
   type local_var_map_t = SingleEntryType.local_var_map_t
   [@@deriving sexp]
@@ -58,6 +71,10 @@ module FuncInputEntry = struct
     sexp_of_t e |> Sexplib.Sexp.to_string_hum
   let to_ocaml_string (_ : t) : string = panic ()
   let empty_var_map_to_ocaml_string = ""
+  let get_empty_flag () : flag_t = panic ()
+  let get_flag_taint (_: flag_t) : TaintExp.t option = panic ()
+  let flag_repl_local_var (_: local_var_map_t) (_: flag_t) : flag_t = panic ()
+  let flag_get_useful_vars (_: flag_t) : SingleExp.SingleVarSet.t = panic ()
   let cmp (_: t) (_: t) : int = panic ()
   let read_val (_: int64 option) (_: int64) (_: int64) (_: t) : t = panic ()
   let write_gpr_partial (_: int64) (_: int64) (_: t) (_: t) : t = panic ()
@@ -71,6 +88,7 @@ module FuncInputEntry = struct
   let get_must_known_taint_constraint (_: t) : Constraint.t list = panic ()
   let update_ld_taint_constraint (_: t) (_: TaintExp.t option) : Constraint.t list = panic ()
   let update_st_taint_constraint (_: t) (_: TaintExp.t option) : t * Constraint.t list = panic ()
+  let compile_cond_j (_: IsaBasic.branch_cond) (_: flag_t) : CondTypeBase.t * t * t = panic ()
   let exe_bop_inst (_: IsaBasic.bop) (_: t) (_: t) (_: flag_t) (_: bool) : t * flag_t = panic ()
   let exe_uop_inst (_: IsaBasic.uop) (_: t) (_: flag_t) : t * flag_t = panic ()
   let exe_top_inst (_: IsaBasic.top) (_: t list) (_: flag_t) : t * flag_t = panic ()

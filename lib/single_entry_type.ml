@@ -1,9 +1,11 @@
 open Isa_basic
 (* open Entry_type *)
+open Single_exp_basic
 open Single_exp
 open Taint_exp
 open Constraint
 (* open Smt_emitter *)
+open Sexplib.Std
 
 module SingleEntryType = struct
 include SingleExp
@@ -14,8 +16,125 @@ include SingleExp
   | OldExt of t (* Used for memory slot partial update *)
   [@@deriving sexp]
 
-  type flag_t = t * t
+  type flag_src_t =
+  | FlagCmp of t * t
+  | FlagBInst of IsaBasic.bop * t * t
+  | FlagUInst of IsaBasic.uop * t
+  | FlagTInst of IsaBasic.top * t list
   [@@deriving sexp]
+
+  type flag_t = {
+    legacy: (t * t) option;   (* legacy left and right *)
+    finstr: flag_src_t option; (* extra info recording instr modifying the flag *)
+  }
+  [@@deriving sexp]
+
+  let get_empty_flag () : flag_t =
+    { legacy = None; finstr = None }
+
+  let make_flag ~(legacy: (t * t) option) ~(finstr: flag_src_t option) : flag_t =
+    { legacy; finstr }
+
+  let get_flag_taint (_: flag_t) : TaintExp.t option = None
+
+  let flag_repl_local_var (map: local_var_map_t) (flag: flag_t) : flag_t =
+    let repl = SingleExp.repl_local_var map in
+    let legacy = Option.map (fun (l, r) -> (repl l, repl r)) flag.legacy in
+    let finstr = Option.map (function
+      | FlagCmp (l, r) -> FlagCmp (repl l, repl r)
+      | FlagBInst (op, l, r) -> FlagBInst (op, repl l, repl r)
+      | FlagUInst (op, e) -> FlagUInst (op, repl e)
+      | FlagTInst (op, e_list) -> FlagTInst (op, List.map repl e_list)
+    ) flag.finstr in
+    { legacy; finstr }
+
+  let flag_get_useful_vars (flag: flag_t) : SingleExp.SingleVarSet.t =
+    let legacy_vars =
+      match flag.legacy with
+      | None -> SingleExp.SingleVarSet.empty
+      | Some (l, r) -> SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
+    in
+    let finstr_vars =
+      match flag.finstr with
+      | None -> SingleExp.SingleVarSet.empty
+      | Some (FlagCmp (l, r)) -> SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
+      | Some (FlagBInst (_, l, r)) -> SingleExp.SingleVarSet.union (SingleExp.get_vars l) (SingleExp.get_vars r)
+      | Some (FlagUInst (_, e)) -> SingleExp.get_vars e
+      | Some (FlagTInst (_, e_list)) -> List.fold_left SingleExp.SingleVarSet.union SingleExp.SingleVarSet.empty (List.map SingleExp.get_vars e_list)
+    in
+    SingleExp.SingleVarSet.union legacy_vars finstr_vars
+
+  let compile_cond_j (cc: IsaBasic.branch_cond) (flag: flag_t) : CondTypeBase.t * t * t =
+    let error_msg =
+      Printf.sprintf "compile_cond_j: unsupported combination, flag: %s, cc: %s\n"
+        (flag |> sexp_of_flag_t |> Sexplib.Sexp.to_string_hum)
+        (cc |> IsaBasic.sexp_of_branch_cond |> Sexplib.Sexp.to_string_hum)
+    in
+    match cc, flag.finstr with
+    | _, Some FlagCmp (_, _)
+    | _, Some FlagBInst (IsaBasic.Sub, _, _)
+    | _, Some FlagUInst (IsaBasic.Dec, _) -> (
+      let fl, fr = Option.get flag.legacy in
+      match cc with
+      | JNe -> (Ne, fl, fr)
+      | JE ->  (Eq, fl, fr)
+      | JL ->  (Lt, fl, fr)
+      | JLe -> (Le, fl, fr)
+      | JG ->  (Lt, fr, fl)
+      | JGe -> (Le, fr, fl)
+      | JB ->  (Bt, fl, fr)
+      | JBe -> (Be, fl, fr)
+      | JA ->  (Bt, fr, fl)
+      | JAe -> (Be, fr, fl)
+      | _ -> single_exp_error "expecting only (n)eq or signed conditions"
+    )
+    | _, Some (FlagBInst (IsaBasic.Add, l, r)) -> (
+      match cc, l, r with
+      | JB, SingleConst c, _ when c < 0L -> (Be, SingleConst (Int64.neg c), r)
+      | JB, _, SingleConst c when c < 0L -> (Be, SingleConst (Int64.neg c), l)
+      | _ -> single_exp_error error_msg
+    )
+    | JB, Some (FlagBInst (IsaBasic.Bt, l, r)) -> (
+      let bit = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, l, r))) in
+      (Eq, bit, SingleConst 1L)
+    )
+    | JE, Some (FlagBInst (IsaBasic.And, l, r)) -> (Eq, SingleBExp (SingleAnd, l, r), SingleConst 0L)
+    | JNe, Some (FlagBInst (IsaBasic.And, l, r)) -> (Ne, SingleBExp (SingleAnd, l, r), SingleConst 0L)
+    | _ -> single_exp_error error_msg
+
+  let compile_cond_cmov (cc: IsaBasic.bop) (flag: flag_t) : CondTypeBase.t * t * t =
+    let dummy_j: IsaBasic.branch_cond = match cc with
+    | CmovNe -> JNe
+    | CmovE -> JE
+    | CmovL -> JL
+    | CmovLe -> JLe
+    | CmovG -> JG
+    | CmovGe -> JGe
+    | CmovB -> JB
+    | CmovBe -> JBe
+    | CmovA -> JA
+    | CmovAe -> JAe
+    | CmovOther -> JOther
+    | _ -> single_exp_error "compile_cond_cmov: expecting cmovxx"
+    in
+    compile_cond_j dummy_j flag
+
+  let compile_cond_set (cc: IsaBasic.uop) (flag: flag_t) : CondTypeBase.t * t * t =
+    let dummy_j: IsaBasic.branch_cond = match cc with
+    | SetNe -> JNe
+    | SetE -> JE
+    | SetL -> JL
+    | SetLe -> JLe
+    | SetG -> JG
+    | SetGe -> JGe
+    | SetB -> JB
+    | SetBe -> JBe
+    | SetA -> JA
+    | SetAe -> JAe
+    | SetOther -> JOther
+    | _ -> single_exp_error "compile_cond_set: expecting setxx"
+    in
+    compile_cond_j dummy_j flag
 
   let get_taint_var_map (_: local_var_map_t) : TaintExp.local_var_map_t option = None
 
@@ -94,94 +213,86 @@ include SingleExp
 
   let get_const_type = get_imm_type
 
-  let set_flag_helper (dest_type: t) =
-    dest_type, (dest_type, get_const_type (IsaBasic.ImmNum (0L, None)))
-
-  let exe_cmov (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) : t * flag_t =
+  let exe_cmov (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flag: flag_t) : t * flag_t =
     (* Printf.printf "exe_cmov cond ? %s : %s\n" (SingleExp.to_string e2) (SingleExp.to_string e1); *)
-    let fl, fr = flags in
     let res = match isa_bop with
-    | CmovNe -> SingleITE ((Ne, fl, fr), e2, e1)
-    | CmovE -> SingleITE ((Eq, fl, fr), e2, e1)
-    | CmovL -> SingleITE ((Lt, fl, fr), e2, e1)
-    | CmovLe -> SingleITE ((Le, fl, fr), e2, e1)
-    | CmovG -> SingleITE ((Lt, fr, fl), e2, e1)
-    | CmovGe -> SingleITE ((Le, fr, fl), e2, e1)
-    | CmovB -> SingleITE ((Bt, fl, fr), e2, e1)
-    | CmovBe -> SingleITE ((Be, fl, fr), e2, e1)
-    | CmovA -> SingleITE ((Bt, fr, fl), e2, e1)
-    | CmovAe -> SingleITE ((Be, fr, fl), e2, e1)
     | CmovOther -> SingleTop
+    | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
+    | CmovB | CmovBe | CmovA | CmovAe ->
+      SingleITE (compile_cond_cmov isa_bop flag, e2, e1)
     | _ -> single_exp_error "exe_cmov: expecting cmovxx"
     in
-    eval res |> set_flag_helper
+    eval res, flag (* no impact on flag *)
 
-  let exe_set (isa_bop: IsaBasic.uop) (_) (flags: flag_t) : t * flag_t =
-    let fl, fr = flags in
-    let e2 = SingleExp.SingleConst 1L in
-    let e1 = SingleExp.SingleConst 0L in
-    let res = match isa_bop with
-    | SetNe -> SingleITE ((Ne, fl, fr), e2, e1)
-    | SetE -> SingleITE ((Eq, fl, fr), e2, e1)
-    | SetL -> SingleITE ((Lt, fl, fr), e2, e1)
-    | SetLe -> SingleITE ((Le, fl, fr), e2, e1)
-    | SetG -> SingleITE ((Lt, fr, fl), e2, e1)
-    | SetGe -> SingleITE ((Le, fr, fl), e2, e1)
-    | SetB -> SingleITE ((Bt, fl, fr), e2, e1)
-    | SetBe -> SingleITE ((Be, fl, fr), e2, e1)
-    | SetA -> SingleITE ((Bt, fr, fl), e2, e1)
-    | SetAe -> SingleITE ((Be, fr, fl), e2, e1)
+  let exe_set (isa_uop: IsaBasic.uop) (_) (flag: flag_t) : t * flag_t =
+    let e1 = SingleExp.SingleConst 1L in
+    let e0 = SingleExp.SingleConst 0L in
+    let res = match isa_uop with
     | SetOther -> SingleTop
+    | SetNe | SetE | SetL | SetLe | SetG | SetGe
+    | SetB | SetBe | SetA | SetAe ->
+      SingleITE (compile_cond_set isa_uop flag, e1, e0)
     | _ -> single_exp_error "exe_set: expecting setxx"
     in
-    eval res |> set_flag_helper
+    eval res, flag (* no impact on flag *)
 
-  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flag: flag_t) (same_op: bool): t * flag_t =
+    let flag_src = Some (FlagBInst (isa_bop, e1, e2)) in
+    (* default new flag, if instr modifies any flag *)
+    let new_flag = make_flag ~legacy:None ~finstr:flag_src in
     match isa_bop with
-    | Add -> eval (SingleBExp (SingleAdd, e1, e2)) |> set_flag_helper
-    | Adc -> SingleTop |> set_flag_helper
-    | Sub -> eval (SingleBExp (SingleSub, e1, e2)) |> set_flag_helper
-    | Sbb -> SingleTop |> set_flag_helper
-    | Mul -> SingleTop |> set_flag_helper
-    | Imul -> eval (SingleBExp (SingleMul, e1, e2)) |> set_flag_helper
-    | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2)) |> set_flag_helper
-    | Sar -> eval (SingleBExp (SingleSar, e1, e2)) |> set_flag_helper
-    | Shr -> eval (SingleBExp (SingleShr, e1, e2)) |> set_flag_helper
-    | Rol | Ror -> SingleTop |> set_flag_helper
-    | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))) |> set_flag_helper
-    | And -> eval (SingleBExp (SingleAnd, e1, e2)) |> set_flag_helper
-    | Or -> eval (SingleBExp (SingleOr, e1, e2)) |> set_flag_helper
+    | Add -> eval (SingleBExp (SingleAdd, e1, e2)), new_flag
+    | Adc -> SingleTop, new_flag
+    | Sub ->
+      let res = eval (SingleBExp (SingleSub, e1, e2)) in
+      res, make_flag ~legacy:(Some (res, SingleConst 0L)) ~finstr:flag_src
+    | Sbb -> SingleTop, new_flag
+    | Mul -> SingleTop, new_flag
+    | Imul -> eval (SingleBExp (SingleMul, e1, e2)), new_flag
+    | Sal | Shl -> eval (SingleBExp (SingleSal, e1, e2)), new_flag
+    | Sar -> eval (SingleBExp (SingleSar, e1, e2)), new_flag
+    | Shr -> eval (SingleBExp (SingleShr, e1, e2)), new_flag
+    | Rol | Ror -> SingleTop, new_flag (* we assume that rol and ror always affect flag *)
+    | Xor -> (if same_op then SingleConst 0L else eval (SingleBExp (SingleXor, e1, e2))), new_flag
+    | And -> eval (SingleBExp (SingleAnd, e1, e2)), new_flag
+    | Or -> eval (SingleBExp (SingleOr, e1, e2)), new_flag
     | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
     | CmovB | CmovBe | CmovA | CmovAe | CmovOther ->
-      exe_cmov isa_bop e1 e2 flags
+      exe_cmov isa_bop e1 e2 flag
     | Bt -> (* bit test, set CF to the bit *)
-      let result = eval (SingleBExp (SingleAnd, SingleConst 1L, SingleBExp (SingleSar, e1, e2))) in
-      e1, (result, get_const_type (IsaBasic.ImmNum (0L, None)))
-    | Pxor | Xorp -> if same_op then SingleConst 0L, flags else SingleTop, flags
+      e1, new_flag
+    | Pxor | Xorp -> if same_op then SingleConst 0L, flag else SingleTop, flag
     | Punpck | Packxs
     | Pshuf
     | Padd | Psub | Pand | Pandn | Por
-    | Psll | Psrl -> SingleTop, flags
+    | Psll | Psrl -> SingleTop, flag
 
-  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flags: flag_t) : t * flag_t =
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flag: flag_t) : t * flag_t =
+    let flag_src = Some (FlagUInst (isa_uop, e)) in
+    (* default new flag, if instr modifies any flag *)
+    let new_flag = make_flag ~legacy:None ~finstr:flag_src in
     match isa_uop with
-    | Mov | MovZ | MovS | Lea -> e, flags
-    | Not -> eval (SingleUExp (SingleNot, e)), flags
-    | Bswap -> SingleTop, flags
+    | Mov | MovZ | MovS | Lea -> e, flag
+    | Not -> eval (SingleUExp (SingleNot, e)), flag
+    | Bswap -> SingleTop, flag
     | Neg ->
-      eval (SingleBExp (SingleMul, e, SingleConst (-1L))) |> set_flag_helper
+      eval (SingleBExp (SingleMul, e, SingleConst (-1L))), new_flag
     | Inc ->
-      eval (SingleBExp (SingleAdd, e, SingleConst 1L)) |> set_flag_helper
+      eval (SingleBExp (SingleAdd, e, SingleConst 1L)), new_flag
     | Dec ->
-      eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) |> set_flag_helper
+      let res = eval (SingleBExp (SingleAdd, e, SingleConst (-1L))) in
+      res, make_flag ~legacy:(Some (res, SingleConst 0L)) ~finstr:flag_src
     | SetNe | SetE | SetL | SetLe | SetG | SetGe
     | SetB | SetBe | SetA | SetAe | SetOther ->
-      exe_set isa_uop e flags
+      exe_set isa_uop e flag
 
-  let exe_top_inst (isa_top: IsaBasic.top) (_: t list) (flags: flag_t) : t * flag_t =
+  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flag: flag_t) : t * flag_t =
+    let flag_src = Some (FlagTInst (isa_top, e_list)) in
+    (* default new flag, if instr modifies any flag *)
+    let new_flag = make_flag ~legacy:None ~finstr:flag_src in
     match isa_top with
-    | Shld | Shrd -> SingleTop |> set_flag_helper
-    | Shufp -> SingleTop, flags
+    | Shld | Shrd -> SingleTop, new_flag
+    | Shufp -> SingleTop, flag
 
   let get_taint_exp (_: t) : TaintExp.t option = None
 

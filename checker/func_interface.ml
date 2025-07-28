@@ -86,6 +86,20 @@ module FuncInterface = struct
     let out_reg_type, out_flag_type, out_mem_type, (out_dep_context, out_taint_context) =
       ArchTypeBasic.sub_ctx_map_helper smt_ctx func_interface.out_type call_anno.ctx_map
     in
+
+    (* we should add context first before updating memory, which may need context for vars of out interface *)
+
+    Printf.printf "adding out_ctx, original ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
+    (* List.iter (fun e ->
+      let single_check = SmtEmitter.check_compliance smt_ctx [e] != SatNo in
+      if not single_check then begin
+        Printf.printf "single check failed: %s\nctx=%s\n" (Z3.Expr.to_string e) (SmtEmitter.to_string smt_ctx);
+      end
+    ) out_dep_context; *)
+
+    SmtEmitter.add_assertions smt_ctx out_dep_context;
+    Printf.printf "after adding out_ctx, ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
+
     let out_mem_opt =
       MemType.set_mem_type_with_other smt_ctx
         pr_type.mem_type out_mem_type call_anno.mem_map
@@ -96,18 +110,6 @@ module FuncInterface = struct
       None
     | Some out_mem_type ->
       let dep_context, taint_context = pr_type.context in
-
-      Printf.printf "adding out_ctx, original ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
-      (* List.iter (fun e ->
-        let single_check = SmtEmitter.check_compliance smt_ctx [e] != SatNo in
-        if not single_check then begin
-          Printf.printf "single check failed: %s\nctx=%s\n" (Z3.Expr.to_string e) (SmtEmitter.to_string smt_ctx);
-        end
-      ) out_dep_context; *)
-
-      SmtEmitter.add_assertions smt_ctx out_dep_context;
-      Printf.printf "after adding out_ctx, ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
-      
       Some { pr_type with
         pc = pr_type.pc + 1;
         reg_type = out_reg_type;

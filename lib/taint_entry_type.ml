@@ -1,10 +1,12 @@
 open Isa_basic
 open Single_exp
 open Entry_type
+open Single_exp_basic
 open Single_entry_type
 open Taint_exp
 open Constraint
 open Smt_emitter
+open Sexplib.Std
 
 module TaintBaseEntryType (Entry: EntryType) = struct
   exception TaintEntryTypeError of string
@@ -14,7 +16,17 @@ module TaintBaseEntryType (Entry: EntryType) = struct
   type t = Entry.t * TaintExp.t
   [@@deriving sexp]
 
-  type flag_t = t * t
+  type flag_src_t =
+  | FlagCmp of t * t
+  | FlagBInst of IsaBasic.bop * t * t
+  | FlagUInst of IsaBasic.uop * t
+  | FlagTInst of IsaBasic.top * t list
+  [@@deriving sexp]
+
+  type flag_t = {
+    legacy: (t * t) option;   (* legacy left and right *)
+    finstr: flag_src_t option; (* extra info recording instr modifying the flag *)
+  }
   [@@deriving sexp]
 
   type ext_t =
@@ -147,70 +159,191 @@ module TaintBaseEntryType (Entry: EntryType) = struct
       (single, st_taint) (* override data's taint with store's taint *), [ TaintSub (taint, st_taint) ] (* t_data => t_st *)
     | None -> e, []
 
-  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flags: flag_t) (same_op: bool): t * flag_t =
+  let get_empty_flag () : flag_t =
+    { legacy = None; finstr = None }
+
+  let get_flag_taint (flag: flag_t) : TaintExp.t option =
+    match flag.legacy, flag.finstr with
+    | Some (l, r), _ -> Some (TaintExp.merge (snd l) (snd r))
+    | None, Some (FlagCmp (l, r)) -> Some (TaintExp.merge (snd l) (snd r))
+    | None, Some (FlagBInst (_, l, r)) -> Some (TaintExp.merge (snd l) (snd r))
+    | None, Some (FlagUInst (_, e)) -> Some (snd e)
+    | None, Some (FlagTInst (_, e_list)) -> Some (List.fold_left TaintExp.merge (TaintConst false) (List.map snd e_list))
+    | _ -> None
+
+  let make_flag ~(legacy: (t * t) option) ~(finstr: flag_src_t option) : flag_t =
+    { legacy; finstr }
+
+  let get_entry_flag (flag: flag_t) : Entry.flag_t =
+    let legacy' = Option.map (
+      fun (fl, fr) -> (fst fl, fst fr)
+    ) flag.legacy
+    in
+    let finstr' = Option.map (function
+      | FlagCmp (l, r) -> Entry.FlagCmp (fst l, fst r)
+      | FlagBInst (bop, l, r) -> Entry.FlagBInst (bop, fst l, fst r)
+      | FlagUInst (uop, e) -> Entry.FlagUInst (uop, fst e)
+      | FlagTInst (top, e_list) -> Entry.FlagTInst (top, List.map fst e_list)
+    ) flag.finstr
+    in
+    { Entry.legacy = legacy'; Entry.finstr = finstr'}
+  
+  let set_flag_taint (flag: Entry.flag_t) (t: TaintExp.t) : flag_t =
+    (* the same taint is assigned to every entry *)
+    let set_finstr (finstr: Entry.flag_src_t) : flag_src_t =
+      match finstr with
+      | Entry.FlagCmp (l, r) -> FlagCmp ((l, t), (r, t))
+      | Entry.FlagBInst (bop, l, r) -> FlagBInst (bop, (l, t), (r, t))
+      | Entry.FlagUInst (uop, e) -> FlagUInst (uop, (e, t))
+      | Entry.FlagTInst (top, e_list) -> FlagTInst (top, List.map (fun e -> (e, t)) e_list)
+    in
+    match flag.legacy, flag.finstr with
+    | Some (l, r), _ -> {
+        legacy = Some ((l, t), (r, t));
+        finstr = Option.map set_finstr flag.finstr
+      }
+    | None, _ -> {
+        legacy = None;
+        finstr = Option.map set_finstr flag.finstr
+      }
+
+  let compile_cond_j (cc: IsaBasic.branch_cond) (flag: flag_t) : CondTypeBase.t * t * t =
+    let error_msg =
+        Printf.sprintf "compile_cond_j: unsupported combination, flag: %s, cc: %s\n"
+          (flag |> sexp_of_flag_t |> Sexplib.Sexp.to_string_hum)
+          (cc |> IsaBasic.sexp_of_branch_cond |> Sexplib.Sexp.to_string_hum)
+    in
+    let entry_flag = get_entry_flag flag in
+    match cc, flag.finstr with
+    | _, Some FlagCmp (_, _)
+    | _, Some FlagBInst (IsaBasic.Sub, _, _)
+    | _, Some FlagUInst (IsaBasic.Dec, _) -> (
+      let (_, t1), (_, t2) = Option.get flag.legacy in
+      let cond, e1, e2 = Entry.compile_cond_j cc entry_flag in
+      (* assign combined taint to both sides *)
+      (* t1 and t2 may differ, e.g. Cmp assigns two operands that may have different taint *)
+      (* therefore, merge is necessary *)
+      let taint = TaintExp.merge t1 t2 in
+      (cond, (e1, taint), (e2, taint))
+    )
+    | _, Some (FlagBInst (_, (_, t1), (_, t2))) ->
+      let cond, e1, e2 = Entry.compile_cond_j cc entry_flag in
+      let taint = TaintExp.merge t1 t2 in
+      (* assign combined taint to both sides *)
+      (* actually t1 and t2 are the same, so merge is not necessary *)
+      (* see how we set flag's taint when executing BInst other than Sub *)
+      (cond, (e1, taint), (e2, taint))
+    | _, Some (FlagUInst (_, (_, taint))) ->
+      let cond, e1, e2 = Entry.compile_cond_j cc entry_flag in
+      (* assign taint to both sides *)
+      (cond, (e1, taint), (e2, taint))
+    | _ -> taint_entry_type_error error_msg
+
+  let compile_cond_cmov (cc: IsaBasic.bop) (flag: flag_t) : CondTypeBase.t * t * t =
+    let dummy_j: IsaBasic.branch_cond = match cc with
+    | CmovNe -> JNe
+    | CmovE -> JE
+    | CmovL -> JL
+    | CmovLe -> JLe
+    | CmovG -> JG
+    | CmovGe -> JGe
+    | CmovB -> JB
+    | CmovBe -> JBe
+    | CmovA -> JA
+    | CmovAe -> JAe
+    | CmovOther -> JOther
+    | _ -> taint_entry_type_error "compile_cond_cmov: expecting cmovxx"
+    in
+    compile_cond_j dummy_j flag
+
+  let compile_cond_set (cc: IsaBasic.uop) (flag: flag_t) : CondTypeBase.t * t * t =
+    let dummy_j: IsaBasic.branch_cond = match cc with
+    | SetNe -> JNe
+    | SetE -> JE
+    | SetL -> JL
+    | SetLe -> JLe
+    | SetG -> JG
+    | SetGe -> JGe
+    | SetB -> JB
+    | SetBe -> JBe
+    | SetA -> JA
+    | SetAe -> JAe
+    | SetOther -> JOther
+    | _ -> taint_entry_type_error "compile_cond_set: expecting setxx"
+    in
+    compile_cond_j dummy_j flag
+
+  let exe_bop_inst (isa_bop: IsaBasic.bop) (e1: t) (e2: t) (flag: flag_t) (same_op: bool): t * flag_t =
     let s1, t1 = e1 in
     let s2, t2 = e2 in
-    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
-    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_bop_inst isa_bop s1 s2 (fl_entry, fr_entry) same_op in
+    let entry_flag = get_entry_flag flag in
+    let dest_entry_type, entry_flag = Entry.exe_bop_inst isa_bop s1 s2 entry_flag same_op in
     let (dest_taint_type: TaintExp.t) =
       if (isa_bop = Xor || isa_bop = Xorp || isa_bop = Pxor) && same_op then
         TaintConst false
       else begin
         let new_t = TaintExp.merge t1 t2 in
         if IsaBasic.bop_result_depends_on_flag isa_bop then
-          TaintExp.merge new_t (TaintExp.merge fl_taint fr_taint)
+          TaintExp.merge new_t (get_flag_taint flag |> Option.get)
         else
           new_t
       end
     in
-    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_bop with
+    let new_flag = match isa_bop with
     | Add | Adc | Sub | Sbb | Mul | Imul | Sal | Shl | Sar | Shr | Rol | Ror | Xor | And | Or | Bt ->
-      dest_taint_type, TaintConst false
+      set_flag_taint entry_flag dest_taint_type
     | CmovNe | CmovE | CmovL | CmovLe | CmovG | CmovGe
     | CmovB | CmovBe | CmovA | CmovAe | CmovOther
     | Punpck | Packxs
     | Pshuf
     | Padd | Psub | Pxor | Pand | Pandn | Por
     | Psll | Psrl
-    | Xorp -> fl_taint, fr_taint
+    | Xorp ->
+      (* flag is untouched *)
+      flag
     in
-    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
+    (dest_entry_type, dest_taint_type), new_flag
 
 
-  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flags: flag_t) : t * flag_t =
+  let exe_uop_inst (isa_uop: IsaBasic.uop) (e: t) (flag: flag_t) : t * flag_t =
     let single, taint = e in
-    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
-    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_uop_inst isa_uop single (fl_entry, fr_entry) in
+    let entry_flag = get_entry_flag flag in
+    let dest_entry_type, entry_flag = Entry.exe_uop_inst isa_uop single entry_flag in
     let dest_taint_type = if IsaBasic.uop_result_depends_on_flag isa_uop then
-      TaintExp.merge taint (TaintExp.merge fl_taint fr_taint)
+      TaintExp.merge taint (get_flag_taint flag |> Option.get)
     else
       taint
     in
-    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = 
-      match isa_uop with
+    let new_flag = match isa_uop with
       | Mov | MovZ | MovS | Lea | Not | Bswap
       (* set does not affect any flags *)
       | SetNe | SetE | SetL | SetLe | SetG | SetGe
-      | SetB | SetBe | SetA | SetAe | SetOther -> fl_taint, fr_taint
-      | Neg | Inc | Dec -> dest_taint_type, TaintConst false
-      in
-    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
+      | SetB | SetBe | SetA | SetAe | SetOther ->
+        (* flag is untouched *)
+        flag
+      | Neg | Inc | Dec ->
+        set_flag_taint entry_flag dest_taint_type
+    in
+    (dest_entry_type, dest_taint_type), new_flag
 
-  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flags: flag_t) : t * flag_t =
+  let exe_top_inst (isa_top: IsaBasic.top) (e_list: t list) (flag: flag_t) : t * flag_t =
     let single_list, t_list = List.split e_list in
-    let (fl_entry, fl_taint), (fr_entry, fr_taint) = flags in
-    let dest_entry_type, (fl_entry, fr_entry) = Entry.exe_top_inst isa_top single_list (fl_entry, fr_entry) in
+    let entry_flag = get_entry_flag flag in
+    let dest_entry_type, entry_flag = Entry.exe_top_inst isa_top single_list entry_flag in
     let dest_taint_type = List.fold_left TaintExp.merge (TaintConst false) t_list in
     let dest_taint_type = if IsaBasic.top_result_depends_on_flag isa_top then
-      TaintExp.merge dest_taint_type (TaintExp.merge fl_taint fr_taint)
+      TaintExp.merge dest_taint_type (get_flag_taint flag |> Option.get)
     else
       dest_taint_type
     in
-    let (fl_taint: TaintExp.t), (fr_taint: TaintExp.t) = match isa_top with
-    | Shld | Shrd -> dest_taint_type, TaintConst false
-    | Shufp -> fl_taint, fr_taint
+    let new_flag = match isa_top with
+    | Shld | Shrd ->
+      set_flag_taint entry_flag dest_taint_type
+    | Shufp ->
+      (* flag is untouched *)
+      flag
     in
-    (dest_entry_type, dest_taint_type), ((fl_entry, fl_taint), (fr_entry, fr_taint))
+    (dest_entry_type, dest_taint_type), new_flag
 
   let get_single_exp (e: t) : SingleExp.t =
     let single, _ = e in Entry.get_single_exp single
@@ -294,6 +427,22 @@ module TaintBaseEntryType (Entry: EntryType) = struct
     let single, taint = e in
     Entry.repl_context_var single_map single,
     TaintExp.repl_context_var taint_map taint
+
+  let flag_repl_local_var (map: local_var_map_t) (flag: flag_t) : flag_t =
+    let repl = repl_local_var map in
+    let legacy' = Option.map (fun (l, r) -> (repl l, repl r)) flag.legacy in
+    let finstr' = Option.map (function
+      | FlagCmp (l, r) -> FlagCmp (repl l, repl r)
+      | FlagBInst (bop, l, r) -> FlagBInst (bop, repl l, repl r)
+      | FlagUInst (uop, e) -> FlagUInst (uop, repl e)
+      | FlagTInst (top, e_list) -> FlagTInst (top, List.map repl e_list)
+    ) flag.finstr
+    in
+    { legacy = legacy'; finstr = finstr' }
+
+  let flag_get_useful_vars (flag: flag_t) : SingleExp.SingleVarSet.t =
+    let entry_flag = get_entry_flag flag in
+    Entry.flag_get_useful_vars entry_flag
 
   let is_val2 (map: local_var_map_t) (e: t) : bool =
     let single_map, taint_map = map in
