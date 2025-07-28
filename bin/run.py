@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 import time
 from colorama import Fore
+import shutil
 
 script_dir = Path(__file__).resolve().parent
 proj_dir = script_dir.parent
@@ -94,10 +95,7 @@ def run(cmd, log_file, msg):
     type=click.Tuple([int, int]),
     default=(0, 3),
 )
-@click.option(
-    "--use-cache",
-    is_flag=True
-)
+@click.option("--use-cache", is_flag=True)
 def infer(name: str, input_dir: Path, phase, use_cache):
     output_dir = proj_dir / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -178,7 +176,13 @@ def check(name: str, phase):
 
 
 def transform_helper(
-    name: str, out=None, delta=None, no_push_pop=None, no_call=None, tf_suffix=""
+    name: str,
+    out=None,
+    delta=None,
+    no_push_pop=None,
+    no_call=None,
+    tf_suffix="",
+    install_dir=None,
 ):
     if out is None:
         output_dir = proj_dir / "out" / name
@@ -199,6 +203,12 @@ def transform_helper(
         msg += " (call untaint preservation TF disabled)"
 
     run(arg_list, output_dir / f"{name}.transform{tf_suffix}.log", msg)
+    if install_dir is not None:
+        target = install_dir / name / out.name
+        shutil.copy(out, target)
+        print(
+            f"{Fore.MAGENTA}Installing to {target}{Fore.RESET}",
+        )
 
 
 @cli_command()
@@ -207,7 +217,7 @@ def transform_helper(
     type=click.STRING,
 )
 @click.option(
-    "--tf-option",
+    "--all-tf",
     is_flag=True,
 )
 @click.option(
@@ -218,20 +228,34 @@ def transform_helper(
     "--no-call",
     is_flag=True,
 )
+@click.option(
+    "--install-dir",
+    type=Path,
+)
 def transform(
     name: str,
     delta: str,
-    tf_option: bool,
+    all_tf: bool,
     no_push_pop: bool,
     no_call: bool,
+    install_dir: Path,
 ):
-    if tf_option is None:
+    if all_tf:
         transform_helper(
-            name, delta=delta, no_push_pop=True, no_call=True, tf_suffix="3"
+            name,
+            delta=delta,
+            no_push_pop=True,
+            no_call=True,
+            tf_suffix="3",
+            install_dir=install_dir,
         )
-        transform_helper(name, delta=delta, no_call=True, tf_suffix="2")
-        transform_helper(name, delta=delta, no_push_pop=True, tf_suffix="1")
-        transform_helper(name, delta=delta)
+        transform_helper(
+            name, delta=delta, no_call=True, tf_suffix="2", install_dir=install_dir
+        )
+        transform_helper(
+            name, delta=delta, no_push_pop=True, tf_suffix="1", install_dir=install_dir
+        )
+        transform_helper(name, delta=delta, install_dir=install_dir)
     else:
         if no_push_pop:
             if no_call:
@@ -249,6 +273,7 @@ def transform(
             no_push_pop=no_push_pop,
             no_call=no_call,
             tf_suffix=tf_suffix,
+            install_dir=install_dir,
         )
 
 
