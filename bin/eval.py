@@ -11,14 +11,6 @@ import pandas as pd
 import datetime
 
 
-logger = logging.getLogger()
-logging.basicConfig(
-    format="[%(levelname)s] - %(message)s",
-    level=logging.INFO,
-)
-logger.setLevel(logging.INFO)
-
-
 OCTAL_DIR = Path(__file__).parent.parent
 BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
@@ -64,6 +56,24 @@ HW_ENCODE_MAP = {
 }
 
 
+def setup_logger(level=logging.INFO, is_subprocess=False):
+    if is_subprocess:
+        fmt = "[%(levelname)s] <%(processName)s> - %(message)s"
+    else:
+        fmt = "[%(levelname)s] - %(message)s"
+    formatter = logging.Formatter(fmt)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    handler.setLevel(level)
+
+    logger = logging.getLogger()
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logger.addHandler(handler)
+    logger.setLevel(level)
+
+
 def get_bench_tf_name(bench: str, tf: TF) -> str:
     match tf:
         case TF.Origin:
@@ -81,7 +91,7 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
         case TF.ProspectSec:
             return f"{bench}.prospect_sec_stack"
         case _:
-            logger.error(f"Unknown TF: {tf}")
+            logging.error(f"Unknown TF: {tf}")
             exit(1)
 
 
@@ -93,15 +103,15 @@ def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
 
     assert bin_path and asm_path and compiled_asm_path
     if not bin_path.exists():
-        logger.error(f"Binary not found: {bin_path}")
+        logging.error(f"Binary not found: {bin_path}")
         raise FileNotFoundError()
     if not asm_path.exists():
-        logger.error(f"Source ASM not found: {asm_path}")
+        logging.error(f"Source ASM not found: {asm_path}")
         raise FileNotFoundError()
     if not compiled_asm_path.exists():
-        logger.error(f"Compiled ASM not found: {compiled_asm_path}")
+        logging.error(f"Compiled ASM not found: {compiled_asm_path}")
         raise FileNotFoundError()
-    logger.debug(
+    logging.debug(
         f"bench={bench}, tf={tf}, bin_path={bin_path}, asm_path={asm_path}, compiled_asm_path={compiled_asm_path}"
     )
     return bin_path, asm_path, compiled_asm_path
@@ -135,24 +145,24 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
         text=True,
     )
     if result.returncode != 0:
-        logger.error(f"Failed to run stat_asm on {asm_file}: {result.stderr}")
+        logging.error(f"Failed to run stat_asm on {asm_file}: {result.stderr}")
         exit(1)
 
     pattern = re.compile(r"asm line count: (\d+)")
     stat_match = pattern.search(result.stdout)
     if stat_match:
         line_count = int(stat_match.group(1))
-        logger.debug(f"ASM line count for {asm_file.name}: {line_count}")
+        logging.debug(f"ASM line count for {asm_file.name}: {line_count}")
         collection["asm_lines"] = line_count
         return collection
     else:
-        logger.error(f"Failed to parse ASM line count from output: {result.stdout}")
+        logging.error(f"Failed to parse ASM line count from output: {result.stdout}")
         exit(1)
 
 
 def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
     if repeat <= 1:
-        logger.error("repeat must be greater than 1")
+        logging.error("repeat must be greater than 1")
         exit(1)
 
     perf_output_dir = EVAL_DIR / "perf"
@@ -173,7 +183,7 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
         text=True,
     )
     if result.returncode != 0:
-        logger.error(f"Failed to run perf on {bin_file}: {result.stderr}")
+        logging.error(f"Failed to run perf on {bin_file}: {result.stderr}")
         exit(1)
     perf_output = result.stderr
 
@@ -184,17 +194,17 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
     instrs_match = instr_pattern.search(perf_output)
 
     if not cycles_match:
-        logger.error(f"Failed to find cycles in perf output: {perf_output}")
+        logging.error(f"Failed to find cycles in perf output: {perf_output}")
         exit(1)
     if not instrs_match:
-        logger.error(f"Failed to find instructions in perf output: {perf_output}")
+        logging.error(f"Failed to find instructions in perf output: {perf_output}")
         exit(1)
 
     cycles, cycles_std = int(cycles_match.group(1)), float(cycles_match.group(2)) / 100
     instrs, instrs_std = int(instrs_match.group(1)), float(instrs_match.group(2)) / 100
-    logger.debug(f"Perf output: {perf_output}")
-    logger.debug(f"Cycles: {cycles}, Cycles Std: {cycles_std}")
-    logger.debug(f"Instructions: {instrs}, Instructions Std: {instrs_std}")
+    logging.debug(f"Perf output: {perf_output}")
+    logging.debug(f"Cycles: {cycles}, Cycles Std: {cycles_std}")
+    logging.debug(f"Instructions: {instrs}, Instructions Std: {instrs_std}")
 
     collection["cycles"] = cycles
     collection["cycles_std"] = cycles_std
@@ -214,7 +224,7 @@ def get_gem5_result(
     if not skip_gem5:
         # Run gem5 to get result
         # python3 scripts/run.py --apps boringssl_ed25519 --bench-regex "^bench_ed25519_plain_noinline(_tf)?$"
-        logger.info(f"Running gem5 for {bench_tf}...")
+        logging.info(f"Running gem5 for {bench_tf}...")
         result = subprocess.run(
             [
                 "docker",
@@ -234,7 +244,7 @@ def get_gem5_result(
             ]
         )
         if result.returncode != 0:
-            logger.error(f"Failed to run gem5 for {bench_tf}: {result.stderr}")
+            logging.error(f"Failed to run gem5 for {bench_tf}: {result.stderr}")
             exit(1)
 
         result = subprocess.run(
@@ -250,9 +260,16 @@ def get_gem5_result(
             ]
         )
         if result.returncode != 0:
-            logger.error(f"Failed to run get_decl.py for {bench_tf}: {result.stderr}")
+            logging.error(f"Failed to run get_decl.py for {bench_tf}: {result.stderr}")
             exit(1)
-        out_decl_file = GEM5_DIR / "results" / "raw_data" / f"{app}-{bench_tf}" / HWMode.DefenseOn.value / "declassify_inst"
+        out_decl_file = (
+            GEM5_DIR
+            / "results"
+            / "raw_data"
+            / f"{app}-{bench_tf}"
+            / HWMode.DefenseOn.value
+            / "declassify_inst"
+        )
         decl_file = EVAL_DIR / "declassification" / f"{bench_tf}.decl.txt"
         decl_file.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(out_decl_file, decl_file)
@@ -280,13 +297,13 @@ def get_gem5_result(
         cycles_match = cycles_pattern.search(content)
         instrs_match = instrs_pattern.search(content)
         if not cycles_match or not instrs_match:
-            logger.error(
+            logging.error(
                 f"Failed to find cycles / dyn instrs in gem5 output for {bench_tf} {hw}"
             )
             exit(1)
         cycles = int(cycles_match.group(1))
         instrs = int(instrs_match.group(1))
-        logger.debug(f"{bench_tf} {hw}: cycles={cycles}, instrs={instrs}")
+        logging.debug(f"{bench_tf} {hw}: cycles={cycles}, instrs={instrs}")
 
         collection[f"gem5_cycles_{HW_ENCODE_MAP[hw]}"] = cycles
         collection[f"gem5_instrs_{HW_ENCODE_MAP[hw]}"] = instrs
@@ -311,23 +328,27 @@ def get_overhead(base: dict, curr: dict) -> dict:
             curr_std = curr[std_key] if std_key in curr else None
 
             growth = (curr_val - base_val) / base_val
-            std = (base_std**2 + curr_std**2) ** 0.5 if base_std is not None and curr_std is not None else None
+            std = (
+                (base_std**2 + curr_std**2) ** 0.5
+                if base_std is not None and curr_std is not None
+                else None
+            )
 
         else:
             # special handling for gem5 stats
             # metrics with def on should be compared with original benchmark with def off
             matching = re.compile(r"gem5_(\w+)_def-(\w+)").match(key)
             if not matching:
-                logger.error(f"Failed to match gem5 key: {key}")
+                logging.error(f"Failed to match gem5 key: {key}")
                 exit(1)
             metric, mode = matching.groups()
-            logger.debug(f"key={key} --> metric={metric}, mode={mode}")
+            logging.debug(f"key={key} --> metric={metric}, mode={mode}")
             if mode == "off":
                 base_val = base[f"gem5_{metric}_def-off"]
                 curr_val = curr[f"gem5_{metric}_def-off"]
             else:
                 if mode != "on":
-                    logger.error(f"Unknown mode: {mode}")
+                    logging.error(f"Unknown mode: {mode}")
                     exit(1)
                 base_val = base[f"gem5_{metric}_def-off"]
                 curr_val = curr[f"gem5_{metric}_def-on"]
@@ -348,9 +369,7 @@ def print_overhead(overhead: dict):
         base_val, curr_val, growth, std = overhead[key]
         std_str = f"(+-{std:.2%})" if std is not None else ""
         overhead_str = f"{growth:.2%}{std_str}"
-        print(
-            f"\t{key:>25}: {overhead_str:<20} {base_val:>10} -> {curr_val}"
-        )
+        print(f"\t{key:>25}: {overhead_str:<20} {base_val:>10} -> {curr_val}")
 
 
 @click.command()
@@ -374,7 +393,7 @@ def print_overhead(overhead: dict):
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
 def main(verbose, gem5_docker, skip_gem5, delta, out):
-    EVAL_DIR.mkdir(parents=True, exist_ok=True)
+    EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"gem5_docker={gem5_docker}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
@@ -383,13 +402,15 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
 
     if verbose:
         print("verbose")
-        logger.setLevel(logging.DEBUG)
+        setup_logger(logging.DEBUG)
+    else:
+        setup_logger(logging.INFO)
 
     if not skip_gem5:
         print(f"Will run gem5, confirm? (y/n) ", end="")
         confirm = input()
         if confirm.lower() != "y":
-            logger.info("Will skip running gem5")
+            logging.info("Will skip running gem5")
             skip_gem5 = True
 
     df_index = pd.MultiIndex.from_product(
@@ -452,18 +473,18 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
 
     if out is None:
         out = EVAL_DIR / "result.csv"
-        logger.info(f"No output file specified, saving to {out}")
+        logging.info(f"No output file specified, saving to {out}")
     out = Path(out)
     out_suffix = out.suffix
     match out_suffix:
         case ".csv":
-            logger.info(f"Saving result to CSV file {out}")
+            logging.info(f"Saving result to CSV file {out}")
             df.to_csv(out)
         case ".json":
-            logger.info(f"Saving result to JSON file {out}")
+            logging.info(f"Saving result to JSON file {out}")
             df.to_json(out)
         case ".xlsx":
-            logger.info(f"Saving result to Excel file {out}")
+            logging.info(f"Saving result to Excel file {out}")
             df.to_excel(out)
 
 
