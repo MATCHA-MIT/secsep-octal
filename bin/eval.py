@@ -22,13 +22,17 @@ logger.setLevel(logging.INFO)
 OCTAL_DIR = Path(__file__).parent.parent
 BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
+GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
 EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
-
-class Benchmark(Enum):
-    Salsa20 = ("salsa20", "bench_salsa20")
-    SHA512 = ("boringssl_sha512", "bench_sha512_plain")
-    ED25519 = ("boringssl_ed25519", "bench_ed25519_plain_noinline")
+BENCHMARKS = [
+    "salsa20",
+    "sha512",
+    "ed25519_sign",
+    "chacha20",
+    "poly1305_clean",
+    "x25519",
+]
 
 
 class TF(Enum):
@@ -65,40 +69,40 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
         case TF.Origin:
             return bench
         case TF.Octal:
-            return f"{bench}_tf"
+            return f"{bench}.tf"
         case TF.OctalNoPushPop:
-            return f"{bench}_tf1"
+            return f"{bench}.tf1"
         case TF.OctalNoCallPreserv:
-            return f"{bench}_tf2"
+            return f"{bench}.tf2"
         case TF.OctalNoPushPopNoCallPreserv:
-            return f"{bench}_tf3"
+            return f"{bench}.tf3"
         case TF.ProspectPub:
-            return f"{bench}_annotated_pub_stack"
+            return f"{bench}.prospect_pub_stack"
         case TF.ProspectSec:
-            return f"{bench}_annotated_sec_stack"
+            return f"{bench}.prospect_sec_stack"
         case _:
             logger.error(f"Unknown TF: {tf}")
             exit(1)
 
 
-def get_bin_asm(app: str, bench: str, tf: TF) -> tuple[Path, Path]:
+def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
     bench_tf = get_bench_tf_name(bench, tf)
-    bin_path = BENCH_DIR / "out" / app / "bin" / bench_tf
-    asm_path = BENCH_DIR / "src" / app / f"{bench_tf}.s"
-    compiled_asm_path = BENCH_DIR / "out" / app / "asm" / f"{bench_tf}.asm"
+    bin_path          = BENCH_DIR / "bench" / bench / "build" / bench_tf
+    asm_path          = BENCH_DIR / "bench" / bench / f"{bench_tf}.s"
+    compiled_asm_path = BENCH_DIR / "bench" / bench / "build" / f"{bench_tf}.asm"
 
-    assert bin_path and asm_path
+    assert bin_path and asm_path and compiled_asm_path
     if not bin_path.exists():
         logger.error(f"Binary not found: {bin_path}")
-        exit(1)
+        raise FileNotFoundError()
     if not asm_path.exists():
         logger.error(f"Source ASM not found: {asm_path}")
-        exit(1)
+        raise FileNotFoundError()
     if not compiled_asm_path.exists():
         logger.error(f"Compiled ASM not found: {compiled_asm_path}")
-        exit(1)
+        raise FileNotFoundError()
     logger.debug(
-        f"app={app}, bench={bench}, tf={tf}, bin_path={bin_path}, asm_path={asm_path}"
+        f"bench={bench}, tf={tf}, bin_path={bin_path}, asm_path={asm_path}, compiled_asm_path={compiled_asm_path}"
     )
     return bin_path, asm_path, compiled_asm_path
 
@@ -106,9 +110,9 @@ def get_bin_asm(app: str, bench: str, tf: TF) -> tuple[Path, Path]:
 def collect_bin_asm(bin_file: Path, asm_file: Path, compiled_asm_file: Path):
     target_dir = EVAL_DIR / "bench"
     target_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(bin_file, target_dir / bin_file.name)
-    shutil.copy(asm_file, target_dir / asm_file.name)
-    shutil.copy(compiled_asm_file, target_dir / compiled_asm_file.name)
+    shutil.copy(bin_file, target_dir)
+    shutil.copy(asm_file, target_dir)
+    shutil.copy(compiled_asm_file, target_dir)
 
 
 def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
@@ -206,7 +210,7 @@ def get_gem5_result(
     delta: str,
     app: str,
     bench_tf: str,
-) -> dict:
+):
     if not skip_gem5:
         # Run gem5 to get result
         # python3 scripts/run.py --apps boringssl_ed25519 --bench-regex "^bench_ed25519_plain_noinline(_tf)?$"
@@ -218,6 +222,8 @@ def get_gem5_result(
                 gem5_docker,
                 "python3",
                 "scripts/run.py",
+                "--bench-dir",
+                str(GEM5_DOCKER_BENCH_DIR),
                 "--apps",
                 app,
                 "--bench-regex",
@@ -351,7 +357,7 @@ def print_overhead(overhead: dict):
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging")
 @click.option(
     "--gem5-docker",
-    default="sct-gem5",
+    default="secsep-gem5",
     required=False,
     type=click.STRING,
     help="Docker container name running gem5",
@@ -388,7 +394,7 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
 
     df_index = pd.MultiIndex.from_product(
         [
-            [bench.name for bench in Benchmark],
+            BENCHMARKS,
             [tf.name for tf in TF],
         ],
         names=["Benchmark", "TF"],
@@ -407,26 +413,25 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
     df_columns.extend([f"overhead_{col}" for col in df_columns])
     df = pd.DataFrame(columns=df_columns, index=df_index)
 
-    for bench in Benchmark:
-        bench_app, bench_name = bench.value
+    for bench in BENCHMARKS:
         results = {}
         for tf in TF:
             # if tf == TF.OctalNoPushPop or tf == TF.OctalNoPushPopNoCallPreserv or tf == TF.ProspectPub or tf == TF.ProspectSec:
             #     continue
-            bench_name_tf = get_bench_tf_name(bench_name, tf)
-            bin_path, asm_path, compiled_asm = get_bin_asm(bench_app, bench_name, tf)
+            bench_name_tf = get_bench_tf_name(bench, tf)
+            bin_path, asm_path, compiled_asm = get_bin_asm(bench, tf)
             collect_bin_asm(bin_path, asm_path, compiled_asm)
 
             result = {}
             get_asm_line_count(result, asm_path)
             get_perf(result, bin_path)
             if run_gem5_on_tf(tf):
-                get_gem5_result(result, gem5_docker, skip_gem5, delta, bench_app, bench_name_tf)
-            results[tf] = result
+                get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
 
             for key, value in result.items():
-                df.loc[(bench.name, tf.name), key] = value
-            
+                df.loc[(bench, tf.name), key] = value
+
+            results[tf] = result
 
         for tf in TF:
             if tf == TF.Origin:
@@ -438,13 +443,13 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
                 if overhead[key] is None:
                     continue
                 _, _, growth, std = overhead[key]
-                df.loc[(bench.name, tf.name), f"overhead_{key}"] = growth
+                df.loc[(bench, tf.name), f"overhead_{key}"] = growth
                 if std is not None:
-                    df.loc[(bench.name, tf.name), f"overhead_{key}_std"] = std
-            print(f"Overhead of {bench_name} / {tf.name}")
+                    df.loc[(bench, tf.name), f"overhead_{key}_std"] = std
+            print(f"Overhead of {bench} / {tf.name}")
             print_overhead(overhead)
             print()
-    
+
     if out is None:
         out = EVAL_DIR / "result.csv"
         logger.info(f"No output file specified, saving to {out}")

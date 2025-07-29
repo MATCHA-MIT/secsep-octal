@@ -184,9 +184,9 @@ def transform_helper(
     tf_suffix="",
     install_dir=None,
 ):
+    output_dir = proj_dir / "out" / name
+    output_dir.mkdir(exist_ok=True, parents=True)
     if out is None:
-        output_dir = proj_dir / "out" / name
-        output_dir.mkdir(exist_ok=True, parents=True)
         out = output_dir / f"{name}.tf{tf_suffix}.s"
 
     arg_list = ["dune", "exec", "prog_transform", "--", "-name", name, "-out", out]

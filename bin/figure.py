@@ -8,14 +8,14 @@ import numpy as np
 from pathlib import Path
 
 
-from eval import Benchmark, TF
+from eval import BENCHMARKS, TF
 
 
 TASKS = [
     {
         "metric": "overhead_gem5_cycles_def-off",
         "ylabel": "Overhead (%)",
-        "benchmark_list": list(Benchmark),
+        "benchmark_list": BENCHMARKS,
         "tf_list": [TF.ProspectPub, TF.ProspectSec, TF.Octal],
         "legend_loc": (0.50, -0.15),
         "break_y": 3,
@@ -25,7 +25,7 @@ TASKS = [
     {
         "metric": "overhead_gem5_cycles_def-on",
         "ylabel": "Overhead (%)",
-        "benchmark_list": list(Benchmark),
+        "benchmark_list": BENCHMARKS,
         "tf_list": [
             TF.Origin,
             TF.ProspectPub,
@@ -68,12 +68,12 @@ def draw(
     data: pd.DataFrame,
     output_dir: Path,
     prefix: str,
-    metric: str = None,
-    ylabel: str = None,
-    benchmark_list: list[Benchmark] = list(Benchmark),
-    tf_list: list[TF] = list(TF),
+    metric: str,
+    ylabel: str,
+    benchmark_list: list[str],
+    tf_list: list[TF],
     # break_y: tuple[float, float, float] = None,
-    break_y: float = None,
+    break_y: float,
     bar_width: float = 0.5,
     img_size: tuple[int, int] = (8, 3),
     fontsize_label: int = 16,
@@ -85,10 +85,7 @@ def draw(
     ylabel_yloc: float = 0.5,
     legend_ncol: int = 2,
 ):
-    benchmark_list = [bench.name for bench in benchmark_list]
-    tf_list = [tf.name for tf in tf_list]
-
-    data = data.loc[pd.IndexSlice[benchmark_list, tf_list], :][[metric]]
+    data = data.loc[pd.IndexSlice[benchmark_list, [tf.name for tf in tf_list]], :][[metric]]
     data = data[data[metric].notna()]
     data[metric] = data[metric] * 100
     data.index = data.index.set_levels(
