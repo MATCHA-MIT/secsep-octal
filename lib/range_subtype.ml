@@ -802,6 +802,7 @@ module RangeSubtype = struct
       try_solve_empty input_var_set;
       (* try_solve_non_val smt_ctx get_block_var block_subtype_list; *)
     ] in
+    (* Printf.printf "solving var %d\n" (fst tv_rel.var_idx); *)
     match tv_rel.sol with
     | Some _ -> new_sol_list, tv_rel
     | None ->

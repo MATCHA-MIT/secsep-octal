@@ -392,6 +392,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
         result = {}
         if run_gem5_on_tf(tf):
             get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
+        logging.info(f"Gem5 finished for {bench} - {tf.name}")
         return result
     except Exception as e:
         logging.error(f"Error processing {bench} - {tf.name}: {e}")

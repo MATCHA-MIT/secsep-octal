@@ -9,8 +9,15 @@ import time
 from colorama import Fore
 import shutil
 
-script_dir = Path(__file__).resolve().parent
-proj_dir = script_dir.parent
+OCTAL_DIR = Path(__file__).parent.parent
+OCTAL_BUILD = OCTAL_DIR / "_build" / "default" / "bin"
+OCTAL_PPC = OCTAL_BUILD / "preprocess_input.exe"
+OCTAL_INFER_SINGLE = OCTAL_BUILD / "infer_single.exe"
+OCTAL_INFER_RANGE = OCTAL_BUILD / "infer_range.exe"
+OCTAL_INFER_TAINT = OCTAL_BUILD / "infer_taint.exe"
+OCTAL_CONVERT = OCTAL_BUILD / "convert.exe"
+OCTAL_CHECK = OCTAL_BUILD / "check.exe"
+OCTAL_TRANSFORM = OCTAL_BUILD / "prog_transform.exe"
 
 
 class InferPhase(Enum):
@@ -97,7 +104,7 @@ def run(cmd, log_file, msg):
 )
 @click.option("--use-cache", is_flag=True)
 def infer(name: str, input_dir: Path, phase, use_cache):
-    output_dir = proj_dir / "out" / name
+    output_dir = OCTAL_DIR / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
     phase_beg, phase_end = phase
@@ -106,10 +113,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
         if i == InferPhase.PreprocessInput.value:
             run(
                 [
-                    "dune",
-                    "exec",
-                    "preprocess_input",
-                    "--",
+                    OCTAL_PPC,
                     "-input-dir",
                     str(input_dir),
                     "-name",
@@ -119,7 +123,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
                 "Running Preprocess Input",
             )
         elif i == InferPhase.SingleTypeInfer.value:
-            command = ["dune", "exec", "infer_single", "--", "-name", name]
+            command = [OCTAL_INFER_SINGLE, "-name", name]
             if use_cache:
                 command.append("-use-cache")
             run(
@@ -129,13 +133,13 @@ def infer(name: str, input_dir: Path, phase, use_cache):
             )
         elif i == InferPhase.RangeTypeInfer.value:
             run(
-                ["dune", "exec", "infer_range", "--", "-name", name],
+                [OCTAL_INFER_RANGE, "-name", name],
                 output_dir / f"{name}.range_infer.log",
                 "Running Range Type Infer",
             )
         elif i == InferPhase.TaintTypeInfer.value:
             run(
-                ["dune", "exec", "infer_taint", "--", "-name", name],
+                [OCTAL_INFER_TAINT, "-name", name],
                 output_dir / f"{name}.taint_infer.log",
                 "Running Taint Type Infer",
             )
@@ -152,7 +156,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
     default=(0, 1),
 )
 def check(name: str, phase):
-    output_dir = proj_dir / "out" / name
+    output_dir = OCTAL_DIR / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
     phase_beg, phase_end = phase
@@ -160,13 +164,13 @@ def check(name: str, phase):
     for i in range(phase_beg, phase_end + 1):
         if i == CheckPhase.Conversion.value:
             run(
-                ["dune", "exec", "convert", "--", "-name", name],
+                [OCTAL_CONVERT, "-name", name],
                 output_dir / f"{name}.conversion.log",
                 "Running Conversion",
             )
         elif i == CheckPhase.Check.value:
             run(
-                ["dune", "exec", "check", "--", "-name", name],
+                [OCTAL_CHECK, "-name", name],
                 output_dir / f"{name}.check.log",
                 "Running Check",
             )
@@ -184,12 +188,12 @@ def transform_helper(
     tf_suffix="",
     install_dir=None,
 ):
-    output_dir = proj_dir / "out" / name
+    output_dir = OCTAL_DIR / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
     if out is None:
         out = output_dir / f"{name}.tf{tf_suffix}.s"
 
-    arg_list = ["dune", "exec", "prog_transform", "--", "-name", name, "-out", out]
+    arg_list = [OCTAL_TRANSFORM, "-name", name, "-out", out]
     msg = "Transforming program"
     if delta is not None:
         arg_list += ["--delta", delta]

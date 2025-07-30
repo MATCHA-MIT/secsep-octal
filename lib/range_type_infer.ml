@@ -178,6 +178,8 @@ module RangeTypeInfer = struct
     (* ArchType.MemType.gen_implicit_mem_constraints state.smt_ctx (List.hd state.func_type).mem_type; *)
     (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
     let state, block_subtype = type_prop_all_blocks func_interface_list state in
+    Printf.printf "block_subtype:\n%s\n"
+      (Sexplib.Sexp.to_string_hum (sexp_of_list ArchType.sexp_of_block_subtype_t block_subtype));
 
     Printf.printf "After infer, unknown list:\n";
     List.iter (
