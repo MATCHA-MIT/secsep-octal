@@ -145,7 +145,8 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
         text=True,
     )
     if result.returncode != 0:
-        logging.error(f"Failed to run stat_asm on {asm_file}: {result.stderr}")
+        logging.error(f"Failed to run stat_asm on {asm_file}")
+        logging.info(result.stderr)
         raise RuntimeError()
 
     pattern = re.compile(r"asm line count: (\d+)")
@@ -156,7 +157,8 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
         collection["asm_lines"] = line_count
         return collection
     else:
-        logging.error(f"Failed to parse ASM line count from output: {result.stdout}")
+        logging.error(f"Failed to parse ASM line count from output")
+        logging.info(result.stdout)
         raise ValueError()
 
 
@@ -183,25 +185,28 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
         text=True,
     )
     if result.returncode != 0:
-        logging.error(f"Failed to run perf on {bin_file}: {result.stderr}")
+        logging.error(f"Failed to run perf on {bin_file}")
+        logging.info(result.stderr)
         raise RuntimeError()
     perf_output = result.stderr
 
-    cycles_pattern = re.compile(r"\s*(\d+)\s+cycles.*\+-\s*(\d+[\d\.]*)%")
-    instr_pattern = re.compile(r"\s*(\d+)\s+instructions.*\+-\s*(\d+[\d\.]*)%")
+    cycles_pattern = re.compile(r"\s+([\d,]+)\s+cycles.*\+-\s*(\d+[\d\.]*)%")
+    instr_pattern = re.compile(r"\s+([\d,]+)\s+instructions.*\+-\s*(\d+[\d\.]*)%")
 
     cycles_match = cycles_pattern.search(perf_output)
     instrs_match = instr_pattern.search(perf_output)
 
     if not cycles_match:
-        logging.error(f"Failed to find cycles in perf output: {perf_output}")
+        logging.error(f"Failed to find cycles in perf output")
+        logging.info(perf_output)
         raise ValueError()
     if not instrs_match:
-        logging.error(f"Failed to find instructions in perf output: {perf_output}")
+        logging.error(f"Failed to find instructions in perf output")
+        logging.info(perf_output)
         raise ValueError()
 
-    cycles, cycles_std = int(cycles_match.group(1)), float(cycles_match.group(2)) / 100
-    instrs, instrs_std = int(instrs_match.group(1)), float(instrs_match.group(2)) / 100
+    cycles, cycles_std = int(cycles_match.group(1).replace(",", "")), float(cycles_match.group(2)) / 100
+    instrs, instrs_std = int(instrs_match.group(1).replace(",", "")), float(instrs_match.group(2)) / 100
     logging.debug(f"Perf output: {perf_output}")
     logging.debug(f"Cycles: {cycles}, Cycles Std: {cycles_std}")
     logging.debug(f"Instructions: {instrs}, Instructions Std: {instrs_std}")
@@ -246,7 +251,8 @@ def get_gem5_result(
             text=True,
         )
         if result.returncode != 0:
-            logging.error(f"Failed to run gem5 for {bench_tf}: {result.stderr}")
+            logging.error(f"Failed to run gem5 for {bench_tf}")
+            logging.info(result.stderr)
             raise RuntimeError()
         logging.info("gem5:\n" + result.stdout)
 
@@ -265,7 +271,8 @@ def get_gem5_result(
             text=True,
         )
         if result.returncode != 0:
-            logging.error(f"Failed to run get_decl.py for {bench_tf}: {result.stderr}")
+            logging.error(f"Failed to run get_decl.py for {bench_tf}")
+            logging.info(result.stderr)
             raise RuntimeError()
         out_decl_file = (
             GEM5_DIR
