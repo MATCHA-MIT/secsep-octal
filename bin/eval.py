@@ -9,9 +9,11 @@ import shutil
 from pathlib import Path
 import pandas as pd
 import datetime
+from multiprocessing import Pool
 
 
 OCTAL_DIR = Path(__file__).parent.parent
+OCTAL_STAT_ASM = OCTAL_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
 BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
 GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
@@ -38,11 +40,12 @@ class TF(Enum):
 
 
 def run_gem5_on_tf(tf: TF) -> bool:
-    match tf:
-        case TF.Origin | TF.Octal | TF.OctalNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
-            return True
-        case _:
-            return False
+    return True
+    # match tf:
+    #     case TF.Origin | TF.Octal | TF.OctalNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
+    #         return True
+    #     case _:
+    #         return False
 
 
 class HWMode(Enum):
@@ -92,7 +95,7 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
             return f"{bench}.prospect_sec_stack"
         case _:
             logging.error(f"Unknown TF: {tf}")
-            exit(1)
+            raise ValueError()
 
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
@@ -131,10 +134,7 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
 
     result = subprocess.run(
         [
-            "dune",
-            "exec",
-            "stat_asm",
-            "--",
+            OCTAL_STAT_ASM,
             "-asm",
             str(asm_file),
             "-preview",
@@ -146,7 +146,7 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
     )
     if result.returncode != 0:
         logging.error(f"Failed to run stat_asm on {asm_file}: {result.stderr}")
-        exit(1)
+        raise RuntimeError()
 
     pattern = re.compile(r"asm line count: (\d+)")
     stat_match = pattern.search(result.stdout)
@@ -157,13 +157,13 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
         return collection
     else:
         logging.error(f"Failed to parse ASM line count from output: {result.stdout}")
-        exit(1)
+        raise ValueError()
 
 
 def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
     if repeat <= 1:
         logging.error("repeat must be greater than 1")
-        exit(1)
+        raise ValueError()
 
     perf_output_dir = EVAL_DIR / "perf"
     perf_output_dir.mkdir(parents=True, exist_ok=True)
@@ -184,7 +184,7 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
     )
     if result.returncode != 0:
         logging.error(f"Failed to run perf on {bin_file}: {result.stderr}")
-        exit(1)
+        raise RuntimeError()
     perf_output = result.stderr
 
     cycles_pattern = re.compile(r"\s*(\d+)\s+cycles.*\+-\s*(\d+[\d\.]*)%")
@@ -195,10 +195,10 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
 
     if not cycles_match:
         logging.error(f"Failed to find cycles in perf output: {perf_output}")
-        exit(1)
+        raise ValueError()
     if not instrs_match:
         logging.error(f"Failed to find instructions in perf output: {perf_output}")
-        exit(1)
+        raise ValueError()
 
     cycles, cycles_std = int(cycles_match.group(1)), float(cycles_match.group(2)) / 100
     instrs, instrs_std = int(instrs_match.group(1)), float(instrs_match.group(2)) / 100
@@ -241,11 +241,14 @@ def get_gem5_result(
                 "--delta",
                 delta,
                 # "--debug-flags=Process"
-            ]
+            ],
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             logging.error(f"Failed to run gem5 for {bench_tf}: {result.stderr}")
-            exit(1)
+            raise RuntimeError()
+        logging.info("gem5:\n" + result.stdout)
 
         result = subprocess.run(
             [
@@ -257,11 +260,13 @@ def get_gem5_result(
                 app,
                 bench_tf,
                 HWMode.DefenseOn.value,
-            ]
+            ],
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             logging.error(f"Failed to run get_decl.py for {bench_tf}: {result.stderr}")
-            exit(1)
+            raise RuntimeError()
         out_decl_file = (
             GEM5_DIR
             / "results"
@@ -300,7 +305,7 @@ def get_gem5_result(
             logging.error(
                 f"Failed to find cycles / dyn instrs in gem5 output for {bench_tf} {hw}"
             )
-            exit(1)
+            raise ValueError()
         cycles = int(cycles_match.group(1))
         instrs = int(instrs_match.group(1))
         logging.debug(f"{bench_tf} {hw}: cycles={cycles}, instrs={instrs}")
@@ -340,7 +345,7 @@ def get_overhead(base: dict, curr: dict) -> dict:
             matching = re.compile(r"gem5_(\w+)_def-(\w+)").match(key)
             if not matching:
                 logging.error(f"Failed to match gem5 key: {key}")
-                exit(1)
+                raise ValueError()
             metric, mode = matching.groups()
             logging.debug(f"key={key} --> metric={metric}, mode={mode}")
             if mode == "off":
@@ -349,7 +354,7 @@ def get_overhead(base: dict, curr: dict) -> dict:
             else:
                 if mode != "on":
                     logging.error(f"Unknown mode: {mode}")
-                    exit(1)
+                    raise ValueError()
                 base_val = base[f"gem5_{metric}_def-off"]
                 curr_val = curr[f"gem5_{metric}_def-on"]
             growth = (curr_val - base_val) / base_val
@@ -371,9 +376,23 @@ def print_overhead(overhead: dict):
         overhead_str = f"{growth:.2%}{std_str}"
         print(f"\t{key:>25}: {overhead_str:<20} {base_val:>10} -> {curr_val}")
 
+        
+def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool, delta: str):
+    setup_logger(log_level, is_subprocess=True)
+
+    try:
+        bench_name_tf = get_bench_tf_name(bench, tf)
+        result = {}
+        if run_gem5_on_tf(tf):
+            get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
+        return result
+    except Exception as e:
+        logging.error(f"Error processing {bench} - {tf.name}: {e}")
+        return None
+
 
 @click.command()
-@click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging")
+@click.option("-v", "--verbose", count=True, help="Enable verbose logging (-v, -vv)")
 @click.option(
     "--gem5-docker",
     default="secsep-gem5",
@@ -391,20 +410,31 @@ def print_overhead(overhead: dict):
     type=click.STRING,
     help="Absolute offset between public and secret stack",
 )
+@click.option(
+    "-p",
+    "--processes",
+    default=4,
+    required=False,
+    type=click.INT,
+    help="Number of processes to use for parallel execution",
+)
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_gem5, delta, out):
+def main(verbose, gem5_docker, skip_gem5, delta, processes, out):
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"gem5_docker={gem5_docker}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
         f.write(f"delta={delta}\n")
+        f.write(f"processes={processes}\n")
         f.write(f"out={out}\n")
 
-    if verbose:
+    if verbose >= 2:
         print("verbose")
         setup_logger(logging.DEBUG)
-    else:
+    elif verbose == 1:
         setup_logger(logging.INFO)
+    else:
+        setup_logger(logging.WARN)
 
     if not skip_gem5:
         print(f"Will run gem5, confirm? (y/n) ", end="")
@@ -434,32 +464,50 @@ def main(verbose, gem5_docker, skip_gem5, delta, out):
     df_columns.extend([f"overhead_{col}" for col in df_columns])
     df = pd.DataFrame(columns=df_columns, index=df_index)
 
+    results = dict()
+
+    # Run perf and fast procedures using single-threaded execution
     for bench in BENCHMARKS:
-        results = {}
         for tf in TF:
-            # if tf == TF.OctalNoPushPop or tf == TF.OctalNoPushPopNoCallPreserv or tf == TF.ProspectPub or tf == TF.ProspectSec:
-            #     continue
-            bench_name_tf = get_bench_tf_name(bench, tf)
-            bin_path, asm_path, compiled_asm = get_bin_asm(bench, tf)
-            collect_bin_asm(bin_path, asm_path, compiled_asm)
+            try:
+                bin_path, asm_path, compiled_asm = get_bin_asm(bench, tf)
+                collect_bin_asm(bin_path, asm_path, compiled_asm)
+                r = results.setdefault((bench, tf), {})
+                get_asm_line_count(r, asm_path)
+                get_perf(r, bin_path)
+                for key, value in r.items():
+                    df.loc[(bench, tf.name), key] = value
+            except Exception as e:
+                logging.warning(f"Failed to process {bench} - {tf.name}, skipping: {e}")
+                continue
 
-            result = {}
-            get_asm_line_count(result, asm_path)
-            get_perf(result, bin_path)
-            if run_gem5_on_tf(tf):
-                get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
-
+    # Parallelize gem5 tasks
+    worker_args = []
+    for bench in BENCHMARKS:
+        for tf in TF:
+            worker_args.append((bench, tf, logging.getLogger().level, gem5_docker, skip_gem5, delta))
+    with Pool(processes=processes) as pool:
+        worker_results = pool.starmap(worker, worker_args)
+        for args, result in zip(worker_args, worker_results):
+            bench, tf, _, _, _, _ = args
+            if result is None:
+                logging.warning(f"Failed to process {bench} - {tf.name}, skipping")
+                continue
+            r = results.setdefault((bench, tf), {})
             for key, value in result.items():
                 df.loc[(bench, tf.name), key] = value
+                r[key] = value
 
-            results[tf] = result
-
+    # Calculate overheads
+    for bench in BENCHMARKS:
         for tf in TF:
             if tf == TF.Origin:
                 continue
-            # if tf == TF.OctalNoPushPop or tf == TF.OctalNoPushPopNoCallPreserv or tf == TF.ProspectPub or tf == TF.ProspectSec:
-            #     continue
-            overhead = get_overhead(results[TF.Origin], results[tf])
+            if (bench, tf) not in results:
+                logging.warning(f"Results for {bench} - {tf.name} not found, skipping overhead calculation")
+                continue
+
+            overhead = get_overhead(results[(bench, TF.Origin)], results[(bench, tf)])
             for key in overhead:
                 if overhead[key] is None:
                     continue
