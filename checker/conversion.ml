@@ -704,7 +704,7 @@ let convert_call_anno
   ) anno.pr_reg in
 
   let convert_ch_mem_slot_info _ _ _ entry _ =
-    let (slot_base, slot_off, slot_full), _ (* base *) = entry in
+    let (slot_base, slot_off, slot_full, _), _ (* base *) = entry in
     (* reference memory is caller's memory *)
     convert_slot from_mem slot_base slot_off (Some slot_full) (Some 1)
   in

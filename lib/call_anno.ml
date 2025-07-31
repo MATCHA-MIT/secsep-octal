@@ -15,8 +15,8 @@ module CallAnno = struct
   module TaintRegType = RegType (TaintEntryType)
 
   (* which slot in parent's memory is this slot mapped to *)
-  (* base pointer, slot's offset to base pointer, accessing full slot or not *)
-  type slot_info = IsaBasic.imm_var_id * MemOffset.t * bool
+  (* base pointer, slot's offset to base pointer, accessing full slot or not, parent slot's taint *)
+  type slot_info = IsaBasic.imm_var_id * MemOffset.t * bool * TaintExp.t option
   [@@deriving sexp]
 
   (* how is its base pointer passed during the call *)
@@ -107,6 +107,12 @@ module CallAnno = struct
       Some { 
         anno' with 
         pr_reg = List.map update_taint_entry anno'.pr_reg;
+        ch_mem = MemTypeBasic.map (fun (slot: slot_t) ->
+          let slot_info, base_info = slot in
+          let base_id, off, is_full_slot, taint_opt = slot_info in
+          let new_taint_opt = Option.map update_taint taint_opt in
+          ((base_id, off, is_full_slot, new_taint_opt), base_info)
+        ) anno'.ch_mem;
         taint_var_map = List.map update_taint_map anno'.taint_var_map;
       }
 

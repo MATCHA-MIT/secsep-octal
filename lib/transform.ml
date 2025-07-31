@@ -308,7 +308,7 @@ module Transform = struct
       callee_saving_slots = [];
     }
 
-  let get_slot_unity (mem_unity: (Isa.imm_var_id * unity) list) (base_id: Isa.imm_var_id) : unity =
+  let query_mem_part_unity (mem_unity: (Isa.imm_var_id * unity) list) (base_id: Isa.imm_var_id) : unity =
     let result = List.find_map (fun (id, unity) ->
       if id = base_id then Some unity
       else None
@@ -356,7 +356,7 @@ module Transform = struct
           let (slot_base, _, _, _) = Option.get slot_anno in
           let taint_anno = Option.get taint_anno in
           let taint_anno = tv_ittt taint_anno in (* mocking *)
-          match get_slot_unity func_state.init_mem_unity slot_base with
+          match query_mem_part_unity func_state.init_mem_unity slot_base with
           | Unified -> operand, []
           | Ununified -> begin
               match taint_anno with
@@ -528,22 +528,48 @@ module Transform = struct
         if List.length slots = 0 then acc else
 
         (* sample the first slot to get info of base pointer, should be the same accross all slots *)
-        let _, _, ((parent_base, _, _), parent_base_info) = (List.hd slots) in
+        let _, _, ((parent_base, _, _, parent_taint), parent_base_info) = (List.hd slots) in
+        (* parent_base_info: how the base is passed into child *)
         (* sanity check: all slots with same base in the child maps have same info about base *)
         List.iter (
-          fun (_, _, ((parent_base', _, _), parent_base_info')) ->
+          fun (_, _, ((parent_base', _, _, _), parent_base_info')) ->
             if parent_base' != parent_base || CallAnno.cmp_base_info parent_base_info parent_base_info' != 0 then
               transform_error "Different parent base in the same child memory part"
         ) (List.tl slots);
 
-        (* do not transform, if dealing with child's RSP or global base, or parent mem is already unified *)
-        if child_base = func_state.init_rsp_var_id ||
-           parent_base_info = BaseAsGlobal ||
-           get_slot_unity func_state.init_mem_unity parent_base = Unified 
-        then acc else
-        (* see if all slots are taint true or all slots are taint false *)
-        let unity = get_mem_part_unity mem_part (get_child_slot_taint child_fi.in_mem) in
-        if unity = Unified then parent_base_info :: acc else acc
+        let transform =
+          if child_base = func_state.init_rsp_var_id || parent_base_info = BaseAsGlobal then
+            (* no need to transform, if dealing with child's RSP or global base *)
+            false
+          else begin
+            match query_mem_part_unity func_state.init_mem_unity parent_base with
+            | Unified -> false (* no need to transform, if parent mem part is already unified *)
+            | Ununified -> (
+              match get_mem_part_unity mem_part (get_child_slot_taint child_fi.in_mem) with
+              | Ununified -> false (* no need to transform, if child's memory part is also not unified *)
+              | Unified -> (
+                (* now, parent's memory part is Ununified, while child's memory part is Unified *)
+                (* need to make sure the parent portion passed into child has the same taint *)
+                List.iter (
+                  fun (_, _, ((_, _, _, parent_taint'), _)) ->
+                    match parent_taint, parent_taint' with
+                    | None, None -> ()
+                    | Some x, Some y when TaintExp.cmp x y = 0 -> ()
+                    | _ -> transform_error "Different parent taint in the same child memory part"
+                ) (List.tl slots);
+                match parent_taint with
+                | Some (TaintConst true) -> true
+                | Some (TaintConst false) -> false
+                | None | Some _ ->
+                  transform_error "Taint of parent's memory about to be passed into child is None or non-constant"
+              )
+            )
+          end
+        in
+        if transform then
+          parent_base_info :: acc
+        else
+          acc
     ) [] anno.ch_mem in
     List.sort_uniq CallAnno.cmp_base_info res
 
@@ -657,14 +683,14 @@ module Transform = struct
                     (tf :: acc_tf, bases_to_change)
             ) ([], bases_to_change) acc_tf
             in
-            (* deal with all BaseAsSlot stuff here *)
+            (* deal with all BaseAsReg, BaseAsSlot stuff here *)
             let inst_pre, inst_post, sf = List.fold_left (
               fun (acc: (Isa.instruction list * Isa.instruction list * tv_fault_t list)) (base_info: CallAnno.base_info) ->
                 let acc_inst_pre, acc_inst_post, acc_sf = acc in
                 match base_info with
                 | BaseAsReg reg ->
                   if Isa.is_reg_callee_saved reg then
-                    transform_error "trying to temporarily transform a callee saved register, unexpceted";
+                    transform_error "trying to temporarily transform a callee saved register, unexpected";
                   (
                     (Isa.make_inst_add_i_r !tf_config.delta reg) :: acc_inst_pre,
                     acc_inst_post (* no need to restore, since the register is caller saved *),
@@ -677,11 +703,13 @@ module Transform = struct
                   | None -> transform_error "sanity check failed: BaseAsSlot does not describe a full slot in child's memory";
                   | Some x -> x
                   in
-                  let (pa_base, pa_base_off, is_full), base_info = ch_slot_anno in
+                  let (pa_base, pa_base_off, is_full, pa_taint), base_info = ch_slot_anno in
                   if not is_full then
                     transform_error "sanity check failed: BaseAsSlot is not mapped to a full slot of parent";
                   if not (MemOffset.is_8byte_slot pa_base_off) then
                     transform_error "sanity check failed: BaseAsSlot does not access slot of 8 bytes";
+                  if Option.get pa_taint != TaintConst false then
+                    transform_error "sanity check failed: BaseAsSlot uses tainted slot to pass pointer";
                   let off_of_base = SingleExp.match_const_offset (fst ch_base_off) ch_base |> Option.get in
                   let mem_op = 
                     match base_info with

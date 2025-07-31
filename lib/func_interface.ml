@@ -106,7 +106,8 @@ module FuncInterface (Entry: EntryType) = struct
   type read_hint_t =
     | Untrans of (MemOffset.t * MemRange.t * entry_t)
     | Unmapped of MemOffset.t
-    | Mapped of (IsaBasic.imm_var_id * MemOffset.t * bool * MemRange.t * entry_t)
+    (* mapped to parent's which pointer, parent slot at which offset, slot fully mapped, parent's slot type, child's range, child's slot type *)
+    | Mapped of (IsaBasic.imm_var_id * MemOffset.t * bool * entry_t * MemRange.t * entry_t)
   [@@deriving sexp]
 
   let add_mem_var_map
@@ -163,7 +164,7 @@ module FuncInterface (Entry: EntryType) = struct
                 (Entry.add_context_map true simp_local_var) var_map c_entry p_entry),
                 acc_useful
               ),
-              Mapped (p_ptr, p_off, is_full, m_range, c_entry)
+              Mapped (p_ptr, p_off, is_full, p_entry, m_range, c_entry)
             | None -> 
               (* Printf.printf "Unmapped m_off %s c_off %s\n" (MemOffset.to_string m_off) (MemOffset.to_string c_off); *)
               (* SingleExp.pp_local_var 0 single_var_map; *)
@@ -312,7 +313,7 @@ module FuncInterface (Entry: EntryType) = struct
       | _, (Unmapped off) :: read_hint, _ :: write_mem ->
         helper write_parent_slot_idx_set finished_parent_entry ((Unknown off) :: constraint_list) useful_vars parent_entry read_hint write_mem
       | (p_idx, (p_off, p_range, p_entry)) :: parent_entry_tl,
-        (Mapped (_, mp_off, is_full, m_in_range, c_in_entry)) :: read_hint_tl,
+        (Mapped (_, mp_off, is_full, _, m_in_range, c_in_entry)) :: read_hint_tl,
         (write_mem_can_write, write_entry) :: write_mem_tl ->
         if MemOffset.cmp p_off mp_off = 0 then
           let new_entry, new_constraints, new_useful_vars = 
@@ -468,9 +469,9 @@ module FuncInterface (Entry: EntryType) = struct
             List.map2 (
               fun (hint: read_hint_t) (entry: MemOffset.t * MemRange.t * entry_t) ->
                 match hint with
-                | Mapped (p_ptr, p_off, p_is_full, _, _) ->
+                | Mapped (p_ptr, p_off, p_is_full, p_entry, _, _) ->
                   let c_off, c_range, _ = entry in
-                  c_off, c_range, (p_ptr, p_off, p_is_full)
+                  c_off, c_range, (p_ptr, p_off, p_is_full, Entry.get_taint_exp p_entry)
                 | _ -> func_interface_error "get_slot_map_info read hint is not fully resolved"
             ) part_hint part_mem
           else 

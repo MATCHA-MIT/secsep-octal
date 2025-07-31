@@ -90,9 +90,9 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
         case TF.OctalNoPushPopNoCallPreserv:
             return f"{bench}.tf3"
         case TF.ProspectPub:
-            return f"{bench}.prospect_pub_stack"
+            return f"{bench}.prospect_pubstk"
         case TF.ProspectSec:
-            return f"{bench}.prospect_sec_stack"
+            return f"{bench}.prospect_secstk"
         case _:
             logging.error(f"Unknown TF: {tf}")
             raise ValueError()
