@@ -9,15 +9,19 @@ import shutil
 from pathlib import Path
 import pandas as pd
 import datetime
+import resource
 from multiprocessing import Pool
 
 
 OCTAL_DIR = Path(__file__).parent.parent
+OCTAL_WORK_DIR = OCTAL_DIR / "out"
 OCTAL_STAT_ASM = OCTAL_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
 BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
 GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
 EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+
+DEFAULT_RLIMIT_STACK_SIZE_MB = 16
 
 BENCHMARKS = [
     "salsa20",
@@ -96,6 +100,18 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
         case _:
             logging.error(f"Unknown TF: {tf}")
             raise ValueError()
+
+            
+def collect_octal_stats():
+    target_dir = EVAL_DIR / "octal_stats"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for bench in BENCHMARKS:
+        bench_work_dir = OCTAL_WORK_DIR / bench
+        cnt = 0
+        for stat_file in bench_work_dir.glob("*.stat"):
+            shutil.copy(stat_file, target_dir)
+            cnt += 1
+        logging.info(f"Collected {cnt} stats for {bench}")
 
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
@@ -413,8 +429,8 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--delta",
-    default="0x800000",
-    required=False,
+#   default="0x800000",
+    required=True,
     type=click.STRING,
     help="Absolute offset between public and secret stack",
 )
@@ -426,8 +442,19 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     type=click.INT,
     help="Number of processes to use for parallel execution",
 )
+@click.option(
+    "-r",
+    "--rlimit-stack",
+    "rlimit_stack_mb",
+    default=DEFAULT_RLIMIT_STACK_SIZE_MB,
+    required=False,
+    type=click.INT,
+    help="Set larger stack size to run transformed benchmarks on host",
+)
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_gem5, delta, processes, out):
+def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb):
+    resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
+
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"gem5_docker={gem5_docker}\n")
@@ -437,7 +464,6 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out):
         f.write(f"out={out}\n")
 
     if verbose >= 2:
-        print("verbose")
         setup_logger(logging.DEBUG)
     elif verbose == 1:
         setup_logger(logging.INFO)
@@ -450,6 +476,8 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out):
         if confirm.lower() != "y":
             logging.info("Will skip running gem5")
             skip_gem5 = True
+
+    collect_octal_stats()
 
     df_index = pd.MultiIndex.from_product(
         [
