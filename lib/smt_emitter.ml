@@ -16,7 +16,7 @@ module SmtEmitter = struct
 
   let bv_width = 64
   let () = assert (bv_width mod 8 = 0)
-  
+
   let to_string (smt_ctx: t) : string =
     Printf.sprintf "Current smt_ctx:\n%s\n" (Z3.Solver.to_string (snd smt_ctx))
 
@@ -63,13 +63,21 @@ module SmtEmitter = struct
   | SatUnknown
   [@@deriving sexp]
 
+let z3_solver_check_wrapper (solver: Z3.Solver.solver) (exp_list: Z3.Expr.expr list) : Z3.Solver.status =
+  Stat.stat.smt_queries <- Stat.stat.smt_queries + 1;
+  let start_time = Sys.time () in
+  let result = Z3.Solver.check solver exp_list in
+  let end_time = Sys.time () in
+  Stat.stat.smt_queries_time <- Stat.stat.smt_queries_time +. (end_time -. start_time);
+  result
+
 let get_model (smt_ctx: t) : Model.model option =
     let _, z3_solver = smt_ctx in
     Z3.Solver.get_model z3_solver
 
   let check_context (smt_ctx: t) : sat_result_t =
     let ctx, z3_solver = smt_ctx in
-    match Z3.Solver.check z3_solver [ Z3.Boolean.mk_true ctx ] with
+    match z3_solver_check_wrapper z3_solver [ Z3.Boolean.mk_true ctx ] with
     | Z3.Solver.UNKNOWN -> SatUnknown
     | Z3.Solver.SATISFIABLE -> SatYes
     | Z3.Solver.UNSATISFIABLE -> SatNo
@@ -85,21 +93,7 @@ let get_model (smt_ctx: t) : Model.model option =
     in
     if List.length assertions = 0 then SatYes else
 
-    (*
-    let _ = begin
-      Printf.printf "\ncheck_compliance\n";
-      Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-        (Z3.Solver.get_num_assertions z3_solver) (Z3.Solver.to_string z3_solver) (Z3.Solver.string_of_status (Z3.Solver.check z3_solver []));
-      (* Printf.printf "base solver (%d assertions) = \n%s\nbase result: %s\n"
-      (Z3.Solver.get_num_assertions z3_solver) "..." (Z3.Solver.string_of_status (Z3.Solver.check z3_solver [])); *)
-      (* get string of all assertion and concat them *)
-      Printf.printf "assertion (%d) = \n%s\n\n" (List.length assertions) (
-        List.fold_left (fun acc x -> (Z3.Expr.to_string x) ^ " " ^ acc) "" assertions
-      );
-    end in
-    *)
-
-    match Z3.Solver.check z3_solver assertions with
+    match z3_solver_check_wrapper z3_solver assertions with
     | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
     | Z3.Solver.UNSATISFIABLE -> begin
         (* Printf.printf "satno\n"; *)
@@ -109,7 +103,7 @@ let get_model (smt_ctx: t) : Model.model option =
         let neg_sat = List.exists (fun assertion ->
           (* Printf.printf "checking neg %s\n" (Z3.Expr.to_string assertion); *)
           let neg = Z3.Boolean.mk_not ctx assertion in
-          match Z3.Solver.check z3_solver [neg] with
+          match z3_solver_check_wrapper z3_solver [neg] with
           | Z3.Solver.UNKNOWN -> smt_emitter_error "solver reports unknown"
           | Z3.Solver.SATISFIABLE ->
             (* Printf.printf "this expr is not always true:\n%s\n" (Z3.Expr.to_string assertion);

@@ -44,7 +44,8 @@ module FuncInterface (Entry: EntryType) = struct
   let interface_list_to_file (filename: string) (interface_list: t list) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_list sexp_of_t interface_list)
+    Sexp.output_hum channel (sexp_of_list sexp_of_t interface_list);
+    close_out channel
 
   let interface_list_from_file (filename: string) : t list =
     let open Sexplib in
@@ -686,7 +687,8 @@ module FuncInterface (Entry: EntryType) = struct
   let fi_list_to_file (filename: string) (fi_list: t list) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_list sexp_of_t fi_list)
+    Sexp.output_hum channel (sexp_of_list sexp_of_t fi_list);
+    close_out channel
 
   let fi_list_from_file (filename: string) : t list =
     let open Sexplib in

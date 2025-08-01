@@ -895,7 +895,8 @@ module Parser = struct
   let prog_to_file (filename: string) (prog: Isa.prog) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (Isa.sexp_of_prog prog)
+    Sexp.output_hum channel (Isa.sexp_of_prog prog);
+    close_out channel
 
   let prog_from_file (filename: string) : Isa.prog =
     let open Sexplib in

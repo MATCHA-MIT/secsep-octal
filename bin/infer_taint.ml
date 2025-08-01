@@ -9,6 +9,8 @@ let speclist = [
 ]
 
 let () =
+  let start_time = Sys.time () in
+
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
   (* 1. Parse range infer output *)
@@ -29,4 +31,8 @@ let () =
     Taint_type_infer.TaintTypeInfer.infer range_infer_result general_interface_list taint_input_list
   in
   Taint_type_infer.TaintTypeInfer.state_list_to_file (get_related_filename !program_name "out" "taint_infer") taint_infer_result;
-  Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "interface") func_interface_list
+  Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "interface") func_interface_list;
+
+  let end_time = Sys.time () in
+  Stat.stat.time <- end_time -. start_time;
+  Stat.statistics_to_file (get_related_filename !program_name "out" "taint_infer.stat")

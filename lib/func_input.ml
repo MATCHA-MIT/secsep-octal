@@ -188,7 +188,8 @@ module FuncInput = struct
   let input_to_file (filename: string) (input_list: entry_t list) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_list sexp_of_entry_t input_list)
+    Sexp.output_hum channel (sexp_of_list sexp_of_entry_t input_list);
+    close_out channel
     
   let update_global_symbol_layout 
       (func: Isa.func)

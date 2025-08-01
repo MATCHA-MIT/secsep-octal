@@ -10,6 +10,8 @@ let speclist = [
 ]
 
 let () =
+  let start_time = Sys.time () in
+
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
   let fi_list =
@@ -32,7 +34,7 @@ let () =
       Printf.printf "=================================================================\n";
       Printf.printf "checking function %s\n" func_name;
       Printf.printf "=================================================================\n%!";
-      (* if func_name <> "SHA512" then begin
+      (* if func_name <> "ED25519_sign" then begin
         Printf.printf "skipping check\n";
         acc_success
       end else *)
@@ -48,6 +50,10 @@ let () =
       acc_success && success
   ) true checker_func_list
   in
+
+  let end_time = Sys.time () in
+  Type.Stat.stat.time <- end_time -. start_time;
+  Type.Stat.statistics_to_file (get_related_filename !program_name "out" "check.stat");
 
   if not all_success then
     exit 1

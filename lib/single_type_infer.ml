@@ -59,7 +59,8 @@ module SingleTypeInfer = struct
   let state_list_to_file (filename: string) (infer_result: t list) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_list sexp_of_t infer_result)
+    Sexp.output_hum channel (sexp_of_list sexp_of_t infer_result);
+    close_out channel
 
   let state_list_from_file (filename: string) : t list =
     let open Sexplib in

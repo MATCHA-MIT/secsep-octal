@@ -12,6 +12,8 @@ let speclist = [
 ]
 
 let () =  
+  let start_time = Sys.time () in
+
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
   (* 1. Parse func and func_input *)
@@ -35,5 +37,8 @@ let () =
   (* 3. Infer *)
   let single_infer_func_interface, single_infer_result = Single_type_infer.SingleTypeInfer.infer p func_input_list general_interface_list cached_func_interface_list 6 20 in
   Single_type_infer.SingleTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "single_infer_interface") single_infer_func_interface;
-  Single_type_infer.SingleTypeInfer.state_list_to_file (get_related_filename !program_name "out" "single_infer") single_infer_result
-  (* Main functionality here *)
+  Single_type_infer.SingleTypeInfer.state_list_to_file (get_related_filename !program_name "out" "single_infer") single_infer_result;
+
+  let end_time = Sys.time () in
+  Stat.stat.time <- end_time -. start_time;
+  Stat.statistics_to_file (get_related_filename !program_name "out" "single_infer.stat")

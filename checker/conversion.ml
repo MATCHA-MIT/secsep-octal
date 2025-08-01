@@ -870,7 +870,8 @@ let convert_taint_type_infers
 let converted_to_file (filename: string) (cf_list: checker_func list) : unit =
   let open Sexplib in
   let channel = open_out filename in
-  Sexp.output_hum channel (Std.sexp_of_list sexp_of_checker_func cf_list)
+  Sexp.output_hum channel (Std.sexp_of_list sexp_of_checker_func cf_list);
+  close_out channel
 
 let converted_from_file (filename: string) : checker_func list =
   let open Sexplib in

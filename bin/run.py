@@ -219,6 +219,7 @@ def transform_helper(
 @click.option(
     "--delta",  # hex format
     type=click.STRING,
+    required=True,
 )
 @click.option(
     "--all-tf",

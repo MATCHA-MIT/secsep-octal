@@ -20,7 +20,11 @@ let speclist = [
 let () =
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
-  let delta = Int64.of_string_opt !delta_string |> Option.value ~default:0x100000L in
+  let delta_opt = Int64.of_string_opt !delta_string in
+  let delta = match delta_opt with
+    | Some d -> d
+    | None -> failwith "Please specify a delta"
+  in
   if delta <= 0L then
     failwith "expecting positive delta value";
 
@@ -59,6 +63,7 @@ let () =
   (* print into output_name *)
   let oc = open_out !output_name in
   Printf.fprintf oc "%s" (AsmGen.gen_asm prog tf_func_states);
+  close_out oc;
 
   if List.length soft_faults > 0 then
     exit 1;

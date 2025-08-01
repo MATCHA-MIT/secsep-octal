@@ -9,6 +9,8 @@ let speclist = [
 ]
 
 let () =
+  let start_time = Sys.time () in
+
   Arg.parse speclist (fun _ -> ()) usage_msg;
 
   (* 1. Parse single infer output *)
@@ -24,4 +26,8 @@ let () =
   let range_infer_result =
     Range_type_infer.RangeTypeInfer.infer single_infer_result general_interface_list
   in
-  Range_type_infer.RangeTypeInfer.state_list_to_file (get_related_filename !program_name "out" "range_infer") range_infer_result
+  Range_type_infer.RangeTypeInfer.state_list_to_file (get_related_filename !program_name "out" "range_infer") range_infer_result;
+
+  let end_time = Sys.time () in
+  Stat.stat.time <- end_time -. start_time;
+  Stat.statistics_to_file (get_related_filename !program_name "out" "range_infer.stat")

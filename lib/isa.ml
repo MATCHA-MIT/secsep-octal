@@ -289,7 +289,8 @@ module Isa (MemAnno: MemAnnoType) (BranchAnno: BranchAnnoType) (CallAnno: CallAn
   let prog_to_file (filename: string) (p: prog) =
     let open Sexplib in
     let channel = open_out filename in
-    Sexp.output_hum channel (sexp_of_prog p)
+    Sexp.output_hum channel (sexp_of_prog p);
+    close_out channel
 
   let mnemonic_of_instruction (inst: instruction) : string =
     match inst with

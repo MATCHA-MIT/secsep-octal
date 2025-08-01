@@ -198,8 +198,7 @@ module SingleInputVarCondSubtype = struct
       List.iter (
         fun (x: CondType.t) ->
           SingleContext.add_assertions smt_ctx [ SingleContext.Cond x ];
-          let open Z3 in
-          match Z3.Solver.check solver [ Boolean.mk_true ctx ] with
+          match SmtEmitter.z3_solver_check_wrapper solver [ Z3.Boolean.mk_true ctx ] with
           | UNSATISFIABLE -> 
             Printf.printf "pc_cond\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_pc_cond_t pc_cond));
             Printf.printf "Unsat cond\n%s\n" (Sexplib.Sexp.to_string_hum (CondType.sexp_of_t x));
