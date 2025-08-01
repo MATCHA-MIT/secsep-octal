@@ -665,11 +665,12 @@ let convert_call_anno
     (ctx: Z3.context)
     (arch_type: TaintTypeInfer.ArchType.t)
     (anno: Type.Call_anno.CallAnno.t)
+    (func_vsm: func_var_size_map)
+    (from_func: string)
+    (targ_func: string)
     (from_mem: TaintTypeInfer.ArchType.MemType.t)
-    (from_get_var_size: int -> int option)
-    (targ_get_var_size: int -> int option)
     (targ_is_forget: (int * int) -> bool)
-    : CallAnno.t =
+    : CallAnno.t * func_var_size_map =
   let single_local_var_map = TaintEntryType.get_single_var_map arch_type.local_var_map in
   let get_var_size (fallback: int -> int option) (var: int) : int option =
     (* this is to return the size of global vars that is not contained in the func_vsm *)
@@ -681,6 +682,30 @@ let convert_call_anno
 
   let anno = Option.get anno in
 
+  let _, func_vsm = List.fold_left (
+    fun ((reg_id, func_vsm): int * func_var_size_map) (se, _) ->
+      let reg_size = reg_id
+        |> TaintTypeInfer.Isa.get_full_reg_by_idx
+        |> TaintTypeInfer.Isa.get_reg_size
+        |> Int64.to_int
+      in
+      let se = SingleEntryType.repl_local_var single_local_var_map se in
+      if SingleEntryType.get_vars se |> SingleEntryType.SingleVarSet.cardinal = 1 then
+        let var = SingleEntryType.SingleVarSet.choose (SingleEntryType.get_vars se) in
+        let func_vsm =
+          if get_size_finder_of_func func_vsm from_func var = None then
+            append_func_var_size_map func_vsm from_func [(var, reg_size)]
+          else
+            func_vsm
+        in
+        (reg_id + 1, func_vsm)
+      else
+        (reg_id + 1, func_vsm)
+  ) (0, func_vsm) anno.pr_reg in
+
+  let from_get_var_size = get_size_finder_of_func func_vsm from_func in
+  let targ_get_var_size = get_size_finder_of_func func_vsm targ_func in
+
   let pr_reg = List.mapi (
     fun reg_id (se, te) ->
       let reg_size = reg_id
@@ -689,15 +714,6 @@ let convert_call_anno
         |> Int64.to_int
       in
       let se = SingleEntryType.repl_local_var single_local_var_map se in
-      (* if pr_reg is a single var, then we know an extra info of var's size *)
-      let from_get_var_size = match se with
-      | SingleEntryType.SingleVar v -> fun var ->
-          if var = v then begin
-            Option.value (from_get_var_size var) ~default:reg_size |> Some
-          end else
-            from_get_var_size var
-      | _ -> from_get_var_size
-      in
       let se' = convert_dep_type ~zext:true ctx se (get_var_size from_get_var_size) reg_size in
       let te' = convert_taint_type ctx te in
       (se', te')
@@ -721,7 +737,7 @@ let convert_call_anno
       convert_taint_var_map ctx anno.taint_var_map
     );
     mem_map = ch_mem_slot_info;
-  }
+  }, func_vsm
 
 let convert_mem_anno
     (ctx: Z3.context)
@@ -775,17 +791,19 @@ let convert_taint_type_infers
         IntSet.mem idx stack_forget_slot_info
       in
       let input_var = convert_input_var tti in
-      let vsm, arch = List.fold_left_map (
+      let func_vsm, arch = List.fold_left_map (
         fun func_vsm arch_type ->
           let converted, func_vsm = convert_arch_type ctx tti arch_type input_var func_vsm is_forget_slot in
           func_vsm, converted
       ) func_vsm tti.func_type
       in
-      (vsm, arch)
+      (func_vsm, arch)
   ) func_vsm tti_list
   in
 
   Printf.printf "func var size map:\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_func_var_size_map func_vsm));
+
+  let func_vsm = ref func_vsm in
 
   List.map2 (fun (tti: TaintTypeInfer.t) (archs: ArchType.t list) ->
     let bbs = List.map2 (
@@ -812,8 +830,8 @@ let convert_taint_type_infers
             end else begin
               if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
                 failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
-              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-              let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              let from_get_var_size = get_size_finder_of_func !func_vsm tti.func_name in
+              let targ_get_var_size = get_size_finder_of_func !func_vsm tti.func_name in
               ArchType.Isa.Jmp (targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
             end
           | Jcond (cond, targ, branch_anno) ->
@@ -822,17 +840,17 @@ let convert_taint_type_infers
             end else begin
               if not (TaintTypeInfer.Isa.block_list_contains_block tti.func targ) then
                 failwith (Printf.sprintf "jump to block %s that is not in current function" targ);
-              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-              let targ_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
+              let from_get_var_size = get_size_finder_of_func !func_vsm tti.func_name in
+              let targ_get_var_size = get_size_finder_of_func !func_vsm tti.func_name in
               ArchType.Isa.Jcond (cond, targ, convert_branch_anno ctx branch_anno from_get_var_size targ_get_var_size)
             end
           | Call (targ, call_anno) ->
             if Option.is_none call_anno then begin
                 ArchType.Isa.Call (targ, CallAnno.get_empty ())
             end else begin
-              let from_get_var_size = get_size_finder_of_func func_vsm tti.func_name in
-              let targ_get_var_size = get_size_finder_of_func func_vsm targ in
-              ArchType.Isa.Call (targ, convert_call_anno ctx bb_type call_anno bb_type.mem_type from_get_var_size targ_get_var_size func_interface_is_forget_slot)
+              let call_anno, vsm = convert_call_anno ctx bb_type call_anno !func_vsm tti.func_name targ bb_type.mem_type func_interface_is_forget_slot in
+              func_vsm := vsm;
+              ArchType.Isa.Call (targ, call_anno)
             end
           | Nop -> ArchType.Isa.Nop
           | Syscall -> ArchType.Isa.Syscall
@@ -864,7 +882,7 @@ let convert_taint_type_infers
         bb, {arch_type with dead_pc = min arch_type.dead_pc (last_executable_pc + 1) }
     ) bbs archs |> List.split in
 
-    (tti.func_name, bbs, archs, func_vsm)
+    (tti.func_name, bbs, archs, !func_vsm)
   ) tti_list archs_of_func
 
 let converted_to_file (filename: string) (cf_list: checker_func list) : unit =

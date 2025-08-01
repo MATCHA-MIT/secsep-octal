@@ -10,14 +10,14 @@ from colorama import Fore
 import shutil
 
 OCTAL_DIR = Path(__file__).parent.parent
-OCTAL_BUILD = OCTAL_DIR / "_build" / "default" / "bin"
-OCTAL_PPC = OCTAL_BUILD / "preprocess_input.exe"
-OCTAL_INFER_SINGLE = OCTAL_BUILD / "infer_single.exe"
-OCTAL_INFER_RANGE = OCTAL_BUILD / "infer_range.exe"
-OCTAL_INFER_TAINT = OCTAL_BUILD / "infer_taint.exe"
-OCTAL_CONVERT = OCTAL_BUILD / "convert.exe"
-OCTAL_CHECK = OCTAL_BUILD / "check.exe"
-OCTAL_TRANSFORM = OCTAL_BUILD / "prog_transform.exe"
+OCTAL_BUILD_DIR = OCTAL_DIR / "_build" / "default" / "bin"
+OCTAL_PPC = OCTAL_BUILD_DIR / "preprocess_input.exe"
+OCTAL_INFER_SINGLE = OCTAL_BUILD_DIR / "infer_single.exe"
+OCTAL_INFER_RANGE = OCTAL_BUILD_DIR / "infer_range.exe"
+OCTAL_INFER_TAINT = OCTAL_BUILD_DIR / "infer_taint.exe"
+OCTAL_CONVERT = OCTAL_BUILD_DIR / "convert.exe"
+OCTAL_CHECK = OCTAL_BUILD_DIR / "check.exe"
+OCTAL_TRANSFORM = OCTAL_BUILD_DIR / "prog_transform.exe"
 
 
 class InferPhase(Enum):
@@ -46,6 +46,17 @@ CheckPhaseDescription = """Run checker on the infer result:
     0: Conversion
     1: Check
 """
+
+
+def build_octal():
+    subprocess.run(
+        [
+            "dune",
+            "build"
+        ],
+        cwd=OCTAL_DIR,
+        check=True,
+    )
 
 
 @click.group()
@@ -104,6 +115,8 @@ def run(cmd, log_file, msg):
 )
 @click.option("--use-cache", is_flag=True)
 def infer(name: str, input_dir: Path, phase, use_cache):
+    build_octal()
+
     output_dir = OCTAL_DIR / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
@@ -156,6 +169,8 @@ def infer(name: str, input_dir: Path, phase, use_cache):
     default=(0, 1),
 )
 def check(name: str, phase):
+    build_octal()
+
     output_dir = OCTAL_DIR / "out" / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
@@ -245,6 +260,8 @@ def transform(
     no_call: bool,
     install_dir: Path,
 ):
+    build_octal()
+
     if all_tf:
         transform_helper(
             name,

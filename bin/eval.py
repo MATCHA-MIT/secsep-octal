@@ -92,6 +92,18 @@ def setup_logger(level=logging.INFO):
     logger.addHandler(file_handler)
     logger.setLevel(level)
 
+    
+def build_octal():
+    logging.info("Building Octal...")
+    subprocess.run(
+        [
+            "dune",
+            "build"
+        ],
+        cwd=OCTAL_DIR,
+        check=True,
+    )
+
 
 def get_bench_tf_name(bench: str, tf: TF) -> str:
     match tf:
@@ -329,7 +341,8 @@ def get_gem5_result(
         )
         if result.returncode != 0:
             logging.error(f"Failed to run gem5 for {bench_tf}")
-            logging.info(result.stderr)
+            logging.info("Gem5 stdout:\n" + result.stdout)
+            logging.info("Gem5 stderr:\n" + result.stderr)
             raise RuntimeError()
         logging.info("Gem5 output:\n" + result.stdout)
 
@@ -538,6 +551,7 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb
             logging.info("Will skip running gem5")
             skip_gem5 = True
 
+    build_octal()
     collect_octal_stats()
 
     df_index = pd.MultiIndex.from_product(
