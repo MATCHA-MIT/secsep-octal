@@ -413,7 +413,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--delta",
-    default="0x100000",
+    default="0x800000",
     required=False,
     type=click.STRING,
     help="Absolute offset between public and secret stack",

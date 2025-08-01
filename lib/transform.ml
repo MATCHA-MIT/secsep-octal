@@ -485,17 +485,11 @@ module Transform = struct
           else
             css
           in
-          if !tf_config.disable_tf_push_pop then
-            (orig, [], [], false), css', sf
-          else
-            (inst_st, [inst_rsp_sub], [], false), css', sf
+          (inst_st, [inst_rsp_sub], [], false), css', sf
         | Pop _ ->
           let inst_ld = Isa.UInst(Isa.Mov, o', Isa.LdOp(offset_as_disp, Some Isa.RSP, None, None, o_size, mem_anno)) in
           let inst_rsp_add = Isa.make_inst_add_i_r o_size Isa.RSP in
-          if !tf_config.disable_tf_push_pop then
-            (orig, [], [], false), css, sf
-          else
-            (inst_ld, [], [inst_rsp_add], false), css, sf
+          (inst_ld, [], [inst_rsp_add], false), css, sf
         | _ -> transform_error "Expecting only Push/Pop here"
       end
     | Call _ -> (orig, [], [], true), css, [] (* handled in another pass *)
