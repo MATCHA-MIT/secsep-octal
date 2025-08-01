@@ -363,7 +363,40 @@ Conversion of single variable map always uses zero extension:
 ## Dep Type Check
 
 ### Func call
-What do we need to do to update mem content + permission?
+1. What do we need to do to update mem content + permission?
+2. Check how we update valid region after func call
+
+
+# Proof
+
+## Type Soundness
+TODO: Double check the "is forget" stuff
+
+## Public Noninterference
+1. Pub stack is $$(sp+\delta, sp]$$, and sec stack is $$(sp+2\delta, sp+\delta]$$. Pay attention to the boundary!!!
+
+## Pointer Problem
+Currently, the type system is not perfect to build simulation relation.
+This is because we want reg/slots with top type have consistent values before and after transformation.
+However, pointer (which might be changed before/after transformation), can eventually have a top type, which is so bad!
+We need a better way to represent pointer and non-pointer types.
+
+## Should we mention transformed program's type?
+In the current verion (of the paper), we do implies the type of the transformed program (especially when describing the transformation algorithm).
+However, we did not implement type check of the transformed program.
+Also, it would be nice if we can do the proof without mentioning the type of the transformed program.
+
+## Limitation on how we handle pointers
+1. We do not want to pass pointer in mem (like a struct)
+2. We do not want the function to return a pointer in reg or in struct.
+This prevents us from handling RSA, where the struct contains pointers...
+
+One improvement:
+Transformed pointers are only passed by reg, and never affect status of valid reg/slots in return states!
+
+This statement is not clear enough. What I want to say is that, I want to assume all stack ptrs, that might need to be transformed, are not returned in valid reg/slots.
+However for heap/static pointers that will be considered as "transformed ptr" but actually will not be changed before/after transformation, they are ok to be returned...
+Too complicated...
 
 ## Range check
 
