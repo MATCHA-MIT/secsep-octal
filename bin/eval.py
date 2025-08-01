@@ -63,21 +63,23 @@ HW_ENCODE_MAP = {
 }
 
 
-def setup_logger(level=logging.INFO, is_subprocess=False):
-    if is_subprocess:
-        fmt = "[%(levelname)s] <%(processName)s> - %(message)s"
-    else:
-        fmt = "[%(levelname)s] - %(message)s"
-    formatter = logging.Formatter(fmt)
+LOG_PATH = EVAL_DIR / "eval.log"
 
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    handler.setLevel(level)
+
+def setup_logger(level=logging.INFO):
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter("[%(levelname)s] <%(processName)s> - %(message)s"))
+    console_handler.setLevel(logging.DEBUG)
+
+    file_handler = logging.FileHandler(LOG_PATH, mode="a")
+    file_handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] <%(processName)s> - %(message)s"))
+    file_handler.setLevel(logging.DEBUG)
 
     logger = logging.getLogger()
     if logger.hasHandlers():
         logger.handlers.clear()
-    logger.addHandler(handler)
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
     logger.setLevel(level)
 
 
@@ -270,7 +272,7 @@ def get_gem5_result(
             logging.error(f"Failed to run gem5 for {bench_tf}")
             logging.info(result.stderr)
             raise RuntimeError()
-        logging.info("gem5:\n" + result.stdout)
+        logging.info("Gem5 output:\n" + result.stdout)
 
         result = subprocess.run(
             [
@@ -401,7 +403,7 @@ def print_overhead(overhead: dict):
 
         
 def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool, delta: str):
-    setup_logger(log_level, is_subprocess=True)
+    setup_logger(log_level)
 
     try:
         bench_name_tf = get_bench_tf_name(bench, tf)
