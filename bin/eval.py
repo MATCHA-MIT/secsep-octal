@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 import pandas as pd
 import datetime
+import json
 import resource
 from multiprocessing import Pool
 
@@ -16,7 +17,16 @@ from multiprocessing import Pool
 OCTAL_DIR = Path(__file__).parent.parent
 OCTAL_WORK_DIR = OCTAL_DIR / "out"
 OCTAL_STAT_ASM = OCTAL_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
-BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks"
+OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
+OCTAL_PHASE_CHECK = "check"
+OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
+OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
+OCTAL_STATS = [
+    "loc", "scale_anno", "prospect_anno",
+    "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
+    "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
+]
+BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks" / "bench"
 GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
 GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
 EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
@@ -107,20 +117,69 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
 def collect_octal_stats():
     target_dir = EVAL_DIR / "octal_stats"
     target_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        index=BENCHMARKS,
+        columns=pd.Index(OCTAL_STATS).append(
+            pd.MultiIndex.from_product([OCTAL_PHASES, OCTAL_PHASE_METRICS], names=["Phase", "Metric"])
+        )
+    )
     for bench in BENCHMARKS:
         bench_work_dir = OCTAL_WORK_DIR / bench
-        cnt = 0
+        stat = dict()
+
+        phase_cnt = 0
         for stat_file in bench_work_dir.glob("*.stat"):
             shutil.copy(stat_file, target_dir)
-            cnt += 1
-        logging.info(f"Collected {cnt} stats for {bench}")
+            file_bench, file_phase = stat_file.stem.split(".")[:2]
+            if file_bench != bench:
+                logging.error(f"Unexpected stat file {stat_file} with name {file_bench} in directory of {stat_file}")
+                raise ValueError()
+            if file_phase not in OCTAL_PHASES:
+                logging.error(f"Unexpected stat file {stat_file} with unknown phase {file_phase}")
+                raise ValueError()
+            phase_cnt += 1
+            with open(stat_file, "r") as f:
+                stat[file_phase] = json.load(f)
+            time, smt_time, smt_queries = stat[file_phase]["time"], stat[file_phase]["smt_queries_time"], stat[file_phase]["smt_queries"]
+            if file_phase in OCTAL_PHASE_INFER:
+                stat["infer_time"] = stat.get("infer_time", 0) + time
+                stat["infer_smt_time"] = stat.get("infer_smt_time", 0) + smt_time
+                stat["infer_smt_queries"] = stat.get("infer_smt_queries", 0) + smt_queries
+            elif file_phase == OCTAL_PHASE_CHECK:
+                stat["check_time"] = time
+                stat["check_smt_time"] = smt_time
+                stat["check_smt_queries"] = smt_queries
+        if phase_cnt != len(OCTAL_PHASES):
+            logging.error(f"Expected {len(OCTAL_PHASES)} phases, but found {phase_cnt} in {bench_work_dir}")
+            raise ValueError()
+        stat["infer_smt_time_pct"] = stat["infer_smt_time"] / stat["infer_time"] * 100
+        stat["check_smt_time_pct"] = stat["check_smt_time"] / stat["check_time"] * 100
+
+        loc_file = BENCH_DIR / bench / f"{bench}.loc"
+        if loc_file.exists():
+            with open(loc_file, "r") as f:
+                scale_anno = int(f.read().strip())
+            stat["scale_anno"] = scale_anno
+        else:
+            logging.warning(f"LOC file not found for {bench}")
+
+        for k, v in stat.items():
+            if k in OCTAL_PHASES:
+                for key, value in v.items():
+                    df.at[bench, (k, key)] = value
+            else:
+                df.at[bench, k] = v
+
+    out = EVAL_DIR / "octal.csv"
+    logging.info(f"Saving octal stats to CSV file {out}")
+    df.to_csv(out)
 
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
     bench_tf = get_bench_tf_name(bench, tf)
-    bin_path          = BENCH_DIR / "bench" / bench / "build" / bench_tf
-    asm_path          = BENCH_DIR / "bench" / bench / f"{bench_tf}.s"
-    compiled_asm_path = BENCH_DIR / "bench" / bench / "build" / f"{bench_tf}.asm"
+    bin_path          = BENCH_DIR / bench / "build" / bench_tf
+    asm_path          = BENCH_DIR / bench / f"{bench_tf}.s"
+    compiled_asm_path = BENCH_DIR / bench / "build" / f"{bench_tf}.asm"
 
     assert bin_path and asm_path and compiled_asm_path
     if not bin_path.exists():
@@ -504,7 +563,7 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb
 
     results = dict()
 
-    # Run perf and fast procedures using single-threaded execution
+    # Run perf and fast procedures using single-thread execution
     for bench in BENCHMARKS:
         for tf in TF:
             try:
@@ -558,7 +617,7 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb
             print()
 
     if out is None:
-        out = EVAL_DIR / "result.csv"
+        out = EVAL_DIR / "eval.csv"
         logging.info(f"No output file specified, saving to {out}")
     out = Path(out)
     out_suffix = out.suffix
