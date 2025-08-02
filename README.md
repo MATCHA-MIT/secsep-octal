@@ -57,9 +57,11 @@ We need to annotate two things:
 
 * general: every benchmark repeats 100 times
 * salsa20: initialize a stack allocated array to zero, to help range inference (better explanation?)
-* sha512: (!! if we make SHA512\_Update noinline, we need to initialize SHA512\_CTX.p to zero)
+* sha512: (!! if we make SHA512\_Update noinline, we need to initialize SHA512\_CTX.p to zero; after we do this, checker ctx check complains, need to fix)
 * ed25519_sign: we make some functions noinline so that the infer tool works (@shixin: make it work, or make it work faster?)
-* chacha20: mention we implement more than the type system described in paper: we support overlapping memory, and we can cite Andres' paper
+* chacha20:
+  * mention we implement more than the type system described in paper: we support overlapping memory, and we can cite Andres' paper
+  * after removing unnecessary noinline from `chacha20_core`, it is inlined, and checker complains on ctx check, need to fix; after fixing, check sha512's checker problem above and see if they are the same problem
 * poly1305: remove irreducible control flow in poly1305\_update;
 (@shixin: didn't find this problem ---> pointer stored to array and then cast back. can you clarify?)
 * x25519: none
