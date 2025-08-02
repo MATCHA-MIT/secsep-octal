@@ -266,7 +266,7 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
             "-r",
             str(repeat),
             "-e",
-            "cycles,instructions",
+            "cycles,instructions,cache-references,cache-misses,branches,branch-misses",
             "--",
             str(bin_file),
         ],
@@ -281,9 +281,17 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
 
     cycles_pattern = re.compile(r"\s+([\d,]+)\s+cycles.*\+-\s*(\d+[\d\.]*)%")
     instr_pattern = re.compile(r"\s+([\d,]+)\s+instructions.*\+-\s*(\d+[\d\.]*)%")
+    cache_refs_pattern = re.compile(r"\s+([\d,]+)\s+cache-references")
+    cache_misses_pattern = re.compile(r"\s+([\d,]+)\s+cache-misses")
+    branches_pattern = re.compile(r"\s+([\d,]+)\s+branches")
+    branch_misses_pattern = re.compile(r"\s+([\d,]+)\s+branch-misses")
 
     cycles_match = cycles_pattern.search(perf_output)
     instrs_match = instr_pattern.search(perf_output)
+    cache_refs_match = cache_refs_pattern.search(perf_output)
+    cache_misses_match = cache_misses_pattern.search(perf_output)
+    branches_match = branches_pattern.search(perf_output)
+    branch_misses_match = branch_misses_pattern.search(perf_output)
 
     if not cycles_match:
         logging.error(f"Failed to find cycles in perf output")
@@ -293,17 +301,48 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
         logging.error(f"Failed to find instructions in perf output")
         logging.info(perf_output)
         raise ValueError()
+    if not cache_refs_match:
+        logging.error(f"Failed to find cache references in perf output")
+        logging.info(perf_output)
+        raise ValueError()
+    if not cache_misses_match:
+        logging.error(f"Failed to find cache misses in perf output")
+        logging.info(perf_output)
+        raise ValueError()
+    if not branches_match:
+        logging.error(f"Failed to find branches in perf output")
+        logging.info(perf_output)
+        raise ValueError()
+    if not branch_misses_match:
+        logging.error(f"Failed to find branch misses in perf output")
+        logging.info(perf_output)
+        logging.warning("try:\necho 0 | sudo tee /proc/sys/kernel/nmi_watchdog\n...\necho 1 | sudo tee /proc/sys/kernel/nmi_watchdog")
+        raise ValueError()
 
     cycles, cycles_std = int(cycles_match.group(1).replace(",", "")), float(cycles_match.group(2)) / 100
     instrs, instrs_std = int(instrs_match.group(1).replace(",", "")), float(instrs_match.group(2)) / 100
+    cache_refs = int(cache_refs_match.group(1).replace(",", ""))
+    cache_misses = int(cache_misses_match.group(1).replace(",", ""))
+    branches = int(branches_match.group(1).replace(",", ""))
+    branch_misses = int(branch_misses_match.group(1).replace(",", ""))
     logging.debug(f"Perf output: {perf_output}")
     logging.debug(f"Cycles: {cycles}, Cycles Std: {cycles_std}")
     logging.debug(f"Instructions: {instrs}, Instructions Std: {instrs_std}")
+    logging.debug(f"Cache References: {cache_refs}")
+    logging.debug(f"Cache Misses: {cache_misses}")
+    logging.debug(f"Branches: {branches}")
+    logging.debug(f"Branch Misses: {branch_misses}")
 
     collection["cycles"] = cycles
     collection["cycles_std"] = cycles_std
     collection["dyn_instrs"] = instrs
     collection["dyn_instrs_std"] = instrs_std
+    collection["cache_refs"] = cache_refs
+    collection["cache_misses"] = cache_misses
+    collection["cache_miss_rate"] = cache_misses / cache_refs if cache_refs > 0 else 0
+    collection["branches"] = branches
+    collection["branch_misses"] = branch_misses
+    collection["branch_miss_rate"] = branch_misses / branches if branches > 0 else 0
     return collection
 
 
@@ -567,6 +606,12 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb
         "cycles_std",
         "dyn_instrs",
         "dyn_instrs_std",
+        "cache_refs",
+        "cache_misses",
+        "cache_miss_rate",
+        "branches",
+        "branch_misses",
+        "branch_miss_rate",
         "gem5_cycles_def-off",
         "gem5_cycles_def-on",
         "gem5_instrs_def-off",

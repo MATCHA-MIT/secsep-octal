@@ -55,6 +55,15 @@ We need to annotate two things:
 2. We need to check whether each benchmark function is called in a proper way to make sure that the performance numbers make sense.
 3. Structs on stack is not annotated properly, which causes the main function of poly1305 to fail.
 
+* general: every benchmark repeats 100 times
+* salsa20: initialize a stack allocated array to zero, to help range inference (better explanation?)
+* sha512: (!! if we make SHA512\_Update noinline, we need to initialize SHA512\_CTX.p to zero)
+* ed25519_sign: we make some functions noinline so that the infer tool works (@shixin: make it work, or make it work faster?)
+* chacha20: mention we implement more than the type system described in paper: we support overlapping memory, and we can cite Andres' paper
+* poly1305: remove irreducible control flow in poly1305\_update;
+(@shixin: didn't find this problem ---> pointer stored to array and then cast back. can you clarify?)
+* x25519: none
+
 ## Dep Type Infer
 
 Technique details worth documenting:
