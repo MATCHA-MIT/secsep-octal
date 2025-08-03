@@ -414,12 +414,61 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
     collection["branch_miss_rate"] = branch_misses / branches if branches > 0 else 0
     return collection
 
+    
+def get_bench_tf_roi(bench: str, tf: TF) -> str:
+    bench_tf = get_bench_tf_name(bench, tf)
+
+    funcs_file = BENCH_DIR / bench / f"{bench}.funcs_noopt.txt"
+    if not funcs_file.exists():
+        logging.error(f"Functions file not found for {bench_tf}: {funcs_file}")
+        raise FileNotFoundError()
+    with open(funcs_file, "r") as f:
+        funcs = f.read().strip().splitlines()
+        funcs = [f.strip() for f in funcs if f.strip()]
+
+    seg_file = BENCH_DIR / bench / "build" / f"{bench_tf}.seg"
+    if not seg_file.exists():
+        logging.error(f"Segmentation file not found for {bench_tf}: {seg_file}")
+        raise FileNotFoundError()
+    with open(seg_file, "r") as f:
+        lines = f.readlines()
+        hex_re = re.compile(r"(0x|0X)?[0-9a-fA-F]{3,}")
+        text_segs = {}
+        for line in lines:
+            tokens = line.strip().split()
+            name = tokens[-1]
+            cdd = []
+            for token in tokens:
+                if hex_re.fullmatch(token):
+                    cdd.append(int(token, 16))
+            if len(cdd) != 2:
+                logging.error(f"Failed to parse text begin and end: {line.strip()}, number candidates: {cdd}")
+                raise ValueError()
+            addr_l, size = cdd
+            addr_r = addr_l + size
+            text_segs[name] = (addr_l, addr_r)
+    
+    active_funcs = []
+    strs = []
+    for func in funcs:
+        if func in text_segs:
+            active_funcs.append(func)
+            l, r = text_segs[func]
+            strs.append(f"0x{l:x}:0x{r:x}")
+        else:
+            logging.debug(f"Function {func} not found in binary {bench_tf}")
+
+    roi_str = ",".join(strs)
+    logging.info(f"Active functions in {bench} - {tf.name}: {active_funcs}; ROI: {roi_str}")
+    return roi_str
+
 
 def get_gem5_result(
     collection: dict,
     gem5_docker: str,
     skip_gem5: bool,
     delta: str,
+    inst_roi: str,
     app: str,
     bench_tf: str,
 ):
@@ -442,17 +491,20 @@ def get_gem5_result(
                 f"^{bench_tf}$",
                 "--delta",
                 delta,
-                # "--debug-flags=Process"
+                # "--debug-flags=DynInst",
+                "--inst-roi",
+                inst_roi,
             ],
             capture_output=True,
             text=True,
         )
         if result.returncode != 0:
             logging.error(f"Failed to run gem5 for {bench_tf}")
-            logging.info("Gem5 stdout:\n" + result.stdout)
-            logging.info("Gem5 stderr:\n" + result.stderr)
+            logging.error("Gem5 stdout:\n" + result.stdout)
+            logging.error("Gem5 stderr:\n" + result.stderr)
             raise RuntimeError()
-        logging.info("Gem5 output:\n" + result.stdout)
+        logging.info(f"Gem5 run completed for {bench_tf}")
+        logging.debug("Gem5 output:\n" + result.stdout)
 
         result = subprocess.run(
             [
@@ -584,14 +636,14 @@ def print_overhead(overhead: dict):
         print(f"\t{key:>25}: {overhead_str:<20} {base_val:>10} -> {curr_val}")
 
         
-def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool, delta: str):
+def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool, delta: str, inst_roi: str):
     setup_logger(log_level)
 
     try:
         bench_name_tf = get_bench_tf_name(bench, tf)
         result = {}
         if run_gem5_on_tf(tf):
-            get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
+            get_gem5_result(result, gem5_docker, skip_gem5, delta, inst_roi, bench, bench_name_tf)
         logging.debug(f"Gem5 result of {bench} - {tf.name} collected successfully")
         return result
     except Exception as e:
@@ -613,6 +665,9 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--skip-gem5", is_flag=True, help="Skip running gem5 and use last results"
+)
+@click.option(
+    "--enable-roi", is_flag=True, help="Enable ROI for gem5 runs to focus only on relavent functions"
 )
 @click.option(
     "--print-overhead", is_flag=True, help="Print overheads in console"
@@ -642,7 +697,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, processes, out, rlimit_stack_mb):
+def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
@@ -724,11 +779,12 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, proc
     worker_args = []
     for bench in BENCHMARKS:
         for tf in TF:
-            worker_args.append((bench, tf, logging.getLogger().level, gem5_docker, skip_gem5, delta))
+            inst_roi = get_bench_tf_roi(bench, tf) if enable_roi else ""
+            worker_args.append((bench, tf, logging.getLogger().level, gem5_docker, skip_gem5, delta, inst_roi))
     with Pool(processes=processes) as pool:
         worker_results = pool.starmap(worker, worker_args)
         for args, result in zip(worker_args, worker_results):
-            bench, tf, _, _, _, _ = args
+            bench, tf, _, _, _, _, _ = args
             if result is None:
                 logging.warning(f"Failed to process {bench} - {tf.name}, skipping")
                 continue
@@ -759,6 +815,8 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, proc
                 print(f"Overhead of {bench} / {tf.name}")
                 print_overhead(overhead)
                 print()
+    
+    df["overhead_defense"] = df["overhead_gem5_cycles_def-on"] - df["overhead_gem5_cycles_def-off"]
 
     df = df.dropna(axis=1, how='all')
     if out is None:

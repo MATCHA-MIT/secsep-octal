@@ -18,12 +18,12 @@ TASKS = [
         "metrics": ["overhead_gem5_cycles_def-off", "overhead_gem5_cycles_def-on"],
         "ylabel": "Overhead (%)",
         "benchmark_list": BENCHMARKS,
-        "tf_list": [TF.ProspectPub, TF.ProspectSec, TF.Secsep, TF.SecsepNoCallPreserv],
+        "tf_list": [TF.ProspectPub, TF.ProspectSec, TF.SecsepNoCallPreserv, TF.Secsep],
         "bar_width": 0.9,
         "legend_loc": (0.50, -0.10),
         "y_ticks": np.concatenate([np.arange(-2, 5, 0.5)]),
         "y_low": -1,
-        "y_break": 4,
+        "y_break": 3.5,
         "ylabel_yloc": 0.3,
         "legend_ncol": 4,
     },
@@ -100,7 +100,8 @@ def draw(
     data = data[["Value", "TF"]]
 
     plt.figure(figsize=img_size)
-    sns.set_theme(style="ticks", palette="Set2", font_scale=1.5)
+    reversed_set2 = sns.color_palette("Set2")[::-1]
+    sns.set_theme(style="ticks", palette=reversed_set2, font_scale=1.5)
 
     ax = sns.barplot(
         data=data,
