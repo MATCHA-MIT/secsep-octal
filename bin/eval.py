@@ -22,7 +22,9 @@ OCTAL_PHASE_CHECK = "check"
 OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
 OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
 OCTAL_STATS = [
-    "loc", "scale_anno", "prospect_anno",
+    "loc", "num_args", "num_local_vars",
+    "num_public_var_anno", "num_secret_var_anno",
+    "num_scale_anno",
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
@@ -41,6 +43,15 @@ BENCHMARKS = [
     "poly1305_clean",
     "x25519",
 ]
+
+BENCHMARK_PAPER_ORDER = {
+    "salsa20": "salsa20",
+    "sha512": "sha512",
+    "chacha20": "chacha20",
+    "poly1305": "poly1305_clean",
+    "x25519": "x25519",
+    "ed25519_sign": "ed25519_sign",
+}
 
 
 class TF(Enum):
@@ -125,6 +136,34 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
             logging.error(f"Unknown TF: {tf}")
             raise ValueError()
 
+
+def print_octal_stats_latex(df: pd.DataFrame, out: Path):
+    with open(out, "w") as f:
+        for bench_print, bench in BENCHMARK_PAPER_ORDER.items():
+            if bench not in BENCHMARKS:
+                logging.warning(f"Skipping {bench_print} when printing paper table")
+                continue
+            loc = df.at[bench, "loc"]
+            local_vars = df.at[bench, "num_local_vars"]
+            func_args = df.at[bench, "num_args"]
+            prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
+            prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
+            scale_anno = df.at[bench, "num_scale_anno"]
+            infer_time = df.at[bench, "infer_time"]
+            infer_smt_pct = df.at[bench, "infer_smt_time_pct"]
+            infer_smt_queries = df.at[bench, "infer_smt_queries"]
+            check_time = df.at[bench, "check_time"]
+            check_smt_pct = df.at[bench, "check_smt_time_pct"]
+            check_smt_queries = df.at[bench, "check_smt_queries"]
+
+            f.write(f"\\texttt{{{bench_print:<15}}} ")
+            f.write(f"& {loc:>4} & {local_vars:>3} & {func_args:>3} ")
+            f.write(f"&  {prospect_pubstk_anno} / {prospect_secstk_anno}  ")
+            f.write(f"& {scale_anno:>3} ")
+            f.write(f"&  {infer_time:.1f}s / {infer_smt_pct:.1f}\\% / {infer_smt_queries}  ")
+            f.write(f"&  {check_time:.1f}s / {check_smt_pct:.1f}\\% / {check_smt_queries}  ")
+            f.write(f"\\\\\n")
+
             
 def collect_octal_stats():
     target_dir = EVAL_DIR / "octal_stats"
@@ -167,13 +206,19 @@ def collect_octal_stats():
         stat["infer_smt_time_pct"] = stat["infer_smt_time"] / stat["infer_time"] * 100
         stat["check_smt_time_pct"] = stat["check_smt_time"] / stat["check_time"] * 100
 
-        loc_file = BENCH_DIR / bench / f"{bench}.loc"
-        if loc_file.exists():
-            with open(loc_file, "r") as f:
-                scale_anno = int(f.read().strip())
-            stat["scale_anno"] = scale_anno
+        bench_stat_file = BENCH_DIR / bench / f"{bench}.stat"
+        if bench_stat_file.exists():
+            shutil.copy(bench_stat_file, target_dir)
+            with open(bench_stat_file, "r") as f:
+                bench_stat = json.load(f)
+            for k, v in bench_stat.items():
+                if k not in OCTAL_STATS:
+                    logging.error(f"Unexpected stat {k} in {bench_stat_file}")
+                    raise ValueError()
+                stat[k] = v
         else:
-            logging.warning(f"LOC file not found for {bench}")
+            logging.error(f"Stat file not found for {bench}")
+            raise FileNotFoundError(f"Stat file not found for {bench}")
 
         for k, v in stat.items():
             if k in OCTAL_PHASES:
@@ -185,6 +230,10 @@ def collect_octal_stats():
     out = EVAL_DIR / "octal.csv"
     logging.info(f"Saving octal stats to CSV file {out}")
     df.to_csv(out)
+
+    out_stat_table = EVAL_DIR / "octal.tex"
+    logging.info(f"Saving octal stats to LaTeX table {out_stat_table}")
+    print_octal_stats_latex(df, out_stat_table)
 
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
@@ -538,6 +587,9 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Docker container name running gem5",
 )
 @click.option(
+    "--skip-eval", is_flag=True, help="Skip evaluation and only collect Octal stats"
+)
+@click.option(
     "--skip-gem5", is_flag=True, help="Skip running gem5 and use last results"
 )
 @click.option(
@@ -565,12 +617,13 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb):
+def main(verbose, gem5_docker, skip_eval, skip_gem5, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"gem5_docker={gem5_docker}\n")
+        f.write(f"skip_eval={skip_eval}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
         f.write(f"delta={delta}\n")
         f.write(f"processes={processes}\n")
@@ -583,15 +636,19 @@ def main(verbose, gem5_docker, skip_gem5, delta, processes, out, rlimit_stack_mb
     else:
         setup_logger(logging.WARN)
 
+    build_octal()
+    collect_octal_stats()
+
+    if skip_eval:
+        logging.info("Skipping evaluation, exiting...")
+        return
+
     if not skip_gem5:
         print(f"Will run gem5, confirm? (y/n) ", end="")
         confirm = input()
         if confirm.lower() != "y":
             logging.info("Will skip running gem5")
             skip_gem5 = True
-
-    build_octal()
-    collect_octal_stats()
 
     df_index = pd.MultiIndex.from_product(
         [
