@@ -463,6 +463,8 @@ def get_gem5_result(
         decl_file = EVAL_DIR / "declassification" / f"{bench_tf}.decl.txt"
         decl_file.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(out_decl_file, decl_file)
+    else:
+        logging.info(f"Skipping gem5 for {bench_tf}, using last results")
 
     for hw in HWMode:
         out_stats_file = (
@@ -570,7 +572,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
         result = {}
         if run_gem5_on_tf(tf):
             get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
-        logging.info(f"Gem5 finished for {bench} - {tf.name}")
+        logging.info(f"Gem5 result of {bench} - {tf.name} collected successfully")
         return result
     except Exception as e:
         logging.error(f"Error processing {bench} - {tf.name}: {e}")
@@ -587,7 +589,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Docker container name running gem5",
 )
 @click.option(
-    "--skip-eval", is_flag=True, help="Skip evaluation and only collect Octal stats"
+    "--skip-perf", is_flag=True, help="Skip running perf"
 )
 @click.option(
     "--skip-gem5", is_flag=True, help="Skip running gem5 and use last results"
@@ -617,13 +619,13 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_eval, skip_gem5, delta, processes, out, rlimit_stack_mb):
+def main(verbose, gem5_docker, skip_perf, skip_gem5, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"gem5_docker={gem5_docker}\n")
-        f.write(f"skip_eval={skip_eval}\n")
+        f.write(f"skip_perf={skip_perf}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
         f.write(f"delta={delta}\n")
         f.write(f"processes={processes}\n")
@@ -639,10 +641,8 @@ def main(verbose, gem5_docker, skip_eval, skip_gem5, delta, processes, out, rlim
     build_octal()
     collect_octal_stats()
 
-    if skip_eval:
-        logging.info("Skipping evaluation, exiting...")
-        return
-
+    if skip_perf:
+        logging.info("Will skip perf runs")
     if not skip_gem5:
         print(f"Will run gem5, confirm? (y/n) ", end="")
         confirm = input()
@@ -687,7 +687,8 @@ def main(verbose, gem5_docker, skip_eval, skip_gem5, delta, processes, out, rlim
                 collect_bin_asm(bin_path, asm_path, compiled_asm)
                 r = results.setdefault((bench, tf), {})
                 get_asm_line_count(r, asm_path)
-                get_perf(r, bin_path)
+                if not skip_perf:
+                    get_perf(r, bin_path)
                 for key, value in r.items():
                     df.loc[(bench, tf.name), key] = value
             except Exception as e:
@@ -717,7 +718,7 @@ def main(verbose, gem5_docker, skip_eval, skip_gem5, delta, processes, out, rlim
             if tf == TF.Origin:
                 continue
             if (bench, tf) not in results:
-                logging.warning(f"Results for {bench} - {tf.name} not found, skipping overhead calculation")
+                logging.warning(f"Results of {bench} - {tf.name} not found, skipping overhead calculation")
                 continue
 
             overhead = get_overhead(results[(bench, TF.Origin)], results[(bench, tf)])
