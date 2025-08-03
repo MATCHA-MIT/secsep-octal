@@ -69,6 +69,13 @@ class TF(Enum):
     ProspectSec = 6
 
 
+def iter_benchmark():
+    global selected_benchmarks
+    for bench in BENCHMARKS:
+        if bench in selected_benchmarks:
+            yield bench
+
+
 def run_gem5_on_tf(tf: TF) -> bool:
     return True
     # match tf:
@@ -145,7 +152,7 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
 def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
     with open(out, "w") as f:
         for bench_print, bench in BENCHMARK_PAPER_ORDER.items():
-            if bench not in BENCHMARKS:
+            if bench not in iter_benchmark():
                 logging.warning(f"Skipping {bench_print} when printing paper table")
                 continue
             bench_print = bench_print.replace("_", "\\_")
@@ -177,12 +184,12 @@ def collect_secsep_stats():
     target_dir = EVAL_DIR / "stats"
     target_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
-        index=BENCHMARKS,
+        index=list(iter_benchmark()),
         columns=pd.Index(STATS).append(
             pd.MultiIndex.from_product([SECSEP_PHASES, SECSEP_PHASE_METRICS], names=["Phase", "Metric"])
         )
     )
-    for bench in BENCHMARKS:
+    for bench in iter_benchmark():
         bench_work_dir = SECSEP_WORK_DIR / bench
         stat = dict()
 
@@ -505,38 +512,38 @@ def get_gem5_result(
             raise RuntimeError()
         logging.info(f"Gem5 run completed for {bench_tf}")
         logging.debug("Gem5 output:\n" + result.stdout)
-
-        result = subprocess.run(
-            [
-                "docker",
-                "exec",
-                gem5_docker,
-                "python3",
-                "scripts/get_decl.py",
-                app,
-                bench_tf,
-                HWMode.DefenseOn.value,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logging.error(f"Failed to run get_decl.py for {bench_tf}")
-            logging.info(result.stderr)
-            raise RuntimeError()
-        out_decl_file = (
-            GEM5_DIR
-            / "results"
-            / "raw_data"
-            / f"{app}-{bench_tf}"
-            / HWMode.DefenseOn.value
-            / "declassify_inst"
-        )
-        decl_file = EVAL_DIR / "declassification" / f"{bench_tf}.decl.txt"
-        decl_file.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(out_decl_file, decl_file)
     else:
         logging.debug(f"Skipping gem5 for {bench_tf}, using last results")
+
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            gem5_docker,
+            "python3",
+            "scripts/get_decl.py",
+            app,
+            bench_tf,
+            HWMode.DefenseOn.value,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        logging.error(f"Failed to run get_decl.py for {bench_tf}")
+        logging.info(result.stderr)
+        raise RuntimeError()
+    out_decl_file = (
+        GEM5_DIR
+        / "results"
+        / "raw_data"
+        / f"{app}-{bench_tf}"
+        / HWMode.DefenseOn.value
+        / "declassify_inst"
+    )
+    decl_file = EVAL_DIR / "declassification" / f"{bench_tf}.decl.txt"
+    decl_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(out_decl_file, decl_file)
 
     for hw in HWMode:
         out_stats_file = (
@@ -654,6 +661,14 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 @click.command()
 @click.option("-v", "--verbose", count=True, help="Enable verbose logging (-v, -vv)")
 @click.option(
+    "--benchmarks",
+    "benchmark_sel",
+    default="",
+    required=False,
+    type=click.STRING,
+    help="Comma-separated list of benchmarks to run, empty for all",
+)
+@click.option(
     "--gem5-docker",
     default="secsep-gem5",
     required=False,
@@ -697,11 +712,12 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
+def main(verbose, benchmark_sel, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
+        f.write(f"benchmark_sel={benchmark_sel}\n")
         f.write(f"gem5_docker={gem5_docker}\n")
         f.write(f"skip_perf={skip_perf}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
@@ -716,6 +732,13 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead,
     else:
         setup_logger(logging.WARN)
 
+    global selected_benchmarks
+    benchmark_sel = benchmark_sel.strip()
+    if benchmark_sel == "":
+        selected_benchmarks = BENCHMARKS
+    else:
+        selected_benchmarks = benchmark_sel.split(",")
+
     build_secsep()
     collect_secsep_stats()
 
@@ -725,14 +748,14 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead,
         print(f"Will run gem5, confirm? (y/n) ", end="")
         confirm = input()
         if confirm.lower() != "y":
-            logging.info("Will skip running gem5")
+            logging.info("Will skip gem5 runs")
             skip_gem5 = True
-    if skip_gem5:
+    else:
         logging.info("Will skip gem5 runs")
 
     df_index = pd.MultiIndex.from_product(
         [
-            BENCHMARKS,
+            list(iter_benchmark()),
             [tf.name for tf in TF],
         ],
         names=["Benchmark", "TF"],
@@ -760,7 +783,7 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead,
     results = dict()
 
     # Run perf and fast procedures using single-thread execution
-    for bench in BENCHMARKS:
+    for bench in iter_benchmark():
         for tf in TF:
             try:
                 bin_path, asm_path, compiled_asm = get_bin_asm(bench, tf)
@@ -777,7 +800,7 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead,
 
     # Parallelize gem5 tasks
     worker_args = []
-    for bench in BENCHMARKS:
+    for bench in iter_benchmark():
         for tf in TF:
             inst_roi = get_bench_tf_roi(bench, tf) if enable_roi else ""
             worker_args.append((bench, tf, logging.getLogger().level, gem5_docker, skip_gem5, delta, inst_roi))
@@ -794,7 +817,7 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead,
                 r[key] = value
 
     # Calculate overheads
-    for bench in BENCHMARKS:
+    for bench in iter_benchmark():
         for tf in TF:
             if tf == TF.Origin:
                 continue
