@@ -21,10 +21,15 @@ OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
 OCTAL_PHASE_CHECK = "check"
 OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
 OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
-OCTAL_STATS = [
-    "loc", "num_args", "num_local_vars",
+PROSPECT_STATS = [
+    "loc", "num_all_funcs", "num_local_vars",
     "num_public_var_anno", "num_secret_var_anno",
-    "num_scale_anno",
+]
+SECSEP_STATS = [
+    "num_funcs", "num_args", "num_scale_anno",
+]
+OCTAL_STATS = [
+    *PROSPECT_STATS, *SECSEP_STATS,
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
@@ -143,12 +148,15 @@ def print_octal_stats_latex(df: pd.DataFrame, out: Path):
             if bench not in BENCHMARKS:
                 logging.warning(f"Skipping {bench_print} when printing paper table")
                 continue
+            bench_print = bench_print.replace("_", "\\_")
             loc = df.at[bench, "loc"]
-            local_vars = df.at[bench, "num_local_vars"]
-            func_args = df.at[bench, "num_args"]
-            prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
-            prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
-            scale_anno = df.at[bench, "num_scale_anno"]
+            num_all_funcs = df.at[bench, "num_all_funcs"]
+            num_local_vars = df.at[bench, "num_local_vars"]
+            num_prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
+            num_prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
+            num_funcs = df.at[bench, "num_funcs"]
+            num_func_args = df.at[bench, "num_args"]
+            num_scale_anno = df.at[bench, "num_scale_anno"]
             infer_time = df.at[bench, "infer_time"]
             infer_smt_pct = df.at[bench, "infer_smt_time_pct"]
             infer_smt_queries = df.at[bench, "infer_smt_queries"]
@@ -157,11 +165,11 @@ def print_octal_stats_latex(df: pd.DataFrame, out: Path):
             check_smt_queries = df.at[bench, "check_smt_queries"]
 
             f.write(f"\\texttt{{{bench_print:<15}}} ")
-            f.write(f"& {loc:>4} & {local_vars:>3} & {func_args:>3} ")
-            f.write(f"&  {prospect_pubstk_anno} / {prospect_secstk_anno}  ")
-            f.write(f"& {scale_anno:>3} ")
-            f.write(f"&  {infer_time:.1f}s / {infer_smt_pct:.1f}\\% / {infer_smt_queries}  ")
-            f.write(f"&  {check_time:.1f}s / {check_smt_pct:.1f}\\% / {check_smt_queries}  ")
+            f.write(f"& {loc:>4} &  {num_all_funcs:>3} / {num_local_vars:>3}  ")
+            f.write(f"&  {num_prospect_pubstk_anno:>3} / {num_prospect_secstk_anno:>3}  ")
+            f.write(f"&  {num_funcs:>3} / {num_func_args:>3}  & {num_scale_anno:>3} ")
+            f.write(f"&  {infer_time:>6.1f}s / {infer_smt_pct:>4.1f}\\% / {infer_smt_queries:>5}  ")
+            f.write(f"&  {check_time:>6.1f}s / {check_smt_pct:>4.1f}\\% / {check_smt_queries:>5}  ")
             f.write(f"\\\\\n")
 
             
@@ -212,13 +220,25 @@ def collect_octal_stats():
             with open(bench_stat_file, "r") as f:
                 bench_stat = json.load(f)
             for k, v in bench_stat.items():
-                if k not in OCTAL_STATS:
-                    logging.error(f"Unexpected stat {k} in {bench_stat_file}")
-                    raise ValueError()
-                stat[k] = v
+                if k in SECSEP_STATS:
+                    stat[k] = v
         else:
             logging.error(f"Stat file not found for {bench}")
-            raise FileNotFoundError(f"Stat file not found for {bench}")
+            raise FileNotFoundError()
+        bench_stat_file = BENCH_DIR / bench / f"{bench}.stat_noopt"
+        if bench_stat_file.exists():
+            shutil.copy(bench_stat_file, target_dir)
+            with open(bench_stat_file, "r") as f:
+                bench_stat = json.load(f)
+            for k, v in bench_stat.items():
+                if k in PROSPECT_STATS:
+                    stat[k] = v
+                elif k == "num_funcs":
+                    # distinguish between noopt and opt
+                    stat["num_all_funcs"] = v
+        else:
+            logging.error(f"Stat file (noopt) not found for {bench}")
+            raise FileNotFoundError()
 
         for k, v in stat.items():
             if k in OCTAL_PHASES:
@@ -464,7 +484,7 @@ def get_gem5_result(
         decl_file.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(out_decl_file, decl_file)
     else:
-        logging.info(f"Skipping gem5 for {bench_tf}, using last results")
+        logging.debug(f"Skipping gem5 for {bench_tf}, using last results")
 
     for hw in HWMode:
         out_stats_file = (
@@ -572,7 +592,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
         result = {}
         if run_gem5_on_tf(tf):
             get_gem5_result(result, gem5_docker, skip_gem5, delta, bench, bench_name_tf)
-        logging.info(f"Gem5 result of {bench} - {tf.name} collected successfully")
+        logging.debug(f"Gem5 result of {bench} - {tf.name} collected successfully")
         return result
     except Exception as e:
         logging.error(f"Error processing {bench} - {tf.name}: {e}")
@@ -593,6 +613,9 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--skip-gem5", is_flag=True, help="Skip running gem5 and use last results"
+)
+@click.option(
+    "--print-overhead", is_flag=True, help="Print overheads in console"
 )
 @click.option(
     "--delta",
@@ -619,7 +642,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, gem5_docker, skip_perf, skip_gem5, delta, processes, out, rlimit_stack_mb):
+def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
@@ -649,6 +672,8 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, delta, processes, out, rlim
         if confirm.lower() != "y":
             logging.info("Will skip running gem5")
             skip_gem5 = True
+    if skip_gem5:
+        logging.info("Will skip gem5 runs")
 
     df_index = pd.MultiIndex.from_product(
         [
@@ -729,9 +754,11 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, delta, processes, out, rlim
                 df.loc[(bench, tf.name), f"overhead_{key}"] = growth
                 if std is not None:
                     df.loc[(bench, tf.name), f"overhead_{key}_std"] = std
-            print(f"Overhead of {bench} / {tf.name}")
-            print_overhead(overhead)
-            print()
+            
+            if print_overhead:
+                print(f"Overhead of {bench} / {tf.name}")
+                print_overhead(overhead)
+                print()
 
     if out is None:
         out = EVAL_DIR / "eval.csv"
