@@ -14,13 +14,13 @@ import resource
 from multiprocessing import Pool
 
 
-OCTAL_DIR = Path(__file__).parent.parent
-OCTAL_WORK_DIR = OCTAL_DIR / "out"
-OCTAL_STAT_ASM = OCTAL_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
-OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
-OCTAL_PHASE_CHECK = "check"
-OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
-OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
+SECSEP_DIR = Path(__file__).parent.parent
+SECSEP_WORK_DIR = SECSEP_DIR / "out"
+SECSEP_STAT_ASM = SECSEP_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
+SECSEP_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
+SECSEP_PHASE_CHECK = "check"
+SECSEP_PHASES = SECSEP_PHASE_INFER + [SECSEP_PHASE_CHECK]
+SECSEP_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
 PROSPECT_STATS = [
     "loc", "num_all_funcs", "num_local_vars",
     "num_public_var_anno", "num_secret_var_anno",
@@ -28,15 +28,15 @@ PROSPECT_STATS = [
 SECSEP_STATS = [
     "num_funcs", "num_args", "num_scale_anno",
 ]
-OCTAL_STATS = [
+STATS = [
     *PROSPECT_STATS, *SECSEP_STATS,
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
-BENCH_DIR = OCTAL_DIR.parent / "sechw-const-time-benchmarks" / "bench"
-GEM5_DIR = OCTAL_DIR.parent / "gem5-mirror"
+BENCH_DIR = SECSEP_DIR.parent / "sechw-const-time-benchmarks" / "bench"
+GEM5_DIR = SECSEP_DIR.parent / "gem5-mirror"
 GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
-EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+EVAL_DIR = SECSEP_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
 DEFAULT_RLIMIT_STACK_SIZE_MB = 16
 
@@ -61,10 +61,10 @@ BENCHMARK_PAPER_ORDER = {
 
 class TF(Enum):
     Origin = 0
-    Octal = 1
-    OctalNoPushPop = 2
-    OctalNoCallPreserv = 3
-    OctalNoPushPopNoCallPreserv = 4
+    Secsep = 1
+    SecsepNoPushPop = 2
+    SecsepNoCallPreserv = 3
+    SecsepNoPushPopNoCallPreserv = 4
     ProspectPub = 5
     ProspectSec = 6
 
@@ -72,7 +72,7 @@ class TF(Enum):
 def run_gem5_on_tf(tf: TF) -> bool:
     return True
     # match tf:
-    #     case TF.Origin | TF.Octal | TF.OctalNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
+    #     case TF.Origin | TF.Secsep | TF.SecsepNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
     #         return True
     #     case _:
     #         return False
@@ -109,14 +109,14 @@ def setup_logger(level=logging.INFO):
     logger.setLevel(level)
 
     
-def build_octal():
-    logging.info("Building Octal...")
+def build_secsep():
+    logging.info("Building Secsep...")
     subprocess.run(
         [
             "dune",
             "build"
         ],
-        cwd=OCTAL_DIR,
+        cwd=SECSEP_DIR,
         check=True,
     )
 
@@ -125,13 +125,13 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
     match tf:
         case TF.Origin:
             return bench
-        case TF.Octal:
+        case TF.Secsep:
             return f"{bench}.tf"
-        case TF.OctalNoPushPop:
+        case TF.SecsepNoPushPop:
             return f"{bench}.tf1"
-        case TF.OctalNoCallPreserv:
+        case TF.SecsepNoCallPreserv:
             return f"{bench}.tf2"
-        case TF.OctalNoPushPopNoCallPreserv:
+        case TF.SecsepNoPushPopNoCallPreserv:
             return f"{bench}.tf3"
         case TF.ProspectPub:
             return f"{bench}.prospect_pubstk"
@@ -142,7 +142,7 @@ def get_bench_tf_name(bench: str, tf: TF) -> str:
             raise ValueError()
 
 
-def print_octal_stats_latex(df: pd.DataFrame, out: Path):
+def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
     with open(out, "w") as f:
         for bench_print, bench in BENCHMARK_PAPER_ORDER.items():
             if bench not in BENCHMARKS:
@@ -173,17 +173,17 @@ def print_octal_stats_latex(df: pd.DataFrame, out: Path):
             f.write(f"\\\\\n")
 
             
-def collect_octal_stats():
-    target_dir = EVAL_DIR / "octal_stats"
+def collect_secsep_stats():
+    target_dir = EVAL_DIR / "stats"
     target_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
         index=BENCHMARKS,
-        columns=pd.Index(OCTAL_STATS).append(
-            pd.MultiIndex.from_product([OCTAL_PHASES, OCTAL_PHASE_METRICS], names=["Phase", "Metric"])
+        columns=pd.Index(STATS).append(
+            pd.MultiIndex.from_product([SECSEP_PHASES, SECSEP_PHASE_METRICS], names=["Phase", "Metric"])
         )
     )
     for bench in BENCHMARKS:
-        bench_work_dir = OCTAL_WORK_DIR / bench
+        bench_work_dir = SECSEP_WORK_DIR / bench
         stat = dict()
 
         phase_cnt = 0
@@ -193,23 +193,23 @@ def collect_octal_stats():
             if file_bench != bench:
                 logging.error(f"Unexpected stat file {stat_file} with name {file_bench} in directory of {stat_file}")
                 raise ValueError()
-            if file_phase not in OCTAL_PHASES:
+            if file_phase not in SECSEP_PHASES:
                 logging.error(f"Unexpected stat file {stat_file} with unknown phase {file_phase}")
                 raise ValueError()
             phase_cnt += 1
             with open(stat_file, "r") as f:
                 stat[file_phase] = json.load(f)
             time, smt_time, smt_queries = stat[file_phase]["time"], stat[file_phase]["smt_queries_time"], stat[file_phase]["smt_queries"]
-            if file_phase in OCTAL_PHASE_INFER:
+            if file_phase in SECSEP_PHASE_INFER:
                 stat["infer_time"] = stat.get("infer_time", 0) + time
                 stat["infer_smt_time"] = stat.get("infer_smt_time", 0) + smt_time
                 stat["infer_smt_queries"] = stat.get("infer_smt_queries", 0) + smt_queries
-            elif file_phase == OCTAL_PHASE_CHECK:
+            elif file_phase == SECSEP_PHASE_CHECK:
                 stat["check_time"] = time
                 stat["check_smt_time"] = smt_time
                 stat["check_smt_queries"] = smt_queries
-        if phase_cnt != len(OCTAL_PHASES):
-            logging.error(f"Expected {len(OCTAL_PHASES)} phases, but found {phase_cnt} in {bench_work_dir}")
+        if phase_cnt != len(SECSEP_PHASES):
+            logging.error(f"Expected {len(SECSEP_PHASES)} phases, but found {phase_cnt} in {bench_work_dir}")
             raise ValueError()
         stat["infer_smt_time_pct"] = stat["infer_smt_time"] / stat["infer_time"] * 100
         stat["check_smt_time_pct"] = stat["check_smt_time"] / stat["check_time"] * 100
@@ -241,19 +241,19 @@ def collect_octal_stats():
             raise FileNotFoundError()
 
         for k, v in stat.items():
-            if k in OCTAL_PHASES:
+            if k in SECSEP_PHASES:
                 for key, value in v.items():
                     df.at[bench, (k, key)] = value
             else:
                 df.at[bench, k] = v
 
-    out = EVAL_DIR / "octal.csv"
-    logging.info(f"Saving octal stats to CSV file {out}")
+    out = EVAL_DIR / "secsep.csv"
+    logging.info(f"Saving secsep stats to CSV file {out}")
     df.to_csv(out)
 
-    out_stat_table = EVAL_DIR / "octal.tex"
-    logging.info(f"Saving octal stats to LaTeX table {out_stat_table}")
-    print_octal_stats_latex(df, out_stat_table)
+    out_stat_table = EVAL_DIR / "secsep.tex"
+    logging.info(f"Saving secsep stats to LaTeX table {out_stat_table}")
+    print_secsep_stats_latex(df, out_stat_table)
 
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
@@ -292,13 +292,13 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
 
     result = subprocess.run(
         [
-            OCTAL_STAT_ASM,
+            SECSEP_STAT_ASM,
             "-asm",
             str(asm_file),
             "-preview",
             line_output_dir / f"{asm_file.name}.lines",
         ],
-        cwd=OCTAL_DIR,
+        cwd=SECSEP_DIR,
         capture_output=True,
         text=True,
     )
@@ -661,8 +661,8 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, proc
     else:
         setup_logger(logging.WARN)
 
-    build_octal()
-    collect_octal_stats()
+    build_secsep()
+    collect_secsep_stats()
 
     if skip_perf:
         logging.info("Will skip perf runs")
@@ -760,6 +760,7 @@ def main(verbose, gem5_docker, skip_perf, skip_gem5, print_overhead, delta, proc
                 print_overhead(overhead)
                 print()
 
+    df = df.dropna(axis=1, how='all')
     if out is None:
         out = EVAL_DIR / "eval.csv"
         logging.info(f"No output file specified, saving to {out}")

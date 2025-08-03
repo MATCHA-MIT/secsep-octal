@@ -18,7 +18,7 @@ TASKS = [
         "metrics": ["overhead_gem5_cycles_def-off", "overhead_gem5_cycles_def-on"],
         "ylabel": "Overhead (%)",
         "benchmark_list": BENCHMARKS,
-        "tf_list": [TF.ProspectPub, TF.ProspectSec, TF.Octal, TF.OctalNoCallPreserv],
+        "tf_list": [TF.ProspectPub, TF.ProspectSec, TF.Secsep, TF.SecsepNoCallPreserv],
         "bar_width": 0.9,
         "legend_loc": (0.50, -0.10),
         "y_ticks": np.concatenate([np.arange(-2, 5, 0.5)]),
@@ -32,10 +32,10 @@ TASKS = [
 
 TF_NAME_MAP = {
     TF.Origin: "Original",
-    TF.Octal: "SecSep",
-    TF.OctalNoPushPop: "SecSep (no push/pop TF)",
-    TF.OctalNoCallPreserv: "SecSep (no $C_{callee}$)",
-    TF.OctalNoPushPopNoCallPreserv: "SecSep (no push/pop and call TF)",
+    TF.Secsep: "SecSep",
+    TF.SecsepNoPushPop: "SecSep (no push/pop TF)",
+    TF.SecsepNoCallPreserv: "SecSep (no $C_{callee}$)",
+    TF.SecsepNoPushPopNoCallPreserv: "SecSep (no push/pop and call TF)",
     TF.ProspectPub: "ProSpeCT (public stack)",
     TF.ProspectSec: "ProSpeCT (secret stack)",
 }
