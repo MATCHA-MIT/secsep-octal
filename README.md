@@ -377,6 +377,9 @@ Conversion of single variable map always uses zero extension:
 1. What do we need to do to update mem content + permission?
 2. Check how we update valid region after func call
 
+### Context map (Br Anno and Call Anno)
+1. For branch anno, needs to check that the branch context substitute map does not substitute input variables or taint variables (done for taint variables, still needs to be done for input dep variables).
+
 
 # Proof
 
