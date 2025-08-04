@@ -23,7 +23,7 @@ TASKS = [
         "legend_loc": (0.50, -0.10),
         "y_ticks": np.concatenate([np.arange(-2, 5, 0.5)]),
         "y_low": -1,
-        "y_break": 3.5,
+        "y_break": 3.0,
         "ylabel_yloc": 0.3,
         "legend_ncol": 4,
     },
