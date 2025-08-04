@@ -21,15 +21,14 @@ SECSEP_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
 SECSEP_PHASE_CHECK = "check"
 SECSEP_PHASES = SECSEP_PHASE_INFER + [SECSEP_PHASE_CHECK]
 SECSEP_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
-PROSPECT_STATS = [
-    "loc", "num_all_funcs", "num_local_vars",
-    "num_public_var_anno", "num_secret_var_anno",
-]
-SECSEP_STATS = [
-    "num_funcs", "num_args", "num_scale_anno",
-]
 STATS = [
-    *PROSPECT_STATS, *SECSEP_STATS,
+    "loc", "loc_noopt",
+    "num_funcs", "num_funcs_noopt",
+    "num_args", "num_args_noopt",
+    "num_local_vars", "num_local_vars_noopt",
+    "num_public_var_anno", "num_public_var_anno_noopt",
+    "num_secret_var_anno", "num_secret_var_anno_noopt",
+    "num_scale_anno",
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
@@ -53,8 +52,8 @@ BENCHMARK_PAPER_ORDER = {
     "salsa20": "salsa20",
     "sha512": "sha512",
     "chacha20": "chacha20",
-    "poly1305": "poly1305_clean",
     "x25519": "x25519",
+    "poly1305": "poly1305_clean",
     "ed25519_sign": "ed25519_sign",
 }
 
@@ -155,15 +154,20 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             if bench not in iter_benchmark():
                 logging.warning(f"Skipping {bench_print} when printing paper table")
                 continue
+
             bench_print = bench_print.replace("_", "\\_")
-            loc = df.at[bench, "loc"]
-            num_all_funcs = df.at[bench, "num_all_funcs"]
-            num_local_vars = df.at[bench, "num_local_vars"]
-            num_prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
-            num_prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
+            loc = df.at[bench, "loc_noopt"]
+            num_all_funcs = df.at[bench, "num_funcs_noopt"]
             num_funcs = df.at[bench, "num_funcs"]
+
+            num_local_vars_all_funcs = df.at[bench, "num_local_vars_noopt"]
+            num_local_vars = df.at[bench, "num_local_vars"]
+            # stack public, count number of secret variables that are moved away
+            num_prospect_pubstk_anno_all_funcs = df.at[bench, "num_secret_var_anno_noopt"]
+            num_prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
             num_func_args = df.at[bench, "num_args"]
             num_scale_anno = df.at[bench, "num_scale_anno"]
+
             infer_time = df.at[bench, "infer_time"]
             infer_smt_pct = df.at[bench, "infer_smt_time_pct"]
             infer_smt_queries = df.at[bench, "infer_smt_queries"]
@@ -172,11 +176,12 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             check_smt_queries = df.at[bench, "check_smt_queries"]
 
             f.write(f"\\texttt{{{bench_print:<15}}} ")
-            f.write(f"& {loc:>4} &  {num_all_funcs:>3} / {num_local_vars:>3}  ")
-            f.write(f"&  {num_prospect_pubstk_anno:>3} / {num_prospect_secstk_anno:>3}  ")
-            f.write(f"&  {num_funcs:>3} / {num_func_args:>3}  & {num_scale_anno:>3} ")
-            f.write(f"&  {infer_time:>6.1f}s / {infer_smt_pct:>4.1f}\\% / {infer_smt_queries:>5}  ")
-            f.write(f"&  {check_time:>6.1f}s / {check_smt_pct:>4.1f}\\% / {check_smt_queries:>5}  ")
+            f.write(f"& {loc:>4} ")
+            f.write(f"& {num_all_funcs:>2} & {num_funcs:>2} ")
+            f.write(f"& {num_local_vars_all_funcs:>3} ({num_local_vars}) ")
+            f.write(f"& {num_prospect_pubstk_anno_all_funcs:>3} ({num_prospect_pubstk_anno}) ")
+            f.write(f"& {num_func_args:>3} ")
+            f.write(f"& {num_scale_anno:>2} ")
             f.write(f"\\\\\n")
 
             
@@ -221,31 +226,19 @@ def collect_secsep_stats():
         stat["infer_smt_time_pct"] = stat["infer_smt_time"] / stat["infer_time"] * 100
         stat["check_smt_time_pct"] = stat["check_smt_time"] / stat["check_time"] * 100
 
-        bench_stat_file = BENCH_DIR / bench / f"{bench}.stat"
-        if bench_stat_file.exists():
-            shutil.copy(bench_stat_file, target_dir)
-            with open(bench_stat_file, "r") as f:
-                bench_stat = json.load(f)
-            for k, v in bench_stat.items():
-                if k in SECSEP_STATS:
-                    stat[k] = v
-        else:
-            logging.error(f"Stat file not found for {bench}")
-            raise FileNotFoundError()
-        bench_stat_file = BENCH_DIR / bench / f"{bench}.stat_noopt"
-        if bench_stat_file.exists():
-            shutil.copy(bench_stat_file, target_dir)
-            with open(bench_stat_file, "r") as f:
-                bench_stat = json.load(f)
-            for k, v in bench_stat.items():
-                if k in PROSPECT_STATS:
-                    stat[k] = v
-                elif k == "num_funcs":
-                    # distinguish between noopt and opt
-                    stat["num_all_funcs"] = v
-        else:
-            logging.error(f"Stat file (noopt) not found for {bench}")
-            raise FileNotFoundError()
+        for file_suffix, field_suffix in [("stat", ""), ("stat_noopt", "_noopt")]:
+            bench_stat_file = BENCH_DIR / bench / f"{bench}.{file_suffix}"
+            if bench_stat_file.exists():
+                shutil.copy(bench_stat_file, target_dir)
+                with open(bench_stat_file, "r") as f:
+                    j = json.load(f)
+                for k, v in j.items():
+                    k = k + field_suffix
+                    if k in STATS:
+                        stat[k] = v
+            else:
+                logging.error(f"Stat file not found for {bench}")
+                raise FileNotFoundError()
 
         for k, v in stat.items():
             if k in SECSEP_PHASES:
