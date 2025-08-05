@@ -379,7 +379,7 @@ Conversion of single variable map always uses zero extension:
 
 ### Context map (Br Anno and Call Anno)
 1. For branch anno, needs to check that the branch context substitute map does not substitute input variables or taint variables (done for taint variables, still needs to be done for input dep variables).
-
+2. We also need to check that the map does not substitute var to top!!!
 
 # Proof
 
