@@ -165,6 +165,9 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             # stack public, count number of secret variables that are moved away
             num_prospect_pubstk_anno_all_funcs = df.at[bench, "num_secret_var_anno_noopt"]
             num_prospect_pubstk_anno = df.at[bench, "num_secret_var_anno"]
+            # stack secret, count number of public variables that are moved away
+            num_prospect_secstk_anno_all_funcs = df.at[bench, "num_public_var_anno_noopt"]
+            num_prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
             num_func_args = df.at[bench, "num_args"]
             num_scale_anno = df.at[bench, "num_scale_anno"]
 
@@ -180,6 +183,7 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             f.write(f"& {num_all_funcs:>2} & {num_funcs:>2} ")
             f.write(f"& {num_local_vars_all_funcs:>3} ({num_local_vars}) ")
             f.write(f"& {num_prospect_pubstk_anno_all_funcs:>3} ({num_prospect_pubstk_anno}) ")
+            # f.write(f"& {num_prospect_pubstk_anno_all_funcs:>3} ({num_prospect_pubstk_anno}) / {num_prospect_secstk_anno_all_funcs} ({num_prospect_secstk_anno}) ")
             f.write(f"& {num_func_args:>3} ")
             f.write(f"& {num_scale_anno:>2} ")
             f.write(f"\\\\\n")
@@ -189,7 +193,7 @@ def collect_secsep_stats():
     target_dir = EVAL_DIR / "stats"
     target_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
-        index=list(iter_benchmark()),
+        index=pd.Index(list(iter_benchmark()), name="Benchmark"),
         columns=pd.Index(STATS).append(
             pd.MultiIndex.from_product([SECSEP_PHASES, SECSEP_PHASE_METRICS], names=["Phase", "Metric"])
         )
