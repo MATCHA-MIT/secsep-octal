@@ -75,6 +75,7 @@ def cli_command():
         @click.option(
             "--name",
             type=click.STRING,
+            help="Name of the benchmark",
         )
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -106,15 +107,20 @@ def run(cmd, log_file, msg):
 @click.option(
     "--input-dir",
     type=Path,
+    required=True,
+    help="SecSep benchmark analysis directory",
 )
 @click.option(
     "--phase",
     nargs=2,
     type=click.Tuple([int, int]),
     default=(0, 3),
+    help="0: Preprocessing, 1: Dependent type infer, 2: Range type infer, 3: Taint type infer",
 )
 @click.option("--use-cache", is_flag=True)
 def infer(name: str, input_dir: Path, phase, use_cache):
+    """Infer the given assembly program"""
+
     build_octal()
 
     output_dir = OCTAL_DIR / "out" / name
@@ -169,6 +175,8 @@ def infer(name: str, input_dir: Path, phase, use_cache):
     default=(0, 1),
 )
 def check(name: str, phase):
+    """Check the inference results of the given assembly program"""
+
     build_octal()
 
     output_dir = OCTAL_DIR / "out" / name
@@ -232,25 +240,30 @@ def transform_helper(
 
 @cli_command()
 @click.option(
-    "--delta",  # hex format
+    "--delta",
     type=click.STRING,
     required=True,
+    help="Delta used by SecSep transformation. Must be in hex format, e.g. 0x800000",
 )
 @click.option(
     "--all-tf",
     is_flag=True,
+    help="Generate all transformation variations",
 )
 @click.option(
     "--no-push-pop",
     is_flag=True,
+    help="Disable pass: consecutive push/pop optimization",
 )
 @click.option(
     "--no-call",
     is_flag=True,
+    help="Disable pass: callee-saved registers' taint restoration C_{callee}",
 )
 @click.option(
     "--install-dir",
     type=Path,
+    help="Directory to install transformed assembly, usually the analysis directory"
 )
 def transform(
     name: str,
@@ -260,6 +273,8 @@ def transform(
     no_call: bool,
     install_dir: Path,
 ):
+    """Transform the given assembly program using the inference results"""
+
     build_octal()
 
     if all_tf:
@@ -297,6 +312,27 @@ def transform(
             tf_suffix=tf_suffix,
             install_dir=install_dir,
         )
+
+
+@cli_command()
+@click.pass_context
+@click.option(
+    "--analysis-dir",
+    type=Path,
+    required=True,
+    help="SecSep benchmark analysis directory",
+)
+@click.option(
+    "--delta",
+    type=click.STRING,
+    required=True,
+    help="Delta used by SecSep transformation. Must be in hex format, e.g. 0x800000",
+)
+def all(ctx: click.Context, name: str, analysis_dir: Path, delta: str):
+    """Infer, check, and transform the given assembly program"""
+    ctx.invoke(infer, name=name, input_dir=analysis_dir)
+    ctx.invoke(check, name=name)
+    ctx.invoke(transform, name=name, delta=delta, all_tf=True, install_dir=analysis_dir)
 
 
 if __name__ == "__main__":
