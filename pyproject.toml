@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "secsep-octal"
+version = "0.1.0"
+description = ""
+package-mode = false
+authors = ["Shixin Song <shixins@mit.edu>", "Tingzhen Dong <rogerdtz@mit.edu>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+colorama = "^0.4.6"
+click = "^8.2.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

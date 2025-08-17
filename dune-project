@@ -1,26 +1,12 @@
 (lang dune 3.15)
+(name octal)
 
-(name type)
-
-(generate_opam_files true)
-
-(source
- (github username/reponame))
-
-(authors "Author Name")
-
-(maintainers "Maintainer Name")
-
-(license LICENSE)
-
-(documentation https://url/to/documentation)
+(generate_opam_files)
+(homepage "https://github.mit.edu/arch-sec/secsep-octal")
 
 (package
- (name type)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune)
- (tags
-  (topics "to describe" your project)))
-
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
+ (name octal)
+ (synopsis "SecSep's inference, checker, and transformation on Octal")
+ (authors "Shixin Song" "Tingzhen Dong")
+ (license MIT)
+ (depends ocaml dune core z3 sexp))
