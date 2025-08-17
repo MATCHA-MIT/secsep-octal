@@ -1,34 +1,20 @@
 (executables
  (public_names 
-  type 
-  gen_interface 
-  gen_interface_new
-  parse_prog
-  parse_test_prog
   preprocess_input
   infer_single
-  infer_block_invariance
   infer_range
   infer_taint
   prog_transform
-  gen_csvt_taint_api
   convert
   check
   stat_asm
   )
  (names 
-  main 
-  gen_interface 
-  gen_interface_new
-  parse_prog
-  parse_test_prog
   preprocess_input
   infer_single
-  infer_block_invariance
   infer_range
   infer_taint
   prog_transform
-  gen_csvt_taint_api
   convert
   check
   stat_asm
