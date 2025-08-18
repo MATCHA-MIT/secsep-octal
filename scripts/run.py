@@ -309,7 +309,7 @@ def transform(
     required=True,
     help="Delta used by SecSep transformation. Must be in hex format, e.g. 0x800000",
 )
-def all(ctx: click.Context, name: str, analysis_dir: Path, delta: str):
+def full(ctx: click.Context, name: str, analysis_dir: Path, delta: str):
     """Infer, check, and transform the given assembly program"""
     ctx.invoke(infer, name=name, input_dir=analysis_dir)
     ctx.invoke(check, name=name)

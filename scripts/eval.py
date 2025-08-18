@@ -658,7 +658,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Docker container name running gem5",
 )
 @click.option(
-    "--skip-perf", is_flag=True, help="Skip running perf"
+    "--perf", "run_perf", is_flag=True, help="Run perf to check software overhead on host"
 )
 @click.option(
     "--skip-gem5", is_flag=True, help="Skip running gem5 and use last results"
@@ -694,14 +694,14 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, benchmark_sel, gem5_docker, skip_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
+def main(verbose, benchmark_sel, gem5_docker, run_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
     with open(EVAL_DIR / "config.txt", "w") as f:
         f.write(f"benchmark_sel={benchmark_sel}\n")
         f.write(f"gem5_docker={gem5_docker}\n")
-        f.write(f"skip_perf={skip_perf}\n")
+        f.write(f"run_perf={run_perf}\n")
         f.write(f"skip_gem5={skip_gem5}\n")
         f.write(f"delta={delta}\n")
         f.write(f"processes={processes}\n")
@@ -724,7 +724,7 @@ def main(verbose, benchmark_sel, gem5_docker, skip_perf, skip_gem5, enable_roi, 
     build_octal()
     collect_secsep_stats()
 
-    if skip_perf:
+    if not run_perf:
         logging.info("Will skip perf runs")
     if not skip_gem5:
         print(f"Will run gem5, confirm? (y/n) ", end="")
@@ -772,7 +772,7 @@ def main(verbose, benchmark_sel, gem5_docker, skip_perf, skip_gem5, enable_roi, 
                 collect_bin_asm(bin_path, asm_path, compiled_asm)
                 r = results.setdefault((bench, tf), {})
                 get_asm_line_count(r, asm_path)
-                if not skip_perf:
+                if run_perf:
                     get_perf(r, bin_path)
                 for key, value in r.items():
                     df.loc[(bench, tf.name), key] = value
