@@ -9,15 +9,7 @@ import time
 from colorama import Fore
 import shutil
 
-OCTAL_DIR = Path(__file__).parent.parent
-OCTAL_BUILD_DIR = OCTAL_DIR / "_build" / "default" / "bin"
-OCTAL_PPC = OCTAL_BUILD_DIR / "preprocess_input.exe"
-OCTAL_INFER_SINGLE = OCTAL_BUILD_DIR / "infer_single.exe"
-OCTAL_INFER_RANGE = OCTAL_BUILD_DIR / "infer_range.exe"
-OCTAL_INFER_TAINT = OCTAL_BUILD_DIR / "infer_taint.exe"
-OCTAL_CONVERT = OCTAL_BUILD_DIR / "convert.exe"
-OCTAL_CHECK = OCTAL_BUILD_DIR / "check.exe"
-OCTAL_TRANSFORM = OCTAL_BUILD_DIR / "prog_transform.exe"
+from general import *
 
 
 class InferPhase(Enum):
@@ -46,17 +38,6 @@ CheckPhaseDescription = """Run checker on the infer result:
     0: Conversion
     1: Check
 """
-
-
-def build_octal():
-    subprocess.run(
-        [
-            "dune",
-            "build"
-        ],
-        cwd=OCTAL_DIR,
-        check=True,
-    )
 
 
 @click.group()
@@ -123,7 +104,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
 
     build_octal()
 
-    output_dir = OCTAL_DIR / "out" / name
+    output_dir = OCTAL_WORK_DIR / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
     phase_beg, phase_end = phase
@@ -172,14 +153,14 @@ def infer(name: str, input_dir: Path, phase, use_cache):
     "--phase",
     nargs=2,
     type=click.Tuple([int, int]),
-    default=(0, 1),
+    default=(1, 1),
 )
 def check(name: str, phase):
     """Check the inference results of the given assembly program"""
 
     build_octal()
 
-    output_dir = OCTAL_DIR / "out" / name
+    output_dir = OCTAL_WORK_DIR / name
     output_dir.mkdir(exist_ok=True, parents=True)
 
     phase_beg, phase_end = phase
@@ -211,7 +192,7 @@ def transform_helper(
     tf_suffix="",
     install_dir=None,
 ):
-    output_dir = OCTAL_DIR / "out" / name
+    output_dir = OCTAL_WORK_DIR / name
     output_dir.mkdir(exist_ok=True, parents=True)
     if out is None:
         out = output_dir / f"{name}.tf{tf_suffix}.s"
@@ -319,7 +300,7 @@ def transform(
 @click.option(
     "--analysis-dir",
     type=Path,
-    required=True,
+    default=BENCHMARK_DIR,
     help="SecSep benchmark analysis directory",
 )
 @click.option(

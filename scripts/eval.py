@@ -13,14 +13,13 @@ import json
 import resource
 from multiprocessing import Pool
 
+from general import *
 
-SECSEP_DIR = Path(__file__).parent.parent
-SECSEP_WORK_DIR = SECSEP_DIR / "out"
-SECSEP_STAT_ASM = SECSEP_DIR / "_build" / "default" / "bin" / "stat_asm.exe"
-SECSEP_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
-SECSEP_PHASE_CHECK = "check"
-SECSEP_PHASES = SECSEP_PHASE_INFER + [SECSEP_PHASE_CHECK]
-SECSEP_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
+
+OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
+OCTAL_PHASE_CHECK = "check"
+OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
+OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]
 STATS = [
     "loc", "loc_noopt",
     "num_funcs", "num_funcs_noopt",
@@ -32,10 +31,7 @@ STATS = [
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
-BENCH_DIR = SECSEP_DIR.parent / "sechw-const-time-benchmarks" / "bench"
-GEM5_DIR = SECSEP_DIR.parent / "gem5-mirror"
-GEM5_DOCKER_BENCH_DIR = "/root/benchmarks/bench"
-EVAL_DIR = SECSEP_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
 DEFAULT_RLIMIT_STACK_SIZE_MB = 16
 
@@ -75,15 +71,6 @@ def iter_benchmark():
             yield bench
 
 
-def run_gem5_on_tf(tf: TF) -> bool:
-    return True
-    # match tf:
-    #     case TF.Origin | TF.Secsep | TF.SecsepNoCallPreserv | TF.ProspectPub | TF.ProspectSec:
-    #         return True
-    #     case _:
-    #         return False
-
-
 class HWMode(Enum):
     DefenseOff = "NoDefense"
     DefenseOn = "OurDefense"
@@ -115,14 +102,14 @@ def setup_logger(level=logging.INFO):
     logger.setLevel(level)
 
     
-def build_secsep():
-    logging.info("Building Secsep...")
+def build_octal():
+    logging.info("Building Octal...")
     subprocess.run(
         [
             "dune",
             "build"
         ],
-        cwd=SECSEP_DIR,
+        cwd=OCTAL_DIR,
         check=True,
     )
 
@@ -152,7 +139,7 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
     with open(out, "w") as f:
         for bench_print, bench in BENCHMARK_PAPER_ORDER.items():
             if bench not in iter_benchmark():
-                logging.warning(f"Skipping {bench_print} when printing paper table")
+                logging.warning(f"Skipping {bench_print} when printing latex table")
                 continue
 
             bench_print = bench_print.replace("_", "\\_")
@@ -195,11 +182,11 @@ def collect_secsep_stats():
     df = pd.DataFrame(
         index=pd.Index(list(iter_benchmark()), name="Benchmark"),
         columns=pd.Index(STATS).append(
-            pd.MultiIndex.from_product([SECSEP_PHASES, SECSEP_PHASE_METRICS], names=["Phase", "Metric"])
+            pd.MultiIndex.from_product([OCTAL_PHASES, OCTAL_PHASE_METRICS], names=["Phase", "Metric"])
         )
     )
     for bench in iter_benchmark():
-        bench_work_dir = SECSEP_WORK_DIR / bench
+        bench_work_dir = OCTAL_WORK_DIR / bench
         stat = dict()
 
         phase_cnt = 0
@@ -209,29 +196,29 @@ def collect_secsep_stats():
             if file_bench != bench:
                 logging.error(f"Unexpected stat file {stat_file} with name {file_bench} in directory of {stat_file}")
                 raise ValueError()
-            if file_phase not in SECSEP_PHASES:
+            if file_phase not in OCTAL_PHASES:
                 logging.error(f"Unexpected stat file {stat_file} with unknown phase {file_phase}")
                 raise ValueError()
             phase_cnt += 1
             with open(stat_file, "r") as f:
                 stat[file_phase] = json.load(f)
             time, smt_time, smt_queries = stat[file_phase]["time"], stat[file_phase]["smt_queries_time"], stat[file_phase]["smt_queries"]
-            if file_phase in SECSEP_PHASE_INFER:
+            if file_phase in OCTAL_PHASE_INFER:
                 stat["infer_time"] = stat.get("infer_time", 0) + time
                 stat["infer_smt_time"] = stat.get("infer_smt_time", 0) + smt_time
                 stat["infer_smt_queries"] = stat.get("infer_smt_queries", 0) + smt_queries
-            elif file_phase == SECSEP_PHASE_CHECK:
+            elif file_phase == OCTAL_PHASE_CHECK:
                 stat["check_time"] = time
                 stat["check_smt_time"] = smt_time
                 stat["check_smt_queries"] = smt_queries
-        if phase_cnt != len(SECSEP_PHASES):
-            logging.error(f"Expected {len(SECSEP_PHASES)} phases, but found {phase_cnt} in {bench_work_dir}")
+        if phase_cnt != len(OCTAL_PHASES):
+            logging.error(f"Expected {len(OCTAL_PHASES)} phases, but found {phase_cnt} in {bench_work_dir}")
             raise ValueError()
         stat["infer_smt_time_pct"] = stat["infer_smt_time"] / stat["infer_time"] * 100
         stat["check_smt_time_pct"] = stat["check_smt_time"] / stat["check_time"] * 100
 
         for file_suffix, field_suffix in [("stat", ""), ("stat_noopt", "_noopt")]:
-            bench_stat_file = BENCH_DIR / bench / f"{bench}.{file_suffix}"
+            bench_stat_file = BENCHMARK_DIR / bench / f"{bench}.{file_suffix}"
             if bench_stat_file.exists():
                 shutil.copy(bench_stat_file, target_dir)
                 with open(bench_stat_file, "r") as f:
@@ -245,7 +232,7 @@ def collect_secsep_stats():
                 raise FileNotFoundError()
 
         for k, v in stat.items():
-            if k in SECSEP_PHASES:
+            if k in OCTAL_PHASES:
                 for key, value in v.items():
                     df.at[bench, (k, key)] = value
             else:
@@ -262,9 +249,9 @@ def collect_secsep_stats():
 
 def get_bin_asm(bench: str, tf: TF) -> tuple[Path, Path, Path]:
     bench_tf = get_bench_tf_name(bench, tf)
-    bin_path          = BENCH_DIR / bench / "build" / bench_tf
-    asm_path          = BENCH_DIR / bench / f"{bench_tf}.s"
-    compiled_asm_path = BENCH_DIR / bench / "build" / f"{bench_tf}.asm"
+    bin_path          = BENCHMARK_DIR / bench / "build" / bench_tf
+    asm_path          = BENCHMARK_DIR / bench / f"{bench_tf}.s"
+    compiled_asm_path = BENCHMARK_DIR / bench / "build" / f"{bench_tf}.asm"
 
     assert bin_path and asm_path and compiled_asm_path
     if not bin_path.exists():
@@ -296,13 +283,13 @@ def get_asm_line_count(collection: dict, asm_file: Path) -> dict:
 
     result = subprocess.run(
         [
-            SECSEP_STAT_ASM,
+            OCTAL_STAT_ASM,
             "-asm",
             str(asm_file),
             "-preview",
             line_output_dir / f"{asm_file.name}.lines",
         ],
-        cwd=SECSEP_DIR,
+        cwd=OCTAL_DIR,
         capture_output=True,
         text=True,
     )
@@ -422,7 +409,7 @@ def get_perf(collection: dict, bin_file: Path, repeat=1000) -> dict:
 def get_bench_tf_roi(bench: str, tf: TF) -> str:
     bench_tf = get_bench_tf_name(bench, tf)
 
-    funcs_file = BENCH_DIR / bench / f"{bench}.funcs_noopt.txt"
+    funcs_file = BENCHMARK_DIR / bench / f"{bench}.funcs_noopt.txt"
     if not funcs_file.exists():
         logging.error(f"Functions file not found for {bench_tf}: {funcs_file}")
         raise FileNotFoundError()
@@ -430,7 +417,7 @@ def get_bench_tf_roi(bench: str, tf: TF) -> str:
         funcs = f.read().strip().splitlines()
         funcs = [f.strip() for f in funcs if f.strip()]
 
-    seg_file = BENCH_DIR / bench / "build" / f"{bench_tf}.seg"
+    seg_file = BENCHMARK_DIR / bench / "build" / f"{bench_tf}.seg"
     if not seg_file.exists():
         logging.error(f"Segmentation file not found for {bench_tf}: {seg_file}")
         raise FileNotFoundError()
@@ -646,8 +633,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     try:
         bench_name_tf = get_bench_tf_name(bench, tf)
         result = {}
-        if run_gem5_on_tf(tf):
-            get_gem5_result(result, gem5_docker, skip_gem5, delta, inst_roi, bench, bench_name_tf)
+        get_gem5_result(result, gem5_docker, skip_gem5, delta, inst_roi, bench, bench_name_tf)
         logging.debug(f"Gem5 result of {bench} - {tf.name} collected successfully")
         return result
     except Exception as e:
@@ -667,8 +653,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--gem5-docker",
-    default="secsep-gem5",
-    required=False,
+    required=True,
     type=click.STRING,
     help="Docker container name running gem5",
 )
@@ -689,7 +674,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 #   default="0x800000",
     required=True,
     type=click.STRING,
-    help="Absolute offset between public and secret stack",
+    help="Absolute offset between public and secret stack, must match the delta used by SecSep transformation",
 )
 @click.option(
     "-p",
@@ -736,7 +721,7 @@ def main(verbose, benchmark_sel, gem5_docker, skip_perf, skip_gem5, enable_roi, 
     else:
         selected_benchmarks = benchmark_sel.split(",")
 
-    build_secsep()
+    build_octal()
     collect_secsep_stats()
 
     if skip_perf:

@@ -9,6 +9,7 @@ authors = ["Shixin Song <shixins@mit.edu>", "Tingzhen Dong <rogerdtz@mit.edu>"]
 python = "^3.10"
 colorama = "^0.4.6"
 click = "^8.2.1"
+pandas = "^2.3.1"
 
 [build-system]
 requires = ["poetry-core"]
