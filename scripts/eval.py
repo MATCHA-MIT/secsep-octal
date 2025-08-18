@@ -28,7 +28,7 @@ STATS = [
     "num_local_vars", "num_local_vars_noopt",
     "num_public_var_anno", "num_public_var_anno_noopt",
     "num_secret_var_anno", "num_secret_var_anno_noopt",
-    "num_scale_anno",
+    "num_secsep_anno",
     "infer_time", "infer_smt_time", "infer_smt_time_pct", "infer_smt_queries",
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
@@ -169,7 +169,7 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             num_prospect_secstk_anno_all_funcs = df.at[bench, "num_public_var_anno_noopt"]
             num_prospect_secstk_anno = df.at[bench, "num_public_var_anno"]
             num_func_args = df.at[bench, "num_args"]
-            num_scale_anno = df.at[bench, "num_scale_anno"]
+            num_secsep_anno = df.at[bench, "num_secsep_anno"]
 
             infer_time = df.at[bench, "infer_time"]
             infer_smt_pct = df.at[bench, "infer_smt_time_pct"]
@@ -185,7 +185,7 @@ def print_secsep_stats_latex(df: pd.DataFrame, out: Path):
             f.write(f"& {num_prospect_pubstk_anno_all_funcs:>3} ({num_prospect_pubstk_anno}) ")
             # f.write(f"& {num_prospect_pubstk_anno_all_funcs:>3} ({num_prospect_pubstk_anno}) / {num_prospect_secstk_anno_all_funcs} ({num_prospect_secstk_anno}) ")
             f.write(f"& {num_func_args:>3} ")
-            f.write(f"& {num_scale_anno:>2} ")
+            f.write(f"& {num_secsep_anno:>2} ")
             f.write(f"\\\\\n")
 
             
