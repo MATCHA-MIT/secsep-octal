@@ -454,20 +454,15 @@ def get_bench_tf_roi(bench: str, tf: TF) -> str:
     return roi_str
 
 
-def get_gem5_result(
-    collection: dict,
+def run_gem5(
     gem5_docker: str,
-    skip_gem5: bool,
-    delta: str,
-    inst_roi: str,
     app: str,
     bench_tf: str,
+    delta: str,
+    inst_roi: str
 ):
-    if not skip_gem5:
-        # Run gem5 to get result
-        # python3 scripts/run.py --apps boringssl_ed25519 --bench-regex "^bench_ed25519_plain_noinline(_tf)?$"
-        logging.info(f"Running gem5 for {bench_tf}...")
-        result = subprocess.run(
+    if gem5_docker is not None and len(gem5_docker) > 0:
+        return subprocess.run(
             [
                 "docker",
                 "exec",
@@ -482,13 +477,79 @@ def get_gem5_result(
                 f"^{bench_tf}$",
                 "--delta",
                 delta,
-                # "--debug-flags=DynInst",
                 "--inst-roi",
                 inst_roi,
             ],
             capture_output=True,
             text=True,
         )
+    else:
+        return subprocess.run(
+            [
+                "python3",
+                "scripts/run.py",
+                "--bench-dir",
+                BENCHMARK_DIR,
+                "--apps",
+                app,
+                "--bench-regex",
+                f"^{bench_tf}$",
+                "--delta",
+                delta,
+                "--inst-roi",
+                inst_roi,
+            ],
+            cwd=GEM5_DIR,
+            capture_output=True,
+            text=True,
+        )
+
+
+def run_get_decl(gem5_docker: str, app: str, bench_tf: str):
+    if gem5_docker is not None and len(gem5_docker) > 0:
+        return subprocess.run(
+            [
+                "docker",
+                "exec",
+                gem5_docker,
+                "python3",
+                "scripts/get_decl.py",
+                app,
+                bench_tf,
+                HWMode.DefenseOn.value,
+            ],
+            capture_output=True,
+            text=True,
+        )
+    else:
+        return subprocess.run(
+            [
+                "python3",
+                "scripts/get_decl.py",
+                app,
+                bench_tf,
+                HWMode.DefenseOn.value,
+            ],
+            cwd=GEM5_DIR,
+            capture_output=True,
+            text=True,
+        )
+
+
+def get_gem5_result(
+    collection: dict,
+    gem5_docker: str,
+    skip_gem5: bool,
+    delta: str,
+    inst_roi: str,
+    app: str,
+    bench_tf: str,
+):
+    if not skip_gem5:
+        # Run gem5 to get result
+        # python3 scripts/run.py --apps boringssl_ed25519 --bench-regex "^bench_ed25519_plain_noinline(_tf)?$"
+        logging.info(f"Running gem5 for {bench_tf}...")
+        result = run_gem5(gem5_docker, app, bench_tf, delta, inst_roi)
         if result.returncode != 0:
             logging.error(f"Failed to run gem5 for {bench_tf}")
             logging.error("Gem5 stdout:\n" + result.stdout)
@@ -499,20 +560,7 @@ def get_gem5_result(
     else:
         logging.debug(f"Skipping gem5 for {bench_tf}, using last results")
 
-    result = subprocess.run(
-        [
-            "docker",
-            "exec",
-            gem5_docker,
-            "python3",
-            "scripts/get_decl.py",
-            app,
-            bench_tf,
-            HWMode.DefenseOn.value,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    result = run_get_decl(gem5_docker, app, bench_tf)
     if result.returncode != 0:
         logging.error(f"Failed to run get_decl.py for {bench_tf}")
         logging.info(result.stderr)
@@ -653,9 +701,9 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
 )
 @click.option(
     "--gem5-docker",
-    required=True,
+    required=False,
     type=click.STRING,
-    help="Docker container name running gem5",
+    help="Run gem5 in another docker container. Leave it empty to run gem5 in current environment",
 )
 @click.option(
     "--perf", "run_perf", is_flag=True, help="Run perf to check software overhead on host"
