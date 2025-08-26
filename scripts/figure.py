@@ -130,7 +130,7 @@ def draw(
 
     if draw_avg:
         avg_df = df.groupby(level="TF").mean()
-        avg_df[metric] = avg_df[metric].round(2)
+        avg_df[metric] = avg_df[metric].round(3)
         avg_df = avg_df.reset_index()
         avg_df["Benchmark"] = "Avg"
         df = pd.concat([df.reset_index(), avg_df], ignore_index=True).set_index(["Benchmark", "TF"])
