@@ -715,7 +715,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     "--enable-roi", is_flag=True, help="Enable ROI for gem5 runs to focus only on relavent functions"
 )
 @click.option(
-    "--print-overhead", is_flag=True, help="Print overheads in console"
+    "--show-overhead", is_flag=True, help="Print overheads in console"
 )
 @click.option(
     "--delta",
@@ -742,7 +742,7 @@ def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool
     help="Set larger stack size to run transformed benchmarks on host",
 )
 @click.option("-o", "--out", type=click.Path(), required=False)
-def main(verbose, benchmark_sel, gem5_docker, run_perf, skip_gem5, enable_roi, print_overhead, delta, processes, out, rlimit_stack_mb):
+def main(verbose, benchmark_sel, gem5_docker, run_perf, skip_gem5, enable_roi, show_overhead, delta, processes, out, rlimit_stack_mb):
     resource.setrlimit(resource.RLIMIT_STACK, (rlimit_stack_mb * 1024 * 1024, resource.RLIM_INFINITY))
 
     EVAL_DIR.mkdir(parents=True, exist_ok=False)
@@ -864,7 +864,7 @@ def main(verbose, benchmark_sel, gem5_docker, run_perf, skip_gem5, enable_roi, p
                 if std is not None:
                     df.loc[(bench, tf.name), f"overhead_{key}_std"] = std
             
-            if print_overhead:
+            if show_overhead:
                 print(f"Overhead of {bench} / {tf.name}")
                 print_overhead(overhead)
                 print()
