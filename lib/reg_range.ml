@@ -22,10 +22,8 @@ module RegRange = struct
   let write_update_range (r: range_t) (off: range_t) : range_t =
     let r1, r2 = r in
     let o1, o2 = off in
-    let x1 = Int64.min r1 o1 in
-    let x2 = Int64.min r2 o2 in
-    if x1 >= x2 then 0L, 0L
-    else x1, x2
+    if r2 < o1 || o2 < r1 then reg_range_error "cannot merge non-connected range";
+    Int64.min r1 o1, Int64.max r2 o2
 
   let write_update (r: t) (off: range_t) : t =
     match r with
