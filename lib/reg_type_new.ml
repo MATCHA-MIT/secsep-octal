@@ -117,12 +117,12 @@ module RegType (Entry: EntryType) = struct
       | 4L | 8L -> Entry.ext_val Entry.ZeroExt off full_size new_type
       | _ -> reg_type_error "set_reg_type_helper: expecting reg size of 1/2/4/8"
       in
-      let write_range = match write_size with
-      | 1L | 2L -> off, Int64.add off write_size
-      | 4L | 8L -> IsaBasic.gpr_full_off_size
+      let write_range, write_is_full = match write_size with
+      | 1L | 2L -> (off, Int64.add off write_size), false
+      | 4L | 8L -> IsaBasic.gpr_full_off_size, true
       | _ -> reg_type_error "set_reg_type_helper: expecting reg size of 1/2/4/8"
       in
-      let new_range = RegRange.write_update old_range write_range in
+      let new_range = RegRange.write_update old_range write_range write_is_full in
       List.mapi (fun idx r -> if idx = reg_idx then (new_range, new_type) else r) reg_type
 
   let set_reg_type = set_reg_type_helper false

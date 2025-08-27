@@ -25,7 +25,8 @@ module RegRange = struct
     if r2 < o1 || o2 < r1 then reg_range_error "cannot merge non-connected range";
     Int64.min r1 o1, Int64.max r2 o2
 
-  let write_update (r: t) (off: range_t) : t =
+  let write_update (r: t) (off: range_t) (is_full: bool) : t =
+    if is_full then RangeConst off else
     match r with
     | RangeConst r -> RangeConst (write_update_range r off)
     | RangeVar v -> RangeExp (v, off)
