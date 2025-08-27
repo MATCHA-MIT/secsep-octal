@@ -102,13 +102,13 @@ module TaintApi = struct
     | None -> None, None
 
   let merge_reg_type_api
-      (reg_type: 'a list) (reg_api: (bool option) list option) :
-      (('a * (bool option)) list) =
+      (reg_type: 'a TaintRegType.reg_content) (reg_api: (bool option) list option) :
+      (('a * (bool option)) TaintRegType.reg_content) =
     match reg_api with
     | Some reg_api ->
-      List.map2 (fun x y -> x, y) reg_type reg_api
+      List.map2 (fun (valid, x) y -> valid, (x, y)) reg_type reg_api
     | None ->
-      List.map (fun x -> x, None) reg_type
+      List.map (fun (valid, x) -> valid, (x, None)) reg_type
 
   let merge_mem_type_api
       (mem_type: 'a MemTypeBasic.mem_content) (mem_api: mem_t option) :
@@ -164,7 +164,7 @@ module TaintApi = struct
     let reg_type_api = merge_reg_type_api single_arch_type.reg_type reg_api in
     let mem_type_api = merge_mem_type_api single_arch_type.mem_type mem_api in
 
-    let acc_taint_exp, reg_type = List.fold_left_map inner_helper acc_taint_exp reg_type_api in
+    let acc_taint_exp, reg_type = TaintRegType.fold_left_map inner_helper acc_taint_exp reg_type_api in
     let acc_taint_exp, mem_type = MemTypeBasic.fold_left_map inner_helper acc_taint_exp mem_type_api in
 
     acc_taint_exp, reg_type, mem_type

@@ -357,7 +357,7 @@ module SingleSubtype = struct
             (SingleEntryType.to_string sub) sub_pc (SingleEntryType.to_string sup))
       in
       let acc_tv_rel, reg_useful_var = 
-        List.fold_left2 add_one_helper 
+        ArchType.RegType.fold_left2 add_one_helper 
           (acc_tv_rel, SingleEntryType.SingleVarSet.empty)
           sub_block.reg_type sup_block.reg_type
       in
@@ -539,7 +539,7 @@ module SingleSubtype = struct
         (all_useful_var: IntSet.t)
         (acc: VarSubMap.t) (sub_block: ArchType.t) : VarSubMap.t =
       let helper = update_one_pair all_useful_var sub_block.label sub_block.pc in
-      let acc = List.fold_left2 helper acc target_block.reg_type sub_block.reg_type in
+      let acc = ArchType.RegType.fold_left2 helper acc target_block.reg_type sub_block.reg_type in
       let spill_slot_filter acc sup_ptr sup_slot _sub_ptr sub_slot =
         let sup_off, _, sup_entry = sup_slot in
         let sub_off, _, sub_entry = sub_slot in

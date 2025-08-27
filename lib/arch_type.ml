@@ -1062,7 +1062,7 @@ module ArchType (Entry: EntryType) = struct
         match curr_type.prop_mode with
         | TypeInferTaint ->
           CallAnno.get_call_anno 
-            (List.map Entry.get_single_taint_exp curr_type.reg_type)
+            (RegType.map Entry.get_single_taint_exp curr_type.reg_type)
             call_slot_info
             (Entry.get_single_var_map var_map)
             (Entry.get_taint_var_map var_map)
@@ -1246,7 +1246,7 @@ module ArchType (Entry: EntryType) = struct
     let helper (acc: SingleExp.SingleVarSet.t) (x: entry_t) =
       SingleExp.SingleVarSet.union (SingleExp.get_vars (Entry.get_single_exp x)) acc
     in
-    let reg_var_set = List.fold_left helper SingleExp.SingleVarSet.empty a_type.reg_type in
+    let reg_var_set = RegType.fold_left helper SingleExp.SingleVarSet.empty a_type.reg_type in
     let mem_var_set = MemType.fold_left helper SingleExp.SingleVarSet.empty a_type.mem_type in
     SingleExp.SingleVarSet.union reg_var_set mem_var_set
 
@@ -1262,14 +1262,14 @@ module ArchType (Entry: EntryType) = struct
 
   let update_reg_mem_type (update_func: entry_t -> entry_t) (a_type: t) : t =
     { a_type with
-      reg_type = List.map update_func a_type.reg_type;
+      reg_type = RegType.map update_func a_type.reg_type;
       mem_type = MemType.map update_func a_type.mem_type }
 
   let find_one_base_info
       (base: Isa.imm_var_id) (reg_type: RegType.t) (mem_type: MemType.t) :
       CallAnno.base_info =
     let find_reg_idx =
-      List.find_index (
+      RegType.find_index (
         fun (x: entry_t) -> SingleExp.cmp (Entry.get_single_exp x) (SingleVar base) = 0
       ) reg_type
     in
@@ -1333,7 +1333,7 @@ module ArchType (Entry: EntryType) = struct
     let in_reg = in_state.reg_type in
     let in_mem = MemType.merge_local_mem_quick_cmp smt_ctx in_state.mem_type in
 
-    let out_reg = List.map (sub_sol out_state.pc) out_state.reg_type in
+    let out_reg = RegType.map (sub_sol out_state.pc) out_state.reg_type in
     let out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type) in
     let out_context = List.filter_map (fun (context_entry: SingleContext.t) ->
       SingleContext.sub_sol_and_filter (sub_sol_single out_state.pc) context_entry

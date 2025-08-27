@@ -73,9 +73,11 @@ module SingleRetInvariance = struct
       (sub_sol_func: SingleExp.t -> RangeExp.t)
       (a_type: ArchType.t) :
       ArchType.t * ((IsaBasic.imm_var_id * (SingleExp.t list)) list) * (SingleContext.t list list) =
-    let reg_type, reg_other_info = 
-      List.map (process_one_ret_val sub_sol_func) a_type.reg_type |> List.split
+    let reg_valid, other =
+      ArchType.RegType.map (process_one_ret_val sub_sol_func) a_type.reg_type |> List.split
     in
+    let reg_type, reg_other_info = List.split other in
+    let reg_type = List.combine reg_valid reg_type in
     let sub_list, tmp_ctx =
       List.filter_map (fun x -> x) reg_other_info |> List.split
     in

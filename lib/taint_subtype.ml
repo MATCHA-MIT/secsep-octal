@@ -69,7 +69,7 @@ module TaintSubtype = struct
         (subtype_list: sub_t list)
         (sub_block: ArchType.t) : sub_t list =
       (* Printf.printf "sup block: %s(%d), sub block: %s(%d)\n" sup_block.label sup_block.pc sub_block.label sub_block.pc; *)
-      let subtype_list = List.fold_left2 reg_helper_entry subtype_list sub_block.reg_type sup_block.reg_type in
+      let subtype_list = ArchType.RegType.fold_left2 reg_helper_entry subtype_list sub_block.reg_type sup_block.reg_type in
       ArchType.MemType.fold_left2 mem_helper_entry subtype_list sub_block.mem_type sup_block.mem_type
     in
     List.fold_left (helper sup_block) subtype_list sub_block_list    

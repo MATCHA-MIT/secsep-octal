@@ -117,7 +117,7 @@ Among the three cases, only try_solve_single_corr will use unresolved block var 
 ### Logic of simplify block var solution
 Overall rule of simplify block var solution:
 1. If current solution is represented by a block var, while the var can be represented by some other single exp sol, then substitute the var with its solution.
-2. If a solution contains a block var which cannot be representedc by other single exp, then keep it to be there. We want to represent as many solutions with single exp as possible.
+2. If a solution contains a block var which cannot be represented by other single exp, then keep it to be there. We want to represent as many solutions with single exp as possible.
 
 ### SingleSubtype.is_sol_resolved
 1. We only allow represent solution of one var (e.g., `x`) with another unresolved solution to break the circular dependency chain between variables.
@@ -139,18 +139,6 @@ loop2:
     if i < n, jmp to loop1
 ```
 In this example, we need to first solve `i`, and then solve `k`. However, our current rule does not allow us to solve `i` in the inner loop before its boundary `k` is resolved.
-
-### Scale: Default Taint
-* taint annotation: `@taint[0/1/?]`
-* For memory slots:
-  * stack slots: always `? (i.e. taint var)`; no way to specify
-  * others: default is `tainted`; specify with `@taint`
-* For registers:
-  * `rsp`: always `untainted`; no way to specify
-  * `rdi, rsi, rdx, rcx, r8, r9`:
-    * as data: default is `tainted`; specify with `@taint`
-    * as pointer: always `untainted`; no way to specify
-  * Other registers: default is `?`; specify with `@taint`
 
 
 ### Why do we want to sub sol even though we already have smt solver?
@@ -228,7 +216,7 @@ Another decision choice:
 
 TODO: Potential improvement: 
 1. Replace counter vars following their dependency order may solve this problem.
-2. Propagagte the branch conditions more smartly so that even the format of the bound is not unified, we can still infer the condition - NOT EASY!
+2. Propagate the branch conditions more smartly so that even the format of the bound is not unified, we can still infer the condition - NOT EASY!
 
 
 ### NOTE
@@ -349,6 +337,19 @@ We now uses a mixture of 1 and 3 to update each memory slot in caller
 4. Which option of update valid region after func call should I use? Change to the cleaner one
 5. Allow marking range var that we failed to infer as empty.
 
+## Taint Type Infer
+
+### Scale: Default Taint
+* taint annotation: `@taint[0/1/?]`
+* For memory slots:
+  * stack slots: always `? (i.e. taint var)`; no way to specify
+  * others: default is `tainted`; specify with `@taint`
+* For registers:
+  * `rsp`: always `untainted`; no way to specify
+  * `rdi, rsi, rdx, rcx, r8, r9`:
+    * as data: default is `tainted`; specify with `@taint`
+    * as pointer: always `untainted`; no way to specify
+  * Other registers: default is `?`; specify with `@taint`
 
 # Type Check
 

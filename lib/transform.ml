@@ -251,7 +251,7 @@ module Transform = struct
     in
     let first_bb_type = List.hd ti.func_type in
     let taint_tv_list = List.filter_map (fun idx ->
-      let reg_type = List.nth first_bb_type.reg_type idx in
+      let _, reg_type = List.nth first_bb_type.reg_type idx in
       match snd reg_type with
       | TaintVar tv -> Some tv
       | _ -> None

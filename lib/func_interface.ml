@@ -90,13 +90,13 @@ module FuncInterface (Entry: EntryType) = struct
       (extra_single_var_map: SingleExp.local_var_map_t)
       (child_reg: RegType.t) (parent_reg: RegType.t) : 
       SingleExp.local_var_map_t * Entry.local_var_map_t =
-    let child_single_reg = List.map Entry.get_single_exp child_reg in
-    let parent_single_reg = List.map Entry.get_single_exp parent_reg in
-    List.fold_left2 
+    let child_single_reg = RegType.map Entry.get_single_exp child_reg in
+    let parent_single_reg = RegType.map Entry.get_single_exp parent_reg in
+    RegType.fold_left2 
       (SingleExp.add_local_var_simp simp_local_var) 
       extra_single_var_map 
       child_single_reg parent_single_reg,
-    List.fold_left2 
+    RegType.fold_left2 
       (Entry.add_context_map false simp_local_var) 
       (Entry.get_empty_var_map_from_init_single_var_map extra_single_var_map) 
       child_reg parent_reg
@@ -231,7 +231,7 @@ module FuncInterface (Entry: EntryType) = struct
         Entry.get_top_type ()
       end
     in
-    List.map helper child_reg
+    RegType.map helper child_reg
 
   let set_one_entry
       (smt_ctx: SmtEmitter.t)
@@ -420,7 +420,7 @@ module FuncInterface (Entry: EntryType) = struct
   let get_reg_taint_constraint
       (var_map: Entry.local_var_map_t)
       (parent_reg: RegType.t) (child_reg: RegType.t) : Constraint.t list =
-    List.map2 (
+    RegType.map2entry (
       fun (p_type: entry_t) (c_type: entry_t) ->
         Entry.get_sub_taint_constraint p_type (Entry.repl_context_var var_map c_type)
     ) parent_reg child_reg |> List.flatten
@@ -707,7 +707,7 @@ module FuncInterface (Entry: EntryType) = struct
       | Some taint -> TaintExp.TaintVarSet.union (TaintExp.get_var_set taint) acc
       | _ -> acc
     in
-    let cannot_change_var_set = List.fold_left get_taint_var_helper TaintExp.TaintVarSet.empty fi.out_reg in
+    let cannot_change_var_set = RegType.fold_left get_taint_var_helper TaintExp.TaintVarSet.empty fi.out_reg in
     let cannot_change_var_set = MemType.fold_left get_taint_var_helper cannot_change_var_set fi.in_mem in
     let cannot_change_var_set = MemType.fold_left get_taint_var_helper cannot_change_var_set fi.out_mem in
     let cannot_change_var_set = 
@@ -743,7 +743,7 @@ module FuncInterface (Entry: EntryType) = struct
         TaintExp.TaintVarSet.diff can_taint_var_set var_set,
         reg_idx + 1
     in
-    let _, can_taint_var_set, total_reg_num = List.fold_left helper (cannot_change_var_set, TaintExp.TaintVarSet.empty, 0) fi.in_reg in
+    let _, can_taint_var_set, total_reg_num = RegType.fold_left helper (cannot_change_var_set, TaintExp.TaintVarSet.empty, 0) fi.in_reg in
     if total_reg_num <> IsaBasic.total_reg_num then
       func_interface_error "get_var_can_be_taint: total reg num is incorrect, callee judgement might be wrong"
     else
@@ -760,11 +760,11 @@ module FuncInterfaceConverter = struct
     let mem_map = TaintFuncInterface.MemType.map in
     {
       func_name = interface.func_name;
-      in_reg = List.map TaintEntryType.get_single_exp interface.in_reg;
+      in_reg = SingleFuncInterface.RegType.map TaintEntryType.get_single_exp interface.in_reg;
       in_mem = mem_map TaintEntryType.get_single_exp interface.in_mem;
       in_context = interface.in_context;
       in_taint_context = [];
-      out_reg = List.map TaintEntryType.get_single_exp interface.out_reg;
+      out_reg = SingleFuncInterface.RegType.map TaintEntryType.get_single_exp interface.out_reg;
       out_mem = mem_map TaintEntryType.get_single_exp interface.out_mem;
       out_context = interface.out_context;
       out_single_subtype_list = interface.out_single_subtype_list;

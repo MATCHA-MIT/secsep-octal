@@ -69,7 +69,7 @@ module SingleBrInverseMap = struct
         (acc: target_br_map_t * br_target_map_t) (br_block: ArchType.t) : 
         target_br_map_t * br_target_map_t =
       let helper = helper_inner target_block.useful_var br_block.local_var_map br_block.pc in
-      let acc = List.fold_left2 helper acc target_block.reg_type br_block.reg_type in
+      let acc = ArchType.RegType.fold_left2 helper acc target_block.reg_type br_block.reg_type in
       ArchType.MemType.fold_left2 helper acc target_block.mem_type br_block.mem_type
     in
     let target_block, br_block_list = block_subtype in

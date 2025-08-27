@@ -102,16 +102,16 @@ module TaintTypeInfer = struct
     match List.find_opt (fun (x: FuncInput.entry_t) -> x.func_name = single_arch_type.label) taint_input_list with
     | None ->
       let acc_taint_exp, reg_type = 
-        List.fold_left_map taint_var_no_default_helper acc_taint_exp single_arch_type.reg_type 
+        ArchType.RegType.fold_left_map taint_var_no_default_helper acc_taint_exp single_arch_type.reg_type 
       in
       let acc_taint_exp, mem_type =
         ArchType.MemType.fold_left_map taint_var_no_default_helper acc_taint_exp single_arch_type.mem_type
       in
       acc_taint_exp, reg_type, mem_type
     | Some taint_input ->
-      let reg_type = List.map2 (fun x (_, t) -> x, t) single_arch_type.reg_type taint_input.reg_type in
+      let reg_type = List.map2 (fun (valid, x) (_, (_, t)) -> valid, (x, t)) single_arch_type.reg_type taint_input.reg_type in
       let acc_taint_exp, reg_type =
-        List.fold_left_map taint_var_helper acc_taint_exp reg_type
+        ArchType.RegType.fold_left_map taint_var_helper acc_taint_exp reg_type
       in
       let mem_type = merge_mem_taint single_arch_type.mem_type taint_input.mem_type in
       let acc_taint_exp, mem_type =
@@ -346,7 +346,7 @@ module TaintTypeInfer = struct
     let merge_helper = (
       fun acc (_, entry) -> TaintExp.TaintVarSet.union acc (TaintExp.get_var_set entry)
     ) in
-    let input_var = List.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type in
+    let input_var = ArchType.RegType.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type in
     SmtEmitter.push state.smt_ctx;
     (* SingleContext.add_assertions state.smt_ctx state.state_context; *)
     SingleContext.add_assertions state.smt_ctx (List.hd state.func_type).context;

@@ -46,7 +46,7 @@ module RangeSolTemplate = struct
         SingleEntryType.add_local_var_simp (fun x -> x) acc in_type a_type
       else acc
     in
-    let var_map = List.fold_left2 helper [] in_type.reg_type a_type.reg_type in
+    let var_map = ArchType.RegType.fold_left2 helper [] in_type.reg_type a_type.reg_type in
     MemTypeBasic.fold_left2 helper var_map in_type.mem_type a_type.mem_type
 
   let add_range_sol_template

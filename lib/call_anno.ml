@@ -74,13 +74,13 @@ module CallAnno = struct
       (sub_sol_func: SingleExp.t -> MemOffset.t option)
       (base_info: base_info MemTypeBasic.mem_content) : t =
     (* CallAnno is responsible for replacing local variables & applying solutions for SE in reg types *)
-    let pr_reg = List.map (fun (se, te) ->
+    let pr_reg = List.map (fun (valid, (se, te)) ->
       (* let se = SingleExp.repl_local_var single_map se in *)
       match sub_sol_func se with
       | Some (se_l, se_r) ->
-        if SingleExp.cmp se_l se_r = 0 then (se_l, te) (* expecting result of to_mem_offset2 to be Single e *)
-        else (se, te)
-      | _ -> (se, te)
+        if SingleExp.cmp se_l se_r = 0 then valid, (se_l, te) (* expecting result of to_mem_offset2 to be Single e *)
+        else valid, (se, te)
+      | _ -> valid, (se, te)
     ) pr_reg in
     match call_mem_read_hint_option, taint_map_option with
     | None, _ | _, None -> None
@@ -106,7 +106,7 @@ module CallAnno = struct
     | Some anno' ->
       Some { 
         anno' with 
-        pr_reg = List.map update_taint_entry anno'.pr_reg;
+        pr_reg = TaintRegType.map update_taint_entry anno'.pr_reg;
         ch_mem = MemTypeBasic.map (fun (slot: slot_t) ->
           let slot_info, base_info = slot in
           let base_id, off, is_full_slot, taint_opt = slot_info in

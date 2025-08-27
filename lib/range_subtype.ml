@@ -351,7 +351,7 @@ module RangeSubtype = struct
             (entry1, entry2) :: acc
           else acc
       in
-      let find_list = List.fold_left2 helper [] sup_block.reg_type sub_block.reg_type in
+      let find_list = ArchType.RegType.fold_left2 helper [] sup_block.reg_type sub_block.reg_type in
       ArchType.MemType.fold_left2 helper find_list sup_block.mem_type sub_block.mem_type
     in
     match tv_rel.subtype_list with
@@ -852,7 +852,7 @@ module RangeSubtype = struct
               else acc
             | _ -> acc
       in
-      let acc = List.fold_left2 helper (block_var_set, []) sup_block.reg_type sub_block.reg_type in
+      let acc = ArchType.RegType.fold_left2 helper (block_var_set, []) sup_block.reg_type sub_block.reg_type in
       let remain_var_set, var_map = ArchType.MemType.fold_left2 helper acc sup_block.mem_type sub_block.mem_type in
       if IntSet.is_empty remain_var_set then Some var_map
       else None

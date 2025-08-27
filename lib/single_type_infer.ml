@@ -566,6 +566,7 @@ module SingleTypeInfer = struct
         (* ignore callee saved regs *)
         let callee_saved_reg_vars = arch_type.reg_type
           |> List.filteri (fun i _ -> Isa.is_reg_idx_callee_saved i)
+          |> List.split |> snd
           |> List.filter_map (fun s ->
                match s with
                | SingleEntryType.SingleVar v -> Some v
