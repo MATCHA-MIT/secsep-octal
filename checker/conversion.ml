@@ -240,12 +240,13 @@ let convert_reg_type
   if TaintTypeInfer.ArchType.Isa.total_reg_num != List.length reg_type then
     failwith "source reg_type's length is unexpected"
   else
-    List.mapi (fun idx entry ->
+    List.mapi (fun idx (range, entry) ->
       let size = idx
         |> TaintTypeInfer.ArchType.Isa.get_full_reg_by_idx
         |> TaintTypeInfer.ArchType.Isa.get_reg_size
         |> Int64.to_int
       in
+      RegRange.from_infer_range range,
       (* var for reg will have inferred size equal to reg size *)
       (* no need to worry about sign/zero extension *)
       convert_basic_type ctx entry get_var_size size
@@ -255,8 +256,8 @@ let convert_flag_type
     (ctx: Z3.context)
     : FlagType.t =
   List.init TaintTypeInfer.ArchType.Isa.total_flag_num (fun _ ->
-    DepType.get_top_flag (),
-    TaintType.get_taint_exp ctx
+    false, (* we assume flag is always invalid in the beginning of the basic block *)
+    (DepType.get_top_flag (), TaintType.get_taint_exp ctx)
   )
 
 let convert_mem_offset
@@ -356,7 +357,7 @@ let infer_var_size_map
     (mem_type: TaintTypeInfer.ArchType.MemType.t)
     : (int * int) list =
   (* vars in register *)
-  let res, _ = List.fold_left (
+  let res, _ = RegType.fold_left (
     fun (acc, id) (entry: TaintEntryType.t) ->
       let se, _ = entry in
       let reg = TaintTypeInfer.Isa.get_full_reg_by_idx id in
@@ -484,7 +485,7 @@ let convert_input_var
     fun acc (_, entry) -> TaintExp.TaintVarSet.union acc (TaintExp.get_var_set entry)
   in
   let input_var =
-    List.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type
+    RegType.fold_left merge_helper TaintExp.TaintVarSet.empty input_arch.reg_type
   in
   let input_var = 
     TaintTypeInfer.ArchType.MemType.fold_left merge_helper input_var input_arch.mem_type
@@ -682,7 +683,7 @@ let convert_call_anno
 
   let anno = Option.get anno in
 
-  let _, func_vsm = List.fold_left (
+  let _, func_vsm = RegType.fold_left (
     fun ((reg_id, func_vsm): int * func_var_size_map) (se, _) ->
       let reg_size = reg_id
         |> TaintTypeInfer.Isa.get_full_reg_by_idx
@@ -707,7 +708,7 @@ let convert_call_anno
   let targ_get_var_size = get_size_finder_of_func func_vsm targ_func in
 
   let pr_reg = List.mapi (
-    fun reg_id (se, te) ->
+    fun reg_id (reg_range, (se, te)) ->
       let reg_size = reg_id
         |> TaintTypeInfer.Isa.get_full_reg_by_idx
         |> TaintTypeInfer.Isa.get_reg_size
@@ -716,6 +717,7 @@ let convert_call_anno
       let se = SingleEntryType.repl_local_var single_local_var_map se in
       let se' = convert_dep_type ~zext:true ctx se (get_var_size from_get_var_size) reg_size in
       let te' = convert_taint_type ctx te in
+      RegRange.from_infer_range reg_range, 
       (se', te')
   ) anno.pr_reg in
 

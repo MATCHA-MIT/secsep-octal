@@ -1,18 +1,61 @@
 open Type.Isa_basic
 open Type.Smt_emitter
 open Basic_type
+open Reg_type_basic
 open Z3
 open Sexplib.Std
 
+module RegRange = struct
+  exception RegRangeError of string
+  let reg_range_error msg = raise (RegRangeError ("[Reg Range Error] " ^ msg))
+
+  type t = int64 * int64
+  [@@deriving sexp]
+
+  let from_infer_range (r: Type.Reg_range.RegRange.t) : t =
+    match r with
+    | RangeConst (x, y) -> x, y
+    | RangeVar _ -> 0L, 0L
+    | RangeExp (_, (x, y)) -> x, y
+
+  let get_empty_range () : t = 0L, 0L
+
+  let write_update (r: t) (off: t) : t =
+    let r1, r2 = r in
+    let o1, o2 = off in
+    if r2 < o1 || o2 < r1 then reg_range_error "cannot merge range that are not adjacent";
+    Int64.min r1 o1, Int64.max r2 o2
+
+  let write_update_off_size (r: t) (off_size: int64 * int64) : t =
+    let off, size = off_size in
+    write_update r (off, Int64.add off size)
+
+  let read_check (r: t) (off: t) : bool =
+    let r1, r2 = r in
+    let o1, o2 = off in
+    r1 <= o1 && o2 <= r2
+
+  let read_check_off_size (r: t) (off_size: int64 * int64) : bool =
+    let off, size = off_size in
+    read_check r (off, Int64.add off size)
+
+  let check_subtype = read_check
+  (* check_subtype sub sup: there should be sup belongs to sub *)
+end
+
 module RegType = struct
+include RegTypeBasic
   exception RegTypeError of string
 
   let reg_type_error msg = raise (RegTypeError ("[Reg Type Error] " ^ msg))
 
+  type range_t = RegRange.t
+  [@@deriving sexp]
+
   type entry_t = BasicType.t
   [@@deriving sexp]
 
-  type t = entry_t list
+  type t = (range_t, entry_t) reg_content
   [@@deriving sexp]
 
   let get_reg_type_size_expected
@@ -22,9 +65,11 @@ module RegType = struct
       (expected_size: int64 option) (* in bytes *)
       : entry_t =
     let reg_idx = IsaBasic.get_reg_idx r in
-    let entry_type = List.nth reg_type reg_idx in
+    let entry_range, entry_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
-    if Option.is_none expected_size || (size = Option.get expected_size) then
+    if not (RegRange.read_check_off_size entry_range (off, size)) then
+      reg_type_error "get_reg_type_size_expected: reg valid region check failed"
+    else if Option.is_none expected_size || (size = Option.get expected_size) then
       BasicType.get_start_len ctx off size entry_type
     else
       reg_type_error "get_reg_type_size_expected: reg size is unexpected"
@@ -34,8 +79,9 @@ module RegType = struct
 
   let set_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in
-    let old_type = List.nth reg_type reg_idx in
+    let old_range, old_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
+    let new_range = RegRange.write_update_off_size old_range (off, size) in
     let new_type_taint = snd new_type in
     let new_type = 
       BasicType.set_start_len ctx (IsaBasic.is_partial_update_reg_set_default_zero r) off size old_type new_type
@@ -48,7 +94,7 @@ module RegType = struct
       new_type
     in
     List.mapi (
-      fun i entry_type -> if i = reg_idx then new_type else entry_type
+      fun i entry_type -> if i = reg_idx then (new_range, new_type) else entry_type
     ) reg_type
 
   let set_reg_mult_type 
@@ -72,7 +118,7 @@ module RegType = struct
       (smt_ctx: SmtEmitter.t)
       (sub_r_type: t) (sup_r_type: t) : bool =
     List.fold_left2 (
-      fun (acc: bool) (sub_entry: entry_t) (sup_entry: entry_t) ->
+      fun (acc: bool) (sub_range, sub_entry) (sup_range, sup_entry) ->
         let curr = BasicType.check_subtype smt_ctx false sub_entry sup_entry in
         (* Printf.printf "reg subtype check: %s(%d) -> %s(%d) : %b\n"
           (BasicType.sexp_of_t sub_entry |> Sexplib.Sexp.to_string_hum)
@@ -80,15 +126,17 @@ module RegType = struct
           (BasicType.sexp_of_t sup_entry |> Sexplib.Sexp.to_string_hum)
           (DepType.get_bit_size (fst sup_entry))
           curr; *)
-        acc && curr
+        let range_check = RegRange.check_subtype sub_range sup_range in
+        acc && curr && range_check
         
     ) true sub_r_type sup_r_type
 
   let check_taint_eq
       (smt_ctx: SmtEmitter.t)
       (sub_r_type: t) (sup_r_type: t) : bool =
+    (* This is only used for check reg taint in call anno, so we do not need to check reg valid range *)
     List.fold_left2 (
-      fun (acc: bool) (_, sub_taint) (_, sup_taint) ->
+      fun (acc: bool) (_, (_, sub_taint)) (_, (_, sup_taint)) ->
         acc &&
         TaintType.check_subtype smt_ctx true sub_taint sup_taint
     ) true sub_r_type sup_r_type

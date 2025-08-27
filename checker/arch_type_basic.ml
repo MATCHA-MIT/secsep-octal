@@ -57,8 +57,8 @@ module ArchTypeBasic = struct
     let taint_sub_func = TaintType.substitute ctx taint_ctx_map in
     let basic_sub_func = BasicType.substitute dep_sub_func taint_sub_func in
 
-    let reg_type = List.map basic_sub_func a_type.reg_type in
-    let flag_type = List.map basic_sub_func a_type.flag_type in
+    let reg_type = RegType.map basic_sub_func a_type.reg_type in
+    let flag_type = RegType.map basic_sub_func a_type.flag_type in
     (* Note: We do not substitute ptr since
         1. ptr is checked if slot offset checked
         2. ptr overlap/non-overlap is checked by checking context *)
