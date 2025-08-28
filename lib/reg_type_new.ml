@@ -41,6 +41,9 @@ module RegType (Entry: EntryType) = struct
 
   let map (func: 'a -> 'b) (reg: 'a reg_content) : 'b reg_content =
     List.map (fun (valid, e) -> valid, func e) reg
+  
+  let mapi (func: int -> 'a -> 'b) (reg: 'a reg_content) : 'b reg_content =
+    List.mapi (fun idx (valid, e) -> valid, func idx e) reg
 
   let map2entry (func: 'a -> 'b -> 'c) (reg1: 'a reg_content) (reg2: 'b reg_content) : 'c list =
     List.map2 (fun (_, e1) (_, e2) -> func e1 e2) reg1 reg2
@@ -149,5 +152,17 @@ module RegType (Entry: EntryType) = struct
           acc_useful_var, acc_id + 1
     ) (SingleExp.SingleVarSet.empty, 0) reg_type
     in useful_var
+    
+  let update_input_reg_range (num_args: int) (reg_type: t) : t =
+    List.mapi (
+      fun i (_, e) ->
+        RegRange.get_input_range num_args i, e
+    ) reg_type
+
+  let update_ret_reg_range (reg_type: t) : t =
+    List.mapi (
+      fun i (_, e) ->
+        RegRange.get_ret_range i, e
+    ) reg_type
 
 end

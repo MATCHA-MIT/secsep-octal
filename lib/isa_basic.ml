@@ -198,18 +198,18 @@ module IsaBasic = struct
 
   let get_full_reg_by_idx (idx: int) : register =
     match idx with
-    | 0 -> RAX
-    | 1 -> RCX
-    | 2 -> RDX
+    | 0 -> RAX (* ret val *)
+    | 1 -> RCX (* 4th arg *)
+    | 2 -> RDX (* 3rd arg *)
     | 3 -> RBX
     | 4 -> RSP
     | 5 -> RBP
-    | 6 -> RSI
-    | 7 -> RDI
-    | 8 -> R8
-    | 9 -> R9
-    | 10 -> R10
-    | 11 -> R11
+    | 6 -> RSI (* 2nd arg *)
+    | 7 -> RDI (* 1st arg *)
+    | 8 -> R8  (* 5th arg *)
+    | 9 -> R9  (* 6th arg *)
+    | 10 -> R10 (* scratch/temp, caller-saved *)
+    | 11 -> R11 (* scratch/temp, caller-saved *)
     | 12 -> R12
     | 13 -> R13
     | 14 -> R14
