@@ -126,6 +126,7 @@ module RegType (Entry: EntryType) = struct
       | _ -> reg_type_error "set_reg_type_helper: expecting reg size of 1/2/4/8"
       in
       let new_range = RegRange.write_update old_range write_range write_is_full in
+      (* Printf.printf "old_range %s new_range %s\n" (Sexplib.Sexp.to_string_hum (RegRange.sexp_of_t old_range)) (Sexplib.Sexp.to_string_hum (RegRange.sexp_of_t new_range)); *)
       List.mapi (fun idx r -> if idx = reg_idx then (new_range, new_type) else r) reg_type
 
   let set_reg_type = set_reg_type_helper false
@@ -139,6 +140,12 @@ module RegType (Entry: EntryType) = struct
     in
     let next_var, reg_type = helper start_var [] 0 in
     (next_var, List.rev reg_type)
+
+  let init_reg_range_type (start_range_var: int) (reg_type: t) : int * t =
+    List.fold_left_map (
+      fun (acc: int) (_, e) ->
+        acc + 1, (RegRange.RangeVar acc, e)
+    ) start_range_var reg_type
 
   let get_callee_useful_var (reg_type: t) : SingleExp.SingleVarSet.t =
     let useful_var, _ = List.fold_left (

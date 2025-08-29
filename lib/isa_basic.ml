@@ -218,6 +218,9 @@ module IsaBasic = struct
       if idx < 32 then XMM (idx - 16, Some xmm_full_off_size)
       else isa_error "get_full_reg_by_idx: invalid idx"
 
+  let get_reg_idx_full_size (r_idx: int) : int64 =
+    if r_idx < 16 then 8L else 16L
+
   let get_reg_offset_size_opt (r: register) : data_off_size option =
     match r with
     | RAX | RCX | RDX | RBX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15 -> Some (0L, 8L)

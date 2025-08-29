@@ -134,6 +134,7 @@ module SingleTypeInfer = struct
   let init
       (prog: Isa.prog)
       (func_name: string)
+      (func_input_reg: FuncInput.RegType.t)
       (func_mem_interface: ArchType.MemType.t)
       (stack_spill_info: StackSpillInfo.t)
       (constr_info: ConstrInfo.t)
@@ -170,7 +171,7 @@ module SingleTypeInfer = struct
             (
               (next_pc, start_var), 
               ArchType.init_func_input_from_layout 
-                bb.label (SingleVar 0) start_pc func_mem_interface 
+                bb.label (SingleVar 0) start_pc func_input_reg func_mem_interface 
                 global_var_set ArchType.TypeInferDep
             )
           end else begin
@@ -604,12 +605,13 @@ module SingleTypeInfer = struct
       (prog: Isa.prog)
       (func_interface_list: FuncInterface.t list)
       (func_name: Isa.label)
+      (func_input_reg: FuncInput.RegType.t)
       (func_mem_interface: ArchType.MemType.t)
       (stack_spill_info: StackSpillInfo.t)
       (constr_info: ConstrInfo.t)
       (iter: int)
       (solver_iter: int) : t =
-    let init_infer_state = init prog func_name func_mem_interface stack_spill_info constr_info func_interface_list in
+    let init_infer_state = init prog func_name func_input_reg func_mem_interface stack_spill_info constr_info func_interface_list in
     let ptr_align_list = ArchType.MemType.get_mem_align_constraint_helper func_mem_interface in
     let rec helper (state: t) (iter_left: int) : t =
       if iter_left = 0 then
@@ -964,9 +966,10 @@ module SingleTypeInfer = struct
         (acc: FuncInterface.t list) (entry: FuncInput.entry_t) :
         (FuncInterface.t list) * t =
       let func_name = entry.func_name in
+      let func_input_reg = entry.reg_type in
       let func_mem_interface = MemTypeBasic.map (fun (x, _) -> x) entry.mem_type in
       Printf.printf "Inferring func %s\n" func_name;
-      let infer_state = infer_one_func prog acc func_name func_mem_interface entry.stack_spill_info entry.constr_info iter solver_iter in
+      let infer_state = infer_one_func prog acc func_name func_input_reg func_mem_interface entry.stack_spill_info entry.constr_info iter solver_iter in
       let infer_state = add_var_bound_constraint infer_state in
       let func_interface = get_func_interface infer_state in
       Printf.printf "Infer state of func %s\n" func_name;

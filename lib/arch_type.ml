@@ -166,11 +166,14 @@ module ArchType (Entry: EntryType) = struct
 
   let init_func_input_from_layout
       (label: Isa.label) (start_var: entry_t) 
-      (start_pc: int) (mem_type: MemType.t)
+      (start_pc: int) 
+      (func_input_reg: 'a RegType.reg_content)
+      (mem_type: MemType.t)
       (global_var: SingleExp.SingleVarSet.t)
       (prop_mode: prop_mode_t)
       : t =
     let _, reg_type = RegType.init_reg_type start_var in
+    let reg_type = List.combine (List.split func_input_reg |> fst) (List.split reg_type |> snd) in
     (* Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0); *)
     {
       label = label;

@@ -1,4 +1,5 @@
 open Isa_basic
+open Set_sexp
 open Sexplib.Std
 (* open Sexplib *)
 
@@ -17,6 +18,13 @@ module RegRange = struct
     | RangeVar of var_id
     | RangeExp of var_id * range_t
   [@@deriving sexp]
+
+  module VarSolMap = IntMapSexp (
+    struct
+      type t = range_t
+      [@@deriving sexp]
+    end
+  )
 
   let get_empty_range () : t = RangeConst (0L, 0L)
 
@@ -44,7 +52,7 @@ module RegRange = struct
     if IsaBasic.is_reg_idx_callee_saved reg_idx then RangeConst (0L, 8L)
     else RangeConst (0L, 0L)
 
-  let write_update_range (r: range_t) (off: range_t) : range_t =
+  let union_range (r: range_t) (off: range_t) : range_t =
     let r1, r2 = r in
     let o1, o2 = off in
     if r2 < o1 || o2 < r1 then reg_range_error "cannot merge non-connected range";
@@ -53,8 +61,26 @@ module RegRange = struct
   let write_update (r: t) (off: range_t) (is_full: bool) : t =
     if is_full then RangeConst off else
     match r with
-    | RangeConst r -> RangeConst (write_update_range r off)
+    | RangeConst r -> RangeConst (union_range r off)
     | RangeVar v -> RangeExp (v, off)
-    | RangeExp (v, r) -> RangeExp (v, write_update_range r off)
+    | RangeExp (v, r) -> RangeExp (v, union_range r off)
+
+  let inter_range (a: range_t) (b: range_t) : range_t =
+    let a1, a2 = a in
+    let b1, b2 = b in
+    if a2 <= b1 || b2 <= a1 then 0L, 0L
+    else Int64.max a1 b1, Int64.min a2 b2
+
+  let sub_sol (sol_map: VarSolMap.t) (r: t) : t =
+    match r with
+    | RangeConst _ -> r
+    | RangeVar v -> 
+      Option.value (
+        Option.map (fun x -> RangeConst x) (VarSolMap.find_opt v sol_map)
+      ) ~default:(r)
+    | RangeExp (v, e) -> 
+      Option.value (
+        Option.map (fun x -> RangeConst (union_range e x)) (VarSolMap.find_opt v sol_map)
+      ) ~default:(r)
 
 end

@@ -1,10 +1,12 @@
 open Isa
 open Single_entry_type
+open Reg_range
 open Mem_offset_new
 open Stack_spill_info
 open Constraint
 (* open Single_context *)
 open Single_subtype
+open Reg_range_subtype
 open Range_subtype
 open Range_subset
 open Range_useless_infer
@@ -60,38 +62,46 @@ module RangeTypeInfer = struct
 
   let init (single_infer_state: SingleTypeInfer.t) : t =
     let func_name = single_infer_state.func_name in
-    let start_var = MemRange.RangeVar 1 in
+    let start_reg_var = 1 in
+    let start_mem_var = 1 in
     let helper
-        (acc: MemRange.t) (block_single_type: SingleTypeInfer.ArchType.t) :
-        MemRange.t * ArchType.t =
+        (acc_reg, acc_mem) (block_single_type: SingleTypeInfer.ArchType.t) :
+        (RegRange.var_id * MemRange.range_var_id) * ArchType.t =
       if block_single_type.label = func_name then
-        acc, 
+        (acc_reg, acc_mem), 
         { block_single_type with prop_mode = ArchType.TypeInferInit }
       else
-        let acc, mem_type =
+        let acc_reg, reg_type = 
+          if block_single_type.label = Isa.ret_label then
+            acc_reg, ArchType.RegType.update_ret_reg_range block_single_type.reg_type
+          else
+            ArchType.RegType.init_reg_range_type acc_reg block_single_type.reg_type
+        in
+        let acc_mem, mem_type =
           List.fold_left_map (
-            fun (acc: MemRange.t) (ptr, part_mem) ->
+            fun (acc: MemRange.range_var_id) (ptr, part_mem) ->
               let acc, part_mem =
                 List.fold_left_map (
-                  fun (acc: MemRange.t) (off, range, entry) ->
+                  fun (acc: MemRange.range_var_id) (off, range, entry) ->
                     match range with
                     | MemRange.RangeConst [ range_off ] ->
                       if MemOffset.cmp off range_off = 0 then
                         acc, (off, range, entry)
                       else
-                        MemRange.next_var acc, (off, acc, entry)
-                    | _ -> MemRange.next_var acc, (off, acc, entry)
+                        acc + 1, (off, RangeVar acc, entry)
+                    | _ -> acc + 1, (off, RangeVar acc, entry)
                 ) acc part_mem
               in
               acc, (ptr, part_mem)
-          ) acc block_single_type.mem_type
+          ) acc_mem block_single_type.mem_type
         in
-        acc,
+        (acc_reg, acc_mem),
         { block_single_type with 
+          reg_type = reg_type;
           mem_type = mem_type;
           prop_mode = ArchType.TypeInferInit }
     in
-    let _, func_type = List.fold_left_map helper start_var single_infer_state.func_type in
+    let _, func_type = List.fold_left_map helper (start_reg_var, start_mem_var) single_infer_state.func_type in
     {
       func_name = single_infer_state.func_name;
       func = single_infer_state.func;
@@ -191,7 +201,12 @@ module RangeTypeInfer = struct
         end
     ) state.func_type;
 
-    (* 2. Range type infer *)
+    (* 2. Reg range type infer *)
+    let sol = RegRangeSubtype.solve block_subtype in
+    (* Substitute solution back to func type *)
+    let func_type = List.map (RegRangeSubtype.repl_sol_arch_type sol) state.func_type in
+
+    (* 3. Mem range type infer *)
     let subtype_list = RangeSubtype.get_range_constraint block_subtype in
     let subtype_list =
       List.filter (
@@ -234,9 +249,9 @@ module RangeTypeInfer = struct
     if IntSet.cardinal unresolved_var_set = 0 then
       Printf.printf "Successfully resolve func %s\n" state.func_name;
 
-    (* 3. Substitute solution back to func type *)
+    (* Substitute solution back to func type *)
     let func_type =
-      List.map (RangeSubtype.repl_sol_arch_type subtype_list useless_var_set) state.func_type
+      List.map (RangeSubtype.repl_sol_arch_type subtype_list useless_var_set) func_type
     in
 
     SmtEmitter.pop state.smt_ctx 1;
