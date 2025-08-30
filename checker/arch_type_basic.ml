@@ -3,6 +3,7 @@ open Type.Set_sexp
 open Type.Smt_emitter
 (* open Z3_sexp *)
 open Basic_type
+open Dep_change_ctx
 open Mem_anno
 open Branch_anno
 open Call_anno
@@ -31,6 +32,8 @@ module ArchTypeBasic = struct
     flag_type: FlagType.t;
     mem_type: MemType.t;
     context: BasicType.ctx_t;
+
+    change_ctx: DepChangeCtx.t;
 
     (* stack_spill_info: StackSpillInfo.t; *)
 

@@ -380,7 +380,23 @@ Conversion of single variable map always uses zero extension:
 
 ### Context map (Br Anno and Call Anno)
 1. For branch anno, needs to check that the branch context substitute map does not substitute input variables or taint variables (done for taint variables, still needs to be done for input dep variables).
-2. We also need to check that the map does not substitute var to top!!!
+2. We also need to check that the map does not substitute var to top!!! NOTE: About this, the infer result indeed has the case where context map maps some var to top. However, in checker, these tops are replaced with fresh free variables, so we do not violate this requirement.
+TODO: Double check use cases!!!
+
+### Non Change Exp Check
+1. We cannot mark all var as nonChangeExp, since TransPtr requires that ptr are not nonChangeExp. Hence, at func input block, we mark all variables except for non rsp, non global pointers as nonChangeExp.
+2. For other block var, whether it can be marked as nonChangeExp also needs to satisfy block subtype relation.
+3. Given a exp, and a context (constraints and a list of non-changed vars) how to judge whether it is a nonChangeExp (given the set of changable and nonChange vars?):
+   1. If the exp does not contain any changable vars, then it is a nonChangeExp.
+   2. If the exp's value is independent of all changable vars, then it is a nonChangeExp.
+4. How to check whether a exp is independnet of a variable: 
+   1. raw idea: instantiate the variable to any constant does not affect the variable's value
+   2. for all $v_1$, $v_2$, $[v_1/x](e)=[v_2/x](e)$. Note that $v_1$ and $v_2$ must be reasonable instance of $x$ under the current context.
+   3. We can also simply check $[v_1/x](e)=e$.
+5. IsNonChangeExp check at block subtype: it is exactly isNonChangeExp
+6. Another thing is to infer non change var!!!
+
+Problem: When isNonChangeExp is a complex judgement regarding the type context, the old simulation relation needs to be strengthen to guarantee that the new instance also satsifies the type context (i.e., is a valid instance) - needs to constrain sigma call in Cptr. (Just a guess for now)
 
 ## Reg Validity Check
 1. For flag that is optionally updated, we used to consider itself as the source. However, it will cause trouble when we optionally update an invalid flag. In the implementation, I skipped checking the validity of the optionally updated flag when reading it, but only check when I update it. If it was invalid, then it is still invalid after the optional update.

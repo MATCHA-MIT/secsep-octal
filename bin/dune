@@ -4,6 +4,7 @@
   infer_single
   infer_range
   infer_taint
+  infer_change
   prog_transform
   convert
   check
@@ -14,6 +15,7 @@
   infer_single
   infer_range
   infer_taint
+  infer_change
   prog_transform
   convert
   check

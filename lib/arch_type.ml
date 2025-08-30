@@ -60,6 +60,7 @@ module ArchType (Entry: EntryType) = struct
     useful_var: SingleExp.SingleVarSet.t;
     useful_constrained_var: SingleExp.SingleVarSet.t;
     global_var: SingleExp.SingleVarSet.t;
+    change_var: SingleExp.SingleVarSet.t;
     prop_mode: prop_mode_t;
     (* Maybe add constraint set here!!! *)
   }
@@ -195,6 +196,7 @@ module ArchType (Entry: EntryType) = struct
       useful_var = SingleExp.SingleVarSet.empty;
       useful_constrained_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
+      change_var = SingleExp.SingleVarSet.empty;
       prop_mode = prop_mode;
     }
 
@@ -228,6 +230,7 @@ module ArchType (Entry: EntryType) = struct
       useful_var = SingleExp.SingleVarSet.empty;
       useful_constrained_var = SingleExp.SingleVarSet.empty;
       global_var = global_var;
+      change_var = SingleExp.SingleVarSet.empty;
       prop_mode = prop_mode;
     }
 
@@ -1348,6 +1351,7 @@ module ArchType (Entry: EntryType) = struct
       in_mem = in_mem;
       in_context = in_state.context;
       in_taint_context = [];
+      in_change_var = in_state.change_var;
       out_reg = out_reg;
       out_mem = out_mem;
       out_context = out_context;

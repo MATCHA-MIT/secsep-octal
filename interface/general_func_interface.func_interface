@@ -59,7 +59,7 @@
       (Cond
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 7)))))))
-  (in_taint_context ())
+  (in_taint_context ()) (in_change_var (3 4 5 7 12 13 14 15))
   (out_reg
    (((RangeConst (0 0)) (SingleTop (TaintConst true)))
     ((RangeConst (0 0)) (SingleTop (TaintConst true)))
@@ -171,7 +171,7 @@
       (Cond
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 7)))))))
-  (in_taint_context ())
+  (in_taint_context ()) (in_change_var (3 4 5 7 12 13 14 15))
   (out_reg
    (((RangeConst (0 0)) (SingleTop (TaintConst true)))
     ((RangeConst (0 0)) (SingleTop (TaintConst true)))
@@ -305,6 +305,7 @@
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 7)))))))
   (in_taint_context (((TaintVar 33) (TaintVar 32))))
+  (in_change_var (3 4 5 6 7 12 13 14 15))
   (out_reg
    (((RangeConst (0 0)) (SingleTop (TaintConst true)))
     ((RangeConst (0 0)) (SingleTop (TaintConst true)))
@@ -448,6 +449,7 @@
        (Le (SingleBExp SingleAdd (SingleVar 4) (SingleConst 8))
         (SingleVar 7)))))))
   (in_taint_context (((TaintVar 33) (TaintVar 32))))
+  (in_change_var (3 4 5 6 7 12 13 14 15))
   (out_reg
    (((RangeConst (0 0)) (SingleTop (TaintConst true)))
     ((RangeConst (0 0)) (SingleTop (TaintConst true)))

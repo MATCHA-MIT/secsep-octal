@@ -33,6 +33,7 @@ module FuncInterface (Entry: EntryType) = struct
     in_mem: MemType.t;
     in_context: SingleContext.t list;
     in_taint_context: TaintExp.sub_t list;
+    in_change_var: IntSet.t;
     out_reg: RegType.t;
     out_mem: MemType.t;
     out_context: SingleContext.t list;
@@ -764,6 +765,7 @@ module FuncInterfaceConverter = struct
       in_mem = mem_map TaintEntryType.get_single_exp interface.in_mem;
       in_context = interface.in_context;
       in_taint_context = [];
+      in_change_var = interface.in_change_var;
       out_reg = SingleFuncInterface.RegType.map TaintEntryType.get_single_exp interface.out_reg;
       out_mem = mem_map TaintEntryType.get_single_exp interface.out_mem;
       out_context = interface.out_context;

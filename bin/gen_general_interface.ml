@@ -63,6 +63,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_mem = in_mem;
     in_context = mem_context;
     in_taint_context = [];
+    in_change_var = Type.Set_sexp.IntSet.of_list (r RDI :: Isa_basic.IsaBasic.callee_saved_reg_idx);
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       get_default_info (r RDI), [ 
@@ -128,6 +129,7 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_mem = in_mem;
     in_context = mem_context;
     in_taint_context = [ src_taint, dest_taint ];
+    in_change_var = Type.Set_sexp.IntSet.of_list (r RDI :: r RSI :: Isa_basic.IsaBasic.callee_saved_reg_idx);
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       get_default_info (r RDI), [ 

@@ -1,6 +1,7 @@
 open Arch_type
 open Reg_type
 open Basic_type
+open Dep_change_ctx
 open Flag_type
 open Mem_anno
 open Mem_type
@@ -351,6 +352,19 @@ let convert_context
   in
   (dep_ctx, taint_ctx)
 
+  let convert_dep_change_ctx
+      (ctx: Z3.context)
+      (get_var_size: int -> int option)
+      (change_var_set: IntSet.t)
+      : DepChangeCtx.t =
+    let change_var = IntSet.to_list change_var_set in
+    List.map (
+      fun x ->
+        match convert_dep_type ctx (SingleVar x) get_var_size 8 with
+        | Exp e -> e
+        | Top _ -> convert_error "should not get top"
+    ) change_var
+
 let infer_var_size_map
     (ctx: Z3.context)
     (reg_type: TaintTypeInfer.ArchType.RegType.t)
@@ -429,6 +443,7 @@ let convert_arch_type
     flag_type = convert_flag_type ctx;
     mem_type = convert_mem_type ctx get_var_size is_forget_slot arch_type.mem_type;
     context = convert_context ctx get_var_size arch_type.context tti.taint_context tti.taint_sol;
+    change_ctx = convert_dep_change_ctx ctx get_var_size arch_type.change_var;
     (* stack_spill_info = stack_spill_info; *)
 
     global_var = arch_type.global_var;
@@ -580,6 +595,7 @@ let convert_function_interface
     mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.in_mem;
     context = convert_context ctx get_var_size_func fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
+    change_ctx = convert_dep_change_ctx ctx get_var_size_func fi.in_change_var;
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;
@@ -596,6 +612,7 @@ let convert_function_interface
     mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.out_mem;
     context = convert_context ctx get_var_size_func fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
 
+    change_ctx = convert_dep_change_ctx ctx get_var_size_func IntSet.empty; (* TODO: Double check whether it is ok to mark this as empty (since we do not return new change var on purpose)*)
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;
