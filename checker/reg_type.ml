@@ -20,15 +20,23 @@ module RegRange = struct
 
   let get_empty_range () : t = 0L, 0L
 
+  let get_write_update_range (reg_idx: int) (off_size: int64 * int64) : t =
+    let off, size = off_size in
+    if reg_idx > 15 then IsaBasic.xmm_full_off_size
+    else
+      match size with
+      | 1L | 2L -> off, Int64.add off size
+      | 4L | 8L -> IsaBasic.gpr_full_off_size
+      | _ -> reg_range_error "get_write_update_range unexpected size"
+
   let write_update (r: t) (off: t) : t =
     let r1, r2 = r in
     let o1, o2 = off in
     if r2 < o1 || o2 < r1 then reg_range_error "cannot merge range that are not adjacent";
     Int64.min r1 o1, Int64.max r2 o2
 
-  let write_update_off_size (r: t) (off_size: int64 * int64) : t =
-    let off, size = off_size in
-    write_update r (off, Int64.add off size)
+  let write_update_off_size (reg_idx: int) (r: t) (off_size: int64 * int64) : t =
+    write_update r (get_write_update_range reg_idx off_size)
 
   let read_check (r: t) (off: t) : bool =
     let r1, r2 = r in
@@ -61,27 +69,33 @@ include RegTypeBasic
   let get_reg_type_size_expected
       (ctx: context)
       (reg_type: t)
+      ?(check_valid=true)
       (r: IsaBasic.register)
       (expected_size: int64 option) (* in bytes *)
       : entry_t =
     let reg_idx = IsaBasic.get_reg_idx r in
     let entry_range, entry_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
-    if not (RegRange.read_check_off_size entry_range (off, size)) then
-      reg_type_error "get_reg_type_size_expected: reg valid region check failed"
+    if check_valid && not (RegRange.read_check_off_size entry_range (off, size)) then
+      let _ =
+        Printf.printf "read_region %s check_region %s\n" 
+        (Sexplib.Sexp.to_string_hum (sexp_of_range_t entry_range)) 
+        (Sexplib.Sexp.to_string_hum (sexp_of_range_t (off, size)))
+      in
+      reg_type_error "reg valid region check failed"
     else if Option.is_none expected_size || (size = Option.get expected_size) then
       BasicType.get_start_len ctx off size entry_type
     else
       reg_type_error "get_reg_type_size_expected: reg size is unexpected"
 
-  let get_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) : entry_t =
-    get_reg_type_size_expected ctx reg_type r None
+  let get_reg_type (ctx: context) (reg_type: t) ?(check_valid=true) (r: IsaBasic.register) : entry_t =
+    get_reg_type_size_expected ctx reg_type ~check_valid r None
 
   let set_reg_type (ctx: context) (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in
     let old_range, old_type = List.nth reg_type reg_idx in
     let off, size = IsaBasic.get_reg_offset_size r in
-    let new_range = RegRange.write_update_off_size old_range (off, size) in
+    let new_range = RegRange.write_update_off_size reg_idx old_range (off, size) in
     let new_type_taint = snd new_type in
     let new_type = 
       BasicType.set_start_len ctx (IsaBasic.is_partial_update_reg_set_default_zero r) off size old_type new_type

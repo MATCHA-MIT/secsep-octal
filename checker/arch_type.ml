@@ -3,6 +3,7 @@
 open Type.Smt_emitter
 (* open Z3_sexp *)
 open Basic_type
+open Isa_flag_config
 (* open Mem_anno *)
 open Reg_type
 open Flag_type
@@ -85,12 +86,14 @@ include ArchTypeBasic
 
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
-      (curr_type: t) (src: Isa.operand) : entry_t option =
+      (curr_type: t) 
+      ?(check_reg_valid=true)
+      (src: Isa.operand) : entry_t option =
     let ctx, _ = smt_ctx in
     (* TODO: Should we use data size here? *)
     match src with
     | ImmOp imm -> Some (BasicType.get_imm_type ctx imm) 
-    | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type r)
+    | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type ~check_valid:check_reg_valid r)
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
     | MemOp mem_op -> Some (get_mem_op_type smt_ctx curr_type mem_op)
     | LdOp ld_op -> get_ld_op_type smt_ctx curr_type ld_op
@@ -155,12 +158,13 @@ include ArchTypeBasic
   let set_dest_op_type
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
-      (dest: Isa.operand)
-      (new_type: entry_t) (flag_update_list: (Isa.flag * entry_t) list) : t option =
+      (dest: Isa.operand) (new_type: entry_t) 
+      (flag_update_list: (Isa.flag * entry_t) list)
+      (flag_update_config: (Isa.flag * bool) list) : t option =
     (* Printf.printf "set_dest_op_type: dest=%s, type=%s\n"
       (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand dest))
       (Sexplib.Sexp.to_string_hum (sexp_of_entry_t new_type)); *)
-    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_update_list in
+    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_update_list flag_update_config in
     match dest with
     | RegOp r ->
       Some { curr_type with
@@ -206,14 +210,27 @@ include ArchTypeBasic
         let new_rsp = DepType.Exp new_dep, rsp_tnt in *)
         { curr_type with reg_type = RegType.set_reg_type ctx curr_type.reg_type RSP (new_rsp_dep, rsp_tnt) }
   
+  let get_op_flag_update_config (op: nary_op) : bool IsaFlagConfig.flag_map_t =
+    match op with
+    | BOp bop -> IsaFlagConfig.get_bop_config bop |> snd
+    | UOp uop -> IsaFlagConfig.get_uop_config uop |> snd
+    | TOp top -> IsaFlagConfig.get_top_config top |> snd
+
   let exe_nary
       ?(ignore_flags: bool = false) (* If true, flags will not be updated. This is to allow for n-ary operations to be applied as part of larger instructions, e.g. incrementing/decrementing %rsp in push/pop *)
       (smt_ctx: SmtEmitter.t)
       (curr_type: t)
       (n: int) (nop: nary_op)
       (dest: Isa.operand) (src_ops: Isa.operand list) : bool * t =
+    let xor_reset =
+      match nop, src_ops with
+      | BOp Xor, [ src1; src2 ]
+      | BOp Xorp, [ src1; src2 ]
+      | BOp Pxor, [ src1; src2 ] -> Isa.cmp_operand src1 src2
+      | _ -> false
+    in
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
-    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) src_ops in
+    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type ~check_reg_valid:(not xor_reset)) src_ops in
     (* List.iter (fun src -> Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand src))) src_ops;
     Printf.printf "exe_nary: dest = %s\nsrcs:\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand dest));
     List.iter2 (fun src src_type ->
@@ -222,24 +239,24 @@ include ArchTypeBasic
         (Sexplib.Sexp.to_string_hum (sexp_of_entry_t src_type));
     ) src_ops src_type_list; *)
     if List.length src_type_list <> n then false, curr_type else
-    let ctx, _ = smt_ctx in
     let dest_type, flag_update_list =
       begin match n, nop with
-      | 1, UOp uop -> BasicType.exe_uop ctx uop src_type_list get_src_flag_func (get_dest_op_size dest) false
+      | 1, UOp uop -> BasicType.exe_uop smt_ctx uop src_type_list get_src_flag_func (get_dest_op_size dest) false
       | 2, BOp bop ->
-        let xor_reset = match bop, src_ops with
+        (* let xor_reset = match bop, src_ops with
         | Isa.Xor, [ src1; src2 ]
         | Isa.Xorp, [ src1; src2 ]
         | Isa.Pxor, [ src1; src2 ] -> Isa.cmp_operand src1 src2
         | _ -> false
-        in
-        BasicType.exe_bop ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) xor_reset
-      | 3, TOp top -> BasicType.exe_top ctx top src_type_list get_src_flag_func (get_dest_op_size dest) false
+        in *)
+        BasicType.exe_bop smt_ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) xor_reset
+      | 3, TOp top -> BasicType.exe_top smt_ctx top src_type_list get_src_flag_func (get_dest_op_size dest) false
       | _ -> arch_type_error "exe_nary: n and nop size do not match"
       end
     in
     let flag_update_list = if ignore_flags then [] else flag_update_list in
-    begin match set_dest_op_type smt_ctx curr_type dest dest_type flag_update_list with
+    let flag_update_config = if ignore_flags then [] else get_op_flag_update_config nop in
+    begin match set_dest_op_type smt_ctx curr_type dest dest_type flag_update_list flag_update_config with
     | None -> false, curr_type
     | Some next_type -> true, next_type
     end
@@ -253,11 +270,11 @@ include ArchTypeBasic
     let src_type_opt_1 = get_src_op_type smt_ctx curr_type src1 in
     match src_type_opt_0, src_type_opt_1 with
     | Some src_type_0, Some src_type_1 ->
-      begin match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] with
+      begin match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] [] with
       | None -> false, curr_type
       | Some result_type_1 ->
         begin
-        match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] with
+        match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] [] with
         | None -> false, curr_type
         | Some result_type_2 -> true, result_type_2
         end
@@ -273,9 +290,9 @@ include ArchTypeBasic
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
-    let ctx, _ = smt_ctx in
-    let _, flag_list = BasicType.exe_bop ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
-    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list in
+    let _, flag_list = BasicType.exe_bop smt_ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
+    let flag_config = List.map (fun (x, _) -> x, false) flag_list in
+    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list flag_config in
     true, { curr_type with flag_type = new_flags }
   
   let exe_test
@@ -287,9 +304,9 @@ include ArchTypeBasic
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
-    let ctx, _ = smt_ctx in
-    let _, flag_list = BasicType.exe_bop ctx And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
-    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list in
+    let _, flag_list = BasicType.exe_bop smt_ctx And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
+    let flag_config = List.map (fun (x, _) -> x, false) flag_list in
+    let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list flag_config in
     true, { curr_type with flag_type = new_flags }
 
   let exe_push
@@ -300,8 +317,17 @@ include ArchTypeBasic
     let src_size = Isa.get_op_size src in
     let rsp_type = shift_rsp smt_ctx curr_type (Int64.neg src_size) in
     (* src should be reg, so always return Some *)
-    let src_type = Option.get (get_src_op_type smt_ctx rsp_type src) in
-    match set_dest_op_type smt_ctx rsp_type (StOp (None, Some RSP, None, None, src_size, memslot)) src_type [] with
+
+    (* Special case: rax!!!*)
+    let is_push_rax =
+      match src with
+      | RegOp r -> Isa.get_reg_idx r = Isa.get_reg_idx RAX
+      | _ -> arch_type_error "unexpected push op"
+    in
+    if is_push_rax then Printf.printf "Warning: push rax happens!!!\n";
+
+    let src_type = Option.get (get_src_op_type smt_ctx rsp_type ~check_reg_valid:(not is_push_rax) src) in
+    match set_dest_op_type smt_ctx rsp_type (StOp (None, Some RSP, None, None, src_size, memslot)) src_type [] [] with
     | None -> false, curr_type
     | Some result_type -> true, result_type
 
@@ -317,7 +343,7 @@ include ArchTypeBasic
     | None -> false, curr_type
     | Some ld_type ->
       (* dest should be reg, so always return Some *)
-      let result_type = Option.get (set_dest_op_type smt_ctx curr_type dest ld_type []) in
+      let result_type = Option.get (set_dest_op_type smt_ctx curr_type dest ld_type [] []) in
       true, shift_rsp smt_ctx result_type dest_size
 
   let get_rep_acc (size: int64) : Isa.register =
@@ -390,7 +416,7 @@ include ArchTypeBasic
       match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off ld_slot with
       | None -> false, curr_type
       | Some ld_type -> begin
-        match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] with
+        match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] [] with
         | None -> false, curr_type
         | Some result_type ->
           let rcx_zero = RegType.set_reg_type ctx result_type.reg_type count_reg (Exp (Z3.BitVector.mk_numeral ctx "0" rcx_size), rcx_taint) in

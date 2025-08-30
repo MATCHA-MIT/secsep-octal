@@ -826,16 +826,28 @@ module DepType = struct
     ]
     
 
-  let exe_shld (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+  let exe_shld (smt_ctx: SmtEmitter.t) (dst: exp_t) (src: exp_t) (cnt: exp_t) (* (cflg: exp_t) *) (dest_size: int) : exe_result =
+    let ctx, _ = smt_ctx in
     let dst_size = get_exp_bit_size dst in
     let src_size = get_exp_bit_size src in
     if dst_size <> src_size then
       failwith (Printf.sprintf "exe_shld: invalid dst size: %d != %d" dst_size src_size);
 
-    let cflg_bv = bool_to_bv ctx cflg 1 in
-    let merged = BitVector.mk_concat ctx cflg_bv (BitVector.mk_concat ctx dst src) in
+    (* let cflg_bv = bool_to_bv ctx cflg 1 in
+    let merged = BitVector.mk_concat ctx cflg_bv (BitVector.mk_concat ctx dst src) in *)
+    (* NOTE: Here we only support the case where cnt <> 0, 
+      so that we do not to discuss whether CF is valid (readable) or not.
+      If we want to support the case where cnt may or may not be 0 (CF may or may not be updated), 
+      then output CF should be invalid if input CF is invalid 
+      (similar to the case where some invalid flag update themselves use original value 
+      and we mark them invalid after the update) *)
+    let placeholder_bit = get_const_exp ctx 0L 1 in
+    let merged = BitVector.mk_concat ctx placeholder_bit (BitVector.mk_concat ctx dst src) in
 
     let cnt = mk_extract_wrapper ctx 4 0 cnt in
+    (* For now we assert cnt <> 0 *)
+    if not (check_eq smt_ctx cnt (get_const_exp ctx 0L 5)) then
+      failwith "exe_shld: invalid shift cnt = 0";
     let cnt_ext = BitVector.mk_zero_ext ctx ((get_exp_bit_size merged) - 5) cnt in
     let shifted = BitVector.mk_shl ctx merged cnt_ext in
 
@@ -860,16 +872,28 @@ module DepType = struct
       OF, Exp oflg;
     ]
 
-  let exe_shrd (ctx: context) (dst: exp_t) (src: exp_t) (cnt: exp_t) (cflg: exp_t) (dest_size: int) : exe_result =
+  let exe_shrd (smt_ctx: SmtEmitter.t) (dst: exp_t) (src: exp_t) (cnt: exp_t) (* (cflg: exp_t) *) (dest_size: int) : exe_result =
+    let ctx, _ = smt_ctx in
     let dst_size = get_exp_bit_size dst in
     let src_size = get_exp_bit_size src in
     if dst_size <> src_size then
       failwith (Printf.sprintf "exe_shld: invalid dst size: %d != %d" dst_size src_size);
 
-    let cflg_bv = bool_to_bv ctx cflg 1 in
-    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx src dst) cflg_bv in
+    (* let cflg_bv = bool_to_bv ctx cflg 1 in
+    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx src dst) cflg_bv in *)
+    (* NOTE: Here we only support the case where cnt <> 0, 
+      so that we do not to discuss whether CF is valid (readable) or not.
+      If we want to support the case where cnt may or may not be 0 (CF may or may not be updated), 
+      then output CF should be invalid if input CF is invalid 
+      (similar to the case where some invalid flag update themselves use original value 
+      and we mark them invalid after the update) *)
+    let placeholder_bit = get_const_exp ctx 0L 1 in
+    let merged = BitVector.mk_concat ctx (BitVector.mk_concat ctx src dst) placeholder_bit in
 
     let cnt = mk_extract_wrapper ctx 4 0 cnt in
+    (* For now we assert cnt <> 0 *)
+    if not (check_eq smt_ctx cnt (get_const_exp ctx 0L 5)) then
+      failwith "exe_shld: invalid shift cnt = 0";
     let cnt_ext = BitVector.mk_zero_ext ctx ((get_exp_bit_size merged) - 5) cnt in
     let shifted = BitVector.mk_lshr ctx merged cnt_ext in
 
@@ -896,20 +920,22 @@ module DepType = struct
 
   (* <TODO> Check the following new API *)
   let exe_bop 
-      (ctx: context) (op: IsaBasic.bop) 
+      (smt_ctx: SmtEmitter.t) (op: IsaBasic.bop) 
       (src_list: t list) 
-      (get_src_flag_func: IsaBasic.flag -> t) 
+      (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : exe_result =
+    let ctx, _ = smt_ctx in
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_bop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
-    match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
+    match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list with
     | None, _ | _, None ->
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list ->
       let flag_lookup (flag: IsaBasic.flag) : exp_t = 
-        match get_src_flag_func flag with
+        (* NOTE: We do not check_valid here since it is checked in set_one_flag_type *)
+        match get_src_flag_func ~check_valid:false flag with
         | Top _ -> Expr.mk_const_s ctx "top" (Boolean.mk_sort ctx) (* TODO Isn't there a get_top function somewhere? I should use that instead to keep things consistent. *)
         | Exp flag_exp -> flag_exp
       in
@@ -952,11 +978,12 @@ module DepType = struct
       dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_uop
-      (ctx: context) (op: IsaBasic.uop) 
+      (smt_ctx: SmtEmitter.t) (op: IsaBasic.uop) 
       (src_list: t list) 
-      (get_src_flag_func: IsaBasic.flag -> t) 
+      (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : t * ((IsaBasic.flag * t) list) =
+    let ctx, _ = smt_ctx in
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_uop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
@@ -987,9 +1014,9 @@ module DepType = struct
       dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_top
-      (ctx: context) (op: IsaBasic.top) 
+      (smt_ctx: SmtEmitter.t) (op: IsaBasic.top) 
       (src_list: t list) 
-      (get_src_flag_func: IsaBasic.flag -> t) 
+      (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : t * ((IsaBasic.flag * t) list) =
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_top_config op in
@@ -1001,8 +1028,8 @@ module DepType = struct
     | Some src_exp_list, Some src_flag_list -> 
       begin
       match op, src_exp_list, src_flag_list with
-      | Shld, [ dst; src; cnt ], [ cflg ] -> exe_shld ctx dst src cnt cflg dest_size
-      | Shrd, [ dst; src; cnt ], [ cflg ] -> exe_shrd ctx dst src cnt cflg dest_size
+      | Shld, [ dst; src; cnt ], [] -> exe_shld smt_ctx dst src cnt dest_size
+      | Shrd, [ dst; src; cnt ], [] -> exe_shrd smt_ctx dst src cnt dest_size
       | _ ->
         Printf.printf "top not handled: op=%s\nsrc_list=%s\nsrc_flag_list=%s\n"
           (IsaBasic.sexp_of_top op |> Sexplib.Sexp.to_string_hum)
@@ -1189,15 +1216,16 @@ module BasicType = struct
     DepType.set_flag orig_dep new_dep, new_taint
 
   let exe_helper 
-      (dep_exe_op: context -> 'a -> DepType.t list -> (IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
+      (dep_exe_op: SmtEmitter.t -> 'a -> DepType.t list -> (?check_valid:bool -> IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
       (get_flag_config: 'a -> IsaFlagConfig.t)
-      (ctx: context) (op: 'a) (e_list: t list) (get_src_flag_func: IsaBasic.flag -> t) (dest_size: int) (* in bits *)
+      (smt_ctx: SmtEmitter.t) (op: 'a) (e_list: t list) (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) (dest_size: int) (* in bits *)
       (xor_reset: bool) (* outcome is constant zero due to xor(or similar) %foo, %foo *)
       : t * ((IsaBasic.flag * t) list) =
-    let get_src_flag_dep = fun f -> get_src_flag_func f |> fst in
-    let get_src_flag_taint = fun f -> get_src_flag_func f |> snd in
+    let ctx, _ = smt_ctx in
+    let get_src_flag_dep = fun ?(check_valid=true) f -> get_src_flag_func ~check_valid f |> fst in
+    let get_src_flag_taint = fun ?(check_valid=true) f -> get_src_flag_func ~check_valid f |> snd in
     let dep_list, taint_list = List.split e_list in
-    let dep, dep_flag_list = dep_exe_op ctx op dep_list get_src_flag_dep dest_size in
+    let dep, dep_flag_list = dep_exe_op smt_ctx op dep_list get_src_flag_dep dest_size in
     let src_flag_list, update_flag_map = get_flag_config op in
     let src_flag_taint_list = List.map get_src_flag_taint src_flag_list in
     let dep, taint = if xor_reset then 
@@ -1210,15 +1238,17 @@ module BasicType = struct
       fun (flag, flag_dep) (flag2, self_is_src) -> 
         let flag_taint =
           if flag <> flag2 then basic_type_error "update flag list does not match"
-          else if self_is_src then TaintType.exe ctx [ taint; get_src_flag_taint flag ]
+          else if self_is_src then 
+            (* NOTE: We do not check_valid here since it is checked in set_one_flag_type *)
+            TaintType.exe ctx [ taint; get_src_flag_taint ~check_valid:false flag ]
           else taint
         in
         flag, (flag_dep, flag_taint)
       ) dep_flag_list update_flag_map
 
-  let exe_bop  = exe_helper DepType.exe_bop  IsaFlagConfig.get_bop_config
-  let exe_uop  = exe_helper DepType.exe_uop  IsaFlagConfig.get_uop_config
-  let exe_top  = exe_helper DepType.exe_top  IsaFlagConfig.get_top_config
+  let exe_bop = exe_helper DepType.exe_bop IsaFlagConfig.get_bop_config
+  let exe_uop = exe_helper DepType.exe_uop IsaFlagConfig.get_uop_config
+  let exe_top = exe_helper DepType.exe_top IsaFlagConfig.get_top_config
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)

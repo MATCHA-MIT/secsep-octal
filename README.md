@@ -382,6 +382,14 @@ Conversion of single variable map always uses zero extension:
 1. For branch anno, needs to check that the branch context substitute map does not substitute input variables or taint variables (done for taint variables, still needs to be done for input dep variables).
 2. We also need to check that the map does not substitute var to top!!!
 
+## Reg Validity Check
+1. For flag that is optionally updated, we used to consider itself as the source. However, it will cause trouble when we optionally update an invalid flag. In the implementation, I skipped checking the validity of the optionally updated flag when reading it, but only check when I update it. If it was invalid, then it is still invalid after the optional update.
+2. Same strategy could be used for `shld` and `shrd`, which only update the flag when the shift cnt is not 0 (and is a valid value). However, for now I simply assert the program does not shift by 0 and leave the full implementation as a potential TODO.
+3. `xor op, op`, we do not check validity of op since the original value does not matter.
+4. Some programs will push rax as other callee-saved regsiters in the beginning of the function while never use it. For now I skip checking rax validity in this case and output an Warning. We rely on manual check to ensure that this store value is never used (by checking how the push target slot is used in the function).
+5. Some functions may push/pop rax as othe callee-saved registers. They appear in the benchmark assembly files, but are not called by the benchmarks. Hence, we do not support this case for now.
+
+
 # Proof
 
 ## Type Soundness
