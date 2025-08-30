@@ -7,7 +7,7 @@ from pathlib import Path
 SECSEP_DIR = Path(__file__).parent.parent.parent
 OCTAL_DIR = SECSEP_DIR / "octal"
 OCTAL_WORK_DIR = OCTAL_DIR / "out"
-BENCHMARK_DIR = SECSEP_DIR / "benchmark" / "bench"
+BENCHMARK_DIR = SECSEP_DIR / "benchmark" / "analysis"
 GEM5_DIR = SECSEP_DIR / "gem5"
 GEM5_DOCKER_BENCH_DIR = "/root/benchmark"
 
