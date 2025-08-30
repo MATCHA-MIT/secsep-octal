@@ -40,7 +40,7 @@ BENCHMARKS = [
     "sha512",
     "ed25519_sign",
     "chacha20",
-    "poly1305_clean",
+    "poly1305",
     "x25519",
 ]
 
@@ -49,7 +49,7 @@ BENCHMARK_PAPER_ORDER = {
     "sha512": "sha512",
     "chacha20": "chacha20",
     "x25519": "x25519",
-    "poly1305": "poly1305_clean",
+    "poly1305": "poly1305",
     "ed25519_sign": "ed25519_sign",
 }
 

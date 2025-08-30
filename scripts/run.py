@@ -81,7 +81,7 @@ def run(cmd, log_file, msg):
             print(f"{Fore.YELLOW}log saved to {log_file}{Fore.RESET}", flush=True)
             exit(1)
         else:
-            print("", flush=True)
+            print(f" {Fore.GREEN}Success{Fore.RESET}", flush=True)
 
 
 @cli_command()
