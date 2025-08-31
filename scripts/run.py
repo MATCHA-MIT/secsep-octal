@@ -8,6 +8,7 @@ from pathlib import Path
 import time
 from colorama import Fore
 import shutil
+from multiprocessing import Pool
 
 from general import *
 
@@ -23,7 +24,7 @@ class InferPhase(Enum):
 InferPhaseDescription = """Run inference on the benchmark:
     0: Preprocess Input
     1: Single Type Infer
-    2: Range Type Infer
+    2: Valid Region Infer
     3: Taint Type Infer
 """
 
@@ -58,6 +59,12 @@ def cli_command():
             type=click.STRING,
             help="Name of the benchmark",
         )
+        @click.option(
+            "--log-file",
+            type=Path,
+            default=None,
+            help="Log terminal outputs into a file",
+        )
         @wraps(func)
         def wrapped(*args, **kwargs):
             return func(*args, **kwargs)
@@ -67,42 +74,33 @@ def cli_command():
     return decorator
 
 
-def run(cmd, log_file, msg):
-    print(msg, end=" ", flush=True)
-    with open(log_file, "w") as f:
+def run(cmd, cmd_output, msg):
+    logging.info(f"{msg} started")
+    with open(cmd_output, "w") as f:
         start_time = time.time()
         result = subprocess.run(cmd, stdout=f, stderr=f)
-        print(
-            f"{Fore.BLUE}[time elapsed: {round(time.time() - start_time, 2)} seconds]{Fore.RESET}",
-            end="",
+        logging.info(
+            f"{msg} time elapsed: {Fore.BLUE}{round(time.time() - start_time, 2)} seconds{Fore.RESET}",
         )
         if result.returncode != 0:
-            print(f" ({Fore.RED}errcode: {result.returncode}{Fore.RESET})")
-            print(f"{Fore.YELLOW}log saved to {log_file}{Fore.RESET}", flush=True)
-            exit(1)
+            logging.error(f"{msg} result: {Fore.RED}error{Fore.RESET} exit code: {result.returncode}")
+            logging.error(f"{msg} {Fore.YELLOW}log saved to {cmd_output}{Fore.RESET}")
+            raise RuntimeError(f"Failed when {msg}")
         else:
-            print(f" {Fore.GREEN}Success{Fore.RESET}", flush=True)
+            logging.info(f"{msg} result: {Fore.GREEN}success{Fore.RESET}")
 
 
-@cli_command()
-@click.option(
-    "--input-dir",
-    type=Path,
-    required=True,
-    help="SecSep benchmark analysis directory",
-)
-@click.option(
-    "--phase",
-    nargs=2,
-    type=click.Tuple([int, int]),
-    default=(0, 3),
-    help="0: Preprocessing, 1: Dependent type infer, 2: Range type infer, 3: Taint type infer",
-)
-@click.option("--use-cache", is_flag=True)
-def infer(name: str, input_dir: Path, phase, use_cache):
-    """Infer the given assembly program"""
-
-    build_octal()
+def infer_core(
+    name: str,
+    log_file: Optional[Path],
+    input_dir: Path,
+    phase: tuple[int, int],
+    use_cache: bool,
+    build: bool,
+):
+    setup_logger(logging.INFO, log_file)
+    if build:
+        build_octal()
 
     output_dir = OCTAL_WORK_DIR / name
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -120,7 +118,7 @@ def infer(name: str, input_dir: Path, phase, use_cache):
                     name,
                 ],
                 output_dir / f"{name}.preprocess.log",
-                "Running Preprocess Input",
+                f"[{name}] (Preprocess)",
             )
         elif i == InferPhase.SingleTypeInfer.value:
             command = [OCTAL_INFER_SINGLE, "-name", name]
@@ -129,36 +127,49 @@ def infer(name: str, input_dir: Path, phase, use_cache):
             run(
                 command,
                 output_dir / f"{name}.single_infer.log",
-                "Running Single Type Infer",
+                f"[{name}] (Single Type Infer)",
             )
         elif i == InferPhase.RangeTypeInfer.value:
             run(
                 [OCTAL_INFER_RANGE, "-name", name],
                 output_dir / f"{name}.range_infer.log",
-                "Running Range Type Infer",
+                f"[{name}] (Valid Region Infer)",
             )
         elif i == InferPhase.TaintTypeInfer.value:
             run(
                 [OCTAL_INFER_TAINT, "-name", name],
                 output_dir / f"{name}.taint_infer.log",
-                "Running Taint Type Infer",
+                f"[{name}] (Taint Type Infer)",
             )
         else:
-            print("Invalid phase", i)
-            exit(1)
+            logging.error(f"Invalid phase {i}")
+            raise ValueError(f"Invalid phase {i}")
 
 
 @cli_command()
 @click.option(
+    "--input-dir",
+    type=Path,
+    required=True,
+    help="SecSep benchmark analysis directory",
+)
+@click.option(
     "--phase",
     nargs=2,
     type=click.Tuple([int, int]),
-    default=(1, 1),
+    default=(0, InferPhase.NumPhases.value - 1),
+    help="0: Preprocessing, 1: Dependent type infer, 2: Range type infer, 3: Taint type infer",
 )
-def check(name: str, phase):
-    """Check the inference results of the given assembly program"""
+@click.option("--use-cache", is_flag=True)
+def infer(name, log_file, input_dir, phase, use_cache):
+    """Infer the given assembly program"""
+    infer_core(name=name, log_file=log_file, input_dir=input_dir, phase=phase, use_cache=use_cache, build=True)
 
-    build_octal()
+
+def check_core(name: str, log_file: Optional[Path], phase: tuple[int, int], build: bool):
+    setup_logger(logging.INFO, log_file)
+    if build:
+        build_octal()
 
     output_dir = OCTAL_WORK_DIR / name
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -170,17 +181,29 @@ def check(name: str, phase):
             run(
                 [OCTAL_CONVERT, "-name", name],
                 output_dir / f"{name}.conversion.log",
-                "Running Conversion",
+                f"[{name}] (Type Checker Preprocess)",
             )
         elif i == CheckPhase.Check.value:
             run(
                 [OCTAL_CHECK, "-name", name],
                 output_dir / f"{name}.check.log",
-                "Running Check",
+                f"[{name}] (Type Checker)",
             )
         else:
-            print("Invalid phase", i)
-            exit(1)
+            logging.error(f"Invalid phase {i}")
+            raise ValueError(f"Invalid phase {i}")
+
+
+@cli_command()
+@click.option(
+    "--phase",
+    nargs=2,
+    type=click.Tuple([int, int]),
+    default=(CheckPhase.Check.value, CheckPhase.Check.value),
+)
+def check(name, log_file, phase):
+    """Check the inference results of the given assembly program"""
+    check_core(name=name, log_file=log_file, phase=phase, build=True)
 
 
 def transform_helper(
@@ -188,7 +211,7 @@ def transform_helper(
     out=None,
     delta=None,
     no_push_pop=None,
-    no_call=None,
+    no_call_preservation=None,
     tf_suffix="",
     install_dir=None,
 ):
@@ -198,7 +221,7 @@ def transform_helper(
         out = output_dir / f"{name}.tf{tf_suffix}.s"
 
     arg_list = [OCTAL_TRANSFORM, "-name", name, "-out", out]
-    msg = "Transforming program"
+    msg = f"[{name}] (Transformation)"
     if delta is not None:
         arg_list += ["--delta", delta]
         delta_int = int(delta, 16)
@@ -206,7 +229,7 @@ def transform_helper(
     if no_push_pop:
         arg_list.append("--no-push-pop")
         msg += " (push/pop TF disabled)"
-    if no_call:
+    if no_call_preservation:
         arg_list.append("--no-call-preservation")
         msg += " (call untaint preservation TF disabled)"
 
@@ -214,8 +237,57 @@ def transform_helper(
     if install_dir is not None:
         target = install_dir / name / out.name
         shutil.copy(out, target)
-        print(
-            f"{Fore.MAGENTA}Installing to {target}{Fore.RESET}",
+        logging.info(f"{Fore.MAGENTA}Installing {target}{Fore.RESET}")
+
+
+def transform_core(
+    name: str,
+    log_file: Optional[Path],
+    delta: str,
+    all_tf: bool,
+    no_push_pop: Optional[bool],
+    no_call_preservation: Optional[bool],
+    install_dir: Path,
+    build: bool,
+):
+    setup_logger(logging.INFO, log_file)
+    if build:
+        build_octal()
+
+    if all_tf:
+        transform_helper(
+            name,
+            delta=delta,
+            no_push_pop=True,
+            no_call_preservation=True,
+            tf_suffix="3",
+            install_dir=install_dir,
+        )
+        transform_helper(
+            name, delta=delta, no_call_preservation=True, tf_suffix="2", install_dir=install_dir
+        )
+        transform_helper(
+            name, delta=delta, no_push_pop=True, tf_suffix="1", install_dir=install_dir
+        )
+        transform_helper(name, delta=delta, install_dir=install_dir)
+    else:
+        if no_push_pop:
+            if no_call_preservation:
+                tf_suffix = "3"
+            else:
+                tf_suffix = "1"
+        else:
+            if no_call_preservation:
+                tf_suffix = "2"
+            else:
+                tf_suffix = ""
+        transform_helper(
+            name,
+            delta=delta,
+            no_push_pop=no_push_pop,
+            no_call_preservation=no_call_preservation,
+            tf_suffix=tf_suffix,
+            install_dir=install_dir,
         )
 
 
@@ -246,57 +318,32 @@ def transform_helper(
     type=Path,
     help="Directory to install transformed assembly, usually the analysis directory"
 )
-def transform(
-    name: str,
-    delta: str,
-    all_tf: bool,
-    no_push_pop: bool,
-    no_call: bool,
-    install_dir: Path,
-):
+def transform(name, log_file, delta, all_tf, no_push_pop, no_call_preservation, install_dir):
     """Transform the given assembly program using the inference results"""
+    transform_core(name=name, log_file=log_file, delta=delta, all_tf=all_tf,
+        no_push_pop=no_push_pop, no_call_preservation=no_call_preservation,
+        install_dir=install_dir, build=True,
+    )
 
-    build_octal()
 
-    if all_tf:
-        transform_helper(
-            name,
-            delta=delta,
-            no_push_pop=True,
-            no_call=True,
-            tf_suffix="3",
-            install_dir=install_dir,
-        )
-        transform_helper(
-            name, delta=delta, no_call=True, tf_suffix="2", install_dir=install_dir
-        )
-        transform_helper(
-            name, delta=delta, no_push_pop=True, tf_suffix="1", install_dir=install_dir
-        )
-        transform_helper(name, delta=delta, install_dir=install_dir)
-    else:
-        if no_push_pop:
-            if no_call:
-                tf_suffix = "3"
-            else:
-                tf_suffix = "1"
-        else:
-            if no_call:
-                tf_suffix = "2"
-            else:
-                tf_suffix = ""
-        transform_helper(
-            name,
-            delta=delta,
-            no_push_pop=no_push_pop,
-            no_call=no_call,
-            tf_suffix=tf_suffix,
-            install_dir=install_dir,
-        )
+def full_worker(
+    name: str,
+    log_file: Optional[Path],
+    analysis_dir: Path,
+    delta: str,
+):
+    try:
+        infer_core(name=name, log_file=log_file, input_dir=analysis_dir, phase=(0, InferPhase.NumPhases.value - 1), use_cache=False, build=False)
+        check_core(name=name, log_file=log_file, phase=(CheckPhase.Check.value, CheckPhase.Check.value), build=False)
+        transform_core(name=name, log_file=log_file, delta=delta, all_tf=True, no_push_pop=None, no_call_preservation=None, install_dir=analysis_dir, build=False)
+        logging.info(f"Successfully processed {name}")
+        return True
+    except Exception as e:
+        logging.error(f"Error processing {name}: {e}")
+        return False
 
 
 @cli_command()
-@click.pass_context
 @click.option(
     "--analysis-dir",
     type=Path,
@@ -309,11 +356,37 @@ def transform(
     required=True,
     help="Delta used by SecSep transformation. Must be in hex format, e.g. 0x800000",
 )
-def full(ctx: click.Context, name: str, analysis_dir: Path, delta: str):
+@click.option(
+    "-p",
+    "--processes",
+    default=6,
+    required=False,
+    type=click.INT,
+    help="Number of processes to use for parallel execution",
+)
+def full(name: Optional[str], log_file: Optional[Path], analysis_dir: Path, delta: str, processes: int):
     """Infer, check, and transform the given assembly program"""
-    ctx.invoke(infer, name=name, input_dir=analysis_dir)
-    ctx.invoke(check, name=name)
-    ctx.invoke(transform, name=name, delta=delta, all_tf=True, install_dir=analysis_dir)
+
+    setup_logger(logging.INFO, log_file)
+    build_octal()
+
+    if name is not None:
+        if name.find(",") != -1:
+            names = name.split(",")
+        else:
+            names = [name]
+        worker_args = [(name.strip(), log_file, analysis_dir, delta) for name in names]
+    else:
+        worker_args = [(name, log_file, analysis_dir, delta) for name in BENCHMARKS]
+    logging.info(f"Working on {len(worker_args)} benchmark(s)...")
+
+    with Pool(processes=processes) as pool:
+        worker_results = pool.starmap(full_worker, worker_args)
+        if all(worker_results):
+            logging.info("All benchmark(s) completed successfully")
+        else:
+            logging.error("Some worker(s) failed")
+            raise RuntimeError("Some worker(s) failed")
 
 
 if __name__ == "__main__":

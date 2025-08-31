@@ -7,3 +7,5 @@ _build/
 _opam/
 out/
 eval/
+
+*.log

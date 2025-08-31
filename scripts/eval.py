@@ -32,17 +32,9 @@ STATS = [
     "check_time", "check_smt_time", "check_smt_time_pct", "check_smt_queries",
 ]
 EVAL_DIR = OCTAL_DIR / "eval" / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+LOG_PATH = EVAL_DIR / "eval.log"
 
 DEFAULT_RLIMIT_STACK_SIZE_MB = 16
-
-BENCHMARKS = [
-    "salsa20",
-    "sha512",
-    "ed25519_sign",
-    "chacha20",
-    "poly1305",
-    "x25519",
-]
 
 BENCHMARK_PAPER_ORDER = {
     "salsa20": "salsa20",
@@ -82,26 +74,7 @@ HW_ENCODE_MAP = {
 }
 
 
-LOG_PATH = EVAL_DIR / "eval.log"
 
-
-def setup_logger(level=logging.INFO):
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter("[%(levelname)s] <%(processName)s> - %(message)s"))
-    console_handler.setLevel(logging.DEBUG)
-
-    file_handler = logging.FileHandler(LOG_PATH, mode="a")
-    file_handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] <%(processName)s> - %(message)s"))
-    file_handler.setLevel(logging.DEBUG)
-
-    logger = logging.getLogger()
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-    logger.setLevel(level)
-
-    
 def build_octal():
     logging.info("Building Octal...")
     subprocess.run(
@@ -676,7 +649,7 @@ def print_overhead(overhead: dict):
 
         
 def worker(bench: str, tf: TF, log_level: int, gem5_docker: str, skip_gem5: bool, delta: str, inst_roi: str):
-    setup_logger(log_level)
+    setup_logger(log_level, LOG_PATH)
 
     try:
         bench_name_tf = get_bench_tf_name(bench, tf)
@@ -756,11 +729,11 @@ def main(verbose, benchmark_sel, gem5_docker, run_perf, skip_gem5, enable_roi, s
         f.write(f"out={out}\n")
 
     if verbose >= 2:
-        setup_logger(logging.DEBUG)
+        setup_logger(logging.DEBUG, LOG_PATH)
     elif verbose == 1:
-        setup_logger(logging.INFO)
+        setup_logger(logging.INFO, LOG_PATH)
     else:
-        setup_logger(logging.WARN)
+        setup_logger(logging.WARN, LOG_PATH)
 
     global selected_benchmarks
     benchmark_sel = benchmark_sel.strip()
