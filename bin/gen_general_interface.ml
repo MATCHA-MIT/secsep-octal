@@ -26,6 +26,9 @@ let update_reg_taint
       | None -> valid, (single, taint)
   ) reg_type reg_taint
 
+let get_change_var (non_change_list: int list) : Type.Set_sexp.IntSet.t =
+  let all_var = List.init Type.Isa_basic.IsaBasic.total_reg_num (fun x -> x) |> Type.Set_sexp.IntSet.of_list in
+  Type.Set_sexp.IntSet.diff all_var (Type.Set_sexp.IntSet.of_list non_change_list)
 
 let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t = 
   let start_var: Taint_entry_type.TaintEntryType.t = (SingleVar 0, TaintVar 0) in
@@ -63,7 +66,7 @@ let memset_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_mem = in_mem;
     in_context = mem_context;
     in_taint_context = [];
-    in_change_var = Type.Set_sexp.IntSet.of_list (r RDI :: Isa_basic.IsaBasic.callee_saved_reg_idx);
+    in_change_var = get_change_var [r RSI; r RDX];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       get_default_info (r RDI), [ 
@@ -129,7 +132,7 @@ let memcpy_interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t =
     in_mem = in_mem;
     in_context = mem_context;
     in_taint_context = [ src_taint, dest_taint ];
-    in_change_var = Type.Set_sexp.IntSet.of_list (r RDI :: r RSI :: Isa_basic.IsaBasic.callee_saved_reg_idx);
+    in_change_var = get_change_var [r RDX];
     out_reg = out_reg;
     out_mem = Taint_type_infer.TaintTypeInfer.ArchType.MemType.add_base_to_offset [
       get_default_info (r RDI), [ 
