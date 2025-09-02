@@ -163,7 +163,7 @@ module TaintTypeInfer = struct
         useful_var = block_single_type.useful_var;
         useful_constrained_var = block_single_type.useful_constrained_var;
         global_var = block_single_type.global_var;
-        change_var = SingleEntryType.SingleVarSet.empty;
+        change_var = block_single_type.change_var;
         prop_mode = ArchType.TypeInferTaint;
       }
     in

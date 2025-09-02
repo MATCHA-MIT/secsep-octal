@@ -3,6 +3,7 @@ open Reg_range
 open Arch_type
 open Isa_basic
 (* open Single_subtype *)
+open Reg_range_useless_infer
 open Set_sexp
 open Sexplib.Std
 
@@ -33,169 +34,20 @@ module RegRangeSubtype = struct
 
   module IntSetMap = IntMapSexp (IntSet)
 
-  (* let get_one_block_subtype
-      (block_subtype: ArchType.block_subtype_t) : t =
-    let sup_block, sub_block_list = block_subtype in
-    let sup_valid_idx =
-      List.mapi (
-        fun i (valid, _) -> i, valid
-      ) sup_block.reg_type
-    in
-    let sub_valid_list =
-      List.fold_left (
-        fun (acc: type_exp_t list list) (sub_block: ArchType.t) ->
-          List.map2 (
-            fun valid_list (sub_valid, _) -> (sub_valid, sub_block.pc) :: valid_list
-          ) acc sub_block.reg_type
-      ) (List.init IsaBasic.total_reg_num (fun _ -> [])) sub_block_list
-    in
-    List.map2 (
-      fun (sub_list: type_exp_t list) (reg_idx, sup_valid) ->
-        match sup_valid with
-        | RegRange.RangeConst _ -> None
-        | RangeExp _ -> reg_range_subtype_error "get_one_block_subtype fail when sup is exp"
-        | RangeVar sup_idx ->
-          Some {
-            var_idx = (sup_idx, sup_block.pc);
-            sol = None;
-            size = IsaBasic.get_reg_idx_full_size reg_idx;
-            subtype_list = sub_list;
-          }
-    ) sub_valid_list sup_valid_idx
-    |> List.filter_map (fun x -> x)
-
-  let get_var_sol_template (tv_rel_list: t) : IntSetMap.t =
-    let init_one_sub_var (tv_rel: type_rel) : (int * (int list)) option =
-      let sub_var_list =
-        List.fold_left (
-          fun (acc: IntSet.t option) (sub, _) ->
-            match acc with
-            | None -> None
-            | Some acc_sub_var_set ->
-              match sub with
-              | RegRange.RangeConst (l, r) ->
-                if l = 0L && r = tv_rel.size then acc
-                else None
-              | RangeVar v | RangeExp (v, _) -> 
-                if v = (fst tv_rel.var_idx) then acc 
-                else Some (IntSet.add v acc_sub_var_set)
-        ) (Some IntSet.empty) tv_rel.subtype_list
-      in
-      Option.bind sub_var_list (fun e -> if IntSet.is_empty e then None else Some ((fst tv_rel.var_idx), IntSet.to_list e))
-    in
-    let get_subset_var_helper (subset_var_map: IntSetMap.t) (var_idx: int) : IntSet.t =
-      Option.value (IntSetMap.find_opt var_idx subset_var_map) ~default:(IntSet.singleton var_idx)
-    in
-    let update_one_var (acc: bool * IntSetMap.t) (tv_sub_var: int * (int list)) : bool * IntSetMap.t =
-      let _, acc_var_map = acc in
-      let var, direct_sub_var_list = tv_sub_var in
-      let new_subset_var =
-        match direct_sub_var_list with
-        | [] -> reg_range_subtype_error "unexpected case"
-        | hd :: [] -> get_subset_var_helper acc_var_map hd
-        | hd :: tl -> 
-          List.fold_left IntSet.inter (get_subset_var_helper acc_var_map hd) (List.map (get_subset_var_helper acc_var_map) tl)
-      in
-      if IntSet.is_empty new_subset_var then acc
-      else
-        let old_subset_var = get_subset_var_helper acc_var_map var in
-        if IntSet.subset new_subset_var old_subset_var then acc
-        else 
-          true, 
-          IntSetMap.update var (fun _ -> Some (IntSet.union old_subset_var new_subset_var)) acc_var_map
-    in
-    let rec update_vars (acc_var_map: IntSetMap.t) (tv_sub_var_list: (int * (int list)) list) : IntSetMap.t =
-      let acc_update, acc_var_map = List.fold_left update_one_var (false, acc_var_map) tv_sub_var_list in
-      if acc_update then update_vars acc_var_map tv_sub_var_list
-      else acc_var_map
-    in
-    let tv_sub_var_list = List.filter_map init_one_sub_var tv_rel_list in
-    (* let subset_rel = List.map (fun (x, _) -> x, IntSet.singleton x) tv_sub_var_list |> IntSetMap.of_list in *)
-    update_vars IntSetMap.empty tv_sub_var_list
-
-  let solve_one (var_sol_template: IntSetMap.t) (tv_rel: type_rel) : RegRange.range_t option =
-    if List.is_empty tv_rel.subtype_list then None else
-    let var_idx = fst tv_rel.var_idx in
-    let is_sol_template (sub_idx: int) : bool =
-      (* check whether sub_idx can be a conservative sol to var_idx *)
-      (* return true if var_idx in var_sol_template[sub_idx] *)
-      match IntSetMap.find_opt sub_idx var_sol_template with
-      | None -> false
-      | Some var_set -> IntSet.mem var_idx var_set
-    in
-    let sub_list =
-      List.filter (
-        fun (sub, _) ->
-          match sub with
-          | RegRange.RangeVar v | RangeExp (v, _) ->
-            if v = var_idx then false (* sol is not constrained by this subset *)
-            else not (is_sol_template v)
-          | RangeConst _ -> true
-      ) tv_rel.subtype_list
-    in
-    let const_sub_list =
-      List.filter_map (
-        fun (sub, _) ->
-          match sub with
-          | RegRange.RangeConst r -> Some r
-          | _ -> None
-      ) sub_list
-    in
-    if List.length const_sub_list < List.length sub_list then None
-    else Some (List.fold_left RegRange.inter_range (0L, tv_rel.size) const_sub_list)
-
-  let solve
-      (single_sol: SingleSubtype.t)
-      (block_subtype_list: ArchType.block_subtype_t list) : RegRange.VarSolMap.t =
-    let tv_rel_list = List.concat_map get_one_block_subtype block_subtype_list in
-    let _ = SingleSubtype.get_loop_step_back_pc single_sol in
-    Printf.printf "Reg Range Subtype\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t tv_rel_list));
-    let var_sol_template = get_var_sol_template tv_rel_list in
-    Printf.printf "Reg Range Var Sol Template\n%s\n" (Sexplib.Sexp.to_string_hum (IntSetMap.sexp_of_t var_sol_template));
-
-    let rec helper (tv_rel_list: t) : t =
-      let new_sol, tv_rel_list =
-        List.fold_left_map (
-          fun (acc: (RegRange.var_id * RegRange.range_t) list) (tv_rel: type_rel) ->
-            if tv_rel.sol = None then
-              match solve_one var_sol_template tv_rel with
-              | None -> acc, tv_rel
-              | Some sol -> (fst tv_rel.var_idx, sol) :: acc, { tv_rel with sol = Some sol }
-            else acc, tv_rel
-        ) [] tv_rel_list
-      in
-      if List.is_empty new_sol then tv_rel_list
-      else 
-        let sol_map = RegRange.VarSolMap.of_list new_sol in
-        (* Printf.printf "RegrangeSubtype sol_map\n%s\n" (Sexplib.Sexp.to_string_hum (RegRange.VarSolMap.sexp_of_t sol_map)); *)
-        List.map (
-          fun (tv_rel: type_rel) ->
-            if tv_rel.sol <> None then tv_rel else
-            let sub_list =
-              List.map (fun (x, pc) -> RegRange.sub_sol sol_map x, pc) tv_rel.subtype_list
-            in
-            { tv_rel with subtype_list = sub_list}
-        ) tv_rel_list
-        |> helper
-    in
-    let result = helper tv_rel_list in
-    Printf.printf "RegRangeSubtype sol\n%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t result));
-
-    let sol =
-      List.filter_map (
-        fun (tv_rel: type_rel) ->
-          Option.map (fun x -> (fst tv_rel.var_idx), x) tv_rel.sol
-      ) result
-    in
-    if List.length sol = List.length result then Printf.printf "Successfully infer all reg range\n";
-    RegRange.VarSolMap.of_list sol *)
-
   let repl_sol_arch_type
-      (sol: RegRange.VarSolMap.t) (a_type: ArchType.t) : ArchType.t =
-    let reg_type =
-      List.map (fun (valid, e) -> RegRange.sub_sol sol valid, e) a_type.reg_type
-    in
-    { a_type with reg_type = reg_type }
+      (sol: RegRange.VarSolMap.t) 
+      (a_type: ArchType.t) : ArchType.t =
+    let reg_type = List.map (fun (valid, e) -> RegRange.sub_sol sol valid, e) a_type.reg_type in
+    (* let new_change_v_opt = [] in
+    let new_change_v =
+      List.filter_map (fun x -> x) new_change_v_opt
+      |> IntSet.of_list
+      |> IntSet.union a_type.change_var
+    in *)
+    { a_type with 
+      reg_type = reg_type;
+      (* change_var = IntSet.union a_type.change_var  *)
+    }
 
   type sub_rel_t = RegRange.var_id * (RegRange.t list)
 
@@ -304,10 +156,35 @@ module RegRangeSubtype = struct
     Printf.printf "Sol of reg %d\n%s\n" reg_idx (Sexplib.Sexp.to_string_hum (RegRange.VarSolMap.sexp_of_t sol));
     sol *)
 
-  let solve (block_subtype_list: ArchType.block_subtype_t list) : RegRange.VarSolMap.t =
+  let get_callee_at_ret_var (block_subtype_list: ArchType.block_subtype_t list) : IntSet.t =
+    let _, sub_list = List.nth block_subtype_list ((List.length block_subtype_list) - 1) in
+    List.concat_map (
+      fun (a_type: ArchType.t) ->
+        List.mapi (
+          fun i (valid, _) ->
+            if IsaBasic.is_reg_idx_callee_saved i then
+              match valid with
+              | RegRange.RangeVar v | RangeExp (v, _) -> Some v
+              | _ -> None
+            else None
+        ) a_type.reg_type
+        |> List.filter_map (fun x -> x)
+    ) sub_list
+    |> IntSet.of_list
+
+  let solve (block_subtype_list: ArchType.block_subtype_t list) : RegRange.VarSolMap.t=
+    let callee_at_ret_var = get_callee_at_ret_var block_subtype_list in
+    let useful_var = RegRangeUselessInfer.get_useful_range_vars false callee_at_ret_var block_subtype_list in
+    (* let callee_at_call_var = RegRangeUselessInfer.get_useful_range_vars true callee_at_ret_var block_subtype_list in *)
     let all_reg_sub_rel = get_all_block_subtype block_subtype_list in
     let sol_list = List.mapi solve_sub_rel all_reg_sub_rel |> List.concat in
     let sol = RegRange.VarSolMap.of_list sol_list in
+    let sol = RegRange.VarSolMap.filter_map (
+      fun v r ->
+        if IntSet.mem v useful_var then Some r
+        else Some (0L, 0L)
+    ) sol
+    in
     Printf.printf "RegRange Sol\n%s\n" (Sexplib.Sexp.to_string_hum (RegRange.VarSolMap.sexp_of_t sol));
     sol
 

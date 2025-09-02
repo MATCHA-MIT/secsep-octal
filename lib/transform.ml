@@ -174,7 +174,7 @@ module Transform = struct
     List.exists is_bb_transformed func_state.bbs
 
   let get_rsp_var_from_reg_type (reg_type: RegType.t) : Isa.imm_var_id =
-    let rsp_var_id = match TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP) with
+    let rsp_var_id = match TaintEntryType.get_single_exp (ArchType.RegType.get_reg_type reg_type Isa.RSP |> fst) with
     | SingleVar var_id -> var_id
     | _ -> transform_error "Unexpected single expression for RSP"
     in
@@ -741,7 +741,7 @@ module Transform = struct
                 | BaseAsGlobal -> transform_error "BaseAsGlobal not expected to be in bases_to_change"
             ) ([], [], []) bases_to_change in
             (* save/restore active callee-saved registers in caller's scope *)
-            let (curr_rsp, curr_rsp_taint) = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
+            let (curr_rsp, curr_rsp_taint), _ = CallAnno.TaintRegType.get_reg_type anno.pr_reg Isa.RSP in
             let curr_rsp_taint = tv_ittt curr_rsp_taint in (* mocking *)
             if curr_rsp_taint = TaintConst true then
               transform_error "RSP is tainted, not expected";
@@ -753,7 +753,7 @@ module Transform = struct
               List.filter_map (fun (slot: callee_slot) ->
                 let reg, offset = slot in
                 (* don't need to preserve untaint for tainted callee-saved registers *)
-                let _, reg_taint = CallAnno.TaintRegType.get_reg_type anno.pr_reg reg in
+                let (_, reg_taint), _ = CallAnno.TaintRegType.get_reg_type anno.pr_reg reg in
                 if TaintExp.is_tainted (tv_ittt reg_taint) then None else
                 let disp = get_stack_slot_dyn_offset func_state.init_rsp_var_id offset curr_rsp in
                 let disp = if disp != 0L then Some (Isa.ImmNum (disp, Some 8L)) else None in

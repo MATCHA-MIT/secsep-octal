@@ -1,6 +1,7 @@
 open Isa_basic
 open Single_exp
 open Range_exp
+open Reg_range
 open Single_subtype
 open Single_type_infer
 open Taint_type_infer
@@ -18,6 +19,19 @@ module SingleChangeVarInfer = struct
       [@@deriving sexp]
     end
   )
+
+  (* type var_change_type_t =
+  | NonChange
+  | ChangeBase of int
+  | ChangeNoBase
+  [@@deriving sexp]
+
+  module ChangeMap = IntMapSexp (
+    struct
+      type t = var_change_type_t
+      [@@deriving sexp]
+    end
+  ) *)
 
   type t = {
     (* input_var_set: IntSet.t; *)
@@ -41,15 +55,17 @@ module SingleChangeVarInfer = struct
     let v_set = SingleExp.get_vars e in
     IntSet.subset v_set var_info.non_change_set
 
-  let find_base_ptr (var_info: t) (e: SingleExp.t) : int option =
+  let find_base_ptr (var_info: t) (e: SingleExp.t) : int option option =
     let p_set = SingleExp.filter_single_var e in
     match IntSet.inter var_info.change_ptr_set p_set |> IntSet.to_list with
-    | [] -> None
-    | hd :: [] -> VarMap.find_opt hd var_info.change_ptr_base_map
+    | [] -> None (* Cannot find a base of change var *)
+    | hd :: [] -> Some (VarMap.find_opt hd var_info.change_ptr_base_map)
+    (* Left None -> is change var, but cannot determine the root ptr 
+       Right (Some ptr) -> is change var and the "base" is ptr *)
     | _ -> None
       (* single_change_var_infer_error "has multiple bases, cannot infer" *)
 
-  let find_range_base_ptr (var_info: t) (r: RangeExp.t) : bool * (int option) =
+  let find_range_base_ptr (var_info: t) (r: RangeExp.t) : bool * (int option option) =
     match r with
     | Single e ->
       if is_non_change_exp_naive var_info e then true, None
@@ -58,15 +74,18 @@ module SingleChangeVarInfer = struct
       if is_non_change_exp_naive var_info e1 || is_non_change_exp_naive var_info e2 then true, None
       else begin
         match find_base_ptr var_info e1 with
-        | Some p -> false, Some p
+        | Some p_opt -> false, Some p_opt
         | None -> false, find_base_ptr var_info e2
       end
     | SingleSet e_list ->
-      let is_non_change = List.find_opt (is_non_change_exp_naive var_info) e_list <> None in
+      let is_non_change = List.find_opt (
+        fun e -> not (is_non_change_exp_naive var_info e)
+      ) e_list = None
+      in
       if is_non_change then true, None else
       false,
       List.fold_left (
-        fun (acc: int option) (e: SingleExp.t) ->
+        fun (acc: int option option) (e: SingleExp.t) ->
           match acc with
           | Some _ -> acc
           | None -> find_base_ptr var_info e
@@ -86,7 +105,11 @@ module SingleChangeVarInfer = struct
     else begin
       match ptr_opt with
       | None -> var_info, Some tv_rel
-      | Some ptr ->
+      | Some None -> (* change, but no base *)
+        { var_info with
+          change_ptr_set = IntSet.add var_idx var_info.change_ptr_set },
+        None
+      | Some Some ptr ->
         { var_info with
           change_ptr_set = IntSet.add var_idx var_info.change_ptr_set;
           change_ptr_base_map = VarMap.add var_idx ptr var_info.change_ptr_base_map },
@@ -109,9 +132,14 @@ module SingleChangeVarInfer = struct
     var_info
 
   let init_var_info (state: SingleTypeInfer.t) : t =
-    let ptr_set = SingleTypeInfer.ArchType.MemType.get_ptr_set (List.hd state.func_type).mem_type in
+    let ptr_set = 
+      SingleTypeInfer.ArchType.MemType.get_ptr_set (List.hd state.func_type).mem_type 
+      |> IntSet.filter (fun x -> x >= 0)
+    in
     let callee_saved_var_set = 
-      List.filteri (fun i _ -> IsaBasic.is_reg_idx_callee_saved i) (List.hd state.func_type).reg_type
+      List.filteri 
+        (fun i _ -> i <> IsaBasic.rsp_idx && IsaBasic.is_reg_idx_callee_saved i) 
+        (List.hd state.func_type).reg_type
       |> List.filter_map (
         fun (_, e) -> 
           match e with
@@ -119,7 +147,16 @@ module SingleChangeVarInfer = struct
           | _ -> None
       ) |> IntSet.of_list
     in
-    let ptr_set = IntSet.union ptr_set callee_saved_var_set |> IntSet.remove (IsaBasic.get_reg_idx RSP) in
+    let invalid_var_set =
+      List.filter_map (
+        fun (valid, e) ->
+          match valid, e with
+          | RegRange.RangeConst (0L, 0L), SingleExp.SingleVar v -> Some v
+          | _ -> None
+      ) (List.hd state.func_type).reg_type
+      |> IntSet.of_list
+    in
+    let ptr_set = IntSet.union ptr_set callee_saved_var_set |> IntSet.union invalid_var_set in
     {
       non_change_set = IntSet.diff state.input_var_set ptr_set;
       change_ptr_set = ptr_set;
@@ -137,7 +174,11 @@ module SingleChangeVarInfer = struct
       (a_type_list: TaintTypeInfer.ArchType.t list) : TaintTypeInfer.ArchType.t list =
     List.map (
       fun (a_type: TaintTypeInfer.ArchType.t) ->
-        { a_type with change_var = IntSet.inter var_info.change_ptr_set (IntSet.union input_var_set a_type.useful_var) }
+        { a_type with 
+          change_var = 
+            IntSet.diff (IntSet.inter var_info.change_ptr_set (IntSet.union input_var_set a_type.useful_var)
+            |> IntSet.union a_type.change_var)
+            var_info.non_change_set }
     ) a_type_list
 
 end

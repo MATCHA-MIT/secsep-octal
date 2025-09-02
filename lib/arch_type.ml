@@ -242,6 +242,8 @@ module ArchType (Entry: EntryType) = struct
       constraint_list = [];
       local_var_map = Entry.get_empty_var_map
       (* useful_var = SingleExp.SingleVarSet.empty *)
+      (* NOTE: I cannot clean up staled useful_var here generated in the last round 
+        since this will be used to generate block context for next round prop! *)
     }
 
   let init_block_subtype_from_layout
@@ -289,7 +291,7 @@ module ArchType (Entry: EntryType) = struct
 
   let update_with_block_subtype = update_with_block_subtype_helper update_one_with_another_helper
 
-  let get_reg_type (curr_type: t) (r: Isa.register) : entry_t =
+  let get_reg_type (curr_type: t) (r: Isa.register) : entry_t * Constraint.t list =
     RegType.get_reg_type curr_type.reg_type r
 
   let set_reg_type_helper (allow_set_xmm: bool) (curr_type: t) (r: Isa.register) (new_type: entry_t) : t =
@@ -310,11 +312,21 @@ module ArchType (Entry: EntryType) = struct
   let get_mem_op_type
       (curr_type: t)
       (disp: Isa.immediate option) (base: Isa.register option)
-      (index: Isa.register option) (scale: Isa.scale option) : entry_t =
-    let base_r = if base = None then None else Some (get_reg_type curr_type (Option.get base)) in
-    let index_r = if index = None then None else Some (get_reg_type curr_type (Option.get index)) in
+      (index: Isa.register option) (scale: Isa.scale option) : entry_t * Constraint.t list =
+    let helper (r: Isa.register option) : entry_t option * Constraint.t list =
+      match r with
+      | None -> None, []
+      | Some r ->
+        let e, cons = get_reg_type curr_type r in
+        Some e, cons
+    in
+    let base_r, base_c = helper base in
+    let index_r, index_c = helper index in
+    (* let base_r = if base = None then None else Some (get_reg_type curr_type (Option.get base)) in
+    let index_r = if index = None then None else Some (get_reg_type curr_type (Option.get index)) in *)
     let scale_v = if scale = None then 1L else Isa.scale_val (Option.get scale) in
-    Entry.get_mem_op_type disp base_r index_r scale_v
+    Entry.get_mem_op_type disp base_r index_r scale_v,
+    base_c @ index_c
 
   let get_ld_op_type_no_slot
       (smt_ctx: SmtEmitter.t)
@@ -603,12 +615,15 @@ module ArchType (Entry: EntryType) = struct
     (* TODO: Should we use data size here? *)
     match src with
     | ImmOp imm -> Entry.get_const_type imm, curr_type, [], src
-    | RegOp r -> get_reg_type curr_type r, curr_type, [], src
+    | RegOp r -> 
+      let src_type, cons = get_reg_type curr_type r in
+      src_type, curr_type, cons, src
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
     | MemOp (disp, base, index, scale, _ (* size *)) ->
-      get_mem_op_type curr_type disp base index scale, curr_type, [], src
+      let src_type, cons = get_mem_op_type curr_type disp base index scale in
+      src_type, curr_type, cons, src
     | LdOp (disp, base, index, scale, size, (slot_anno, taint_anno) (* TODO: check offset and generate constraints *)) ->
-      let addr_type = get_mem_op_type curr_type  disp base index scale in
+      let addr_type, addr_constraint = get_mem_op_type curr_type  disp base index scale in
       let size_type = Entry.get_const_type (ImmNum (size, Some 8L)) in
       let src_type, src_constraint, src_useful, slot_anno =
         get_ld_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type addr_type size_type slot_anno
@@ -620,7 +635,7 @@ module ArchType (Entry: EntryType) = struct
           useful_var = SingleExp.SingleVarSet.union curr_type.useful_var src_useful;
           useful_constrained_var = SingleExp.SingleVarSet.union curr_type.useful_constrained_var src_useful;
         },
-        ld_op_constraint @ src_constraint,
+        addr_constraint @ ld_op_constraint @ src_constraint,
         LdOp (disp, base, index, scale, size, (slot_anno, taint_anno))
       )
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
@@ -641,7 +656,7 @@ module ArchType (Entry: EntryType) = struct
     | RegOp r -> set_reg_type_helper allow_set_xmm curr_type r new_type, [], dest
     | RegMultOp r_list -> set_mult_reg_type_helper allow_set_xmm curr_type r_list new_type, [], dest
     | StOp (disp, base, index, scale, size, (slot_anno, taint_anno)) ->
-      let addr_type = get_mem_op_type curr_type disp base index scale in
+      let addr_type, addr_constraint = get_mem_op_type curr_type disp base index scale in
       let size_type = Entry.get_const_type (ImmNum (size, Some 8L)) in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint new_type taint_anno in
       let next_type, dest_constraint, dest_useful, slot_anno =
@@ -651,7 +666,7 @@ module ArchType (Entry: EntryType) = struct
         useful_var = SingleExp.SingleVarSet.union next_type.useful_var dest_useful;
         useful_constrained_var = SingleExp.SingleVarSet.union next_type.useful_constrained_var dest_useful;
       },
-      st_op_constraint @ dest_constraint,
+      addr_constraint @ st_op_constraint @ dest_constraint,
       StOp (disp, base, index, scale, size, (slot_anno, taint_anno))
     | _ -> arch_type_error ("set_dest_op_type: dest is not reg or st op")
 
@@ -738,6 +753,12 @@ module ArchType (Entry: EntryType) = struct
     | BInst (bop, dest, src0, src1) ->
       let src0_type, curr_type, src0_constraint, src0 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src0 in
       let src1_type, curr_type, src1_constraint, src1 = get_src_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src1 in
+      let xor_same_reg_op =
+        match src0, src1 with
+        | RegOp r0, RegOp r1 -> r0 = r1
+        | _ -> false
+      in
+      let src0_constraint, src1_constraint = if xor_same_reg_op then [], [] else src0_constraint, src1_constraint in
       let dest_type, new_flag = Entry.exe_bop_inst bop src0_type src1_type curr_type.flag (Isa.cmp_operand src0 src1) in
       let new_local_var, dest_type = Entry.update_local_var curr_type.local_var_map dest_type curr_type.pc in
       let next_type, dest_constraint, dest =
@@ -786,9 +807,9 @@ module ArchType (Entry: EntryType) = struct
       { next_type with local_var_map = new_local_var; flag = new_flag },
       TInst (top, dest, src_list)
     | RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno)) ->
-      let rcx_type = get_reg_type curr_type RCX in
-      let src_addr_type = get_reg_type curr_type RSI in
-      let dest_addr_type = get_reg_type curr_type RDI in
+      let rcx_type, rcx_constraint = get_reg_type curr_type RCX in
+      let src_addr_type, src_addr_constraint = get_reg_type curr_type RSI in
+      let dest_addr_type, dest_addr_constraint = get_reg_type curr_type RDI in
       let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
       let src_type, src_constraint, src_useful, src_slot_anno = 
         get_ld_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src_addr_type size_type src_slot_anno 
@@ -798,7 +819,7 @@ module ArchType (Entry: EntryType) = struct
       let next_type, dest_constraint, dest_useful, dest_slot_anno =
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type dest_addr_type size_type dest_slot_anno new_type
       in
-      let next_type = add_constraints next_type (src_constraint @ ld_op_constraint @ dest_constraint @ st_op_constraint) in
+      let next_type = add_constraints next_type (rcx_constraint @ src_addr_constraint @ dest_addr_constraint @ src_constraint @ ld_op_constraint @ dest_constraint @ st_op_constraint) in
       let combined = SingleExp.SingleVarSet.union src_useful dest_useful in
       { next_type with
         useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union combined;
@@ -806,8 +827,8 @@ module ArchType (Entry: EntryType) = struct
       },
       RepMovs (size, (dest_slot_anno, dest_taint_anno), (src_slot_anno, src_taint_anno))
     | RepLods (size, (src_slot_anno, src_taint_anno)) ->
-      let rcx_type = get_reg_type curr_type RCX in
-      let src_addr_type = get_reg_type curr_type RSI in
+      let rcx_type, rcx_constraint = get_reg_type curr_type RCX in
+      let src_addr_type, src_addr_constraint = get_reg_type curr_type RSI in
       let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
       let src_type, src_constraint, src_useful, src_slot_anno = 
         get_ld_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type src_addr_type size_type src_slot_anno 
@@ -815,22 +836,25 @@ module ArchType (Entry: EntryType) = struct
       let ld_op_constraint = Entry.update_ld_taint_constraint src_type src_taint_anno in
       let new_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) src_type in
       let next_type = set_reg_type curr_type RAX new_type in
-      let next_type = add_constraints next_type (src_constraint @ ld_op_constraint) in
+      let next_type = add_constraints next_type (rcx_constraint @ src_addr_constraint @ src_constraint @ ld_op_constraint) in
       { next_type with
         useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union src_useful;
         useful_constrained_var = next_type.useful_constrained_var |> SingleExp.SingleVarSet.union src_useful;
       },
       RepLods (size, (src_slot_anno, src_taint_anno))
     | RepStos (size, (dest_slot_anno, dest_taint_anno)) ->
-      let rcx_type = get_reg_type curr_type RCX in
-      let dest_addr_type = get_reg_type curr_type RDI in
+      let rcx_type, rcx_constraint = get_reg_type curr_type RCX in
+      let dest_addr_type, dest_addr_constraint = get_reg_type curr_type RDI in
       let size_type = Entry.get_mem_op_type None None (Some rcx_type) size in
-      let src_type = Entry.set_taint_with_other (Entry.get_top_untaint_type ()) (get_reg_type curr_type RAX) in
+      let src_type, src_constraint = 
+        let rax_type, rax_constraint = get_reg_type curr_type RAX in
+        Entry.set_taint_with_other (Entry.get_top_untaint_type ()) rax_type, rax_constraint
+      in
       let new_type, st_op_constraint = Entry.update_st_taint_constraint src_type dest_taint_anno in
       let next_type, dest_constraint, dest_useful, dest_slot_anno =
         set_st_op_type smt_ctx prop_mode sub_sol_func sub_sol_list_func is_spill_func curr_type dest_addr_type size_type dest_slot_anno new_type
       in
-      let next_type = add_constraints next_type (dest_constraint @ st_op_constraint) in
+      let next_type = add_constraints next_type (rcx_constraint @ dest_addr_constraint @ src_constraint @ dest_constraint @ st_op_constraint) in
       { next_type with
         useful_var = next_type.useful_var |> SingleExp.SingleVarSet.union dest_useful;
         useful_constrained_var = next_type.useful_constrained_var |> SingleExp.SingleVarSet.union dest_useful;

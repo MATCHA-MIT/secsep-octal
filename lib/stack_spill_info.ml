@@ -1,15 +1,11 @@
 open Isa_basic
 open Mem_offset_new
 open Set_sexp
-open Sexplib.Std
 
 module StackSpillInfo = struct
   exception StackSpillInfoError of string
 
   let stack_spill_info_error msg = raise (StackSpillInfoError ("[Stack Spill Info error] " ^ msg))
-
-  type entry_t = int * int
-  [@@deriving sexp]
 
   type t = Int64PairSet.t
   [@@deriving sexp]

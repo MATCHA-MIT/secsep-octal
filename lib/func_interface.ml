@@ -4,6 +4,7 @@ open Ptr_info
 open Single_exp
 open Taint_exp
 open Entry_type
+open Reg_range
 open Mem_offset_new
 open Single_context
 open Constraint
@@ -418,6 +419,25 @@ module FuncInterface (Entry: EntryType) = struct
     in
     List.fold_left2 helper (parent_mem, [], SingleExp.SingleVarSet.empty) read_hint write_mem
 
+  let get_reg_range_constraint
+      (parent_reg: RegType.t) (child_reg: RegType.t) : Constraint.t list =
+    let range_pair_list = List.map2 (fun (p, _) (c, _) -> p, c) parent_reg child_reg in
+    List.mapi (
+      fun i (p_range, c_range) ->
+        if IsaBasic.is_reg_idx_callee_saved i then
+          (* NOTE: in the current version we do not need this *)
+          match p_range with
+          | RegRange.RangeVar v | RangeExp (v, _) -> [ Constraint.RegRangeCalleeAtCall v ]
+          | _ -> []
+        else
+          match c_range with
+          | RegRange.RangeConst (l, r) ->
+            if l = r then [] else RegRange.read_constraint p_range (l, r)
+          | _ -> []
+    ) range_pair_list
+    (* |> List.filteri (fun i _ -> not (IsaBasic.is_reg_idx_callee_saved i)) *)
+    |> List.flatten
+
   let get_reg_taint_constraint
       (var_map: Entry.local_var_map_t)
       (parent_reg: RegType.t) (child_reg: RegType.t) : Constraint.t list =
@@ -523,6 +543,7 @@ module FuncInterface (Entry: EntryType) = struct
       set_mem_type smt_ctx sub_sol_func sub_sol_list_func (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in
 
     let constraint_list = 
+      get_reg_range_constraint parent_reg child_reg @
       get_reg_taint_constraint var_map parent_reg child_reg @
       get_callee_taint_context_constraint var_map child_taint_context @
       (* get_mem_taint_constraint var_map parent_mem child_mem @ *)

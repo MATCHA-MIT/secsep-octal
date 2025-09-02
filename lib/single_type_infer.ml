@@ -557,7 +557,7 @@ module SingleTypeInfer = struct
       SingleEntryType.SingleVarSet.union acc new_vars
     ) SingleEntryType.SingleVarSet.empty state.func_type
     in
-    {state with
+    { state with
       func_type = List.map (fun (arch_type: ArchType.t) ->
         (* only add constraints for the entry block *)
         if arch_type.label <> state.func_name then arch_type else
@@ -600,6 +600,30 @@ module SingleTypeInfer = struct
         { arch_type with context = new_context }
       ) state.func_type;
     }
+
+  let remove_top_var_func_type 
+      (input_var_set: IntSet.t) (single_subtype: SingleSubtype.t)
+      (func_type: ArchType.t list) : ArchType.t list =
+    let non_top_var =
+      List.map (fun (tv_rel: SingleSubtype.type_rel) -> fst tv_rel.var_idx) single_subtype
+      |> IntSet.of_list |> IntSet.union input_var_set
+    in
+    let unused_to_top (non_top_var: IntSet.t) (e: SingleEntryType.t) : SingleEntryType.t =
+      if SingleEntryType.is_val non_top_var e then e
+      else SingleTop
+    in
+    let helper (a_type: ArchType.t) : ArchType.t =
+      let reg_type = List.map (
+        fun (valid, e) ->
+          (* if Isa.is_reg_idx_callee_saved i then valid, e
+          else  *)
+          valid, unused_to_top non_top_var e
+      ) a_type.reg_type 
+      in
+      let mem_type = ArchType.MemType.map (unused_to_top non_top_var) a_type.mem_type in
+      { a_type with reg_type = reg_type; mem_type = mem_type }
+    in
+    List.map helper func_type
 
   let infer_one_func
       (prog: Isa.prog)
@@ -895,6 +919,8 @@ module SingleTypeInfer = struct
                   context = x.context @ (List.hd func_type).context }
             ) func_type
           in
+          let func_type = remove_top_var_func_type state.input_var_set state.single_subtype func_type in
+          let block_subtype = List.map2 (fun sup (_, sub_list) -> sup, sub_list) func_type block_subtype in 
           { state with 
             func = update_branch_anno block_subtype state.func;
             func_type = func_type;

@@ -1,4 +1,5 @@
 open Isa_basic
+open Constraint
 open Set_sexp
 open Sexplib.Std
 (* open Sexplib *)
@@ -27,6 +28,17 @@ module RegRange = struct
   )
 
   let get_empty_range () : t = RangeConst (0L, 0L)
+
+  let is_empty_range (range: t) : bool =
+    match range with
+    | RangeConst (0L, 0L) -> true
+    | _ -> false
+
+  let is_full_range (range: t) (full_size: int64) : bool =
+    match range with
+    | RangeVar _ -> false
+    | RangeConst (l, r) | RangeExp (_, (l, r)) ->
+      l == 0L && r == full_size
 
   let get_input_range (num_args: int) (reg_idx: int) : t =
     let arg_idx =
@@ -64,6 +76,16 @@ module RegRange = struct
     | RangeConst r -> RangeConst (union_range r off)
     | RangeVar v -> RangeExp (v, off)
     | RangeExp (v, r) -> RangeExp (v, union_range r off)
+
+  let read_constraint (r: t) (off: range_t) : Constraint.t list =
+    match r with
+    | RangeConst _ -> []
+    | RangeVar v -> [ RegRangeMustKnown v ]
+    | RangeExp (v, r) ->
+      let r1, r2 = r in
+      let o1, o2 = off in
+      if r1 <= o1 && o2 <= r2 then []
+      else [ RegRangeMustKnown v ]
 
   let inter_range (a: range_t) (b: range_t) : range_t =
     let a1, a2 = a in

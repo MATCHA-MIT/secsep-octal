@@ -31,6 +31,18 @@ let () =
   ) tti_list change_list in
   Taint_type_infer.TaintTypeInfer.state_list_to_file (get_related_filename !program_name "out" "taint_infer") tti_list;
 
+  let interface_list = Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_from_file
+      (get_related_filename !program_name "out" "interface")
+  in
+  let interface_list = List.map (
+    fun (interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t) ->
+      match List.find_opt (fun (tti: Taint_type_infer.TaintTypeInfer.t) -> tti.func_name = interface.func_name) tti_list with
+      | None -> interface
+      | Some tti -> { interface with in_change_var = (List.hd tti.func_type).change_var }
+  ) interface_list
+  in
+  Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "interface") interface_list;
+
   let end_time = Sys.time () in
   Stat.stat.time <- end_time -. start_time;
   Stat.statistics_to_file (get_related_filename !program_name "out" "range_infer.stat")

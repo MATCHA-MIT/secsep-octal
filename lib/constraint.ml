@@ -12,6 +12,9 @@ module Constraint = struct
   type t =
     | Unknown of MemOffset.t
     (* | Subset of MemOffset.t * MemRange.t * MemOffset.t *)
+    | RegRangeOverwritten of int
+    | RegRangeMustKnown of int
+    | RegRangeCalleeAtCall of int
     | RangeSubset of MemRange.range_var_id * (MemOffset.t list) (* var, off_list: off_list is subset of var *)
     | RangeUnsat of MemOffset.t * (MemOffset.t list)
     | RangeEq of MemOffset.t * MemRange.t
@@ -61,6 +64,22 @@ module Constraint = struct
           invalid_pc_list
         | _ -> acc
     ) (TaintExp.TaintVarSet.empty, []) constraint_list
+
+  let get_reg_range_must_known (constraint_list: (t * int) list) : IntSet.t =
+    List.fold_left (
+      fun (acc: IntSet.t) (c, _) ->
+        match c with
+        | RegRangeMustKnown v -> IntSet.add v  acc
+        | _ -> acc
+    ) IntSet.empty constraint_list
+
+  let get_reg_range_callee_at_call (constraint_list: (t * int) list) : IntSet.t =
+    List.fold_left (
+      fun (acc: IntSet.t) (c, _) ->
+        match c with
+        | RegRangeCalleeAtCall v -> IntSet.add v  acc
+        | _ -> acc
+    ) IntSet.empty constraint_list
   
   let get_range_must_known (constraint_list: (t * int) list) : IntSet.t =
     let add_range_var_helper (r: MemRange.t) (s: IntSet.t) : IntSet.t =
@@ -74,24 +93,6 @@ module Constraint = struct
         | RangeMustKnown r -> add_range_var_helper r acc
         | _ -> acc
     ) IntSet.empty constraint_list
-
-  let get_range_can_be_empty (constraint_list: (t * int) list) : IntSet.t =
-    let add_range_var_helper (r: MemRange.t) (s: IntSet.t) : IntSet.t =
-      match MemRange.get_range_var r with
-      | Some v -> IntSet.add v s
-      | None -> s
-    in
-    let overwritten_var_set, must_known_var_set =
-      List.fold_left (
-        fun (acc: IntSet.t * IntSet.t) (x, _) ->
-          let overwritten_var_set, must_known_var_set = acc in
-          match x with
-          | RangeOverwritten r -> add_range_var_helper r overwritten_var_set, must_known_var_set
-          | RangeMustKnown r -> overwritten_var_set, add_range_var_helper r must_known_var_set
-          | _ -> acc
-      ) (IntSet.empty, IntSet.empty) constraint_list
-    in
-    IntSet.diff overwritten_var_set must_known_var_set
 
   let gen_off_subset (smt_ctx: SmtEmitter.t) (sub_off: MemOffset.t) (range: MemRange.t) (off: MemOffset.t) : t list =
     (* check whether sub_off (solution) is the subset of range (subtype) *)

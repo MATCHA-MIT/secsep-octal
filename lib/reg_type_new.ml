@@ -2,6 +2,7 @@ open Isa_basic
 open Reg_range
 open Entry_type
 open Single_exp
+open Constraint
 open Pretty_print
 open Sexplib.Std
 
@@ -85,17 +86,19 @@ module RegType (Entry: EntryType) = struct
       fun (_, e) -> func e
     ) reg
 
-  let get_reg_type (reg_type: t) (r: IsaBasic.register) : entry_t =
+  let get_reg_type (reg_type: t) (r: IsaBasic.register) : entry_t * Constraint.t list =
     let reg_idx = IsaBasic.get_reg_idx r in
-    let (_, entry_type) = List.nth reg_type reg_idx in
+    let (valid, entry_type) = List.nth reg_type reg_idx in
     if IsaBasic.is_xmm r then
+      let read_constraint = RegRange.read_constraint valid (0L, 16L) in
       match Entry.get_single_exp entry_type with
-      | SingleConst 0L -> entry_type
-      | _ -> Entry.set_taint_with_other (Entry.get_top_untaint_type ()) entry_type
+      | SingleConst 0L -> entry_type, read_constraint
+      | _ -> Entry.set_taint_with_other (Entry.get_top_untaint_type ()) entry_type, read_constraint
     else
       let off, size = IsaBasic.get_reg_offset_size r in
       let full_size = IsaBasic.get_reg_full_size r in
-      Entry.read_val (Some full_size) off size entry_type
+      Entry.read_val (Some full_size) off size entry_type,
+      RegRange.read_constraint valid (off, Int64.add off size)
 
   let set_reg_type_helper (allow_set_xmm: bool) (reg_type: t) (r: IsaBasic.register) (new_type: entry_t) : t =
     let reg_idx = IsaBasic.get_reg_idx r in
