@@ -33,7 +33,7 @@ module ArchTypeBasic = struct
     mem_type: MemType.t;
     context: BasicType.ctx_t;
 
-    change_ctx: DepChangeCtx.t;
+    change_sub_map: DepChangeCtx.map_t;
 
     (* stack_spill_info: StackSpillInfo.t; *)
 
@@ -80,6 +80,7 @@ module ArchTypeBasic = struct
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
+      (skip_check_callee_saved_range: bool)
       (sub_a_type: t) (sup_a_type: t)
       (ctx_map: BasicType.map_t)
       (mem_map_opt: MemAnno.slot_t MemType.mem_content option) : bool =
@@ -105,10 +106,11 @@ module ArchTypeBasic = struct
     *)
 
     (* 2. check subtype relation of each reg/flag/mem slot *)
-    let reg_check = RegType.check_subtype smt_ctx sub_a_type.reg_type sup_reg_type in
-    let flag_check = FlagType.check_subtype smt_ctx sub_a_type.flag_type sup_flag_type in
+    let is_non_change_exp = DepChangeCtx.check_non_change_exp smt_ctx sub_a_type.change_sub_map in
+    let reg_check = RegType.check_subtype smt_ctx skip_check_callee_saved_range is_non_change_exp sub_a_type.reg_type sup_reg_type in
+    let flag_check = FlagType.check_subtype smt_ctx is_non_change_exp sub_a_type.flag_type sup_flag_type in
     let mem_check = MemType.check_subtype 
-      smt_ctx 
+      smt_ctx is_non_change_exp
       sub_a_type.mem_type sup_mem_type mem_map_opt in
     let dep_ctx_check = SmtEmitter.check_compliance smt_ctx sup_dep_context = SatYes in
     if not dep_ctx_check then begin
@@ -124,8 +126,15 @@ module ArchTypeBasic = struct
     end;
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
 
-    Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b\n"
-      reg_check flag_check mem_check dep_ctx_check taint_ctx_check;
-    reg_check && flag_check && mem_check && dep_ctx_check && taint_ctx_check
+    let subtype_non_change_check = 
+      DepChangeCtx.check_subtype_non_change smt_ctx sub_a_type.change_sub_map sup_a_type.change_sub_map (fst ctx_map)
+    in
+    (* TODO: remove this later *)
+    if not subtype_non_change_check then
+      arch_type_error "fail subtype_non_change_check";
+
+    Printf.printf "ArchType.check_subtype: reg:%b flag:%b mem:%b dep_ctx:%b taint_ctx:%b subtype_non_change_check:%b\n"
+      reg_check flag_check mem_check dep_ctx_check taint_ctx_check subtype_non_change_check;
+    reg_check && flag_check && mem_check && dep_ctx_check && taint_ctx_check && subtype_non_change_check
 
 end

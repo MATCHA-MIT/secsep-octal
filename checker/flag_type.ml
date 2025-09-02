@@ -52,12 +52,15 @@ include RegTypeBasic
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_r_type: t) (sup_r_type: t) : bool =
     List.fold_left2 (
       fun (acc: bool) (sub_valid, sub_entry) (sup_valid, sup_entry) ->
-        acc &&
-        (not sup_valid || sub_valid) &&
-        BasicType.check_subtype smt_ctx false sub_entry sup_entry
+        if sup_valid then
+          acc &&
+          (not sup_valid || sub_valid) &&
+          BasicType.check_subtype smt_ctx false is_non_change_exp sub_entry sup_entry
+        else acc
     ) true sub_r_type sup_r_type
 
 end

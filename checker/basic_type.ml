@@ -846,7 +846,7 @@ module DepType = struct
 
     let cnt = mk_extract_wrapper ctx 4 0 cnt in
     (* For now we assert cnt <> 0 *)
-    if not (check_eq smt_ctx cnt (get_const_exp ctx 0L 5)) then
+    if check_eq smt_ctx cnt (get_const_exp ctx 0L 5) then
       failwith "exe_shld: invalid shift cnt = 0";
     let cnt_ext = BitVector.mk_zero_ext ctx ((get_exp_bit_size merged) - 5) cnt in
     let shifted = BitVector.mk_shl ctx merged cnt_ext in
@@ -1040,9 +1040,11 @@ module DepType = struct
   
   let check_subtype
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: exp_t -> bool)
       (sub_exp: t) (sup_exp: t) : bool =
     match sub_exp, sup_exp with
-    | _, Top _ -> true
+    | Top _, Top _ -> true
+    | Exp sub_e, Top _ -> is_non_change_exp sub_e
     | Top _, Exp _ -> false
     | Exp sub_e, Exp sup_e ->
       SmtEmitter.check_compliance smt_ctx
@@ -1253,10 +1255,11 @@ module BasicType = struct
   let check_subtype
       (smt_ctx: SmtEmitter.t)
       (taint_must_equal: bool)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_exp: t) (sup_exp: t) : bool =
     let sub_dep, sub_taint = sub_exp in
     let sup_dep, sup_taint = sup_exp in
-    DepType.check_subtype smt_ctx sub_dep sup_dep &&
+    DepType.check_subtype smt_ctx is_non_change_exp sub_dep sup_dep &&
     TaintType.check_subtype smt_ctx taint_must_equal sub_taint sup_taint
 
 end

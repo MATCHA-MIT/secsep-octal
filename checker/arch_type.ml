@@ -3,6 +3,7 @@
 open Type.Smt_emitter
 (* open Z3_sexp *)
 open Basic_type
+open Dep_change_ctx
 open Isa_flag_config
 (* open Mem_anno *)
 open Reg_type
@@ -484,7 +485,7 @@ include ArchTypeBasic
     end else
 
     let result =
-      check_subtype smt_ctx curr_type targ_type br_anno None && BranchAnno.is_taint_map_empty br_anno,
+      check_subtype smt_ctx false curr_type targ_type br_anno None && BranchAnno.is_taint_map_empty br_anno,
       curr_type (* already at the end of block, no further update *)
     in
 
@@ -529,10 +530,11 @@ include ArchTypeBasic
       end else begin
         SmtEmitter.push smt_ctx;
         SmtEmitter.add_assertions smt_ctx [taken];
+        DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_sub_map taken;
         let next_type = { curr_type with
           context = BasicType.append_ctx curr_type.context taken
         } in
-        let valid = check_subtype smt_ctx next_type targ_type br_anno None in
+        let valid = check_subtype smt_ctx false next_type targ_type br_anno None in
         SmtEmitter.pop smt_ctx 1;
         valid && BranchAnno.is_taint_map_empty br_anno
         (* Here I only check for taken side, and will not check if always not taken,
@@ -543,6 +545,7 @@ include ArchTypeBasic
     let check_not_taken () : bool * t =
       let not_taken = Z3.Boolean.mk_not z3_ctx taken in
       SmtEmitter.add_assertions smt_ctx [not_taken];
+      DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_sub_map not_taken;
       let next_type = { curr_type with
         pc = curr_type.pc + 1;
         context = BasicType.append_ctx curr_type.context not_taken
@@ -554,10 +557,26 @@ include ArchTypeBasic
         true, next_type
     in
 
-    let result = match SmtEmitter.check_compliance smt_ctx [taken] with
+    (* let check_non_change_cond, cond_instance = DepChangeCtx.check_non_change_exp smt_ctx curr_type.change_sub_map taken in *)
+    let taken_cond_check_result = SmtEmitter.check_compliance smt_ctx [taken] in
+    let check_non_change_cond = DepChangeCtx.check_non_change_exp smt_ctx curr_type.change_sub_map taken in
+    (* Printf.printf "Check br_cond (sat = %s) is non change\n%s\n" 
+      (Sexplib.Sexp.to_string_hum (SmtEmitter.sexp_of_sat_result_t (taken_cond_check_result))) 
+      (Z3.Expr.to_string taken); *)
+    if not check_non_change_cond then begin
+      Printf.printf "Warning: non change cond branch check failed\n%s\n" (Z3.Expr.to_string taken);
+      Printf.printf "Unsat model\n%s\n" (Z3.Model.to_string (Z3.Solver.get_model (snd smt_ctx) |> Option.get));
+      Printf.printf "Instance\n%s\n" (Sexplib.Sexp.to_string_hum (DepChangeCtx.sexp_of_map_t curr_type.change_sub_map));
+      SmtEmitter.pp_smt_ctx 9 smt_ctx;
+      failwith "Fail non change cond check\n"
+    end else
+
+    let check_pass, next_state = match taken_cond_check_result with
     | SmtEmitter.SatNo -> (* always not taken *)
+      Printf.printf "Always not taken\n";
       check_not_taken ()
     | SmtEmitter.SatYes -> (* always taken *)
+      Printf.printf "Always taken\n";
       if curr_type.pc + 1 < curr_type.dead_pc then begin
         Printf.printf "Warning: instr after always-taken cond branch is not dead\n";
         false, curr_type
@@ -570,9 +589,10 @@ include ArchTypeBasic
       taken_valid && not_taken_valid, next_type
     in
 
-    if (fst result) = false then
+    if not check_pass then
       Printf.printf "Warning: cond branch target subtype check failed\n";
-    result
+
+    check_pass && check_non_change_cond, next_state
 
   let type_prop_check_one_inst
       (smt_ctx: SmtEmitter.t)
@@ -642,6 +662,9 @@ include ArchTypeBasic
     Printf.printf "checking valid region...\n";
     let check_valid_region = MemType.check_valid_region smt_ctx block_type.mem_type in
     Printf.printf "valid region: %b\n" check_valid_region;
+
+    (* Printf.printf "copy block assertions\n"; *)
+    DepChangeCtx.copy_all_assertions smt_ctx block_type.change_sub_map;
 
     let check_prop =
       if block_type.pc >= block_type.dead_pc then true else

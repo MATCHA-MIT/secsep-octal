@@ -506,6 +506,7 @@ module MemType = struct
   let check_slot_subtype
       (smt_ctx: SmtEmitter.t)
       (off_must_eq: bool)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_slot: entry_t mem_slot)
       (sup_slot: entry_t mem_slot) : bool =
     (* for offset / initialized ranges, sup_slot is the subset of sub_slot *)
@@ -543,12 +544,14 @@ module MemType = struct
         if sub_forget_type then true
         else check_taint ()
       else if MemRange.check_single_slot_eq smt_ctx sub_range sup_range then
-        DepType.check_subtype smt_ctx sub_dep sup_dep &&
+        DepType.check_subtype smt_ctx is_non_change_exp sub_dep sup_dep &&
         check_taint ()
       else
         let check_dep =
-          match sub_dep with
-          | Top _ -> true
+          (* TODO: Double check this fix! Originally we check sub_dep is top by mistake *)
+          match sub_dep, sup_dep with
+          | Top _, Top _ -> true
+          | Exp sub_e, Top _ -> is_non_change_exp sub_e
           | _ -> false
         in
         MemRange.check_subset smt_ctx sup_range sub_range &&
@@ -562,6 +565,7 @@ module MemType = struct
 
   let check_subtype_no_map
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_m_type: t) (sup_m_type: t) : bool =
     (* Items to check:
        1. Ptr info
@@ -580,7 +584,7 @@ module MemType = struct
             let acc_check, slot_idx = acc in
             if not acc_check then acc_check, slot_idx + 1
             else 
-              let slot_result = check_slot_subtype smt_ctx true sub_slot sup_slot in
+              let slot_result = check_slot_subtype smt_ctx true is_non_change_exp sub_slot sup_slot in
               (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
               slot_result, slot_idx + 1
         ) (true, 0) sub_part_mem sup_part_mem |> fst
@@ -614,6 +618,7 @@ module MemType = struct
 
   let check_subtype_map
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_m_type: t) (sup_m_type: t)
       (mem_map: MemAnno.slot_t mem_content) : bool =
     (*
@@ -654,7 +659,7 @@ module MemType = struct
               (sup_slot: entry_t mem_slot) ->
             if not acc_check then acc_check
             else
-              let slot_result = check_slot_subtype smt_ctx false sub_slot sup_slot in
+              let slot_result = check_slot_subtype smt_ctx false is_non_change_exp sub_slot sup_slot in
               (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
               slot_result
         ) true sub_part_mem sup_part_mem
@@ -665,11 +670,12 @@ module MemType = struct
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_m_type: t) (sup_m_type: t)
       (mem_map_opt: MemAnno.slot_t mem_content option) : bool =
     match mem_map_opt with
-    | None -> check_subtype_no_map smt_ctx sub_m_type sup_m_type
-    | Some mem_map -> check_subtype_map smt_ctx sub_m_type sup_m_type mem_map
+    | None -> check_subtype_no_map smt_ctx is_non_change_exp sub_m_type sup_m_type
+    | Some mem_map -> check_subtype_map smt_ctx is_non_change_exp sub_m_type sup_m_type mem_map
 
   let find_part_mem_helper
       (mem_type: t) (slot_info: MemAnno.slot_t) : entry_t mem_part =

@@ -75,7 +75,9 @@ module FuncInterface = struct
     (* <NOTE> <TODO> Extra child var in out_type should also be in call_anno's ctx_map *)
     (* 1. Check input type *)
     let check_input = 
-      ArchTypeBasic.check_subtype smt_ctx pr_type func_interface.in_type call_anno.ctx_map (Some call_anno.mem_map)
+      (* NOTE: for func call check, we do not check callee-saved reg's valid region since from the callee's view, 
+        the callee-saved reg cna be instantiated to any value and any taint. Hence, it is ok even the reg type is not tracked by type system (i.e., reg is invalid) *)
+      ArchTypeBasic.check_subtype smt_ctx true pr_type func_interface.in_type call_anno.ctx_map (Some call_anno.mem_map)
     in
     if not check_input then None else
     (* 2. Check pr_reg in call_anno *)

@@ -20,6 +20,9 @@ module RegRange = struct
 
   let get_empty_range () : t = 0L, 0L
 
+  let is_empty_range (range: t) : bool =
+    let l, r = range in l = r
+
   let get_write_update_range (reg_idx: int) (off_size: int64 * int64) : t =
     let off, size = off_size in
     if reg_idx > 15 then IsaBasic.xmm_full_off_size
@@ -78,7 +81,7 @@ include RegTypeBasic
     let off, size = IsaBasic.get_reg_offset_size r in
     if check_valid && not (RegRange.read_check_off_size entry_range (off, size)) then
       let _ =
-        Printf.printf "read_region %s check_region %s\n" 
+        Printf.printf "reg %d read_region %s check_region %s\n" reg_idx
         (Sexplib.Sexp.to_string_hum (sexp_of_range_t entry_range)) 
         (Sexplib.Sexp.to_string_hum (sexp_of_range_t (off, size)))
       in
@@ -130,20 +133,38 @@ include RegTypeBasic
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
+      (skip_check_callee_saved_range: bool)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (sub_r_type: t) (sup_r_type: t) : bool =
+    Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t sub_r_type));
     List.fold_left2 (
-      fun (acc: bool) (sub_range, sub_entry) (sup_range, sup_entry) ->
-        let curr = BasicType.check_subtype smt_ctx false sub_entry sup_entry in
-        (* Printf.printf "reg subtype check: %s(%d) -> %s(%d) : %b\n"
-          (BasicType.sexp_of_t sub_entry |> Sexplib.Sexp.to_string_hum)
-          (DepType.get_bit_size (fst sub_entry))
-          (BasicType.sexp_of_t sup_entry |> Sexplib.Sexp.to_string_hum)
-          (DepType.get_bit_size (fst sup_entry))
-          curr; *)
-        let range_check = RegRange.check_subtype sub_range sup_range in
-        acc && curr && range_check
+      fun (acc, cnt) (sub_range, sub_entry) (sup_range, sup_entry) ->
+        if RegRange.is_empty_range sup_range then
+          acc, cnt + 1
+        else
+          (* We only check when sup type requires reg is marked as valid! *)
+          let curr = BasicType.check_subtype smt_ctx false is_non_change_exp sub_entry sup_entry in
+          if not curr then
+            Printf.printf "reg subtype check: %s(%d) -> %s(%d) : %b\n"
+              (BasicType.sexp_of_t sub_entry |> Sexplib.Sexp.to_string_hum)
+              (DepType.get_bit_size (fst sub_entry))
+              (BasicType.sexp_of_t sup_entry |> Sexplib.Sexp.to_string_hum)
+              (DepType.get_bit_size (fst sup_entry))
+              curr;
+          if not curr then failwith (Printf.sprintf "reg subtype check at reg %d" cnt);
+          let range_check = 
+            (skip_check_callee_saved_range && IsaBasic.is_reg_idx_callee_saved cnt) || 
+            RegRange.check_subtype sub_range sup_range 
+          in
+          if not range_check then
+            Printf.printf "sub_range: %s sup_range: %s\n" 
+              (Sexplib.Sexp.to_string_hum (sexp_of_range_t sub_range))
+              (Sexplib.Sexp.to_string_hum (sexp_of_range_t sup_range));
+          if not range_check then failwith (Printf.sprintf "range_check_failed at reg %d" cnt);
+          acc && curr && range_check, cnt + 1
         
-    ) true sub_r_type sup_r_type
+    ) (true, 0) sub_r_type sup_r_type
+    |> fst
 
   let check_taint_eq
       (smt_ctx: SmtEmitter.t)
