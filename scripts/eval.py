@@ -16,7 +16,7 @@ from multiprocessing import Pool
 from general import *
 
 
-OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer"]
+OCTAL_PHASE_INFER = ["single_infer", "range_infer", "taint_infer", "change_infer"]
 OCTAL_PHASE_CHECK = "check"
 OCTAL_PHASES = OCTAL_PHASE_INFER + [OCTAL_PHASE_CHECK]
 OCTAL_PHASE_METRICS = ["time", "smt_queries", "smt_queries_time"]

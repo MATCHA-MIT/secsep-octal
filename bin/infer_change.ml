@@ -45,4 +45,4 @@ let () =
 
   let end_time = Sys.time () in
   Stat.stat.time <- end_time -. start_time;
-  Stat.statistics_to_file (get_related_filename !program_name "out" "range_infer.stat")
+  Stat.statistics_to_file (get_related_filename !program_name "out" "change_infer.stat")

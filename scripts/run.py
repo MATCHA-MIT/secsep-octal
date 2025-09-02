@@ -18,15 +18,8 @@ class InferPhase(Enum):
     SingleTypeInfer = 1
     RangeTypeInfer = 2
     TaintTypeInfer = 3
-    NumPhases = 4
-
-
-InferPhaseDescription = """Run inference on the benchmark:
-    0: Preprocess Input
-    1: Single Type Infer
-    2: Valid Region Infer
-    3: Taint Type Infer
-"""
+    ChangeInfer = 4
+    NumPhases = 5
 
 
 class CheckPhase(Enum):
@@ -141,6 +134,12 @@ def infer_core(
                 output_dir / f"{name}.taint_infer.log",
                 f"[{name}] (Taint Type Infer)",
             )
+        elif i == InferPhase.ChangeInfer.value:
+            run(
+                [OCTAL_INFER_CHANGE, "-name", name],
+                output_dir / f"{name}.change_infer.log",
+                f"[{name}] (Change Infer)",
+            )
         else:
             logging.error(f"Invalid phase {i}")
             raise ValueError(f"Invalid phase {i}")
@@ -158,7 +157,7 @@ def infer_core(
     nargs=2,
     type=click.Tuple([int, int]),
     default=(0, InferPhase.NumPhases.value - 1),
-    help="0: Preprocessing, 1: Dependent type infer, 2: Range type infer, 3: Taint type infer",
+    help="0: Preprocessing, 1: Dependent type infer, 2: Range type infer, 3: Taint type infer, 4: Change infer",
 )
 @click.option("--use-cache", is_flag=True)
 def infer(name, log_file, input_dir, phase, use_cache):
