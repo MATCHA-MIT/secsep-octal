@@ -48,6 +48,7 @@ include ArchTypeBasic
 
   let get_ld_op_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t) (ld_op: Isa.ldst_op) : entry_t option =
     (* <TODO> Check this against infer and ld rule, make sure it checks everything *)
     let disp, base, index, scale, size, (slot_anno, taint_anno) = ld_op in
@@ -68,7 +69,7 @@ include ArchTypeBasic
         None
       | Exp addr_exp ->
         let addr_off = MemOffset.addr_size_to_offset (fst smt_ctx) addr_exp size in
-        match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off slot_anno with
+        match MemType.get_mem_type smt_ctx is_non_change_exp curr_type.mem_type addr_off slot_anno with
         | None -> 
           Printf.printf "get_ld_op_type op %s fail to load from addr %s\n"
             (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand (LdOp ld_op)))
@@ -87,6 +88,7 @@ include ArchTypeBasic
 
   let get_src_op_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t) 
       ?(check_reg_valid=true)
       (src: Isa.operand) : entry_t option =
@@ -97,7 +99,7 @@ include ArchTypeBasic
     | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type ~check_valid:check_reg_valid r)
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
     | MemOp mem_op -> Some (get_mem_op_type smt_ctx curr_type mem_op)
-    | LdOp ld_op -> get_ld_op_type smt_ctx curr_type ld_op
+    | LdOp ld_op -> get_ld_op_type smt_ctx is_non_change_exp curr_type ld_op
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
 
@@ -112,6 +114,7 @@ include ArchTypeBasic
 
   let set_st_op_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (st_op: Isa.ldst_op)
       (new_type: entry_t) : MemType.t option =
@@ -144,6 +147,7 @@ include ArchTypeBasic
           (* Note: we check taint_anno against original taint in set_mem_type *)
           let new_mem_opt =
             MemType.set_mem_type smt_ctx 
+              is_non_change_exp
               curr_type.mem_type addr_off slot_anno (st_dep_type, taint_anno)
           in
           begin match new_mem_opt with
@@ -158,6 +162,7 @@ include ArchTypeBasic
 
   let set_dest_op_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (dest: Isa.operand) (new_type: entry_t) 
       (flag_update_list: (Isa.flag * entry_t) list)
@@ -176,7 +181,7 @@ include ArchTypeBasic
         reg_type = RegType.set_reg_mult_type (fst smt_ctx) curr_type.reg_type r_list new_type;
         flag_type = new_flags }
     | StOp st_op ->
-      begin match set_st_op_type smt_ctx curr_type st_op new_type with
+      begin match set_st_op_type smt_ctx is_non_change_exp curr_type st_op new_type with
       | None -> Printf.printf "set_st_op_type failed\n"; None
       | Some new_mem_type ->
         Some { curr_type with 
@@ -197,9 +202,10 @@ include ArchTypeBasic
 
   let shift_rsp
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (offset: int64) =
-    match get_src_op_type smt_ctx curr_type (RegOp RSP) with
+    match get_src_op_type smt_ctx is_non_change_exp curr_type (RegOp RSP) with
     | None -> arch_type_error "shift_rsp: Cannot get type of %rsp"
     | Some (Top _, _) -> arch_type_error "shift_rsp: %rsp is top"
     | Some (Exp rsp_dep, rsp_tnt) ->
@@ -220,6 +226,7 @@ include ArchTypeBasic
   let exe_nary
       ?(ignore_flags: bool = false) (* If true, flags will not be updated. This is to allow for n-ary operations to be applied as part of larger instructions, e.g. incrementing/decrementing %rsp in push/pop *)
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (n: int) (nop: nary_op)
       (dest: Isa.operand) (src_ops: Isa.operand list) : bool * t =
@@ -231,7 +238,7 @@ include ArchTypeBasic
       | _ -> false
     in
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
-    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type ~check_reg_valid:(not xor_reset)) src_ops in
+    let src_type_list = List.filter_map (get_src_op_type smt_ctx is_non_change_exp curr_type ~check_reg_valid:(not xor_reset)) src_ops in
     (* List.iter (fun src -> Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand src))) src_ops;
     Printf.printf "exe_nary: dest = %s\nsrcs:\n" (Sexplib.Sexp.to_string_hum (Isa.sexp_of_operand dest));
     List.iter2 (fun src src_type ->
@@ -257,25 +264,26 @@ include ArchTypeBasic
     in
     let flag_update_list = if ignore_flags then [] else flag_update_list in
     let flag_update_config = if ignore_flags then [] else get_op_flag_update_config nop in
-    begin match set_dest_op_type smt_ctx curr_type dest dest_type flag_update_list flag_update_config with
+    begin match set_dest_op_type smt_ctx is_non_change_exp curr_type dest dest_type flag_update_list flag_update_config with
     | None -> false, curr_type
     | Some next_type -> true, next_type
     end
 
   let exe_xchg
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (dest0: Isa.operand) (dest1: Isa.operand)
       (src0: Isa.operand) (src1: Isa.operand) =
-    let src_type_opt_0 = get_src_op_type smt_ctx curr_type src0 in
-    let src_type_opt_1 = get_src_op_type smt_ctx curr_type src1 in
+    let src_type_opt_0 = get_src_op_type smt_ctx is_non_change_exp curr_type src0 in
+    let src_type_opt_1 = get_src_op_type smt_ctx is_non_change_exp curr_type src1 in
     match src_type_opt_0, src_type_opt_1 with
     | Some src_type_0, Some src_type_1 ->
-      begin match set_dest_op_type smt_ctx curr_type dest0 src_type_0 [] [] with
+      begin match set_dest_op_type smt_ctx is_non_change_exp curr_type dest0 src_type_0 [] [] with
       | None -> false, curr_type
       | Some result_type_1 ->
         begin
-        match set_dest_op_type smt_ctx result_type_1 dest1 src_type_1 [] [] with
+        match set_dest_op_type smt_ctx is_non_change_exp result_type_1 dest1 src_type_1 [] [] with
         | None -> false, curr_type
         | Some result_type_2 -> true, result_type_2
         end
@@ -284,12 +292,13 @@ include ArchTypeBasic
 
   let exe_cmp
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (src0: Isa.operand)
       (src1: Isa.operand) =
     (* Note that src0 is not the true dest; in cmp, the result is discarded *)
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
-    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
+    let src_type_list = List.filter_map (get_src_op_type smt_ctx is_non_change_exp curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
     let _, flag_list = BasicType.exe_bop smt_ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let flag_config = List.map (fun (x, _) -> x, false) flag_list in
@@ -298,12 +307,13 @@ include ArchTypeBasic
   
   let exe_test
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (src0: Isa.operand)
       (src1: Isa.operand) =
     (* Note that src0 is not the true dest; in test, the result is discarded *)
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
-    let src_type_list = List.filter_map (get_src_op_type smt_ctx curr_type) [ src0; src1 ] in
+    let src_type_list = List.filter_map (get_src_op_type smt_ctx is_non_change_exp curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
     let _, flag_list = BasicType.exe_bop smt_ctx And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let flag_config = List.map (fun (x, _) -> x, false) flag_list in
@@ -312,11 +322,12 @@ include ArchTypeBasic
 
   let exe_push
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (src: Isa.operand)
       (memslot: MemAnno.t) =
     let src_size = Isa.get_op_size src in
-    let rsp_type = shift_rsp smt_ctx curr_type (Int64.neg src_size) in
+    let rsp_type = shift_rsp smt_ctx is_non_change_exp curr_type (Int64.neg src_size) in
     (* src should be reg, so always return Some *)
 
     (* Special case: rax!!!*)
@@ -327,25 +338,26 @@ include ArchTypeBasic
     in
     if is_push_rax then Printf.printf "Warning: push rax happens!!!\n";
 
-    let src_type = Option.get (get_src_op_type smt_ctx rsp_type ~check_reg_valid:(not is_push_rax) src) in
-    match set_dest_op_type smt_ctx rsp_type (StOp (None, Some RSP, None, None, src_size, memslot)) src_type [] [] with
+    let src_type = Option.get (get_src_op_type smt_ctx is_non_change_exp rsp_type ~check_reg_valid:(not is_push_rax) src) in
+    match set_dest_op_type smt_ctx is_non_change_exp rsp_type (StOp (None, Some RSP, None, None, src_size, memslot)) src_type [] [] with
     | None -> false, curr_type
     | Some result_type -> true, result_type
 
   let exe_pop
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (dest: Isa.operand)
       (memslot: MemAnno.t) =
     (* Store memory taint in dest *)
     let dest_size = Isa.get_op_size dest in
     let ld_op = Isa.LdOp (None, Some RSP, None, None, dest_size, memslot) in
-    match get_src_op_type smt_ctx curr_type ld_op with
+    match get_src_op_type smt_ctx is_non_change_exp curr_type ld_op with
     | None -> false, curr_type
     | Some ld_type ->
       (* dest should be reg, so always return Some *)
-      let result_type = Option.get (set_dest_op_type smt_ctx curr_type dest ld_type [] []) in
-      true, shift_rsp smt_ctx result_type dest_size
+      let result_type = Option.get (set_dest_op_type smt_ctx is_non_change_exp curr_type dest ld_type [] []) in
+      true, shift_rsp smt_ctx is_non_change_exp result_type dest_size
 
   let get_rep_acc (size: int64) : Isa.register =
     match size with
@@ -364,6 +376,7 @@ include ArchTypeBasic
 
   let exe_repmovs
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (size: int64)
       (mem_dst: MemAnno.t)
@@ -374,7 +387,7 @@ include ArchTypeBasic
     let dst_slot, _ = mem_dst in
     let dst_slot = Option.get dst_slot in
     let count_reg = get_rep_count_reg size in
-    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx is_non_change_exp curr_type (RegOp count_reg)) in
     match rcx_dep with
     | Top _ -> false, curr_type 
     | Exp rcx_exp -> begin
@@ -383,10 +396,10 @@ include ArchTypeBasic
       let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
       let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
       let addr_off = (addr_lower, addr_upper) in
-      match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off src_slot with
+      match MemType.get_mem_type smt_ctx is_non_change_exp curr_type.mem_type addr_off src_slot with
       | None -> false, curr_type
       | Some src_type -> begin
-        match MemType.set_mem_type smt_ctx curr_type.mem_type addr_off dst_slot src_type with
+        match MemType.set_mem_type smt_ctx is_non_change_exp curr_type.mem_type addr_off dst_slot src_type with
         | None -> false, curr_type
         | Some result_mem_type ->
           let result_type = { curr_type with mem_type = result_mem_type } in
@@ -397,6 +410,7 @@ include ArchTypeBasic
 
   let exe_replods
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (size: int64)
       (mem: MemAnno.t) =
@@ -405,7 +419,7 @@ include ArchTypeBasic
     let ld_slot, _ = mem in
     let ld_slot = Option.get ld_slot in
     let count_reg = get_rep_count_reg size in
-    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx is_non_change_exp curr_type (RegOp count_reg)) in
     match rcx_dep with
     | Top _ -> false, curr_type 
     | Exp rcx_exp -> begin
@@ -414,10 +428,10 @@ include ArchTypeBasic
       let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
       let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
       let addr_off = (addr_lower, addr_upper) in
-      match MemType.get_mem_type smt_ctx curr_type.mem_type addr_off ld_slot with
+      match MemType.get_mem_type smt_ctx is_non_change_exp curr_type.mem_type addr_off ld_slot with
       | None -> false, curr_type
       | Some ld_type -> begin
-        match set_dest_op_type smt_ctx curr_type (RegOp RAX) ld_type [] [] with
+        match set_dest_op_type smt_ctx is_non_change_exp curr_type (RegOp RAX) ld_type [] [] with
         | None -> false, curr_type
         | Some result_type ->
           let rcx_zero = RegType.set_reg_type ctx result_type.reg_type count_reg (Exp (Z3.BitVector.mk_numeral ctx "0" rcx_size), rcx_taint) in
@@ -427,6 +441,7 @@ include ArchTypeBasic
   
   let exe_repstos
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (size: int64)
       (mem: MemAnno.t) =
@@ -435,18 +450,18 @@ include ArchTypeBasic
     let st_slot, _ = mem in
     let st_slot = Option.get st_slot in
     let count_reg = get_rep_count_reg size in
-    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx curr_type (RegOp count_reg)) in
+    let rcx_dep, rcx_taint = Option.get (get_src_op_type smt_ctx is_non_change_exp curr_type (RegOp count_reg)) in
     match rcx_dep with
     | Top _ -> false, curr_type 
     | Exp rcx_exp -> begin
       let acc_reg = get_rep_acc size in
-      let acc_type = Option.get (get_src_op_type smt_ctx curr_type (RegOp acc_reg)) in
+      let acc_type = Option.get (get_src_op_type smt_ctx is_non_change_exp curr_type (RegOp acc_reg)) in
       let rcx_size = Z3.BitVector.get_size (Z3.Expr.get_sort rcx_exp) in
       let entry_size = string_of_int (Int64.to_int size) in
       let addr_lower = Z3.BitVector.mk_numeral ctx "0" rcx_size in
       let addr_upper = Z3.BitVector.mk_mul ctx rcx_exp (Z3.BitVector.mk_numeral ctx entry_size rcx_size) in
       let addr_off = (addr_lower, addr_upper) in
-      match MemType.set_mem_type smt_ctx curr_type.mem_type addr_off st_slot acc_type with
+      match MemType.set_mem_type smt_ctx is_non_change_exp curr_type.mem_type addr_off st_slot acc_type with
       | None -> false, curr_type
       | Some result_mem_type ->
           let result_type = { curr_type with mem_type = result_mem_type } in
@@ -456,20 +471,21 @@ include ArchTypeBasic
      
   let type_prop_non_branch
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
     match inst with
-    | BInst (bop, dest, src0, src1)           -> exe_nary    smt_ctx curr_type 2 (BOp bop) dest [ src0; src1 ]
-    | UInst (uop, dest, src)                  -> exe_nary    smt_ctx curr_type 1 (UOp uop) dest [ src ]
-    | TInst (top, dest, [ src0; src1; src2 ]) -> exe_nary    smt_ctx curr_type 3 (TOp top) dest [ src0; src1; src2 ]
-    | Xchg (dest0, dest1, src0, src1)         -> exe_xchg    smt_ctx curr_type dest0 dest1 src0 src1
-    | Cmp (src0, src1)                        -> exe_cmp     smt_ctx curr_type src0 src1
-    | Test (src0, src1)                       -> exe_test    smt_ctx curr_type src0 src1
-    | Push (src, memslot)                     -> exe_push    smt_ctx curr_type src memslot
-    | Pop (dest, memslot)                     -> exe_pop     smt_ctx curr_type dest memslot
-    | RepMovs (size, mem_dst, mem_src)        -> exe_repmovs smt_ctx curr_type size mem_dst mem_src 
-    | RepLods (size, mem)                     -> exe_replods smt_ctx curr_type size mem
-    | RepStos (size, mem)                     -> exe_repstos smt_ctx curr_type size mem
+    | BInst (bop, dest, src0, src1)           -> exe_nary    smt_ctx is_non_change_exp curr_type 2 (BOp bop) dest [ src0; src1 ]
+    | UInst (uop, dest, src)                  -> exe_nary    smt_ctx is_non_change_exp curr_type 1 (UOp uop) dest [ src ]
+    | TInst (top, dest, [ src0; src1; src2 ]) -> exe_nary    smt_ctx is_non_change_exp curr_type 3 (TOp top) dest [ src0; src1; src2 ]
+    | Xchg (dest0, dest1, src0, src1)         -> exe_xchg    smt_ctx is_non_change_exp curr_type dest0 dest1 src0 src1
+    | Cmp (src0, src1)                        -> exe_cmp     smt_ctx is_non_change_exp curr_type src0 src1
+    | Test (src0, src1)                       -> exe_test    smt_ctx is_non_change_exp curr_type src0 src1
+    | Push (src, memslot)                     -> exe_push    smt_ctx is_non_change_exp curr_type src memslot
+    | Pop (dest, memslot)                     -> exe_pop     smt_ctx is_non_change_exp curr_type dest memslot
+    | RepMovs (size, mem_dst, mem_src)        -> exe_repmovs smt_ctx is_non_change_exp curr_type size mem_dst mem_src 
+    | RepLods (size, mem)                     -> exe_replods smt_ctx is_non_change_exp curr_type size mem
+    | RepStos (size, mem)                     -> exe_repstos smt_ctx is_non_change_exp curr_type size mem
     | Nop | Hlt | Syscall                     -> true, curr_type
     | _ -> arch_type_error "<TODO> type_prop_non_branch not implemented yet"
   
@@ -495,6 +511,7 @@ include ArchTypeBasic
   
   let type_prop_cond_branch
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t)
       (targ_type: t)
       (br_cond: Isa.branch_cond)
@@ -530,7 +547,7 @@ include ArchTypeBasic
       end else begin
         SmtEmitter.push smt_ctx;
         SmtEmitter.add_assertions smt_ctx [taken];
-        DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_sub_map taken;
+        DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_info.change_copy_map taken;
         let next_type = { curr_type with
           context = BasicType.append_ctx curr_type.context taken
         } in
@@ -545,7 +562,7 @@ include ArchTypeBasic
     let check_not_taken () : bool * t =
       let not_taken = Z3.Boolean.mk_not z3_ctx taken in
       SmtEmitter.add_assertions smt_ctx [not_taken];
-      DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_sub_map not_taken;
+      DepChangeCtx.add_copy_assertion smt_ctx curr_type.change_info.change_copy_map not_taken;
       let next_type = { curr_type with
         pc = curr_type.pc + 1;
         context = BasicType.append_ctx curr_type.context not_taken
@@ -559,14 +576,14 @@ include ArchTypeBasic
 
     (* let check_non_change_cond, cond_instance = DepChangeCtx.check_non_change_exp smt_ctx curr_type.change_sub_map taken in *)
     let taken_cond_check_result = SmtEmitter.check_compliance smt_ctx [taken] in
-    let check_non_change_cond = DepChangeCtx.check_non_change_exp smt_ctx curr_type.change_sub_map taken in
+    let check_non_change_cond = is_non_change_exp taken in
     (* Printf.printf "Check br_cond (sat = %s) is non change\n%s\n" 
       (Sexplib.Sexp.to_string_hum (SmtEmitter.sexp_of_sat_result_t (taken_cond_check_result))) 
       (Z3.Expr.to_string taken); *)
     if not check_non_change_cond then begin
       Printf.printf "Warning: non change cond branch check failed\n%s\n" (Z3.Expr.to_string taken);
       Printf.printf "Unsat model\n%s\n" (Z3.Model.to_string (Z3.Solver.get_model (snd smt_ctx) |> Option.get));
-      Printf.printf "Instance\n%s\n" (Sexplib.Sexp.to_string_hum (DepChangeCtx.sexp_of_map_t curr_type.change_sub_map));
+      Printf.printf "Change ctx\n%s\n" (Sexplib.Sexp.to_string_hum (DepChangeCtx.sexp_of_t curr_type.change_info));
       SmtEmitter.pp_smt_ctx 9 smt_ctx;
       failwith "Fail non change cond check\n"
     end else
@@ -606,6 +623,7 @@ include ArchTypeBasic
     let find_block_helper (label: Isa.label) : t =
       List.find (fun block_type -> block_type.label = label) block_type_list
     in
+    let is_non_change_exp = DepChangeCtx.check_non_change_exp smt_ctx curr_type.change_info.change_copy_map in
     match inst with
     | Directive _ -> true, { curr_type with pc = curr_type.pc + 1 }
     | Jmp (br_target, br_anno) ->
@@ -613,24 +631,24 @@ include ArchTypeBasic
       type_prop_uncond_branch smt_ctx curr_type targ_type br_anno
     | Jcond (br_cond, br_target, br_anno) ->
       let targ_type = find_block_helper br_target in
-      let result = type_prop_cond_branch smt_ctx curr_type targ_type br_cond br_anno in
+      let result = type_prop_cond_branch smt_ctx is_non_change_exp curr_type targ_type br_cond br_anno in
       (* Printf.printf "cond branch met, next type:\n%s\n" (sexp_of_t (snd result) |> Sexplib.Sexp.to_string_hum); *)
       result
     | Call (callee_name, call_anno) ->
       let callee_interface = FuncInterface.get_func_interface func_interface_list callee_name in
-      let curr_type = shift_rsp smt_ctx curr_type (-8L) in
+      let curr_type = shift_rsp smt_ctx is_non_change_exp curr_type (-8L) in
       (* Printf.printf "type before call:\n%s\n" (sexp_of_t curr_type |> Sexplib.Sexp.to_string_hum); *)
-      let result = FuncInterface.prop_check_call smt_ctx curr_type callee_interface call_anno in
+      let result = FuncInterface.prop_check_call smt_ctx is_non_change_exp curr_type callee_interface call_anno in
       begin match result with
       | Some next_type ->
-        let next_type = shift_rsp smt_ctx next_type 8L in
+        let next_type = shift_rsp smt_ctx is_non_change_exp next_type 8L in
         (* Printf.printf "type after call:\n%s\n" (sexp_of_t next_type |> Sexplib.Sexp.to_string_hum); *)
         true, next_type
       | None -> false, curr_type
       end
     | _ ->
       (* Get state before executing next inst *)
-      let checked, next_type = type_prop_non_branch smt_ctx curr_type inst in
+      let checked, next_type = type_prop_non_branch smt_ctx is_non_change_exp curr_type inst in
       let next_type = { next_type with pc = next_type.pc + 1 } in
       (* For non-branch, it always proceed, so the next pc must be smaller than dead pc *)
       (* <TODO> Double check whether it is ok to check dead_pc here and use it for judgement in type_prop_check_one_block *)
@@ -664,7 +682,8 @@ include ArchTypeBasic
     Printf.printf "valid region: %b\n" check_valid_region;
 
     (* Printf.printf "copy block assertions\n"; *)
-    DepChangeCtx.copy_all_assertions smt_ctx block_type.change_sub_map;
+    DepChangeCtx.copy_all_assertions smt_ctx block_type.change_info.change_copy_map;
+    DepChangeCtx.add_extra_non_change_assertions smt_ctx block_type.change_info;
 
     let check_prop =
       if block_type.pc >= block_type.dead_pc then true else

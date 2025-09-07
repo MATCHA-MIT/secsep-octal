@@ -215,6 +215,24 @@ module MemOffset = struct
     in
     List.sort off_cmp off_list
 
+  let check_offset_non_change
+      (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
+      (base_ptr: int) (off: t) : bool =
+    (* Goal: check isNonChangeExp (l - ptr) and isNonChangeExp (l - r) *)
+    let ctx, _ = smt_ctx in
+    let l, r = off in
+    let ptr = Z3.Expr.mk_const_s ctx ("s" ^ (string_of_int base_ptr)) (Z3.BitVector.mk_sort ctx (8 * 8)) in
+    let off_exp = Z3.BitVector.mk_sub ctx l ptr in
+    let len_exp = Z3.BitVector.mk_sub ctx r l in
+    let off_non_change = is_non_change_exp off_exp in
+    let len_non_change = is_non_change_exp len_exp in
+    (* Printf.printf "Ptr: %d, Off:\n%s\n" base_ptr (Sexplib.Sexp.to_string_hum (sexp_of_t off)); *)
+    if not (off_non_change && len_non_change) then begin
+      Printf.printf "Ptr: %d, Off:\n%s\n" base_ptr (Sexplib.Sexp.to_string_hum (sexp_of_t off));
+      mem_offset_error "check_offset_non_change fail"
+    end else true
+
 end
 
 module MemRange = struct
@@ -649,7 +667,7 @@ module MemType = struct
     List.fold_left2 (
       fun (acc: bool) (sub: entry_t mem_part) (sup: entry_t mem_part) ->
         if not acc then acc else
-        let (_, sub_info), sub_part_mem = sub in
+        let (sub_ptr, sub_info), sub_part_mem = sub in
         let (_, sup_info), sup_part_mem = sup in
         (* We only check permission is checked to satisfy target (sup) => current (sup) *)
         let check_imp = PtrInfo.check_subtype_info true sub_info sup_info in
@@ -659,9 +677,13 @@ module MemType = struct
               (sup_slot: entry_t mem_slot) ->
             if not acc_check then acc_check
             else
+              (* Check sup slot off - sup ptr is non change *)
+              let sup_off, _, _, _ = sup_slot in
+              let non_change_off = MemOffset.check_offset_non_change smt_ctx is_non_change_exp sub_ptr sup_off in
+              (* Check slot subtype *)
               let slot_result = check_slot_subtype smt_ctx false is_non_change_exp sub_slot sup_slot in
               (* Printf.printf "check_subtype_map: result %b\n" slot_result; *)
-              slot_result
+              slot_result && non_change_off
         ) true sub_part_mem sup_part_mem
         in
         (* Printf.printf "check_subtype_map: ptr %d check_imp1 %b, check_imp2 %b, check_mem %b\n" (fst (fst sub)) check_imp1 check_imp2 check_mem; *)
@@ -803,6 +825,7 @@ module MemType = struct
 
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (mem_type: t)
       (addr_off: MemOffset.t) 
       (slot_info: MemAnno.slot_t) : entry_t option =
@@ -815,7 +838,8 @@ module MemType = struct
       Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
         (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
       None
-    end else
+    end else if not (MemOffset.check_offset_non_change smt_ctx is_non_change_exp (fst ptr_info) addr_off) then None 
+    else
       (* Check addr_off and get entry *)
       get_part_mem smt_ctx part_mem slot_info addr_off
 
@@ -967,6 +991,7 @@ module MemType = struct
 
   let set_mem_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (mem_type: t)
       (addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
@@ -980,7 +1005,8 @@ module MemType = struct
       Printf.printf "Warning: get_mem_type read slot %s permission is not satisfied.\n"
         (Sexplib.Sexp.to_string_hum (MemAnno.sexp_of_slot_t slot_info));
       None
-    end else
+    end else if not (MemOffset.check_offset_non_change smt_ctx is_non_change_exp ptr addr_off) then None 
+    else
       let new_part_mem_opt = set_part_mem smt_ctx part_mem addr_off slot_info new_type in
       match new_part_mem_opt with
       | None -> None
@@ -997,6 +1023,7 @@ module MemType = struct
 
   let set_mem_type_with_other
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (mem_type: t)
       (update_mem_type: t)
       (mem_map: MemAnno.slot_t mem_content) : t option =
@@ -1041,7 +1068,7 @@ module MemType = struct
             Printf.printf "Warning: Not implemented\n"; (* It is a bit complex to handle update slot is a subsetneq of parent/orig slot. *)
             None
           end else
-          set_mem_type smt_ctx mem_type update_off slot_info update_type
+          set_mem_type smt_ctx is_non_change_exp mem_type update_off slot_info update_type
         | _ -> 
           Printf.printf "Warning: set_mem_type_with_other range format is not single offset slot\n";
           None

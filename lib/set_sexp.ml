@@ -85,3 +85,10 @@ include StrMap
     sexp_of_list sexp_of_key_val_t (StrMap.to_list map)
 
 end
+
+module IntVarMap = IntMapSexp (
+  struct
+    type t = int
+    [@@deriving sexp]
+  end
+)

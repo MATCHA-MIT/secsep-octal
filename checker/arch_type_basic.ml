@@ -33,7 +33,7 @@ module ArchTypeBasic = struct
     mem_type: MemType.t;
     context: BasicType.ctx_t;
 
-    change_sub_map: DepChangeCtx.map_t;
+    change_info: DepChangeCtx.t;
 
     (* stack_spill_info: StackSpillInfo.t; *)
 
@@ -106,7 +106,7 @@ module ArchTypeBasic = struct
     *)
 
     (* 2. check subtype relation of each reg/flag/mem slot *)
-    let is_non_change_exp = DepChangeCtx.check_non_change_exp smt_ctx sub_a_type.change_sub_map in
+    let is_non_change_exp = DepChangeCtx.check_non_change_exp smt_ctx sub_a_type.change_info.change_copy_map in
     let reg_check = RegType.check_subtype smt_ctx skip_check_callee_saved_range is_non_change_exp sub_a_type.reg_type sup_reg_type in
     let flag_check = FlagType.check_subtype smt_ctx is_non_change_exp sub_a_type.flag_type sup_flag_type in
     let mem_check = MemType.check_subtype 
@@ -127,7 +127,7 @@ module ArchTypeBasic = struct
     let taint_ctx_check = SmtEmitter.check_compliance smt_ctx sup_taint_context = SatYes in
 
     let subtype_non_change_check = 
-      DepChangeCtx.check_subtype_non_change smt_ctx sub_a_type.change_sub_map sup_a_type.change_sub_map (fst ctx_map)
+      DepChangeCtx.check_subtype_non_change smt_ctx sub_a_type.change_info sup_a_type.change_info (fst ctx_map)
     in
     (* TODO: remove this later *)
     if not subtype_non_change_check then

@@ -355,15 +355,27 @@ let convert_context
   let convert_dep_change_ctx
       (ctx: Z3.context)
       (get_var_size: int -> int option)
-      (change_var_set: IntSet.t)
-      : DepChangeCtx.map_t =
+      (change_var: IntSet.t * IntVarMap.t)
+      : DepChangeCtx.t =
+    let change_var_set, change_var_base_map = change_var in
     let change_var = IntSet.to_list change_var_set in
-    List.map (
-      fun x ->
-        match convert_dep_type ctx (SingleVar x) get_var_size 8 with
-        | Exp e -> e, DepChangeCtx.get_copy_var ctx x e
+    let change_var_map =
+      List.map (
+        fun x ->
+          match convert_dep_type ctx (SingleVar x) get_var_size 8 with
+          | Exp e -> e, DepChangeCtx.get_copy_var ctx x e
+          | Top _ -> convert_error "should not get top"
+      ) change_var |> List.split
+    in
+    let non_change_offset = List.map (
+      fun (x, y) ->
+        match convert_dep_type ctx (SingleBExp (SingleSub, SingleVar x, SingleVar y)) get_var_size 8 with
+        | Exp e -> e
         | Top _ -> convert_error "should not get top"
-    ) change_var |> List.split
+    ) (IntVarMap.to_list change_var_base_map)
+    in
+    { change_copy_map = change_var_map; non_change_offset = non_change_offset }
+
 
 let infer_var_size_map
     (ctx: Z3.context)
@@ -443,7 +455,7 @@ let convert_arch_type
     flag_type = convert_flag_type ctx;
     mem_type = convert_mem_type ctx get_var_size is_forget_slot arch_type.mem_type;
     context = convert_context ctx get_var_size arch_type.context tti.taint_context tti.taint_sol;
-    change_sub_map = convert_dep_change_ctx ctx get_var_size arch_type.change_var;
+    change_info = convert_dep_change_ctx ctx get_var_size arch_type.change_var;
     (* stack_spill_info = stack_spill_info; *)
 
     global_var = arch_type.global_var;
@@ -595,7 +607,7 @@ let convert_function_interface
     mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.in_mem;
     context = convert_context ctx get_var_size_func fi.in_context fi.in_taint_context [] (* taint solution has been substituted *);
 
-    change_sub_map = convert_dep_change_ctx ctx get_var_size_func fi.in_change_var;
+    change_info = convert_dep_change_ctx ctx get_var_size_func (fi.in_change_var, IntVarMap.empty);
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;
@@ -612,7 +624,7 @@ let convert_function_interface
     mem_type = convert_mem_type ctx get_var_size_func func_interface_is_forget_slot fi.out_mem;
     context = convert_context ctx get_var_size_func fi.out_context [] (* no out taint context *) [] (* taint solution has been substituted *);
 
-    change_sub_map = convert_dep_change_ctx ctx get_var_size_func IntSet.empty; (* TODO: Double check whether it is ok to mark this as empty (since we do not return new change var on purpose)*)
+    change_info = convert_dep_change_ctx ctx get_var_size_func (IntSet.empty, IntVarMap.empty); (* TODO: Double check whether it is ok to mark this as empty (since we do not return new change var on purpose)*)
     (* ignored fields *)
     pc = -1; 
     dead_pc = -1;

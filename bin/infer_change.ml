@@ -38,7 +38,7 @@ let () =
     fun (interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t) ->
       match List.find_opt (fun (tti: Taint_type_infer.TaintTypeInfer.t) -> tti.func_name = interface.func_name) tti_list with
       | None -> interface
-      | Some tti -> { interface with in_change_var = (List.hd tti.func_type).change_var }
+      | Some tti -> { interface with in_change_var = fst ((List.hd tti.func_type).change_var) }
   ) interface_list
   in
   Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "interface") interface_list;

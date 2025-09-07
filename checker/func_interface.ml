@@ -1,5 +1,6 @@
 open Type.Isa_basic
 open Type.Smt_emitter
+open Basic_type
 open Mem_anno
 open Reg_type
 open Mem_type
@@ -69,6 +70,7 @@ module FuncInterface = struct
   
   let prop_check_call
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (pr_type: ArchTypeBasic.t)
       (func_interface: t)
       (call_anno: CallAnno.t) : ArchTypeBasic.t option =
@@ -76,7 +78,8 @@ module FuncInterface = struct
     (* 1. Check input type *)
     let check_input = 
       (* NOTE: for func call check, we do not check callee-saved reg's valid region since from the callee's view, 
-        the callee-saved reg cna be instantiated to any value and any taint. Hence, it is ok even the reg type is not tracked by type system (i.e., reg is invalid) *)
+        the callee-saved reg can be instantiated to any value and any taint. Hence, it is ok even the reg type is not tracked by type system (i.e., reg is invalid) *)
+      (* We also check for each callee's slot s_c mapps to caller's ptr, s_c-ptr is non change exp. *)
       ArchTypeBasic.check_subtype smt_ctx true pr_type func_interface.in_type call_anno.ctx_map (Some call_anno.mem_map)
     in
     if not check_input then None else
@@ -105,6 +108,7 @@ module FuncInterface = struct
 
     let out_mem_opt =
       MemType.set_mem_type_with_other smt_ctx
+        is_non_change_exp
         pr_type.mem_type out_mem_type call_anno.mem_map
     in
     match out_mem_opt with
