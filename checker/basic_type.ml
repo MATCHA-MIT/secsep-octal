@@ -199,12 +199,28 @@ module DepType = struct
   let get_imm_type (ctx: context) (imm: IsaBasic.immediate) : t =
     Exp (get_imm_exp ctx imm)
 
+  let check_src_non_change (is_non_change_exp: exp_t -> bool) (src_list: t list) : unit =
+    (* This is used whenever we return top *)
+    List.iter (
+      fun (src: t) ->
+        match src with
+        | Top _ -> ()
+        | Exp e ->
+          if is_non_change_exp e then ()
+          else 
+            dep_type_error (Printf.sprintf "check_src_non_change fail %s" (Sexplib.Sexp.to_string_hum (sexp_of_exp_t e)))
+    ) src_list
+
   let get_mem_op_type 
       (ctx: context) 
+      (is_non_change_exp: exp_t -> bool)
       (disp: exp_t) (base: t)
       (index: t) (scale: exp_t) : t =
     match base, index with
-    | Top _, _ | _, Top _ -> Top 64
+    | Top _, _ | _, Top _ -> 
+      (* We do not check scale is non change since it is always a constant (while disp can be some global symbol) *)
+      check_src_non_change is_non_change_exp [Exp disp; base; index];
+      Top 64
     | Exp base, Exp index ->
       Exp (
         BitVector.mk_add ctx
@@ -920,8 +936,9 @@ module DepType = struct
 
   (* <TODO> Check the following new API *)
   let exe_bop 
-      (smt_ctx: SmtEmitter.t) (op: IsaBasic.bop) 
-      (src_list: t list) 
+      (smt_ctx: SmtEmitter.t) 
+      (is_non_change_exp: exp_t -> bool)
+      (op: IsaBasic.bop) (src_list: t list) 
       (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : exe_result =
@@ -929,8 +946,12 @@ module DepType = struct
     let src_flag_list, dest_flag_list = IsaFlagConfig.get_bop_config op in
     let src_flag_type_list = List.map get_src_flag_func src_flag_list in
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
+    let check_src_non_change () = (* This is used whenever we return top *)
+      check_src_non_change is_non_change_exp (src_list @ src_flag_type_list) 
+    in
     match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list with
     | None, _ | _, None ->
+      check_src_non_change ();
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list ->
       let flag_lookup (flag: IsaBasic.flag) : exp_t = 
@@ -960,26 +981,27 @@ module DepType = struct
       | CmovB,  [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf src dst), []
       | CmovAe, [ dst; src ], [ cf ]   -> Exp (Boolean.mk_ite ctx cf dst src), []
       | Bt,     [ reg; idx ], [ ]      -> exe_bittest ctx  reg idx
-      | Punpck, [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Packxs, [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Padd,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Psub,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Pxor,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Pandn,  [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Pand,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Por,    [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Psll,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Psrl,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Xorp,   [ _; _ ],     [ ]      -> Top 128, [ ]
-      | Pshuf,  [ _; _ ],     [ ]      -> Top 128, [ ]
+      | Punpck, [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Packxs, [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Padd,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Psub,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Pxor,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Pandn,  [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Pand,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Por,    [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Psll,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Psrl,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Xorp,   [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
+      | Pshuf,  [ _; _ ],     [ ]      -> check_src_non_change (); Top 128, [ ]
       | _ -> dep_type_error "<TODO> not implemented yet"
       end
       in
       dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_uop
-      (smt_ctx: SmtEmitter.t) (op: IsaBasic.uop) 
-      (src_list: t list) 
+      (smt_ctx: SmtEmitter.t) 
+      (is_non_change_exp: exp_t -> bool) 
+      (op: IsaBasic.uop) (src_list: t list) 
       (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : t * ((IsaBasic.flag * t) list) =
@@ -991,6 +1013,7 @@ module DepType = struct
     let one = BitVector.mk_numeral ctx "1" dest_size in
     match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
     | None, _ | _, None ->
+      check_src_non_change is_non_change_exp (src_list @ src_flag_type_list);
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list -> 
       let dep_result, flag_vals = begin
@@ -1014,8 +1037,9 @@ module DepType = struct
       dep_result, set_flag_list top_flag_list flag_vals
 
   let exe_top
-      (smt_ctx: SmtEmitter.t) (op: IsaBasic.top) 
-      (src_list: t list) 
+      (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: exp_t -> bool) 
+      (op: IsaBasic.top) (src_list: t list) 
       (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) 
       (dest_size: int) (* in bits *)
       : t * ((IsaBasic.flag * t) list) =
@@ -1024,6 +1048,7 @@ module DepType = struct
     let top_flag_list = dest_flag_list |> get_top_flag_list_from_map in
     match extract_exp_or_top src_list, extract_exp_or_top src_flag_type_list  with
     | None, _ | _, None ->
+      check_src_non_change is_non_change_exp (src_list @ src_flag_type_list);
       Top dest_size, top_flag_list
     | Some src_exp_list, Some src_flag_list -> 
       begin
@@ -1159,11 +1184,12 @@ module BasicType = struct
 
   let get_mem_op_type 
       (ctx: context) 
+      (is_non_change_exp: DepType.exp_t -> bool)
       (disp: DepType.exp_t) (base: t)
       (index: t) (scale: DepType.exp_t) : t =
     let base_dep, base_taint = base in
     let index_dep, index_taint = index in
-    DepType.get_mem_op_type ctx disp base_dep index_dep scale,
+    DepType.get_mem_op_type ctx is_non_change_exp disp base_dep index_dep scale,
     TaintType.exe ctx [ base_taint; index_taint ]
 
   let get_start_end
@@ -1218,16 +1244,17 @@ module BasicType = struct
     DepType.set_flag orig_dep new_dep, new_taint
 
   let exe_helper 
-      (dep_exe_op: SmtEmitter.t -> 'a -> DepType.t list -> (?check_valid:bool -> IsaBasic.flag -> DepType.t) -> int -> DepType.t * ((IsaBasic.flag * DepType.t) list)) 
-      (get_flag_config: 'a -> IsaFlagConfig.t)
-      (smt_ctx: SmtEmitter.t) (op: 'a) (e_list: t list) (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) (dest_size: int) (* in bits *)
+      dep_exe_op (get_flag_config: 'a -> IsaFlagConfig.t)
+      (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool) 
+      (op: 'a) (e_list: t list) (get_src_flag_func: ?check_valid:bool -> IsaBasic.flag -> t) (dest_size: int) (* in bits *)
       (xor_reset: bool) (* outcome is constant zero due to xor(or similar) %foo, %foo *)
       : t * ((IsaBasic.flag * t) list) =
     let ctx, _ = smt_ctx in
     let get_src_flag_dep = fun ?(check_valid=true) f -> get_src_flag_func ~check_valid f |> fst in
     let get_src_flag_taint = fun ?(check_valid=true) f -> get_src_flag_func ~check_valid f |> snd in
     let dep_list, taint_list = List.split e_list in
-    let dep, dep_flag_list = dep_exe_op smt_ctx op dep_list get_src_flag_dep dest_size in
+    let dep, dep_flag_list = dep_exe_op smt_ctx is_non_change_exp op dep_list get_src_flag_dep dest_size in
     let src_flag_list, update_flag_map = get_flag_config op in
     let src_flag_taint_list = List.map get_src_flag_taint src_flag_list in
     let dep, taint = if xor_reset then 

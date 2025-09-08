@@ -20,6 +20,7 @@ include ArchTypeBasic
 
   let get_mem_op_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (curr_type: t) (mem_op: Isa.mem_op) : entry_t =
     let ctx, _ = smt_ctx in
     (* I ignore mem_op size since it should always be 8! *)
@@ -44,7 +45,7 @@ include ArchTypeBasic
       | Some s -> DepType.get_const_exp ctx (Isa.scale_val s) 64
       | None -> DepType.get_const_exp ctx 1L 64
     in
-    BasicType.get_mem_op_type ctx disp base index scale
+    BasicType.get_mem_op_type ctx is_non_change_exp disp base index scale
 
   let get_ld_op_type
       (smt_ctx: SmtEmitter.t)
@@ -54,7 +55,7 @@ include ArchTypeBasic
     let disp, base, index, scale, size, (slot_anno, taint_anno) = ld_op in
     let slot_anno, taint_anno = (Option.get slot_anno), (Option.get taint_anno) in
     let addr_dep_type, addr_taint_type =
-      get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
+      get_mem_op_type smt_ctx is_non_change_exp curr_type (disp, base, index, scale, None)
     in
     if not (TaintType.check_untaint smt_ctx addr_taint_type) then begin
       Printf.printf "get_ld_op_type op %s taint addr %s\n"
@@ -98,7 +99,7 @@ include ArchTypeBasic
     | ImmOp imm -> Some (BasicType.get_imm_type ctx imm) 
     | RegOp r -> Some (RegType.get_reg_type ctx curr_type.reg_type ~check_valid:check_reg_valid r)
     | RegMultOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a reg mult op"
-    | MemOp mem_op -> Some (get_mem_op_type smt_ctx curr_type mem_op)
+    | MemOp mem_op -> Some (get_mem_op_type smt_ctx is_non_change_exp curr_type mem_op)
     | LdOp ld_op -> get_ld_op_type smt_ctx is_non_change_exp curr_type ld_op
     | StOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a st op"
     | LabelOp _ -> arch_type_error "get_src_op_type: cannot get src op type of a label op"
@@ -122,7 +123,7 @@ include ArchTypeBasic
     let disp, base, index, scale, size, (slot_anno, taint_anno) = st_op in
     let slot_anno, taint_anno = (Option.get slot_anno), (Option.get taint_anno) in
     let addr_dep_type, addr_taint_type =
-      get_mem_op_type smt_ctx curr_type (disp, base, index, scale, None)
+      get_mem_op_type smt_ctx is_non_change_exp curr_type (disp, base, index, scale, None)
     in
     if not (TaintType.check_untaint smt_ctx addr_taint_type) then begin
       Printf.printf "set_st_op_type op %s taint addr %s\n"
@@ -249,7 +250,7 @@ include ArchTypeBasic
     if List.length src_type_list <> n then false, curr_type else
     let dest_type, flag_update_list =
       begin match n, nop with
-      | 1, UOp uop -> BasicType.exe_uop smt_ctx uop src_type_list get_src_flag_func (get_dest_op_size dest) false
+      | 1, UOp uop -> BasicType.exe_uop smt_ctx is_non_change_exp uop src_type_list get_src_flag_func (get_dest_op_size dest) false
       | 2, BOp bop ->
         (* let xor_reset = match bop, src_ops with
         | Isa.Xor, [ src1; src2 ]
@@ -257,8 +258,8 @@ include ArchTypeBasic
         | Isa.Pxor, [ src1; src2 ] -> Isa.cmp_operand src1 src2
         | _ -> false
         in *)
-        BasicType.exe_bop smt_ctx bop src_type_list get_src_flag_func (get_dest_op_size dest) xor_reset
-      | 3, TOp top -> BasicType.exe_top smt_ctx top src_type_list get_src_flag_func (get_dest_op_size dest) false
+        BasicType.exe_bop smt_ctx is_non_change_exp bop src_type_list get_src_flag_func (get_dest_op_size dest) xor_reset
+      | 3, TOp top -> BasicType.exe_top smt_ctx is_non_change_exp top src_type_list get_src_flag_func (get_dest_op_size dest) false
       | _ -> arch_type_error "exe_nary: n and nop size do not match"
       end
     in
@@ -300,7 +301,7 @@ include ArchTypeBasic
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx is_non_change_exp curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
-    let _, flag_list = BasicType.exe_bop smt_ctx Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
+    let _, flag_list = BasicType.exe_bop smt_ctx is_non_change_exp Sub src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let flag_config = List.map (fun (x, _) -> x, false) flag_list in
     let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list flag_config in
     true, { curr_type with flag_type = new_flags }
@@ -315,7 +316,7 @@ include ArchTypeBasic
     let get_src_flag_func = FlagType.get_flag_type curr_type.flag_type in
     let src_type_list = List.filter_map (get_src_op_type smt_ctx is_non_change_exp curr_type) [ src0; src1 ] in
     if List.length src_type_list <> 2 then false, curr_type else
-    let _, flag_list = BasicType.exe_bop smt_ctx And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
+    let _, flag_list = BasicType.exe_bop smt_ctx is_non_change_exp And src_type_list get_src_flag_func (get_dest_op_size src0) false in 
     let flag_config = List.map (fun (x, _) -> x, false) flag_list in
     let new_flags = FlagType.set_flag_list_type curr_type.flag_type flag_list flag_config in
     true, { curr_type with flag_type = new_flags }
@@ -475,6 +476,9 @@ include ArchTypeBasic
       (curr_type: t)
       (inst: Isa.instruction) : bool * t =
     match inst with
+    (* For inst with multiple src, we want to check if one src is top (thereby dest is top), then other src are non change exp.
+      An easy impl is to check if dest is top, then src are non change exp.
+      We do not need to do this for single src op (e.g., RepMovs, where dest_type is just src_type) *)
     | BInst (bop, dest, src0, src1)           -> exe_nary    smt_ctx is_non_change_exp curr_type 2 (BOp bop) dest [ src0; src1 ]
     | UInst (uop, dest, src)                  -> exe_nary    smt_ctx is_non_change_exp curr_type 1 (UOp uop) dest [ src ]
     | TInst (top, dest, [ src0; src1; src2 ]) -> exe_nary    smt_ctx is_non_change_exp curr_type 3 (TOp top) dest [ src0; src1; src2 ]

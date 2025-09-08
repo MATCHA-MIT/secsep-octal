@@ -709,8 +709,20 @@ module MemType = struct
     | None -> mem_type_error (Printf.sprintf "Cannot find ptr %d" slot_ptr)
     | Some part_mem -> part_mem
 
+  let check_src_list_is_non_change
+      (is_non_change_exp: DepType.exp_t -> bool)
+      (get_src_dep: 'a -> DepType.t)
+      (src_list: 'a list) : bool =
+    List.find_opt (
+      fun src -> (* find src that is change exp *)
+        match get_src_dep src with
+        | Top _ -> false
+        | Exp e -> not (is_non_change_exp e)
+    ) src_list = None (* return true if all src are non change exp *)
+
   let get_one_slot_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t) : entry_t option =
     (* Printf.printf "get_one_slot_type:\ntarget address: %s\nslot: %s\n"
@@ -718,6 +730,7 @@ module MemType = struct
       (slot |> sexp_of_entry_mem_slot |> Sexplib.Sexp.to_string_hum); *)
     let ctx, _ = smt_ctx in
     let _, _, slot_range, (slot_dep, slot_taint) = slot in
+    let result =
     match slot_range with
     | [] ->
       Printf.printf "Warning: read from an invalid entry\n";
@@ -750,9 +763,17 @@ module MemType = struct
           (Sexplib.Sexp.to_string_hum (MemRange.sexp_of_t slot_range));
         None
       end
+    in
+    match result with
+    | Some (Top _, _) ->
+      if check_src_list_is_non_change is_non_change_exp (fun x -> x) [ slot_dep ] then
+        result
+      else None
+    | _ -> result
 
   let get_mult_slot_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (slot_list: entry_t mem_slot list)
       (addr_off: MemOffset.t) : entry_t option =
     let get_one_entry
@@ -784,6 +805,7 @@ module MemType = struct
         end
     in
     let addr_l, addr_r = addr_off in
+    let result =
     match slot_list with
     | [] -> mem_type_error "get_mult_slot_type: should not have empty slot_list"
     | (_, _, [ hd_l, hd_r ], hd_type) :: tl ->
@@ -804,9 +826,17 @@ module MemType = struct
         None
       end
     | _ -> None
+    in
+    match result with
+    | Some (Top _, _) ->
+      if check_src_list_is_non_change is_non_change_exp (fun (_, _, _, (dep, _)) -> dep) slot_list then
+        result
+      else None
+    | _ -> result
 
   let get_part_mem
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (part_mem: entry_t mem_slot list)
       (slot_info: MemAnno.slot_t)
       (addr_off: MemOffset.t) : entry_t option =
@@ -816,12 +846,12 @@ module MemType = struct
         num_slots slot_idx;
       None
     end else
-    if num_slots = 1 then get_one_slot_type smt_ctx (List.nth part_mem slot_idx) addr_off
+    if num_slots = 1 then get_one_slot_type smt_ctx is_non_change_exp (List.nth part_mem slot_idx) addr_off
     else
       let matching_slots =
         List.filteri (fun i _ -> i >= slot_idx && i < slot_idx + num_slots) part_mem
       in
-      get_mult_slot_type smt_ctx matching_slots addr_off
+      get_mult_slot_type smt_ctx is_non_change_exp matching_slots addr_off
 
   let get_mem_type
       (smt_ctx: SmtEmitter.t)
@@ -841,17 +871,18 @@ module MemType = struct
     end else if not (MemOffset.check_offset_non_change smt_ctx is_non_change_exp (fst ptr_info) addr_off) then None 
     else
       (* Check addr_off and get entry *)
-      get_part_mem smt_ctx part_mem slot_info addr_off
+      get_part_mem smt_ctx is_non_change_exp part_mem slot_info addr_off
 
   let set_one_slot_type
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (slot: entry_t mem_slot)
       (addr_off: MemOffset.t)
       (is_slot_full_mapped: bool)
       (new_type: BasicType.t) : entry_t mem_slot option =
     (* 1. Update entry (valid region and type)
        2. Check slot_off, taint constraint *)
-    let slot_off, slot_forget_type, slot_range, (_, slot_taint) = slot in
+    let slot_off, slot_forget_type, slot_range, (slot_dep, slot_taint) = slot in
     (* Printf.printf "set_one_slot_type:\n\tslot off: %s\n\tslot range: %s\n\taddr_off: %s\n"
       (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t slot_off))
       (Sexplib.Sexp.to_string_hum (MemRange.sexp_of_t slot_range))
@@ -889,7 +920,9 @@ module MemType = struct
           else
             MemRange.merge smt_ctx slot_range [addr_off]
           in
-          Some (slot_off, slot_forget_type, new_range, (Top DepType.top_unknown_size, new_taint))
+          if check_src_list_is_non_change is_non_change_exp (fun x -> x) [ slot_dep; fst new_type ] then
+            Some (slot_off, slot_forget_type, new_range, (Top DepType.top_unknown_size, new_taint))
+          else None
         end else begin
           Printf.printf "Warning: %s is not subset of %s\n" 
             (Sexplib.Sexp.to_string_hum (MemOffset.sexp_of_t addr_off)) 
@@ -905,6 +938,8 @@ module MemType = struct
       (slot_list: entry_t mem_slot list)
       (addr_off: MemOffset.t)
       (new_type: BasicType.t) : (entry_t mem_slot list) option =
+    (* Note: we only implement the case where the instruction fully overwrites all affected slots.
+      In this case, if result is top, then src must also be top, so we do not need check_src_list_is_non_change. *)
     let addr_l, addr_r = addr_off in
     let new_dep, new_taint = new_type in
     let is_set (idx: int) : bool =
@@ -957,6 +992,7 @@ module MemType = struct
 
   let set_part_mem
       (smt_ctx: SmtEmitter.t)
+      (is_non_change_exp: DepType.exp_t -> bool)
       (part_mem: entry_t mem_slot list)
       (addr_off: MemOffset.t)
       (slot_info: MemAnno.slot_t)
@@ -978,7 +1014,7 @@ module MemType = struct
             | Some acc_idx ->
               if acc_idx <> slot_idx then Some (acc_idx + 1), slot
               else begin
-                match set_one_slot_type smt_ctx slot addr_off is_slot_full_mapped new_type with
+                match set_one_slot_type smt_ctx is_non_change_exp slot addr_off is_slot_full_mapped new_type with
                 | None -> None, slot
                 | Some new_slot -> Some (acc_idx + 1), new_slot
               end
@@ -1007,7 +1043,7 @@ module MemType = struct
       None
     end else if not (MemOffset.check_offset_non_change smt_ctx is_non_change_exp ptr addr_off) then None 
     else
-      let new_part_mem_opt = set_part_mem smt_ctx part_mem addr_off slot_info new_type in
+      let new_part_mem_opt = set_part_mem smt_ctx is_non_change_exp part_mem addr_off slot_info new_type in
       match new_part_mem_opt with
       | None -> None
       | Some new_part_mem ->
