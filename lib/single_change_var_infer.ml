@@ -169,7 +169,7 @@ module SingleChangeVarInfer = struct
   let init_var_info (state: SingleTypeInfer.t) : t =
     let ptr_set = 
       SingleTypeInfer.ArchType.MemType.get_ptr_set (List.hd state.func_type).mem_type 
-      |> IntSet.filter (fun x -> x >= 0)
+      |> IntSet.filter (fun x -> x >= 0 && x <> IsaBasic.rsp_idx)
     in
     let callee_saved_var_set = 
       List.filteri 
