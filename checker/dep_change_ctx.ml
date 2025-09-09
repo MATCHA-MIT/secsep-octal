@@ -49,6 +49,21 @@ module DepChangeCtx = struct
           SmtEmitter.add_assertions smt_ctx [ Z3.Boolean.mk_eq (fst smt_ctx) non_change_offset copy_offset ]
     ) change_info.non_change_offset
 
+  let check_may_change_exp
+      (smt_ctx: SmtEmitter.t)
+      (copy_map: map_t) (e: exp_t) : bool =
+    match get_copy_exp copy_map e with
+    | None -> false (* no change *)
+    | Some copy_e ->
+      DepType.check_not_always_eq smt_ctx copy_e e
+
+  let check_may_change
+      (smt_ctx: SmtEmitter.t)
+      (copy_map: map_t) (e: DepType.t) : bool =
+    match e with
+    | Top _ -> false
+    | Exp e -> check_may_change_exp smt_ctx copy_map e
+
   let check_non_change_exp
       (smt_ctx: SmtEmitter.t)
       (copy_map: map_t) (e: exp_t) : bool =
@@ -60,8 +75,7 @@ module DepChangeCtx = struct
 
   let check_non_change
       (smt_ctx: SmtEmitter.t)
-      (copy_map: map_t)
-      (e: DepType.t) : bool =
+      (copy_map: map_t) (e: DepType.t) : bool =
     match e with
     | Top _ -> true
     | Exp e -> check_non_change_exp smt_ctx copy_map e

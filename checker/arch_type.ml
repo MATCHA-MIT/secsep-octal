@@ -1,4 +1,4 @@
-(* open Type.Isa *)
+open Type.Isa_basic
 (* open Type.Set_sexp *)
 open Type.Smt_emitter
 (* open Z3_sexp *)
@@ -660,6 +660,157 @@ include ArchTypeBasic
         true, next_type
       else false, next_type
 
+  let check_rsp_is_sp
+      (smt_ctx: SmtEmitter.t)
+      (block_type: t) : bool =
+    let rsp_valid, (rsp_dep, _) = List.nth block_type.reg_type (IsaBasic.rsp_idx) in
+    let is_valid = not (RegRange.is_empty_range rsp_valid) in
+    let is_sp =
+      match rsp_dep with
+      | Top _ -> false
+      | Exp rsp_exp -> 
+        DepType.check_eq smt_ctx rsp_exp 
+          (Z3.BitVector.mk_const_s (fst smt_ctx) (DepType.get_dep_var_string IsaBasic.rsp_idx) 64)
+    in
+    is_valid && is_sp
+
+  let check_input_block
+      (smt_ctx: SmtEmitter.t)
+      (block_type: t) : unit =
+    if IsaBasic.is_label_function_entry block_type.label then begin
+      (* Non stack ptr has to be change exp, so that it can be transformed *)
+      List.iter (
+        fun ((ptr, _), _) ->
+          if ptr = IsaBasic.rsp_idx || ptr < 0 (* global ptr has negative idx *) then () else
+          let ptr_exp = 
+            Z3.BitVector.mk_const_s (fst smt_ctx)
+              (DepType.get_dep_var_string ptr) 64 (* 8 * 8 for ptr size *)
+          in
+          if DepChangeCtx.check_may_change_exp smt_ctx block_type.change_info.change_copy_map ptr_exp then ()
+          else arch_type_error "non stack ptr is non change"
+      ) block_type.mem_type;
+
+      (* rsp is valid stack ptr *)
+      if not (check_rsp_is_sp smt_ctx block_type) then arch_type_error "rsp has invalid type";
+
+      (* Callee-saved reg type (except for rsp) is a valid var and is not constrained by anything:
+          1. Not constrainted by block_type.context;
+          2. Not constrained by block_type.change_info.non_change_offset;
+          3. Not constrained by is_non_change_exp *)
+      let callee_valid_list, callee_dep_type_list =
+          List.filteri (
+            fun reg_idx _ -> IsaBasic.is_reg_idx_callee_saved reg_idx && reg_idx <> IsaBasic.rsp_idx
+          ) block_type.reg_type
+          |> List.map (fun (valid, (dep_type, _)) -> valid, dep_type)
+          |> List.split
+      in
+      if List.exists RegRange.is_empty_range callee_valid_list then arch_type_error "callee-saved reg is not valid";
+      
+      let all_non_constrained_var = 
+        DepType.check_non_constrained_var smt_ctx 
+          ((fst block_type.context) @ block_type.change_info.non_change_offset)
+          callee_dep_type_list
+      in
+      let all_may_change =
+        List.for_all (DepChangeCtx.check_may_change smt_ctx block_type.change_info.change_copy_map) callee_dep_type_list
+      in
+      (* Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (Sexplib.Std.sexp_of_list DepType.sexp_of_t callee_dep_type_list));
+      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (DepType.sexp_of_ctx_t (fst block_type.context)));
+      Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (DepType.sexp_of_ctx_t block_type.change_info.non_change_offset));
+      Printf.printf "all_non_constrained_var %b all_may_change %b\n" all_non_constrained_var all_may_change; *)
+      if not (all_non_constrained_var && all_may_change) then arch_type_error "non rsp callee-saved is not non-constrained var"
+      else ()
+    end else ()
+
+  let check_ret_block
+      (smt_ctx: SmtEmitter.t)
+      (block_type_list: t list)
+      (block_type: t) : unit =
+    let is_non_change = DepChangeCtx.check_non_change smt_ctx block_type.change_info.change_copy_map in
+    if block_type.label = IsaBasic.ret_label then begin
+      (* Check callee-saved reg is valid and share the same type to their input types *)
+      let ret_callee_valid, ret_callee_dep_type =
+        List.filteri (fun reg_idx _ -> IsaBasic.is_reg_idx_callee_saved reg_idx) block_type.reg_type
+        |> List.map (
+          fun (valid, (dep_type, _)) ->
+            match dep_type with
+            | DepType.Top _ -> arch_type_error "top is not expected for callee-saved reg"
+            | Exp dep_exp -> valid, dep_exp
+        ) |> List.split
+      in
+      let input_block = List.find (fun (a_type: t) -> IsaBasic.is_label_function_entry a_type.label) block_type_list in
+      let input_callee_dep_type =
+        List.filteri (fun reg_idx _ -> IsaBasic.is_reg_idx_callee_saved reg_idx) input_block.reg_type
+        |> List.map (
+          fun (_, (dep_type, _)) ->
+            match dep_type with
+            | DepType.Top _ -> arch_type_error "top is not expected for callee-saved reg"
+            | Exp dep_exp -> dep_exp
+        )
+      in
+      if List.exists RegRange.is_empty_range ret_callee_valid then arch_type_error "callee-saved reg is not valid";
+      let callee_ret_same = List.for_all2 (DepType.check_eq smt_ctx) ret_callee_dep_type input_callee_dep_type in
+      if not callee_ret_same then arch_type_error "callee is modified by the function";
+
+      (* Check non-callee valid reg is non change exp *)
+      List.iteri (
+        fun i (valid, (dep_type, _)) ->
+          if IsaBasic.is_reg_idx_callee_saved i && i <> IsaBasic.rsp_idx then ()
+          else if RegRange.is_empty_range valid then ()
+          else if is_non_change dep_type then ()
+          else arch_type_error "ret reg is not non change"
+      ) block_type.reg_type;
+      List.iter (
+        fun (valid, (dep_type, _)) ->
+          if valid && not (is_non_change dep_type) then arch_type_error "ret flag is not non change"
+          else ()
+      ) block_type.flag_type;
+
+      (* Check valid mem is non change exp *)
+      List.iter (
+        fun (_, part_mem) ->
+          List.iter (
+            fun (_, _, valid, (dep_type, _)) ->
+              if MemRange.is_empty valid then ()
+              else if is_non_change dep_type then ()
+              else arch_type_error "ret mem slot is not non change"
+          ) part_mem
+      ) block_type.mem_type;
+
+    end else ()
+
+  module ExprSet = Set.Make(
+    struct
+      let compare = Z3.Expr.compare
+      type t = Z3.Expr.expr
+    end
+  )
+
+  let check_block_var (block_type: t) : unit =
+    let get_exp (e: DepType.t) : DepType.exp_t option =
+      match e with
+      | Top _ -> None
+      | Exp e -> Some e
+    in
+
+    let reg_exp_list =
+      List.filter_map (fun (_, (dep, _)) -> get_exp dep) block_type.reg_type
+    in
+    let flag_exp_list =
+      List.filter_map (fun (_, (dep, _)) -> get_exp dep) block_type.flag_type
+    in
+    let mem_exp_list =
+      List.concat_map (
+        fun (_, part_mem) ->
+          List.filter_map (fun (_, _, _, (dep, _)) -> get_exp dep) part_mem
+      ) block_type.mem_type
+    in
+    let exp_list = reg_exp_list @ flag_exp_list @ mem_exp_list in
+    let all_var = List.for_all Z3.Expr.is_const exp_list in
+    let no_repeat = ExprSet.cardinal (ExprSet.of_list exp_list) = List.length exp_list in
+    if all_var && no_repeat then ()
+    else arch_type_error "block dep type is not top or non repeat var"
+
   let add_block_context_to_solver
       (smt_ctx: SmtEmitter.t)
       (block_type: t) : unit =
@@ -676,18 +827,30 @@ include ArchTypeBasic
     Printf.printf "checking block %s\n%!" block_type.label;
     (* Check block type:
        1. Check block well-formness
-          1. s-val belongs to s-alloc for each mem slot
+          1. Special checks for input/ret block
+          2. Expected format of dep type (different vars or top)
+          3. s-val belongs to s-alloc for each mem slot
        2. Prop if dead_pc > pc and check dead_pc *)
     SmtEmitter.push smt_ctx;
     add_block_context_to_solver smt_ctx block_type;
 
-    Printf.printf "checking valid region...\n";
-    let check_valid_region = MemType.check_valid_region smt_ctx block_type.mem_type in
-    Printf.printf "valid region: %b\n" check_valid_region;
-
     (* Printf.printf "copy block assertions\n"; *)
     DepChangeCtx.copy_all_assertions smt_ctx block_type.change_info.change_copy_map;
     DepChangeCtx.add_extra_non_change_assertions smt_ctx block_type.change_info;
+
+    (* Check block reg/slot dep types are either top or non repeat vars (for ease of instantiate) *)
+    check_block_var block_type;
+
+    (* Check vars in input block that have to be change exp *)
+    check_input_block smt_ctx block_type;
+
+    (* Check exps in ret block that have to be non change exp *)
+    (* Note: we do not check the exp in the interface out block since that is generated from ret block *)
+    check_ret_block smt_ctx block_type_list block_type;
+
+    Printf.printf "checking valid region...\n";
+    let check_valid_region = MemType.check_valid_region smt_ctx block_type.mem_type in
+    Printf.printf "valid region: %b\n" check_valid_region;
 
     let check_prop =
       if block_type.pc >= block_type.dead_pc then true else

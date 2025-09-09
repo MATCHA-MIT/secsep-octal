@@ -142,6 +142,38 @@ module DepType = struct
     | Top _ -> e
     | Exp e -> exp_substitute e
 
+  let check_non_constrained_var
+      (smt_ctx: SmtEmitter.t)
+      (context: exp_t list) (exp_list: t list) : bool =
+    let ctx, _ = smt_ctx in
+    let var_list =
+      List.filter_map (
+        fun (e: t) ->
+          match e with
+          | Top _ -> None
+          | Exp e -> if Expr.is_const e then Some e else None
+      ) exp_list
+    in
+    if List.length var_list <> List.length exp_list then false else
+    let dummy_list =
+      List.map (
+        fun (e: exp_t) ->
+          Expr.mk_fresh_const ctx "dummy" (BitVector.mk_sort ctx (get_exp_bit_size e))
+      ) var_list
+    in
+    List.for_all (
+      fun (cons: exp_t) ->
+        let repl_cons = Expr.substitute cons var_list dummy_list in
+        Expr.equal repl_cons cons (* cons does not contain var_list *)
+    ) context
+
+  let check_not_always_eq
+      (smt_ctx: SmtEmitter.t)
+      (exp1: exp_t) (exp2: exp_t) : bool =
+    SmtEmitter.check_compliance smt_ctx
+      [ Boolean.mk_eq (fst smt_ctx) exp1 exp2 ]
+    = SatUnknown
+
   let check_eq
       (smt_ctx: SmtEmitter.t)
       (exp1: exp_t) (exp2: exp_t) : bool =
