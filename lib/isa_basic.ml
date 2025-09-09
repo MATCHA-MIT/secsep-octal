@@ -282,7 +282,9 @@ module IsaBasic = struct
     is_reg_idx_callee_saved (get_reg_idx r)
 
   let is_partial_update_reg_set_default_zero (r: register) : bool =
-    not (is_xmm r) && get_reg_size r = 4L
+    (* not (is_xmm r) && get_reg_size r = 4L *)
+    (is_xmm r) || get_reg_size r = 4L
+    (* TODO: Change to (is_xmm r) || get_reg_size r = 4L *)
 
 
   type flag =
