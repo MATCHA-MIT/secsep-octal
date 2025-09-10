@@ -876,6 +876,7 @@ include ArchTypeBasic
       (func_name: Isa.label)
       (func_type: t list)
       (func: Isa.basic_block list) : bool =
+    SmtEmitter.push smt_ctx;
     (* Check items:
        1. Check first block well-formness
           1. overlap/non-overlap is constrained correctly 
@@ -895,14 +896,19 @@ include ArchTypeBasic
     (* add constraint so that each slot's initialized range is the subset of the slot *)
     FuncInterface.add_in_mem_range_in_off_constr smt_ctx fi;
 
-    result_non_overlap &&
-    (* <TODO> Check func type matches its interface *)
-    true &&
-    (* Check func type correctness (prop/symbolic execution) *)
-    List.fold_left2 (
-      fun (acc: bool) (block_type: t) (block: Isa.basic_block) ->
-        if not acc then acc else
-        type_prop_check_one_block smt_ctx func_interface_list func_type block_type block.insts
-    ) true func_type func
+    let result =
+      result_non_overlap &&
+      (* <TODO> Check func type matches its interface *)
+      true &&
+      (* Check func type correctness (prop/symbolic execution) *)
+      List.fold_left2 (
+        fun (acc: bool) (block_type: t) (block: Isa.basic_block) ->
+          if not acc then acc else
+          type_prop_check_one_block smt_ctx func_interface_list func_type block_type block.insts
+      ) true func_type func
+    in
+
+    SmtEmitter.pop smt_ctx 1;
+    result
 
 end
