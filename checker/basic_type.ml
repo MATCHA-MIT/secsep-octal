@@ -76,6 +76,14 @@ module DepType = struct
 
   let get_dep_var_string = SmtEmitter.expr_var_str_of_single_var
 
+  let check_map_no_top (context_var_map: map_t) : bool =
+    List.for_all (
+      fun (_, e) ->
+        match e with
+        | Exp _ -> true
+        | Top _ -> false
+    ) context_var_map
+
   let substitute_exp_t
       (ctx: context)
       (context_var_map: map_t)
@@ -154,6 +162,7 @@ module DepType = struct
           | Exp e -> if Expr.is_const e then Some e else None
       ) exp_list
     in
+    (* 1. Check all exp must be var *)
     if List.length var_list <> List.length exp_list then false else
     let dummy_list =
       List.map (
@@ -161,6 +170,7 @@ module DepType = struct
           Expr.mk_fresh_const ctx "dummy" (BitVector.mk_sort ctx (get_exp_bit_size e))
       ) var_list
     in
+    (* 2. Check no var appear in the context exp list *)
     List.for_all (
       fun (cons: exp_t) ->
         let repl_cons = Expr.substitute cons var_list dummy_list in
@@ -1138,6 +1148,37 @@ module TaintType = struct
       ) var_list
     in
     Expr.substitute e var_exp_list exp_list
+
+  let check_non_constrained_var
+      (smt_ctx: SmtEmitter.t)
+      (context: t list) (exp_list: t list) : bool =
+    let ctx, _ = smt_ctx in
+    let var_list =
+      List.filter_map (
+        fun (e: t) -> if Expr.is_const e then Some e else None
+      ) exp_list
+    in
+    (* 1. Check all exp must be var *)
+    if List.length var_list <> List.length exp_list then false else
+    let dummy_list =
+      List.map (
+        fun (_) ->
+          Expr.mk_fresh_const ctx "dummy" (Boolean.mk_sort ctx)
+      ) var_list
+    in
+    (* 2. Check no var appear in the context exp list *)
+    List.for_all (
+      fun (cons: t) ->
+        let repl_cons = Expr.substitute cons var_list dummy_list in
+        Expr.equal repl_cons cons (* cons does not contain var_list *)
+    ) context
+
+  let check_eq
+      (smt_ctx: SmtEmitter.t)
+      (exp1: t) (exp2: t) : bool =
+    SmtEmitter.check_compliance smt_ctx
+      [ Boolean.mk_eq (fst smt_ctx) exp1 exp2 ]
+    = SatYes
 
   let get_untaint_exp (ctx: context) : t =
     Boolean.mk_false ctx

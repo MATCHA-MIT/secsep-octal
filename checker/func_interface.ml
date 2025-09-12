@@ -76,13 +76,12 @@ module FuncInterface = struct
       (call_anno: CallAnno.t) : ArchTypeBasic.t option =
     (* <NOTE> <TODO> Extra child var in out_type should also be in call_anno's ctx_map *)
     (* 1. Check input type *)
-    let check_input = 
-      (* NOTE: for func call check, we do not check callee-saved reg's valid region since from the callee's view, 
-        the callee-saved reg can be instantiated to any value and any taint. Hence, it is ok even the reg type is not tracked by type system (i.e., reg is invalid) *)
+    let check_input =
       (* We also check for each callee's slot s_c mapps to caller's ptr, s_c-ptr is non change exp. *)
-      ArchTypeBasic.check_subtype smt_ctx true pr_type func_interface.in_type call_anno.ctx_map (Some call_anno.mem_map)
+      ArchTypeBasic.check_subtype smt_ctx pr_type func_interface.in_type call_anno.ctx_map (Some call_anno.mem_map)
     in
-    if not check_input then None else
+    let check_anno = CallAnno.check_call_anno call_anno in
+    if not (check_input && check_anno) then None else
     (* 2. Check pr_reg in call_anno *)
     let check_pr_reg =
       RegType.check_taint_eq smt_ctx pr_type.reg_type call_anno.pr_reg
@@ -105,6 +104,21 @@ module FuncInterface = struct
 
     SmtEmitter.add_assertions smt_ctx out_dep_context;
     Printf.printf "after adding out_ctx, ctx is %s\n" (SmtEmitter.check_context smt_ctx |> SmtEmitter.sexp_of_sat_result_t |> Sexplib.Sexp.to_string_hum);
+
+    (* NOTE: we only update rsp and non-callee-saved registers here, since for those non-rsp callee-saved registers,
+      (1) their type is guaranteed to be unchanged by the callee (can be derived from the func type check for the callee, 
+          and that's why callee-saved registers has non-top dep types inside the callee)
+      (2) the callee should has no constraints on the non-rsp callee-saved register's dep and taint type
+      (3) in the func interface, we mark them as invalid and type as top (instead of type vars) 
+          to avoid arguing that why we can call a function with a callee-saved register is invalid/top
+    *)
+    let out_reg_type =
+      List.mapi (
+        fun i (in_reg, out_reg) ->
+          if IsaBasic.is_reg_idx_non_rsp_callee_saved i then in_reg
+          else out_reg
+      ) (List.combine pr_type.reg_type out_reg_type)
+    in
 
     let out_mem_opt =
       MemType.set_mem_type_with_other smt_ctx
