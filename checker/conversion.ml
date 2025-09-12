@@ -219,7 +219,7 @@ let convert_taint_type
       Z3.Boolean.mk_or ctx t_list
     end
   | TaintUnknown ->
-    Z3.Boolean.mk_const_s ctx "t_unknown"
+    Z3.Boolean.mk_true ctx
 
 let convert_basic_type
     (ctx: Z3.context)
