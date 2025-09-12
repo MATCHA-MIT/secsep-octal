@@ -49,13 +49,12 @@ module ArchTypeBasic = struct
       RegType.t * FlagType.t * MemType.t * BasicType.ctx_t =
     let ctx, _ = smt_ctx in
     let dep_ctx_map, taint_ctx_map = ctx_map in
-    (*
+    
     Printf.printf "dep_ctx_map:\n%s\n" (DepType.sexp_of_map_t dep_ctx_map |> Sexplib.Sexp.to_string_hum);
     Printf.printf "taint_ctx_map:\n%s\n" (TaintType.sexp_of_map_t taint_ctx_map |> Sexplib.Sexp.to_string_hum);
-    *)
+   
     let dep_sub_helper = DepType.substitute_exp_t ctx dep_ctx_map in
     let dep_exp_sub_func = DepType.substitute_exp_exp dep_sub_helper in
-    let dep_exp_sub_opt_func = DepType.substitute_exp_exp_opt dep_sub_helper in
     let dep_sub_func = DepType.substitute dep_sub_helper in
     let taint_sub_func = TaintType.substitute ctx taint_ctx_map in
     let basic_sub_func = BasicType.substitute dep_sub_func taint_sub_func in
@@ -74,13 +73,12 @@ module ArchTypeBasic = struct
           basic_sub_func entry
       ) a_type.mem_type
     in
-    let dep_context = List.filter_map dep_exp_sub_opt_func (fst a_type.context) in
+    let dep_context = List.map dep_exp_sub_func (fst a_type.context) in
     let taint_context = List.map taint_sub_func (snd a_type.context) in
     reg_type, flag_type, mem_type, (dep_context, taint_context)
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
-      (skip_check_callee_saved_range: bool)
       (sub_a_type: t) (sup_a_type: t)
       (ctx_map: BasicType.map_t)
       (mem_map_opt: MemAnno.slot_t MemType.mem_content option) : bool =
@@ -107,7 +105,7 @@ module ArchTypeBasic = struct
 
     (* 2. check subtype relation of each reg/flag/mem slot *)
     let is_non_change_exp = DepChangeCtx.check_non_change_exp smt_ctx sub_a_type.change_info.change_copy_map in
-    let reg_check = RegType.check_subtype smt_ctx skip_check_callee_saved_range is_non_change_exp sub_a_type.reg_type sup_reg_type in
+    let reg_check = RegType.check_subtype smt_ctx is_non_change_exp sub_a_type.reg_type sup_reg_type in
     let flag_check = FlagType.check_subtype smt_ctx is_non_change_exp sub_a_type.flag_type sup_flag_type in
     let mem_check = MemType.check_subtype 
       smt_ctx is_non_change_exp
