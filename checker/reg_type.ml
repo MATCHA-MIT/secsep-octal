@@ -133,7 +133,6 @@ include RegTypeBasic
 
   let check_subtype
       (smt_ctx: SmtEmitter.t)
-      (skip_check_callee_saved_range: bool)
       (is_non_change_exp: DepType.exp_t -> bool)
       (sub_r_type: t) (sup_r_type: t) : bool =
     Printf.printf "%s\n" (Sexplib.Sexp.to_string_hum (sexp_of_t sub_r_type));
@@ -152,10 +151,7 @@ include RegTypeBasic
               (DepType.get_bit_size (fst sup_entry))
               curr;
           if not curr then failwith (Printf.sprintf "reg subtype check at reg %d" cnt);
-          let range_check = 
-            (skip_check_callee_saved_range && IsaBasic.is_reg_idx_callee_saved cnt) || 
-            RegRange.check_subtype sub_range sup_range 
-          in
+          let range_check = RegRange.check_subtype sub_range sup_range in
           if not range_check then
             Printf.printf "sub_range: %s sup_range: %s\n" 
               (Sexplib.Sexp.to_string_hum (sexp_of_range_t sub_range))
