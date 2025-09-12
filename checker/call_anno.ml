@@ -26,4 +26,7 @@ module CallAnno = struct
     mem_map = [];
   }
 
+  let check_call_anno (anno: t) : bool =
+    DepType.check_map_no_top (fst anno.ctx_map)
+
 end
