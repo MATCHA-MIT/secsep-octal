@@ -278,6 +278,9 @@ module IsaBasic = struct
   let is_reg_idx_callee_saved (r_idx: int) : bool =
     List.mem r_idx callee_saved_reg_idx
 
+  let is_reg_idx_non_rsp_callee_saved (r_idx: int) : bool =
+    r_idx <> rsp_idx && is_reg_idx_callee_saved r_idx
+
   let is_reg_callee_saved (r: register) : bool =
     is_reg_idx_callee_saved (get_reg_idx r)
 

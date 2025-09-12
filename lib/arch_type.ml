@@ -2,6 +2,7 @@ open Pretty_print
 open Entry_type
 open Cond_type_new
 open Single_context
+open Reg_range
 open Reg_type_new
 open Mem_offset_new
 open Mem_type_new
@@ -175,7 +176,14 @@ module ArchType (Entry: EntryType) = struct
       (prop_mode: prop_mode_t)
       : t =
     let _, reg_type = RegType.init_reg_type start_var in
-    let reg_type = List.combine (List.split func_input_reg |> fst) (List.split reg_type |> snd) in
+    (* Another fence to prevent introducing input variables that are not useful and might be mapped to top and appear in context and cause error in checker *)
+    let reg_type =
+      List.map2 (
+        fun (valid, _) (_, reg) ->
+          if RegRange.is_empty_range valid then valid, Entry.get_top_type ()
+          else valid, reg
+      ) func_input_reg reg_type
+    in
     (* Printf.printf "BB %s vars for reg: [%s, %s)\n" label (Entry.to_string start_var) (Entry.to_string idx0); *)
     {
       label = label;
@@ -1361,10 +1369,10 @@ module ArchType (Entry: EntryType) = struct
       | _ -> SingleTop
     in *)
 
-    let in_reg = in_state.reg_type in
+    let in_reg = in_state.reg_type |> RegType.clear_non_rsp_callee_saved_registers in
     let in_mem = MemType.merge_local_mem_quick_cmp smt_ctx in_state.mem_type in
 
-    let out_reg = RegType.map (sub_sol out_state.pc) out_state.reg_type in
+    let out_reg = RegType.map (sub_sol out_state.pc) out_state.reg_type |> RegType.clear_non_rsp_callee_saved_registers in
     let out_mem = MemType.map (sub_sol out_state.pc) (MemType.merge_local_mem_quick_cmp smt_ctx out_state.mem_type) in
     let out_context = List.filter_map (fun (context_entry: SingleContext.t) ->
       SingleContext.sub_sol_and_filter (sub_sol_single out_state.pc) context_entry

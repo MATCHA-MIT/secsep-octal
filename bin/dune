@@ -1,5 +1,6 @@
 (executables
  (public_names 
+  gen_general_interface
   preprocess_input
   infer_single
   infer_range
@@ -11,6 +12,7 @@
   stat_asm
   )
  (names 
+  gen_general_interface
   preprocess_input
   infer_single
   infer_range

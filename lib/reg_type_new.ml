@@ -175,4 +175,19 @@ module RegType (Entry: EntryType) = struct
         RegRange.get_ret_range i, e
     ) reg_type
 
+  let clear_invalid_reg (reg_type: t) : t =
+    List.map (
+      fun (valid, e) ->
+        if RegRange.is_empty_range valid then valid, Entry.get_top_taint_type ()
+        else valid, e
+    ) reg_type
+
+  let clear_non_rsp_callee_saved_registers (reg_type: t) : t =
+    List.mapi (
+      fun i valid_reg_type ->
+        if IsaBasic.is_reg_idx_non_rsp_callee_saved i then
+          RegRange.get_empty_range (), Entry.get_top_taint_type ()
+        else valid_reg_type
+    ) reg_type
+
 end

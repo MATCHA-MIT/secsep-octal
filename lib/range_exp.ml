@@ -17,11 +17,12 @@ module RangeExp = struct
     | Top
   [@@deriving sexp]
 
-  let has_top (r: t) : bool =
+  let has_top ?(naive_check=true) (r: t) : bool =
+    let helper = SingleExp.has_top ~naive_check in
     match r with
-    | Single e -> e = SingleTop
-    | Range (l, r, _) -> l = SingleTop || r = SingleTop
-    | SingleSet e_list -> List.find_opt (fun e -> e = SingleExp.SingleTop) e_list <> None
+    | Single e -> helper e
+    | Range (l, r, _) -> helper l || helper r
+    | SingleSet e_list -> List.find_opt (fun e -> helper e) e_list <> None
     | Top -> true
 
   let cmp (r1: t) (r2: t) : int =

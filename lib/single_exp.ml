@@ -95,6 +95,19 @@ include SingleExpBasic
         ) x;
       ) s
 
+  let has_top ?(naive_check=true) (e: t) : bool =
+    let rec has_top_helper (e: t) : bool =
+      match e with
+      | SingleTop -> true
+      | SingleConst _ | SingleVar _ -> false
+      | SingleBExp (_, l, r) -> has_top_helper l || has_top_helper r
+      | SingleUExp (_, e) -> has_top_helper e
+      | SingleITE ((_, cl, cr), l, r) -> 
+        has_top_helper cl || has_top_helper cr || has_top_helper l || has_top_helper r
+    in
+    if naive_check then e = SingleTop
+    else has_top_helper e
+
   let rec cmp_list_helper (e1: t list) (e2: t list) : int =
     match e1, e2 with
     | [], [] -> 0

@@ -65,11 +65,11 @@ module SingleSol = struct
     | SolCond (pc, e1, e2, e3) -> 
       Printf.sprintf "SolCond (%d, %s, %s, %s)" pc (RangeExp.to_ocaml_string e1) (RangeExp.to_ocaml_string e2) (RangeExp.to_ocaml_string e3)
 
-  let has_top (s: t) : bool =
+  let has_top ?(naive_check=true) (s: t) : bool =
     match s with
     | SolNone | SolSimple Top -> true
-    | SolSimple r -> RangeExp.has_top r
-    | SolCond (_, r1, r2, r3) -> RangeExp.has_top r1 || RangeExp.has_top r2 || RangeExp.has_top r3
+    | SolSimple r -> RangeExp.has_top ~naive_check r
+    | SolCond (_, r1, r2, r3) -> RangeExp.has_top ~naive_check r1 || RangeExp.has_top ~naive_check r2 || RangeExp.has_top ~naive_check r3
 
   let is_single_set_sol (s: t) : bool =
     match s with
@@ -2596,7 +2596,7 @@ module SingleSubtype = struct
 
   let remove_top_subtype
       (tv_rel_list: t) : t =
-    List.filter (fun (x: type_rel) -> SingleSol.has_top x.sol |> not) tv_rel_list
+    List.filter (fun (x: type_rel) -> SingleSol.has_top ~naive_check:false x.sol |> not) tv_rel_list
 
   let combine_loop_cond_sol_map
       (old_tv_rel_list: t)

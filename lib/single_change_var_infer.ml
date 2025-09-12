@@ -2,6 +2,7 @@ open Isa_basic
 open Single_exp
 open Range_exp
 open Reg_range
+open Single_context
 open Single_subtype
 open Single_type_infer
 open Taint_type_infer
@@ -221,5 +222,23 @@ module SingleChangeVarInfer = struct
         { a_type with 
           change_var = change_var_set, change_var_ptr_map }
     ) a_type_list
+
+  let update_func_interface
+      (get_change_var: string -> IntSet.t option)
+      (interface_list: TaintTypeInfer.FuncInterface.t list) : TaintTypeInfer.FuncInterface.t list =
+    List.map (
+      fun (interface: TaintTypeInfer.FuncInterface.t) ->
+        match get_change_var interface.func_name with
+        | None -> interface
+        | Some in_change_var ->
+          (* Should not just arbitrarily remove change var!!! This will make it harder to argue that the func_interface makes sense *)
+          let in_single_var_set =
+            let helper acc (reg, _) = IntSet.union acc (SingleExp.get_vars reg) in
+            let acc = TaintTypeInfer.ArchType.RegType.fold_left helper IntSet.empty interface.in_reg in
+            let acc = TaintTypeInfer.ArchType.MemType.fold_left helper acc interface.in_mem in
+            List.fold_left (fun acc cons -> IntSet.union acc (SingleContext.get_vars cons)) acc interface.in_context
+          in
+          { interface with in_change_var = IntSet.inter in_single_var_set in_change_var }
+    ) interface_list
 
 end

@@ -34,13 +34,15 @@ let () =
   let interface_list = Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_from_file
       (get_related_filename !program_name "out" "interface")
   in
-  let interface_list = List.map (
-    fun (interface: Taint_type_infer.TaintTypeInfer.FuncInterface.t) ->
-      match List.find_opt (fun (tti: Taint_type_infer.TaintTypeInfer.t) -> tti.func_name = interface.func_name) tti_list with
-      | None -> interface
-      | Some tti -> { interface with in_change_var = fst ((List.hd tti.func_type).change_var) }
-  ) interface_list
+  let get_in_change_var_helper (func_name: string) = 
+    List.find_map (
+      fun (tti: Taint_type_infer.TaintTypeInfer.t) -> 
+        if tti.func_name = func_name then 
+          Some (fst (List.hd tti.func_type).change_var)
+        else None
+    ) tti_list
   in
+  let interface_list = Single_change_var_infer.SingleChangeVarInfer.update_func_interface get_in_change_var_helper interface_list in
   Taint_type_infer.TaintTypeInfer.FuncInterface.interface_list_to_file (get_related_filename !program_name "out" "interface") interface_list;
 
   let end_time = Sys.time () in

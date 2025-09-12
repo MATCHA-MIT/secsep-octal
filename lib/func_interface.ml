@@ -222,6 +222,7 @@ module FuncInterface (Entry: EntryType) = struct
 
   let set_reg_type
       (var_map: Entry.local_var_map_t)
+      (parent_reg: RegType.t)
       (child_reg: RegType.t) : RegType.t =
     let helper (reg_out: entry_t) : entry_t =
       if Entry.is_val2 var_map reg_out then
@@ -233,7 +234,12 @@ module FuncInterface (Entry: EntryType) = struct
         Entry.get_top_type ()
       end
     in
-    RegType.map helper child_reg
+    let out_reg = RegType.map helper child_reg in
+    List.mapi (
+      fun i (orig_reg, out_reg) ->
+        if IsaBasic.is_reg_idx_non_rsp_callee_saved i then orig_reg
+        else out_reg
+    ) (List.combine parent_reg out_reg)
 
   let set_one_entry
       (smt_ctx: SmtEmitter.t)
@@ -537,7 +543,7 @@ module FuncInterface (Entry: EntryType) = struct
     (* Printf.printf "!!! set_reg_type\n"; *)
     RegType.pp_reg_type 0 child_out_reg;
     Entry.pp_local_var 0 var_map;
-    let reg_type = set_reg_type var_map child_out_reg in
+    let reg_type = set_reg_type var_map parent_reg child_out_reg in
     (* Printf.printf "!!! set_mem_type\n"; *)
     let mem_type, constraint_list, write_useful_vars = 
       set_mem_type smt_ctx sub_sol_func sub_sol_list_func (single_var_map, single_var_set, var_map) parent_mem mem_read_hint child_out_mem in

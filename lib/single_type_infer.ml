@@ -604,9 +604,11 @@ module SingleTypeInfer = struct
   let remove_top_var_func_type 
       (input_var_set: IntSet.t) (single_subtype: SingleSubtype.t)
       (func_type: ArchType.t list) : ArchType.t list =
+    let useful_var = List.fold_left (fun acc (a_type: ArchType.t) -> IntSet.union acc a_type.useful_var) IntSet.empty func_type in
     let non_top_var =
       List.map (fun (tv_rel: SingleSubtype.type_rel) -> fst tv_rel.var_idx) single_subtype
       |> IntSet.of_list |> IntSet.union input_var_set
+      |> IntSet.inter useful_var
     in
     let unused_to_top (non_top_var: IntSet.t) (e: SingleEntryType.t) : SingleEntryType.t =
       if SingleEntryType.is_val non_top_var e then e
